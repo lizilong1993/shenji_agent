@@ -1,0 +1,251 @@
+{
+    "机动": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 1,
+        "move_path": "机动路径 list(int)"
+    },
+    "射击": {
+        "actor": "int 动作发出者",
+        "obj_id": "攻击算子ID int",
+        "type": 2,
+        "target_obj_id": "目标算子ID",
+        "weapon_id": "武器ID int"
+    },
+    "上车": {
+        "actor": "int 动作发出者",
+        "obj_id": "乘员算子ID int",
+        "type": 3,
+        "target_obj_id": "车辆算子ID"
+    },
+    "下车": {
+        "actor": "int 动作发出者",
+        "obj_id": "车辆算子ID int",
+        "type": 4,
+        "target_obj_id": "乘员算子ID"
+    },
+    "夺控": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 5
+    },
+    "切换状态": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 6,
+        "target_state": "目标状态 0-正常机动 1-行军 2-一级冲锋 3-二级冲锋, 4-掩蔽, 5-半速机动"
+    },
+    "移除压制": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 7
+    },
+    "间瞄射击": {
+        "actor": "int 动作发出者",
+        "obj_id": "攻击算子ID int",
+        "type": 8,
+        "jm_pos": "目标位置",
+        "weapon_id": "武器ID int"
+    },
+    "引导射击": {
+        "actor": "int 动作发出者",
+        "obj_id": "引导算子ID int",
+        "type": 9,
+        "target_obj_id": "目标算子ID",
+        "weapon_id": "武器ID int",
+        "guided_obj_id": "射击算子ID"
+    },
+    "停止机动": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 10
+    },
+    "武器锁定": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 11
+    },
+    "武器展开": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 12
+    },
+    "取消间瞄计划": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 13
+    },
+    "配置编组信息": {
+        "actor": "int 动作发出者席位",
+        "type": 100,
+        "info": {
+            "seat": {
+                "operators": [
+                    "int 算子id",
+                    "int 算子id"
+                ]
+            }
+        }
+    },
+    "配置角色信息": {
+        "type": 102,
+        "info": {
+            "seat": {
+                "faction": "阵营 0红 1蓝",
+                "role": "角色 0连 1营",
+                "user_id": "int user id",
+                "user_name": "string user name"
+            }
+        }
+    },
+    "作战方向": {
+        "actor": "",
+        "type": 201,
+        "info": {
+            "company_id": "命令接收编队id",
+            "target_pos": "作战方向目标点",
+            "start_time": "起始时间",
+            "end_time": "结束时间"
+        }
+    },
+    "作战任务": {
+        "actor": "",
+        "type": 200,
+        "info": {
+            "company_id": "命令接收编队id",
+            "mission_type": "int 任务类型 0-攻击，1-防御，2-侦察",
+            "target_pos": "int 作战任务目标位置",
+            "route": "途径路线",
+            "start_time": "起始时间",
+            "end_time": "结束时间"
+        }
+    },
+    "部署上车": {
+        "actor": "int 动作发出者",
+        "obj_id": "乘员算子ID int",
+        "type": 303,
+        "target_obj_id": "车辆算子ID"
+    },
+    "部署下车": {
+        "actor": "int 动作发出者",
+        "obj_id": "车辆算子ID int",
+        "type": 304,
+        "target_obj_id": "乘员算子ID"
+    },
+    "解聚": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 14
+    },
+    "聚合": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "target_obj_id": "算子ID int",
+        "type": 15
+    },
+    "部署解聚": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 314
+    },
+    "部署聚合": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "target_obj_id": "算子ID int",
+        "type": 315
+    },
+    "改变高程": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 16,
+        "target_altitude": "目标高程，20超低空，200低空"
+    },
+    "部署改变高程": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 316,
+        "target_altitude": "目标高程，20超低空，200低空"
+    },
+    "开启校射雷达": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 17
+    },
+    "进入工事": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 18,
+        "target_obj_id": "工事算子ID"
+    },
+    "退出工事": {
+        "actor": "int 动作发出者",
+        "obj_id": "算子ID int",
+        "type": 19,
+        "target_obj_id": "工事算子ID"
+    },
+    "布雷": {
+        "actor": "int 动作发出者",
+        "obj_id": "布雷车算子ID int",
+        "type": 20,
+        "target_pos": "布雷坐标 int"
+    },
+    "导演击杀算子": {
+        "actor": "int",
+        "type": 401,
+        "target_obj_id": "击杀算子id"
+    },
+    "导演布雷": {
+        "actor": "int",
+        "type": 402,
+        "target_pos": "布雷坐标"
+    },
+    "导演建造路障": {
+        "actor": "int",
+        "type": 403,
+        "target_pos": "路障坐标"
+    },
+    "导演增加算子": {
+        "actor": "int",
+        "type": 404,
+        "sub_type": "算子sub_type",
+        "color": "0红, 1蓝",
+        "hex": "空降位置"
+    },
+    "发送自定义字符串消息": {
+        "actor": "int 动作放出者",
+        "type": 204,
+        "to_all": "0-发给队友，1-发给全部",
+        "msg_type": 1,
+        "msg_body": "custoum strings, up to 100 characters in Chinese and 50 words in English"
+    },
+    "发送预测算子位置消息": {
+        "actor": "int 动作放出者",
+        "type": 204,
+        "to_all": "0-发给队友，1-发给全部",
+        "msg_type": 2,
+        "msg_body": {
+            "被预测的a算子的id": [
+                {
+                    "hex": "预测a算子到达地点1",
+                    "per": "预测概率",
+                    "time": "预测到达时间"
+                },
+                {
+                    "hex": "预测a算子到达地点2",
+                    "per": "预测概率",
+                    "time": "预测到达时间"
+                },
+                {
+                    "hex": "预测a算子到达地点3",
+                    "per": "预测概率",
+                    "time": "预测到达时间"
+                }
+            ]
+        },
+        "display_duration": "动效展示时长"
+    },
+    "结束部署": {
+        "actor": "int",
+        "type": 333
+    }
+}

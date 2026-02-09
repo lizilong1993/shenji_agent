@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  miaosuan-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: miaosuan-ai:latest
+    container_name: miaosuan-ai-dev
+    
+    # 挂载卷（方便开发时实时同步代码）
+    volumes:
+      # 代码目录挂载（开发时使用）
+      - ./land_wargame_sdk/ai:/workspace/ai:ro
+      - ./land_wargame_sdk/run_offline_games.py:/workspace/run_offline_games.py:ro
+      # 数据目录挂载
+      - ./land_wargame_sdk/Data:/workspace/data:ro
+      # 日志输出目录
+      - ./logs:/workspace/logs
+      # 复盘文件输出
+      - ./replays:/workspace/logs/replays
+    
+    # 保持容器运行（方便进入调试）
+    stdin_open: true
+    tty: true
+    
+    # 工作目录
+    working_dir: /workspace
+    
+    # 默认保持运行，可以进入容器
+    command: /bin/bash
+    
+    # 资源限制（根据机器配置调整）
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+  # 快速运行模式（执行一次推演）
+  miaosuan-run:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: miaosuan-ai:latest
+    container_name: miaosuan-ai-run
+    volumes:
+      - ./land_wargame_sdk/ai:/workspace/ai:ro
+      - ./land_wargame_sdk/run_offline_games.py:/workspace/run_offline_games.py:ro
+      - ./land_wargame_sdk/Data:/workspace/data:ro
+      - ./logs:/workspace/logs
+      - ./replays:/workspace/logs/replays
+    command: python run_offline_games.py
+    profiles:
+      - run

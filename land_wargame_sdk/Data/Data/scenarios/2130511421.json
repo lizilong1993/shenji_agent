@@ -1,0 +1,2486 @@
+{
+    "scenario_id": 2130511421,
+    "operators": [
+        {
+            "obj_id": 0,
+            "color": 0,
+            "type": 2,
+            "name": "重型坦克",
+            "sub_type": 0,
+            "basic_speed": 36,
+            "armor": 4,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                37,
+                43,
+                84
+            ],
+            "remain_bullet_nums": {
+                "0": 30,
+                "100": 3,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 2927,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 100,
+            "color": 0,
+            "type": 2,
+            "name": "中型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                56,
+                73
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 6,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 7,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 2926,
+            "blood": 4,
+            "max_blood": 4,
+            "loading_capacity": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [
+                700,
+                701
+            ],
+            "launch_ids": [
+                400,
+                200
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 200,
+            "color": 0,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 2926,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": 100,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 400,
+            "color": 0,
+            "type": 2,
+            "name": "无人战车",
+            "sub_type": 4,
+            "basic_speed": 36,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                56,
+                74
+            ],
+            "remain_bullet_nums": {
+                "0": 20,
+                "100": 0,
+                "101": 2,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 5,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 2926,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": 100,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 700,
+            "color": 0,
+            "type": 3,
+            "name": "巡飞弹",
+            "sub_type": 7,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                76
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 1
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 2926,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 1,
+            "car": 100,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 701,
+            "color": 0,
+            "type": 3,
+            "name": "巡飞弹",
+            "sub_type": 7,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                76
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 1
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 2926,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 1,
+            "car": 100,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 1,
+            "color": 0,
+            "type": 2,
+            "name": "重型坦克",
+            "sub_type": 0,
+            "basic_speed": 36,
+            "armor": 4,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                37,
+                43,
+                84
+            ],
+            "remain_bullet_nums": {
+                "0": 30,
+                "100": 3,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 3722,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 101,
+            "color": 0,
+            "type": 2,
+            "name": "中型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                56,
+                73
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 6,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 7,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 3822,
+            "blood": 4,
+            "max_blood": 4,
+            "loading_capacity": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [
+                702,
+                703
+            ],
+            "launch_ids": [
+                201,
+                401
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 201,
+            "color": 0,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 3822,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": 101,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 401,
+            "color": 0,
+            "type": 2,
+            "name": "无人战车",
+            "sub_type": 4,
+            "basic_speed": 36,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                56,
+                74
+            ],
+            "remain_bullet_nums": {
+                "0": 20,
+                "100": 0,
+                "101": 2,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 5,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 3822,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": 101,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 702,
+            "color": 0,
+            "type": 3,
+            "name": "巡飞弹",
+            "sub_type": 7,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                76
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 1
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 3822,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 1,
+            "car": 101,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 703,
+            "color": 0,
+            "type": 3,
+            "name": "巡飞弹",
+            "sub_type": 7,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                76
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 1
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 3822,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 1,
+            "car": 101,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 2,
+            "color": 0,
+            "type": 2,
+            "name": "重型坦克",
+            "sub_type": 0,
+            "basic_speed": 36,
+            "armor": 4,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                37,
+                43,
+                84
+            ],
+            "remain_bullet_nums": {
+                "0": 30,
+                "100": 3,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4421,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 102,
+            "color": 0,
+            "type": 2,
+            "name": "中型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                56,
+                73
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 6,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 7,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 4420,
+            "blood": 4,
+            "max_blood": 4,
+            "loading_capacity": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [
+                704,
+                705
+            ],
+            "launch_ids": [
+                202,
+                402
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 202,
+            "color": 0,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 4420,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": 102,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 402,
+            "color": 0,
+            "type": 2,
+            "name": "无人战车",
+            "sub_type": 4,
+            "basic_speed": 36,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                56,
+                74
+            ],
+            "remain_bullet_nums": {
+                "0": 20,
+                "100": 0,
+                "101": 2,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 5,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4420,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": 102,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 704,
+            "color": 0,
+            "type": 3,
+            "name": "巡飞弹",
+            "sub_type": 7,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                76
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 1
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4420,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 1,
+            "car": 102,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 705,
+            "color": 0,
+            "type": 3,
+            "name": "巡飞弹",
+            "sub_type": 7,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                76
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 1
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4420,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 1,
+            "car": 102,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 3,
+            "color": 0,
+            "type": 2,
+            "name": "重型坦克",
+            "sub_type": 0,
+            "basic_speed": 36,
+            "armor": 4,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                37,
+                43,
+                84
+            ],
+            "remain_bullet_nums": {
+                "0": 30,
+                "100": 3,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5421,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 103,
+            "color": 0,
+            "type": 2,
+            "name": "中型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                56,
+                73
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 6,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 7,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 5320,
+            "blood": 4,
+            "max_blood": 4,
+            "loading_capacity": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [
+                706,
+                707
+            ],
+            "launch_ids": [
+                203,
+                403
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 203,
+            "color": 0,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 5320,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": 103,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 403,
+            "color": 0,
+            "type": 2,
+            "name": "无人战车",
+            "sub_type": 4,
+            "basic_speed": 36,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                56,
+                74
+            ],
+            "remain_bullet_nums": {
+                "0": 20,
+                "100": 0,
+                "101": 2,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 5,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5320,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 0,
+            "car": null,
+            "launcher": 103,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 706,
+            "color": 0,
+            "type": 3,
+            "name": "巡飞弹",
+            "sub_type": 7,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                76
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 1
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5320,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 1,
+            "car": 103,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 707,
+            "color": 0,
+            "type": 3,
+            "name": "巡飞弹",
+            "sub_type": 7,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 1,
+            "stack": 0,
+            "carry_weapon_ids": [
+                76
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 1
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5320,
+            "blood": 4,
+            "max_blood": 4,
+            "on_board": 1,
+            "car": 103,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 600,
+            "color": 0,
+            "type": 3,
+            "name": "武装直升机",
+            "sub_type": 6,
+            "basic_speed": 200,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                56,
+                43,
+                73
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 6,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4413,
+            "blood": 1,
+            "max_blood": 1,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 601,
+            "color": 0,
+            "type": 3,
+            "name": "武装直升机",
+            "sub_type": 6,
+            "basic_speed": 200,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                56,
+                43,
+                73
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 6,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4513,
+            "blood": 1,
+            "max_blood": 1,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 500,
+            "color": 0,
+            "type": 3,
+            "name": "无人机",
+            "sub_type": 5,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 1,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4414,
+            "blood": 1,
+            "max_blood": 1,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 501,
+            "color": 0,
+            "type": 3,
+            "name": "无人机",
+            "sub_type": 5,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 1,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4514,
+            "blood": 1,
+            "max_blood": 1,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 300,
+            "color": 0,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4112,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 301,
+            "color": 0,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4113,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 302,
+            "color": 0,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4114,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 303,
+            "color": 0,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4213,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 304,
+            "color": 0,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4214,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 305,
+            "color": 0,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4215,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 4,
+            "color": 1,
+            "type": 2,
+            "name": "重型坦克",
+            "sub_type": 0,
+            "basic_speed": 36,
+            "armor": 4,
+            "A1": 1,
+            "stack": 1,
+            "carry_weapon_ids": [
+                36,
+                43
+            ],
+            "remain_bullet_nums": {
+                "0": 30,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 3951,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 104,
+            "color": 1,
+            "type": 2,
+            "name": "重型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 3,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                54,
+                56,
+                69
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 8,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 3952,
+            "blood": 3,
+            "max_blood": 3,
+            "loading_capacity": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [
+                204
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 105,
+            "color": 1,
+            "type": 2,
+            "name": "重型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 3,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                54,
+                56,
+                69
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 8,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 4052,
+            "blood": 3,
+            "max_blood": 3,
+            "loading_capacity": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [
+                205
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 204,
+            "color": 1,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 3952,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": 104,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 205,
+            "color": 1,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 4052,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": 105,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 5,
+            "color": 1,
+            "type": 2,
+            "name": "重型坦克",
+            "sub_type": 0,
+            "basic_speed": 36,
+            "armor": 4,
+            "A1": 1,
+            "stack": 1,
+            "carry_weapon_ids": [
+                36,
+                43
+            ],
+            "remain_bullet_nums": {
+                "0": 30,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4248,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 106,
+            "color": 1,
+            "type": 2,
+            "name": "重型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 3,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                54,
+                56,
+                69
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 8,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 4249,
+            "blood": 3,
+            "max_blood": 3,
+            "loading_capacity": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [
+                206
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 107,
+            "color": 1,
+            "type": 2,
+            "name": "重型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 3,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                54,
+                56,
+                69
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 8,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 4348,
+            "blood": 3,
+            "max_blood": 3,
+            "loading_capacity": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [
+                207
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 206,
+            "color": 1,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 4249,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": 106,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 207,
+            "color": 1,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 4348,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": 107,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 6,
+            "color": 1,
+            "type": 2,
+            "name": "重型坦克",
+            "sub_type": 0,
+            "basic_speed": 36,
+            "armor": 4,
+            "A1": 1,
+            "stack": 1,
+            "carry_weapon_ids": [
+                36,
+                43
+            ],
+            "remain_bullet_nums": {
+                "0": 30,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 4751,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 108,
+            "color": 1,
+            "type": 2,
+            "name": "重型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 3,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                54,
+                56,
+                69
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 8,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 4752,
+            "blood": 3,
+            "max_blood": 3,
+            "loading_capacity": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [
+                208
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 109,
+            "color": 1,
+            "type": 2,
+            "name": "重型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 3,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                54,
+                56,
+                69
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 8,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 4852,
+            "blood": 3,
+            "max_blood": 3,
+            "loading_capacity": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [
+                209
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 208,
+            "color": 1,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 4752,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": 108,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 209,
+            "color": 1,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 4852,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": 109,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 7,
+            "color": 1,
+            "type": 2,
+            "name": "重型坦克",
+            "sub_type": 0,
+            "basic_speed": 36,
+            "armor": 4,
+            "A1": 1,
+            "stack": 1,
+            "carry_weapon_ids": [
+                36,
+                43
+            ],
+            "remain_bullet_nums": {
+                "0": 30,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5549,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 110,
+            "color": 1,
+            "type": 2,
+            "name": "重型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 3,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                54,
+                56,
+                69
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 8,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 5550,
+            "blood": 3,
+            "max_blood": 3,
+            "loading_capacity": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [
+                210
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 111,
+            "color": 1,
+            "type": 2,
+            "name": "重型战车",
+            "sub_type": 1,
+            "basic_speed": 36,
+            "armor": 3,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                43,
+                54,
+                56,
+                69
+            ],
+            "remain_bullet_nums": {
+                "0": 40,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 8,
+            "valid_passenger_types": [
+                2,
+                4,
+                7,
+                16
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2,
+                "16": 1
+            },
+            "cur_hex": 5650,
+            "blood": 3,
+            "max_blood": 3,
+            "loading_capacity": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [
+                211
+            ],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 210,
+            "color": 1,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 5550,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": 110,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 211,
+            "color": 1,
+            "type": 1,
+            "name": "步兵小队",
+            "sub_type": 2,
+            "basic_speed": 5,
+            "armor": 0,
+            "A1": 0,
+            "stack": 1,
+            "carry_weapon_ids": [
+                29,
+                35,
+                71
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 4,
+            "valid_passenger_types": [
+                7
+            ],
+            "max_passenger_nums": {
+                "2": 1,
+                "4": 1,
+                "7": 2
+            },
+            "cur_hex": 5650,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": 111,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 602,
+            "color": 1,
+            "type": 3,
+            "name": "武装直升机",
+            "sub_type": 6,
+            "basic_speed": 200,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                56,
+                43,
+                73
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5255,
+            "blood": 1,
+            "max_blood": 1,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 603,
+            "color": 1,
+            "type": 3,
+            "name": "武装直升机",
+            "sub_type": 6,
+            "basic_speed": 200,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                56,
+                43,
+                73
+            ],
+            "remain_bullet_nums": {
+                "0": 10,
+                "100": 4,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 10,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5256,
+            "blood": 1,
+            "max_blood": 1,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 502,
+            "color": 1,
+            "type": 3,
+            "name": "无人机",
+            "sub_type": 5,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 1,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5155,
+            "blood": 1,
+            "max_blood": 1,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 503,
+            "color": 1,
+            "type": 3,
+            "name": "无人机",
+            "sub_type": 5,
+            "basic_speed": 100,
+            "armor": 0,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 1,
+            "value": 1,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5156,
+            "blood": 1,
+            "max_blood": 1,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 306,
+            "color": 1,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5455,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 307,
+            "color": 1,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5456,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 308,
+            "color": 1,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5457,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 309,
+            "color": 1,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5555,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 310,
+            "color": 1,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5556,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        },
+        {
+            "obj_id": 311,
+            "color": 1,
+            "type": 2,
+            "name": "炮兵",
+            "sub_type": 3,
+            "basic_speed": 36,
+            "armor": 2,
+            "A1": 0,
+            "stack": 0,
+            "carry_weapon_ids": [
+                72
+            ],
+            "remain_bullet_nums": {
+                "0": 0,
+                "100": 0,
+                "101": 0,
+                "102": 0
+            },
+            "guide_ability": 0,
+            "value": 0,
+            "valid_passenger_types": [],
+            "max_passenger_nums": {},
+            "cur_hex": 5557,
+            "blood": 3,
+            "max_blood": 3,
+            "on_board": 0,
+            "car": null,
+            "launcher": null,
+            "passenger_ids": [],
+            "launch_ids": [],
+            "weapon_unfold_state": 1
+        }
+    ],
+    "time": {
+        "cur_step": 0,
+        "tick": 1.0,
+        "max_time": 2880
+    },
+    "cities": [
+        {
+            "coord": 5140,
+            "value": 80,
+            "flag": -1,
+            "name": "主要夺控点"
+        },
+        {
+            "coord": 4838,
+            "value": 80,
+            "flag": -1,
+            "name": "主要夺控点"
+        },
+        {
+            "coord": 5144,
+            "value": 80,
+            "flag": -1,
+            "name": "主要夺控点"
+        },
+        {
+            "coord": 4942,
+            "value": 50,
+            "flag": -1,
+            "name": "次要夺控点"
+        },
+        {
+            "coord": 4341,
+            "value": 50,
+            "flag": -1,
+            "name": "次要夺控点"
+        },
+        {
+            "coord": 5038,
+            "value": 50,
+            "flag": -1,
+            "name": "次要夺控点"
+        },
+        {
+            "coord": 5539,
+            "value": 50,
+            "flag": -1,
+            "name": "次要夺控点"
+        }
+    ]
+}
