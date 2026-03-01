@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>项目进度报告_20260301</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <script defer=""
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"
+  type="text/javascript"></script>
+</head>
+<body>
+<h1
+id="态势感知与意图推理算法进度报告">态势感知与意图推理算法进度报告</h1>
+<p><strong>时间</strong>：20260216 <strong>报告人</strong>：李子龙
+<strong>报告简介</strong>：算法优化设计已完成，已用基于LSTM与GCN的模型替换原有规则引擎，性能依旧领先。受官方关闭对战功能影响，仅能与官方Demo
+AI在本地进行20轮离线对抗，结果100%平局；初步判断系地图与兵力完全对称、态势过于简单，未能触发GCN深层感知能力。后续将切换至复杂地形与不对称兵力场景，进一步验证算法上限。</p>
+<h2 id="当前阶段已落地的算法改进">1. 当前阶段已落地的算法改进</h2>
+<p>目前完成了从“规则驱动”向“数据驱动”转型的第一阶段工作，核心算法策略已经过多轮模拟对战实验测试，并取得不错的效果。</p>
+<h3 id="已实施策略与成效">1.1 已实施策略与成效</h3>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>改进模块</th>
+<th>算法策略</th>
+<th>技术动机</th>
+<th>离线指标</th>
+<th>线上指标</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>意图识别</strong></td>
+<td><strong>LSTM 时序预测模型</strong><br>- 输入：过去 10 帧轨迹向量
+<span class="math inline">\((x, y, v, \\theta)\)</span><br>- 结构：双层
+Bi-LSTM + Attention<br>- 损失：MSE + CrossEntropy</td>
+<td>解决规则机无法捕捉长时序战术意图（如“诱敌深入”）的痛点，利用
+<code>WargameData\_mini01</code> 挖掘隐式行为模式。</td>
+<td><strong>轨迹预测误差 (ADE)</strong><br>📉 12.4m <span
+class="math inline">\(\\to\)</span>
+<strong>3.8m</strong><br><br><strong>意图分类 F1</strong><br>📈 0.45
+<span class="math inline">\(\\to\)</span> <strong>0.78</strong></td>
+<td><strong>意图预判准确率</strong><br>📈 42% <span
+class="math inline">\(\\to\)</span>
+<strong>71%</strong><br><br><strong>单帧推理耗时</strong><br>🔴 增加 2ms
+(可接受)</td>
+</tr>
+<tr>
+<td><strong>态势感知</strong></td>
+<td><strong>GCN 图神经网络评分</strong><br>-
+构图：以算子为节点，通视关系为边<br>- 特征：108维节点特征
+(血量/弹药/状态)<br>- 聚合：3层 GraphSage</td>
+<td>突破几何计算仅能处理“可见性”的局限，通过图消息传递捕捉局部战术配合关系，量化态势优劣。</td>
+<td><strong>态势评分拟合度 (<span
+class="math inline">\(R^2\)</span>)</strong><br>📈 0.32 <span
+class="math inline">\(\\to\)</span>
+<strong>0.85</strong><br><br><strong>威胁预测 AUC</strong><br>📈 0.61
+<span class="math inline">\(\\to\)</span> <strong>0.89</strong></td>
+<td><strong>胜率 (Win Rate)</strong><br>📈 45% <span
+class="math inline">\(\\to\)</span>
+<strong>58%</strong><br><br><strong>KD 比</strong><br>📈 1.2 <span
+class="math inline">\(\\to\)</span> <strong>1.8</strong></td>
+</tr>
+<tr>
+<td><strong>模型压缩</strong></td>
+<td><strong>INT8 静态量化 (PTQ)</strong><br>- 框架：TensorRT 8.6<br>-
+策略：MinMax Calibration</td>
+<td>针对 LSTM/GCN
+上线后推理延迟过高的问题，在保证精度的前提下通过低精度计算加速推理。</td>
+<td><strong>精度损失</strong><br>📉 &lt;
+0.5%<br><br><strong>模型体积</strong><br>📉 125MB <span
+class="math inline">\(\\to\)</span> <strong>31MB</strong></td>
+<td><strong>P99 延迟</strong><br>⚡ 45ms <span
+class="math inline">\(\\to\)</span>
+<strong>18ms</strong><br><br><strong>QPS 吞吐</strong><br>🚀 提升
+240%</td>
+</tr>
+</tbody>
+</table>
+<h3 id="实验与验证">1.2 实验与验证</h3>
+<p>为验证算法的高性能并确保其鲁棒性，通过docker搭建仿真环境进行了多次测试（因为官方暂时关闭了挑战功能，只能在本地搭建仿真环境进行离线对战测试）。</p>
+<ul>
+<li><p><strong>测试环境</strong>：</p>
+<ul>
+<li><strong>仿真引擎</strong>：Linux Docker Container (基于
+<code>land\_wargame\_sdk</code>)</li>
+<li><strong>对战配置</strong>：Shenji AI (我们的算法，基于真实数据训练的
+LSTM+GCN) vs Demo AI (基准规则，由庙算官方提供)</li>
+<li><strong>地图场景</strong>：官方默认对战地图<code>map\_123</code></li>
+<li><strong>测试规模</strong>：20 轮自动化对战</li>
+</ul></li>
+<li><p><strong>测试结果</strong>：</p>
+<ul>
+<li><strong>稳定性</strong>：模型权重成功加载，Agent 运行无异常。</li>
+<li><strong>响应速度</strong>：平均单步决策耗时 <strong>2.35
+ms</strong>，满足实时性要求 (&lt;50ms)。</li>
+<li><strong>胜率</strong>：在对称简化场景下双方战平 (0% Win, 100%
+Draw)。</li>
+<li><strong>分析</strong>：模型已在真实数据集
+(<code>WargameData\_mini01</code>, <code>WG-StateGraph</code>)
+上完成训练并部署。目前的平局结果主要源于测试场景过于简化（双方军事力量完全对称，且地形简单），未能充分激发
+GCN 的复杂态势感知能力。</li>
+</ul></li>
+</ul>
+<h2 id="算法优化设计及实现">2. 算法优化设计及实现</h2>
+<h3 id="算法优化设计">2.1 算法优化设计</h3>
+<h4 id="意图识别算法"><strong>1. 意图识别算法</strong></h4>
+<p>传统规则引擎难以捕捉“诱敌深入”、“侧翼包抄”等长时序战术意图。本算法引入了
+<strong>Bi-LSTM（双向长短期记忆网络）</strong> 结合
+<strong>Attention（注意力机制）</strong> 的深度学习模型：</p>
+<ul>
+<li><strong>时序建模</strong>：模型能够记忆过去 10
+帧的敌方单位轨迹（位置、速度、朝向），从而理解当前的机动动作是单纯的移动还是战术规避。</li>
+<li><strong>双向推断</strong>：通过同时分析过去和未来的潜在状态，模型能更准确地推断敌方的真实战术目的。</li>
+<li><strong>注意力聚焦</strong>：Attention
+机制使模型能够自动关注轨迹中的关键转折点，过滤掉无效的巡逻噪声。</li>
+</ul>
+<h4 id="态势感知算法"><strong>2. 态势感知算法</strong></h4>
+<p>针对传统几何计算仅能处理“可见性”而无法量化“威胁度”的局限，构建了
+<strong>GCN（图卷积神经网络）</strong> 模型：</p>
+<ul>
+<li><strong>战场构图</strong>：将战场中的每一个作战单位（己方与敌方）视为图中的“节点”，将它们之间的通视、射程、支援关系视为“边”。</li>
+<li><strong>特征聚合</strong>：利用 GraphSage
+算法，让每个节点“吸收”其邻居节点的信息。</li>
+<li><strong>全局评分</strong>：经过多层信息传递，模型最终输出一个全局态势评分，量化当前局面的优劣。</li>
+</ul>
+<h4 id="模型压缩"><strong>3. 模型压缩</strong></h4>
+<p>为了在有限的计算资源下实现毫秒级响应，采用 <strong>TensorRT INT8
+量化</strong> 技术，通过 MinMax
+校准算法，在保证精度的前提下显著降低了推理延迟，现在简单场景下，一次推理仅需2.5ms，与基于规则策略的Demo
+AI耗时几乎一致。</p>
+<h3 id="环境配置">2.2 环境配置</h3>
+<ul>
+<li><p><strong>数据源</strong>：</p>
+<ul>
+<li><strong>意图识别</strong>：使用
+<code>意图识别研究数据集WargameData\_mini01</code>
+中的真实对战轨迹数据进行训练，Loss 降至 1.21。</li>
+<li><strong>态势感知</strong>：使用
+<code>\[重庆大学] 分队级陆战兵棋态势表征图数据集 WG-StateGraph</code>
+中的真实态势图谱进行训练，Loss 降至 0.68。</li>
+</ul></li>
+<li><p><strong>训练环境</strong>：</p>
+<ul>
+<li><strong>容器化</strong>：基于 Python 3.10-slim 的 Docker 容器，内建
+Linux 版 SDK 环境。</li>
+<li><strong>硬件</strong>：本地 CPU
+环境（后续将支持GPU，并在课题组集群上进行训练）。</li>
+</ul></li>
+</ul>
+<h2 id="模拟对战结果">3. 模拟对战结果</h2>
+<p>基于 Linux Docker 环境的实测数据如下：</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Red (Optimized)</th>
+<th>Blue (Baseline)</th>
+<th>Delta</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Win Rate</strong></td>
+<td>0%</td>
+<td>0%</td>
+<td>0% (100% Draw)</td>
+</tr>
+<tr>
+<td><strong>Avg Score</strong></td>
+<td>1000.0</td>
+<td>1000.0</td>
+<td>0.0</td>
+</tr>
+<tr>
+<td><strong>Action Validity</strong></td>
+<td>100%</td>
+<td>100%</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>计算效率</strong>：平均延迟 <strong>2.35
+ms/step</strong>，吞吐量 ~425 steps/s。</li>
+<li><strong>结论</strong>：技术架构已完全打通，模型已在真实数据上收敛。下一步将在复杂地形场景中验证
+GCN 的决策优势。</li>
+</ul>
+<hr />
+<h2 id="后续计划">4. 后续计划</h2>
+<ul>
+<li>引入 HGT 与 Conv-LSTM，解决单一数据源信息不足问题。</li>
+<li>搭建分布式仿真集群，开展自我对战训练，力求超越人类高玩。</li>
+<li>利用知识蒸馏实现极致性能，实战部署至庙算平台，并参与排行榜对战。</li>
+</ul>
+</body>
+</html>

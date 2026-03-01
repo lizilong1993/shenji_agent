@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  dev:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USERNAME: developer
+    image: miaosuan_dev:latest
+    container_name: miaosuan_dev_container
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONPATH=/app
+    command: tail -f /dev/null
+    network_mode: bridge
+    # ports:
+    #   - "8888:8888" # Jupyter
+    #   - "6006:6006" # TensorBoard

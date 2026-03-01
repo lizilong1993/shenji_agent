@@ -1,0 +1,9 @@
+numpy
+torch
+scipy
+pandas
+matplotlib
+tensorrt; sys_platform == "linux"
+jupyter
+tqdm
+scikit-learn

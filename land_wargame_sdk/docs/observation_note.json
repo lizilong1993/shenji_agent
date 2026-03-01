@@ -1,0 +1,190 @@
+{
+    "operators": [
+        {
+            "obj_id": "算子ID int",
+            "color": "算子阵营 0-红 1-蓝",
+            "type": "算子类型 1-步兵 2-车辆 3-飞机",
+            "name": "名称 str",
+            "sub_type": "细分类型 坦克 0/  战车1 / 人员2 / 炮兵3 / 无人战车4 / 无人机5 / 直升机6 / 巡飞弹7",
+            "basic_speed": "基础速度 int",
+            "armor": "装甲类型 int 0-无装甲 1-轻型装甲 2-中型装甲 3-重型装甲 4-复合装甲",
+            "A1": "是否有行进间射击能力 int",
+            "stack": "是否堆叠 int",
+            "carry_weapon_ids": "携带武器ID list(int)",
+            "remain_bullet_nums": "剩余弹药数 dict{弹药类型 int 0-非导弹, 100-重型导弹, 101-中型导弹, 102-小型导弹: 剩余弹药数 int}",
+            "remain_bullet_nums_bk": "敌对阵营看到的弹药数",
+            "guide_ability": "是否有引导射击能力 int",
+            "value": "分值 int",
+            "valid_passenger_types": "可承载类型 list(int)",
+            "max_passenger_nums": "最大承载数 dict()",
+            "observe_distance": "观察距离 dict()",
+            "move_state": "机动状态 0-正常机动 1-行军 2-一级冲锋 3-二级冲锋 4-掩蔽",
+            "cur_hex": "当前坐标 int 四位",
+            "cur_pos": "当前格到下一格的百分比进度 float",
+            "speed": "当前机动速度 格/s >0: 移动中, =0: 暂停或停止 int",
+            "move_to_stop_remain_time": "机动转停止剩余时间 >0表示",
+            "can_to_move": "是否可机动标志位.只在停止转换过程中用来判断是否可以继续机动.强制停止不能继续机动,正常停止可以继续机动. 0-否 1-是",
+            "flag_force_stop": "是否被强制停止机动 0-否 1-是",
+            "stop": "是否静止 0-否, 1-是",
+            "move_path": "计划机动路径 [int] 首个元素代表下一目标格",
+            "blood": "当前血量 int",
+            "max_blood": "最大血量 int",
+            "tire": "疲劳等级 0-不疲劳 1-一级疲劳 2-二级疲劳 int",
+            "tire_accumulate_time": "疲劳累积时间 int",
+            "keep": "是否被压制 int",
+            "keep_remain_time": "疲劳剩余时间 int",
+            "on_board": "是否在车上 int",
+            "car": "所属车辆ID int",
+            "launcher": "算子下车/发射后,记录所属发射器 int",
+            "passenger_ids": "乘客列表 [int]",
+            "launch_ids": "记录车辆发射单元列表 [int]",
+            "lose_control": "算子是否失去控制(指无人车失去指挥)",
+            "alive_remain_time": "巡飞弹剩余存活时间",
+            "get_on_remain_time": "上车剩余时间 float",
+            "get_on_partner_id": "车辆算子ID(本算子为上车算子) 或 待上车算子(本算子为车辆算子) list",
+            "get_off_remain_time": "下车剩余时间 float",
+            "get_off_partner_id": "车辆算子ID(本算子为待下车算子) 或 车上算子ID(本算子为车辆算子ID) list",
+            "change_state_remain_time": "切换状态剩余时间 float",
+            "target_state": "状态转换过程中记录目标状态 int 0-正常机动 1-行军 2-一级冲锋 3-二级冲锋 4-掩蔽",
+            "weapon_cool_time": "武器剩余冷却时间 float",
+            "weapon_unfold_time": "武器锁定状态表示展开剩余时间, 武器展开状态下表示锁定剩余时间 float",
+            "weapon_unfold_state": "武器状态 0-锁定 1-展开",
+            "see_enemy_bop_ids": "观察敌方算子列表 list(int)",
+            "C2": "普通弹药数",
+            "C3": "剩余导弹数"
+        }
+    ],
+    "passengers": "车上算子, 字段同operators",
+    "time": {
+        "cur_step": "当前步长 int",
+        "tick": "s/步 float"
+    },
+    "jm_points": [
+        {
+            "obj_id": "攻击算子ID int",
+            "weapon_id": "攻击武器ID int",
+            "pos": "位置 int",
+            "status": "当前状态 0-正在飞行 1-正在爆炸 2-无效",
+            "fly_time": "剩余飞行时间 float",
+            "boom_time": "剩余爆炸时间 float"
+        }
+    ],
+    "cities": [
+        {
+            "coord": "坐标 int",
+            "value": "分值 int",
+            "flag": "阵营 0-红 1-蓝",
+            "name": "名称 str"
+        }
+    ],
+    "scores": {
+        "red_occupy": "红方夺控分",
+        "red_remain": "红方剩余算子分",
+        "red_attack": "红方战斗得分",
+        "blue_occupy": "蓝方夺控分",
+        "blue_remain": "蓝方剩余得分",
+        "blue_attack": "蓝方攻击得分",
+        "red_total": "红方总分",
+        "blue_total": "蓝方总分",
+        "red_win": "红方净胜分",
+        "blue_win": "蓝方净胜分"
+    },
+    "valid_actions": {
+        "算子ID": {
+            "1-机动": null,
+            "2-射击": [
+                {
+                    "target_obj_id": "目标ID int",
+                    "weapon_id": "武器ID int",
+                    "attack_level": "攻击等级 int"
+                }
+            ],
+            "3-上车": [
+                {
+                    "target_obj_id": "车辆ID int"
+                }
+            ],
+            "4-下车": [
+                {
+                    "target_obj_id": "乘客ID int"
+                }
+            ],
+            "5-夺控": null,
+            "6-切换状态": [
+                {
+                    "target_state": "目标状态 0-正常机动 1-行军 2-一级冲锋 3-二级冲锋 4-掩蔽"
+                }
+            ],
+            "7-移除压制": null,
+            "8-间瞄": [
+                {
+                    "weapon_id": "武器ID"
+                }
+            ],
+            "9-引导射击": [
+                {
+                    "guided_obj_id": "被引导算子ID int",
+                    "target_obj_id": "目标算子ID",
+                    "weapon_id": "武器ID int",
+                    "attack_level": "攻击等级 int"
+                }
+            ],
+            "10-停止机动": null,
+            "11-武器锁定": null,
+            "12-武器展开": null,
+            "13-取消间瞄计划": null
+        }
+    },
+    "judge_info": [
+        {
+            "cur_step": "当前步长",
+            "type": "伤害类型 str",
+            "att_obj_id": "攻击算子ID, int",
+            "target_obj_id": "目标算子ID int",
+            "guide_obj_id": "引导算子ID int",
+            "distance": "距离",
+            "ele_diff": "高差等级",
+            "att_obj_blood": "攻击算子血量",
+            "align_status": "较射类型 int 0-无较射 1-格内较射 2-目标较射",
+            "offset": "偏移 bool",
+            "att_level": "攻击等级 int ",
+            "wp_id": "武器ID int",
+            "random1": "随机数1 int",
+            "ori_damage": "原始战损",
+            "random2_rect": "随机数2修正值",
+            "random2": "随机数2",
+            "rect_damage": "战损修正值",
+            "damage": "最终战损"
+        }
+    ],
+    "actions": [
+        {
+            "cur_step": "当前步长 int",
+            "message": {
+                "actor": "动作发起者ID",
+                "obj_id": "算子ID int",
+                "type": "动作类型 ['1-机动', '2-射击', '3-上车', '4-下车', '5-夺控', '6-切换状态', '7-移除压制', '8-间瞄', '9-引导射击', '10-停止机动', '11-武器锁定', '12-武器展开', '13-取消间瞄计划']",
+                "move_path": "机动路径 list(int)",
+                "target_obj_id": "目标算子ID or 车辆算子ID or 下车算子ID int",
+                "weapon_id": "武器编号 int",
+                "jm_pos": "间瞄点位置 int",
+                "target_state": "目标状态 int",
+                "guided_obj_id": "被引导算子单位ID"
+            },
+            "error": {
+                "code": "错误码 int",
+                "message": "错误原因 str"
+            }
+        }
+    ],
+    "role_and_grouping_info":{
+        "0": {
+            "role": 0,
+            "operators": []
+        },
+        "1": {
+            "role": 0,
+            "operators": []
+        }
+    }
+}
