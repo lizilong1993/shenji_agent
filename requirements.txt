@@ -7,3 +7,4 @@ tensorrt; sys_platform == "linux"
 jupyter
 tqdm
 scikit-learn
+PyYAML

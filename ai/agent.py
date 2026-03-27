@@ -19,6 +19,8 @@ except ImportError:
     AI_MODELS_AVAILABLE = False
     # logging.warning("AI models not available, falling back to rule-based.")
 
+from .policy import LearnedPolicy
+
 
 
 class BopType:
@@ -504,6 +506,9 @@ class Agent:
         self.flag_act: Dict[int, bool] = {}
         self.act_gen = ActionGenerator(self)
         self.use_ai_optimization = False
+        self.policy_profile = "baseline"
+        self.policy_artifacts_dir = None
+        self.policy = LearnedPolicy()
         
         # Initialize models (if available)
         self.intention_model = None
@@ -534,6 +539,10 @@ class Agent:
             self.use_ai_optimization = setup_info.get("use_ai_optimization", False)
             if setup_info.get("user_name") == "CurrentAI":
                 self.use_ai_optimization = True
+            self.policy_profile = setup_info.get("policy_profile", "challenger" if self.use_ai_optimization else "baseline")
+            if self.policy_profile != "baseline":
+                self.use_ai_optimization = True
+            self.policy_artifacts_dir = setup_info.get("policy_artifacts_dir")
             
             self.scenario = setup_info.get("scenario")
             self.color = setup_info.get("faction")
@@ -567,6 +576,7 @@ class Agent:
             self.observation = None
             self.map = Map(setup_info["basic_data"], setup_info["cost_data"], setup_info.get("see_data"))
             self.map_data = self.map.get_map_data()
+            self.policy.configure(self.faction, self.policy_artifacts_dir, self.policy_profile)
             self.logger.info("setup complete seat=%s faction=%s role=%s", self.seat, self.faction, self.role)
         except Exception:
             self.logger.exception("setup failed")
@@ -593,6 +603,7 @@ class Agent:
             self.history = None
             self.pending_actions = []
             self.flag_act = {}
+            self.policy.reset()
             self.logger.info("reset complete")
         except Exception:
             self.logger.exception("reset failed")
@@ -604,6 +615,7 @@ class Agent:
                 self.logger.info("step received empty observation")
                 return []
             self.observation = observation
+            self.policy.observe(observation)
             obs_keys = list(observation.keys())
             reward = observation.get("reward")
             done = observation.get("done") or observation.get("terminated") or observation.get("truncated")
@@ -712,18 +724,14 @@ class Agent:
 
     def _generate_action(self, obj_id: int, action_type: int, candidate: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         if self.use_ai_optimization:
-            # Optimized Logic (Simulated AI behavior)
             if action_type == ActionType.Shoot:
-                if not candidate: return None
-                # Prioritize: 1. Killable (low HP), 2. High Threat (Tank), 3. High Hit Chance
-                def score_target(c):
-                    target_hp = c.get("target_blood", 100)
-                    damage = c.get("damage", 10)
-                    hit_prob = c.get("hit_prob", 0.5)
-                    # Simple heuristic score
-                    kill_bonus = 1000 if target_hp <= damage else 0
-                    return kill_bonus + hit_prob * 100 - target_hp
-                best = max(candidate, key=score_target)
+                bop = self.get_bop(obj_id)
+                if not candidate or not bop:
+                    return None
+                best = self.policy.choose_shoot_candidate(bop, candidate, self.observation) or max(
+                    candidate,
+                    key=lambda item: (item.get("attack_level", 0), item.get("hit_prob", 0.0), item.get("damage", 0)),
+                )
                 return {
                     "actor": self.seat, "obj_id": obj_id, "type": ActionType.Shoot,
                     "target_obj_id": best.get("target_obj_id"), "weapon_id": best.get("weapon_id"),
@@ -731,25 +739,18 @@ class Agent:
             
             if action_type == ActionType.Move:
                 bop = self.get_bop(obj_id)
-                if not bop or bop.get("sub_type") == 3: return None
-                
-                # Optimized Move: Prefer cover or strategic points
-                # For demo, just pick a random city but filter for cover if possible
+                if not bop or bop.get("sub_type") == 3:
+                    return None
                 cities = self.observation.get("cities", [])
-                if not cities: return None
-                
-                # Try to find a city that is in cover or provides advantage
-                best_city = self._rng.choice(cities)["coord"]
-                
-                # If we have AI model (SituationGCN), we would use it here to score positions
-                # if self.situation_model:
-                #    scores = self.situation_model(features, adj)
-                #    best_city = select_best(scores)
-                
+                if not cities:
+                    return None
+                selected_city = self.policy.choose_city(bop, cities, self.observation, self.map)
+                best_city = selected_city["coord"] if selected_city else self._rng.choice(cities)["coord"]
                 if self.map and bop.get("cur_hex") != best_city:
                     move_type = self.get_move_type(bop)
                     route = self.map.gen_move_route(bop["cur_hex"], best_city, move_type)
-                    return {"actor": self.seat, "obj_id": obj_id, "type": ActionType.Move, "move_path": route}
+                    if route:
+                        return {"actor": self.seat, "obj_id": obj_id, "type": ActionType.Move, "move_path": route}
                 return None
 
         # Original Rule-based Logic

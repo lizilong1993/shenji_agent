@@ -55,3 +55,58 @@ class SituationGCN(nn.Module):
         x = self.sage2(x, adj)
         x = self.sage3(x, adj)
         return torch.sigmoid(self.fc_score(x))
+
+
+class MultiHorizonIntentionModel(nn.Module):
+    def __init__(self, input_dim=108, hidden_dim=128, horizons=5, num_classes=7):
+        super().__init__()
+        self.horizons = horizons
+        self.num_classes = num_classes
+        self.lstm = nn.LSTM(
+            input_dim,
+            hidden_dim,
+            num_layers=2,
+            batch_first=True,
+            bidirectional=True,
+            dropout=0.1,
+        )
+        self.attention = nn.MultiheadAttention(embed_dim=hidden_dim * 2, num_heads=4, batch_first=True)
+        self.head = nn.Sequential(
+            nn.LayerNorm(hidden_dim * 2),
+            nn.Linear(hidden_dim * 2, hidden_dim * 2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim * 2, horizons * num_classes),
+        )
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        attn_out, _ = self.attention(out, out, out)
+        pooled = attn_out[:, -1, :]
+        logits = self.head(pooled)
+        return logits.view(-1, self.horizons, self.num_classes)
+
+
+class TacticalScorer(nn.Module):
+    def __init__(self, input_dim=32, hidden_dim=128, output_dim=1):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim // 2, output_dim),
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+
+class GraphSituationModel(nn.Module):
+    def __init__(self, num_features=108, hidden_dim=64):
+        super().__init__()
+        self.backbone = SituationGCN(num_features=num_features, hidden_dim=hidden_dim, output_dim=1)
+
+    def forward(self, x, adj):
+        node_scores = self.backbone(x, adj)
+        return node_scores.mean(dim=0)

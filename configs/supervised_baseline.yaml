@@ -1,0 +1,34 @@
+seed: 42
+output_root: experiments/shenji_agent
+publish_to_ai_weights: true
+intent:
+  enabled: true
+  history_len: 8
+  horizons: 5
+  batch_size: 64
+  epochs: 3
+  hidden_dim: 128
+  learning_rate: 0.001
+  max_train_samples: 4096
+  max_val_samples: 1024
+tactical:
+  enabled: true
+  batch_size: 512
+  epochs: 3
+  hidden_dim: 128
+  learning_rate: 0.001
+  max_rows: 50000
+situation:
+  enabled: true
+  epochs: 8
+  hidden_dim: 64
+  learning_rate: 0.001
+map_sampling:
+  train:
+    complex: 0.45
+    medium: 0.30
+    simple: 0.25
+  promotion_eval:
+    complex: 0.50
+    medium: 0.30
+    simple: 0.20

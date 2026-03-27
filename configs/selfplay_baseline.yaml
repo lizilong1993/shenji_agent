@@ -1,0 +1,18 @@
+seed: 42
+output_root: experiments/shenji_agent
+league_dir: league
+paired_matches: 64
+max_steps: 400
+map_sampling:
+  complex: 0.50
+  medium: 0.30
+  simple: 0.20
+promotion_gate:
+  overall_point_estimate_min: 0.60
+  overall_ci_lower_min: 0.55
+  complex_point_estimate_min: 0.58
+  complex_ci_lower_min: 0.53
+  elo_delta_lower_min: 15.0
+  max_bucket_regression: 0.03
+  max_exploiter_win_rate: 0.52
+  consecutive_windows: 2
