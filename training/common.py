@@ -3,12 +3,17 @@ from __future__ import annotations
 import json
 import os
 import random
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
-import torch
+
+try:
+    import torch
+except ImportError:  # pragma: no cover
+    torch = None  # type: ignore[assignment]
 
 try:
     import yaml
@@ -33,6 +38,8 @@ def ensure_dir(path: Path | str) -> Path:
 def set_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
+    if torch is None:
+        return
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
@@ -71,14 +78,26 @@ def discover_dir(parent: Path | str, *, contains: Optional[str] = None, required
     raise FileNotFoundError(f"Could not discover directory in {base} contains={contains} required_file={required_file}")
 
 
-def safe_device() -> torch.device:
+def safe_device():
+    if torch is None:
+        return "cpu"
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def copy_publish_artifacts(run_dir: Path, publish_dir: Path, manifest: Dict[str, Any]) -> None:
     ensure_dir(publish_dir)
+    managed_files = manifest.get("managed_files", [])
+    if isinstance(managed_files, list):
+        for name in managed_files:
+            if not isinstance(name, str):
+                continue
+            target = publish_dir / name
+            if target.is_dir():
+                shutil.rmtree(target)
+            elif target.exists():
+                target.unlink()
     for name, rel_path in manifest.items():
-        if name == "generated_at" or not isinstance(rel_path, str):
+        if name in {"generated_at", "managed_files"} or not isinstance(rel_path, str):
             continue
         src = run_dir / rel_path
         if src.exists():

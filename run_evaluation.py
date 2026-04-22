@@ -54,7 +54,7 @@ def setup_logging(log_dir="logs/evaluation"):
 def run_evaluation(num_rounds=20):
     log_file = setup_logging()
     logging.info(f"Starting Evaluation: {num_rounds} rounds")
-    logging.info("Red: CurrentAI (Optimized) vs Blue: DemoAI (Baseline)")
+    logging.info("Red: challenger(LSTM+GCN) vs Blue: baseline(rule-only)")
     
     # Load Data
     data_dir = "land_wargame_sdk/Data/Data"
@@ -97,13 +97,36 @@ def run_evaluation(num_rounds=20):
         red = Agent()
         blue = Agent()
         
-        # Setup Agents
-        # Red gets "CurrentAI" name to trigger optimization
-        red.setup({"seat": 1, "faction": 0, "role": 1, "user_name": "CurrentAI", "state": state, 
-                   "scenario": scenario_data, "basic_data": basic_data, "cost_data": cost_data, "see_data": see_data})
-        # Blue gets "DemoAI" name (defaults to standard rules)
-        blue.setup({"seat": 11, "faction": 1, "role": 1, "user_name": "DemoAI", "state": state,
-                    "scenario": scenario_data, "basic_data": basic_data, "cost_data": cost_data, "see_data": see_data})
+        red.setup(
+            {
+                "seat": 1,
+                "faction": 0,
+                "role": 1,
+                "user_name": "CurrentAI",
+                "policy_profile": "challenger",
+                "policy_artifacts_dir": "ai/weights",
+                "state": state,
+                "scenario": scenario_data,
+                "basic_data": basic_data,
+                "cost_data": cost_data,
+                "see_data": see_data,
+            }
+        )
+        blue.setup(
+            {
+                "seat": 11,
+                "faction": 1,
+                "role": 1,
+                "user_name": "DemoAI",
+                "policy_profile": "baseline",
+                "policy_artifacts_dir": "ai/weights",
+                "state": state,
+                "scenario": scenario_data,
+                "basic_data": basic_data,
+                "cost_data": cost_data,
+                "see_data": see_data,
+            }
+        )
         
         done = False
         step_count = 0

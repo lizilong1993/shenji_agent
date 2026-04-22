@@ -166,3 +166,19 @@ def mean_feature(features: Iterable[np.ndarray]) -> np.ndarray:
     if not items:
         return np.zeros(FEATURE_DIM, dtype=np.float32)
     return np.mean(np.stack(items), axis=0)
+
+
+def build_feature_similarity_graph(features: np.ndarray, top_k: int = 4) -> np.ndarray:
+    if features.ndim != 2:
+        raise ValueError(f"Expected 2D feature matrix, got shape={features.shape}")
+    num_nodes = features.shape[0]
+    adjacency = np.eye(num_nodes, dtype=np.float32)
+    if num_nodes <= 1:
+        return adjacency
+    similarity = features @ features.T
+    np.fill_diagonal(similarity, 0.0)
+    neighbor_count = min(max(top_k, 1), num_nodes - 1)
+    for row_idx in range(num_nodes):
+        neighbor_idx = np.argsort(similarity[row_idx])[-neighbor_count:]
+        adjacency[row_idx, neighbor_idx] = 1.0
+    return adjacency

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
@@ -25,6 +26,10 @@ def _bucket_metrics(records: Iterable[Tuple[str, bool]]) -> Dict[str, float]:
     return {bucket: float(np.mean(values)) for bucket, values in grouped.items()}
 
 
+def _counter_to_dict(counter: Counter[str]) -> Dict[str, int]:
+    return {key: int(value) for key, value in sorted(counter.items())}
+
+
 def _prepare_run_dir(output_root: str) -> Path:
     path = ensure_dir(repo_root() / output_root / now_tag())
     return path
@@ -34,16 +39,19 @@ def train_intent_model(
     config: Dict[str, object],
     training_files: Dict[str, Path],
     bucket_lookup: Dict[int, str],
+    dataset_contract: Dict[str, object],
     device: torch.device,
     run_dir: Path,
 ) -> Dict[str, object]:
     history_len = int(config["history_len"])
     horizons = int(config["horizons"])
+    map_id_strategy = str(dataset_contract.get("map_id_strategy", "suffix"))
     train_dataset = IntentSequenceDataset(
         training_files["intent_train"],
         history_len=history_len,
         horizons=horizons,
         map_bucket_lookup=bucket_lookup,
+        map_id_strategy=map_id_strategy,
         max_samples=config.get("max_train_samples"),
     )
     val_dataset = IntentSequenceDataset(
@@ -51,6 +59,7 @@ def train_intent_model(
         history_len=history_len,
         horizons=horizons,
         map_bucket_lookup=bucket_lookup,
+        map_id_strategy=map_id_strategy,
         max_samples=config.get("max_val_samples"),
     )
     train_loader = DataLoader(train_dataset, batch_size=int(config["batch_size"]), shuffle=True)
@@ -99,7 +108,7 @@ def train_intent_model(
                 for horizon_idx in range(horizons):
                     per_horizon_hits[horizon_idx].append(float(preds[row_idx, horizon_idx].item() == target[row_idx, horizon_idx].item()))
 
-    weight_path = run_dir / "intent_model.pt"
+    weight_path = run_dir / "intent_lstm.pt"
     torch.save(
         {
             "model_state": model.state_dict(),
@@ -107,6 +116,7 @@ def train_intent_model(
             "horizons": horizons,
             "feature_dim": 108,
             "num_classes": 7,
+            "hidden_dim": int(config["hidden_dim"]),
         },
         weight_path,
     )
@@ -119,6 +129,15 @@ def train_intent_model(
             "train": len(train_dataset),
             "val": len(val_dataset),
         },
+        "bucket_counts": {
+            "train": _counter_to_dict(train_dataset.bucket_counts),
+            "val": _counter_to_dict(val_dataset.bucket_counts),
+        },
+        "schema": {
+            "map_id_strategy": map_id_strategy,
+            "history_len": history_len,
+            "horizons": horizons,
+        },
         "artifact": weight_path.name,
     }
 
@@ -126,10 +145,16 @@ def train_intent_model(
 def train_tactical_model(
     config: Dict[str, object],
     training_files: Dict[str, Path],
+    dataset_contract: Dict[str, object],
     device: torch.device,
     run_dir: Path,
 ) -> Dict[str, object]:
-    dataset = TacticalPositionDataset(training_files["tactical_csv"], max_rows=config.get("max_rows"))
+    label_column = str(dataset_contract.get("label_col", "样本标签"))
+    dataset = TacticalPositionDataset(
+        training_files["tactical_csv"],
+        label_column=label_column,
+        max_rows=config.get("max_rows"),
+    )
     indices = np.arange(len(dataset))
     train_idx, val_idx = train_test_split(indices, test_size=0.2, random_state=42, shuffle=True)
     train_loader = DataLoader(Subset(dataset, train_idx.tolist()), batch_size=int(config["batch_size"]), shuffle=True)
@@ -168,6 +193,11 @@ def train_tactical_model(
         "train_loss": losses[-1] if losses else None,
         "val_accuracy": accuracy,
         "samples": len(dataset),
+        "schema": {
+            "label_column": dataset.label_column,
+            "feature_columns": dataset.feature_columns,
+        },
+        "label_distribution": dataset.label_distribution,
         "artifact": weight_path.name,
     }
 
@@ -176,10 +206,16 @@ def train_situation_model(
     config: Dict[str, object],
     training_files: Dict[str, Path],
     bucket_lookup: Dict[int, str],
+    dataset_contract: Dict[str, object],
     device: torch.device,
     run_dir: Path,
 ) -> Dict[str, object]:
-    dataset = StateGraphDataset(training_files["state_graph_root"], map_bucket_lookup=bucket_lookup)
+    map_id_strategy = str(dataset_contract.get("map_id_strategy", "prefix"))
+    dataset = StateGraphDataset(
+        training_files["state_graph_root"],
+        map_bucket_lookup=bucket_lookup,
+        map_id_strategy=map_id_strategy,
+    )
     indices = np.arange(len(dataset))
     if len(indices) < 2:
         return {"skipped": True, "reason": "not_enough_graph_samples"}
@@ -210,28 +246,48 @@ def train_situation_model(
             label = sample["y"].view(-1).item()
             hits.append((sample["bucket"], (pred >= 0.5) == (label >= 0.5)))
 
-    weight_path = run_dir / "situation_model.pt"
-    torch.save({"model_state": model.state_dict(), "input_dim": 108}, weight_path)
+    weight_path = run_dir / "situation_gcn.pt"
+    torch.save(
+        {
+            "model_state": model.state_dict(),
+            "input_dim": 108,
+            "hidden_dim": int(config["hidden_dim"]),
+        },
+        weight_path,
+    )
     return {
         "train_loss": train_losses[-1] if train_losses else None,
         "val_accuracy": float(np.mean([hit for _, hit in hits])) if hits else 0.0,
         "bucket_accuracy": _bucket_metrics(hits),
         "samples": len(dataset),
+        "bucket_counts": _counter_to_dict(dataset.bucket_counts),
+        "schema": {
+            "map_id_strategy": map_id_strategy,
+        },
         "artifact": weight_path.name,
     }
 
 
 def build_summary(metrics: Dict[str, object], run_dir: Path) -> None:
+    tactical = metrics.get("tactical", {})
+    tactical_line = (
+        f"- tactical_accuracy: `{tactical.get('val_accuracy', 0.0):.4f}`"
+        if not tactical.get("skipped")
+        else f"- tactical_accuracy: `skipped ({tactical.get('reason', 'disabled')})`"
+    )
     lines = [
         "# Shenji Supervised Training Summary",
         "",
         f"- run_dir: `{run_dir}`",
         f"- intent_immediate_accuracy: `{metrics['intent']['val_immediate_accuracy']:.4f}`",
-        f"- tactical_accuracy: `{metrics['tactical'].get('val_accuracy', 0.0):.4f}`",
+        tactical_line,
         f"- situation_accuracy: `{metrics['situation'].get('val_accuracy', 0.0):.4f}`",
         f"- complex_bucket_intent_accuracy: `{metrics['intent']['bucket_accuracy'].get('complex', 0.0):.4f}`",
         f"- medium_bucket_intent_accuracy: `{metrics['intent']['bucket_accuracy'].get('medium', 0.0):.4f}`",
         f"- simple_bucket_intent_accuracy: `{metrics['intent']['bucket_accuracy'].get('simple', 0.0):.4f}`",
+        f"- intent_bucket_counts_train: `{metrics['intent']['bucket_counts']['train']}`",
+        f"- intent_bucket_counts_val: `{metrics['intent']['bucket_counts']['val']}`",
+        f"- situation_bucket_counts: `{metrics['situation'].get('bucket_counts', {})}`",
     ]
     (run_dir / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
@@ -245,6 +301,7 @@ def main() -> None:
     set_seed(int(config["seed"]))
     run_dir = _prepare_run_dir(str(config["output_root"]))
     device = safe_device()
+    dataset_contract = config.get("dataset_contract", {})
 
     maps_root = repo_root() / "land_wargame_sdk" / "Data" / "Data" / "maps"
     catalog_path = repo_root() / "training" / "cache" / "map_catalog.json"
@@ -252,19 +309,49 @@ def main() -> None:
     bucket_lookup = map_bucket_lookup(records)
     training_files = discover_training_files()
 
+    tactical_config = config.get("tactical", {})
+    tactical_metrics: Dict[str, object]
+    if tactical_config.get("enabled", False):
+        tactical_metrics = train_tactical_model(
+            tactical_config,
+            training_files,
+            dataset_contract.get("tactical", {}),
+            device,
+            run_dir,
+        )
+    else:
+        tactical_metrics = {"skipped": True, "reason": "disabled_by_config"}
+
     metrics = {
         "device": str(device),
         "map_catalog": [record.__dict__ for record in records],
-        "intent": train_intent_model(config["intent"], training_files, bucket_lookup, device, run_dir),
-        "tactical": train_tactical_model(config["tactical"], training_files, device, run_dir),
-        "situation": train_situation_model(config["situation"], training_files, bucket_lookup, device, run_dir),
+        "dataset_contract": dataset_contract,
+        "intent": train_intent_model(
+            config["intent"],
+            training_files,
+            bucket_lookup,
+            dataset_contract.get("intent", {}),
+            device,
+            run_dir,
+        ),
+        "tactical": tactical_metrics,
+        "situation": train_situation_model(
+            config["situation"],
+            training_files,
+            bucket_lookup,
+            dataset_contract.get("situation", {}),
+            device,
+            run_dir,
+        ),
     }
 
     save_json(metrics, run_dir / "metrics.json")
     save_json(
         {
             "intent_bucket_accuracy": metrics["intent"]["bucket_accuracy"],
+            "intent_bucket_counts": metrics["intent"]["bucket_counts"],
             "situation_bucket_accuracy": metrics["situation"].get("bucket_accuracy", {}),
+            "situation_bucket_counts": metrics["situation"].get("bucket_counts", {}),
         },
         run_dir / "slice_report.json",
     )
@@ -276,9 +363,16 @@ def main() -> None:
             "generated_at": now_tag(),
             "history_len": int(config["intent"]["history_len"]),
             "horizons": int(config["intent"]["horizons"]),
-            "intent_model": "intent_model.pt",
-            "tactical_model": "tactical_model.pt",
-            "situation_model": "situation_model.pt",
+            "intent_lstm": "intent_lstm.pt",
+            "situation_gcn": "situation_gcn.pt",
+            "managed_files": [
+                "intent_lstm.pt",
+                "situation_gcn.pt",
+                "intent_model.pt",
+                "situation_model.pt",
+                "tactical_model.pt",
+                "model_manifest.json",
+            ],
         }
         copy_publish_artifacts(run_dir, repo_root() / "ai" / "weights", manifest)
 

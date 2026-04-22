@@ -9,16 +9,6 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 
-# Try to import AI models for optimized mode
-try:
-    import torch
-    from .models import IntentionLSTM, SituationGCN
-    from .trt_utils import build_int8_engine
-    AI_MODELS_AVAILABLE = True
-except ImportError:
-    AI_MODELS_AVAILABLE = False
-    # logging.warning("AI models not available, falling back to rule-based.")
-
 from .policy import LearnedPolicy
 
 
@@ -509,41 +499,17 @@ class Agent:
         self.policy_profile = "baseline"
         self.policy_artifacts_dir = None
         self.policy = LearnedPolicy()
-        
-        # Initialize models (if available)
-        self.intention_model = None
-        self.situation_model = None
-        
-        if AI_MODELS_AVAILABLE:
-            try:
-                self.intention_model = IntentionLSTM(input_dim=108, hidden_dim=256, num_classes=4)
-                self.situation_model = SituationGCN(num_features=108, hidden_dim=64, output_dim=1)
-                
-                weights_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ai", "weights")
-                lstm_path = os.path.join(weights_dir, "intention_lstm.pth")
-                gcn_path = os.path.join(weights_dir, "situation_gcn.pth")
-                
-                if os.path.exists(lstm_path):
-                    self.intention_model.load_state_dict(torch.load(lstm_path))
-                    # print("Loaded IntentionLSTM weights")
-                if os.path.exists(gcn_path):
-                    self.situation_model.load_state_dict(torch.load(gcn_path))
-                    # print("Loaded SituationGCN weights")
-            except Exception as e:
-                # self.logger.warning(f"Failed to load AI models: {e}")
-                pass
 
     def setup(self, setup_info: Dict[str, Any]) -> None:
         try:
-            # Enable optimization if explicitly requested or if configured (simulated here by checking user_name)
-            self.use_ai_optimization = setup_info.get("use_ai_optimization", False)
-            if setup_info.get("user_name") == "CurrentAI":
-                self.use_ai_optimization = True
-            self.policy_profile = setup_info.get("policy_profile", "challenger" if self.use_ai_optimization else "baseline")
-            if self.policy_profile != "baseline":
-                self.use_ai_optimization = True
+            requested_policy = setup_info.get("policy_profile")
+            requested_optimization = bool(setup_info.get("use_ai_optimization", False))
+            if setup_info.get("user_name") == "CurrentAI" and requested_policy is None:
+                requested_policy = "challenger"
+            self.policy_profile = str(requested_policy or ("challenger" if requested_optimization else "baseline"))
+            self.use_ai_optimization = requested_optimization or self.policy_profile != "baseline"
             self.policy_artifacts_dir = setup_info.get("policy_artifacts_dir")
-            
+
             self.scenario = setup_info.get("scenario")
             self.color = setup_info.get("faction")
             self.faction = setup_info.get("faction")
@@ -577,6 +543,11 @@ class Agent:
             self.map = Map(setup_info["basic_data"], setup_info["cost_data"], setup_info.get("see_data"))
             self.map_data = self.map.get_map_data()
             self.policy.configure(self.faction, self.policy_artifacts_dir, self.policy_profile)
+            if self.use_ai_optimization and not self.policy.has_models():
+                self.logger.warning(
+                    "learned policy requested but canonical intent+gcn artifacts unavailable, falling back to rules"
+                )
+                self.use_ai_optimization = False
             self.logger.info("setup complete seat=%s faction=%s role=%s", self.seat, self.faction, self.role)
         except Exception:
             self.logger.exception("setup failed")
@@ -703,6 +674,11 @@ class Agent:
             self.logger.exception("load failed")
             raise
 
+    def get_policy_stats(self) -> Dict[str, Any]:
+        stats = self.policy.get_diagnostics()
+        stats["use_ai_optimization"] = self.use_ai_optimization
+        return stats
+
     def get_bop(self, obj_id: int) -> Optional[Dict[str, Any]]:
         for bop in self.observation.get("operators", []):
             if obj_id == bop.get("obj_id"):
@@ -728,15 +704,17 @@ class Agent:
                 bop = self.get_bop(obj_id)
                 if not candidate or not bop:
                     return None
-                best = self.policy.choose_shoot_candidate(bop, candidate, self.observation) or max(
-                    candidate,
-                    key=lambda item: (item.get("attack_level", 0), item.get("hit_prob", 0.0), item.get("damage", 0)),
-                )
-                return {
-                    "actor": self.seat, "obj_id": obj_id, "type": ActionType.Shoot,
-                    "target_obj_id": best.get("target_obj_id"), "weapon_id": best.get("weapon_id"),
-                }
-            
+                best, trace = self.policy.choose_shoot_candidate(bop, candidate, self.observation, self.map)
+                if best is not None:
+                    self.policy.note_action("shoot", True, trace)
+                    return {
+                        "actor": self.seat,
+                        "obj_id": obj_id,
+                        "type": ActionType.Shoot,
+                        "target_obj_id": best.get("target_obj_id"),
+                        "weapon_id": best.get("weapon_id"),
+                    }
+
             if action_type == ActionType.Move:
                 bop = self.get_bop(obj_id)
                 if not bop or bop.get("sub_type") == 3:
@@ -744,13 +722,19 @@ class Agent:
                 cities = self.observation.get("cities", [])
                 if not cities:
                     return None
-                selected_city = self.policy.choose_city(bop, cities, self.observation, self.map)
-                best_city = selected_city["coord"] if selected_city else self._rng.choice(cities)["coord"]
-                if self.map and bop.get("cur_hex") != best_city:
+                selected_city, trace = self.policy.choose_city(bop, cities, self.observation, self.map)
+                if selected_city is not None and self.map:
+                    best_city = selected_city["coord"]
                     move_type = self.get_move_type(bop)
                     route = self.map.gen_move_route(bop["cur_hex"], best_city, move_type)
                     if route:
+                        self.policy.note_action("move", True, trace)
                         return {"actor": self.seat, "obj_id": obj_id, "type": ActionType.Move, "move_path": route}
+                    self.policy.note_action(
+                        "move",
+                        False,
+                        {"obj_id": obj_id, "candidate_id": best_city, "reason": "empty_route"},
+                    )
                 return None
 
         # Original Rule-based Logic
@@ -760,6 +744,11 @@ class Agent:
             if not candidate:
                 return None
             best = max(candidate, key=lambda x: x.get("attack_level", 0))
+            self.policy.note_action(
+                "shoot",
+                False,
+                {"obj_id": obj_id, "candidate_id": best.get("target_obj_id"), "reason": "rule_fallback"},
+            )
             return {
                 "actor": self.seat,
                 "obj_id": obj_id,
@@ -826,6 +815,11 @@ class Agent:
             if self.map and bop.get("cur_hex") != destination:
                 move_type = self.get_move_type(bop)
                 route = self.map.gen_move_route(bop["cur_hex"], destination, move_type)
+                self.policy.note_action(
+                    "move",
+                    False,
+                    {"obj_id": obj_id, "candidate_id": destination, "reason": "rule_fallback"},
+                )
                 return {"actor": self.seat, "obj_id": obj_id, "type": ActionType.Move, "move_path": route}
             return None
         if action_type == ActionType.StopMove:

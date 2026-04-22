@@ -1,149 +1,105 @@
-# 研究路线优化实验设计矩阵
-
-## 实验设计原则
-
-- 先修正证据链，再追求更高模型复杂度。
-- 所有实验优先回答“是否提升最终对抗能力”，而不是只回答“离线准确率是否更高”。
-- 默认沿现有 `规则主干 + supervised surrogate + self-play` 路线优化，不重起一套新体系。
+# Research Route Optimization
 
 ## Baseline 定义
 
-### B0 纯规则基线
+### B0 纯规则 baseline
 
-- 定义：
-  - `ai/agent.py` 使用 `baseline` profile，不加载 learned policy 影响决策。
-- 用途：
-  - 作为最终 paired self-play 的零点参照。
+- profile：`baseline`
+- artifacts：`ai/weights_incumbent_rule`
+- 作用：作为 `LSTM+GCN` 的零点参照
 
-### B1 当前 learned overlay 基线
+### B1 当前主线 baseline
 
-- 定义：
-  - 使用当前 `ai/weights/` 中 manifest 指向的 `intent_model.pt + tactical_model.pt`
-  - `policy_profile=challenger`
-- 用途：
-  - 衡量“现有已落地路线”相对于纯规则 baseline 的真实增益。
+- profile：`challenger`
+- artifacts：`ai/weights`
+- contract：`intent_lstm.pt + situation_gcn.pt`
+- 作用：验证默认主线是否已经真实影响对抗结果
 
-### B2 当前 latest league 退化基线
+### B2 tactical 消融
 
-- 定义：
-  - `candidate == incumbent == ai/weights`
-- 用途：
-  - 只作为 sanity check，验证“同模型对打应接近 0.5”；不作为科研结论。
+- 训练配置：`configs/supervised_tactical_ablation.yaml`
+- 在线地位：不进入默认主线
+- 作用：只回答“修正标签后的 tactical 还有没有价值”
 
-## 低成本高信息量实验
+## 优先实验矩阵
 
-| ID | 优先级 | 实验 | 验证假设 | 关键指标 | 通过判据 | 不通过判据 |
+| ID | 成本 | 实验 | 验证假设 | 关键指标 | 通过判据 | 不通过判据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| E0 | P0 | `baseline vs baseline` | 评测协议稳定、无系统性偏置 | overall paired score, CI, reward pattern | paired score 约等于 0.5，reward 无异常漂移 | 明显偏离 0.5，说明评测协议本身不稳 |
-| E1 | P0 | `tactical wrong-label vs correct-label` | 当前 tactical 结果受标签语义错误污染 | offline acc, 校验集 confusion, paired score | 修正标签后离线指标更可解释，且至少不弱于错误标签版本的 paired score | 修正标签后完全无效，说明这条任务可能本身不对 |
-| E2 | P0 | `old bucket mapping vs explicit mapping` | 当前 bucket 报告失真 | bucket sample counts, slice_report, complex/medium/simple 指标 | 三个 bucket 的样本分布合理，slice_report 不再退化 | 仍无法形成有效 bucket 划分 |
-| E3 | P0 | `learned overlay vs pure baseline` | 现有 intent+tactical 至少能改变局部对抗结果 | paired score, CI, action divergence | overall point estimate > 0.52 且动作差异明显 | 仍接近 0.5 或动作差异极小 |
+| E0 | 低 | `baseline vs baseline` | 协议稳定，无系统偏置 | paired score, CI | score 接近 0.5 | 明显偏离 0.5 |
+| E1 | 低 | `supervised_baseline` 远程重跑 | 新 contract 与 bucket/label 修正生效 | `metrics.json`, `slice_report.json`, manifest | 只发布 `intent_lstm + situation_gcn` | tactical 混入默认发布 |
+| E2 | 低 | `challenger vs baseline` | `LSTM+GCN` 已真实进入决策链 | `paired_score`, `learned_path_coverage`, `participants.json` | coverage > 0 且 paired score 非退化 | coverage≈0 或再度自对弈 |
+| E3 | 中 | `tactical_ablation vs baseline` | 修正标签后的 tactical 是否仍有独立增益 | paired score, move/shoot divergence | tactical 版本带来稳定增益 | paired score 不动或变差 |
+| E4 | 中 | 扩大 learned 接入宽度 | 当前瓶颈是否转为“接入太窄” | coverage, paired score | coverage 与 score 同向提升 | coverage 升高但 score 不动 |
 
-## 后续主线实验
+## 每个实验读哪些指标
 
-| ID | 优先级 | 实验 | 验证假设 | 关键指标 | 通过判据 | 不通过判据 |
-| --- | --- | --- | --- | --- | --- | --- |
-| E4 | P1 | `tactical-only vs tactical+intent` | intent threat penalty 对目标点选择有增益 | complex bucket paired score, city-choice divergence, exploitability | `tactical+intent` 在 complex bucket 明显优于 `tactical-only` | 二者无差异，说明 intent 当前接入点太弱或 surrogate 不对齐 |
-| E5 | P1 | `current overlay vs widened decision-chain overlay` | 当前瓶颈是模型接入宽度不足 | paired score, key-action coverage, exploitability | widened 版本在不增加 exploitability 的前提下提升 paired score | 接入更广后仍无收益，说明主要问题不在接入宽度 |
-| E6 | P1 | `league gate old vs repaired gate` | exploitability/regression/elo 应进入正式晋升门 | promotion.json gate 明细, accepted/rejected consistency | 每次拒绝/接受都能被具体 gate 解释 | gate 仍然无法区分明显好坏模型 |
-| E7 | P2 | `no-situation vs situation-risk-gating` | situation 信号只有进主链才有价值 | complex bucket paired score, exploitability, action shift | situation 版本至少改善一项核心指标且不显著伤害其他指标 | 接入后无收益或副作用明显，则暂停 situation 线 |
+### 监督训练
 
-## 每个实验要读哪些指标
+- `metrics.json`
+  - `intent.val_immediate_accuracy`
+  - `intent.bucket_counts`
+  - `situation.bucket_counts`
+  - `tactical.schema.label_column`（仅 tactical 消融）
+- `slice_report.json`
+  - `intent_bucket_accuracy`
+  - `intent_bucket_counts`
+  - `situation_bucket_accuracy`
+  - `situation_bucket_counts`
+- `ai/weights/model_manifest.json`
+  - 是否只保留 `intent_lstm` 与 `situation_gcn`
 
-### 离线监督指标
-
-- `intent`
-  - `val_immediate_accuracy`
-  - `h1-h5` 准确率
-  - bucket 样本分布与 bucket accuracy
-- `tactical`
-  - 正确标签下的准确率
-  - 正负样本分布
-  - 若条件允许，补充 PR/AUC 或 top-k ranking hit
-- `situation`
-  - 准确率
-  - 各 bucket 样本分布
-  - 与最终对抗结果的相关性
-
-### 对抗评测指标
+### 对抗评测
 
 - `rating.json`
-  - overall point estimate
-  - overall CI95 lower
-  - complex bucket point estimate / CI95 lower
-  - count
+  - `overall.point_estimate`
+  - `overall.ci95`
+  - `policy.learned_path_coverage`
+  - `policy.move_path_coverage`
+  - `policy.shoot_path_coverage`
 - `promotion.json`
-  - accepted
-  - failures
-  - gate 细项
+  - `accepted`
+  - `failures`
+  - `learned_path_coverage`
+- `participants.json`
+  - candidate/incumbent 是否真的不同
 - `exploitability.json`
-  - 每个 exploiter 对 candidate 的 win rate
-- 新增建议指标
-  - action divergence ratio
-  - city-choice divergence
-  - shoot-target divergence
-  - artifact provenance
+  - exploiter 对 candidate 的压制程度
 
-## 通过 / 不通过的统一判据
+## 通过 / 不通过统一判据
 
-### 可进入下一阶段
+### 通过
 
-- 离线指标语义明确，且 bucket 划分可信。
-- `baseline vs baseline` 稳定在 0.5 附近。
-- `learned vs baseline` 出现非退化 paired score 差异。
-- 任何晋升判断都能说明 candidate/incumbent 分别是谁，以及为什么过/不过。
+- `participants.json` 证明不是自对弈
+- `learned_path_coverage > 0`
+- `Move` 或 `Shoot` 至少一类 coverage 明显非零
+- paired score 不再退化为全 0.5
 
-### 不应继续往更重模型推进
+### 不通过
 
-- tactical 标签仍不确定。
-- bucket 映射仍靠不住。
-- learned overlay 进入 agent 后几乎不改变动作。
-- self-play 依旧无法区分不同产物。
+- manifest 仍混入旧主线
+- tactical 又被混回默认在线加载
+- candidate/incumbent 仍是同一路径
+- learned coverage 接近 0，说明模型没有进入真实决策
 
-## 推荐实验顺序
+## 先做哪些 ablation
 
-1. `E0 baseline vs baseline`
-2. `E1 tactical wrong-label vs correct-label`
-3. `E2 old bucket mapping vs explicit mapping`
-4. `E3 learned overlay vs pure baseline`
-5. `E4 tactical-only vs tactical+intent`
-6. `E5 current overlay vs widened decision-chain overlay`
-7. `E6 repaired league gate replay`
-8. `E7 situation-risk-gating`
-
-## 哪些实验现在就做，哪些后做
-
-### 现在就做
-
-- `E0`
-- `E1`
-- `E2`
-- `E3`
+1. `B0 vs B0`
+2. `B1 vs B0`
+3. `B2 vs B0`
 
 原因：
 
-- 成本低；
-- 信息量最大；
-- 直接决定当前路线是否值得继续；
-- 能最快回答“现在该优化什么，而不是优化别的”。
+- 信息量最大
+- 成本最低
+- 能最快判断当前最值得继续投资源的是主线接入、tactical 消融，还是重新定义任务
 
-### 放到后续再做
+## 哪些实验后做
 
-- `E4`
-- `E5`
-- `E6`
-- `E7`
+- 扩大 learned 接入宽度
+- 更严格的 promotion gate
+- situation 更复杂用途
+- 更重 backbone
 
 原因：
 
-- 它们依赖前面四个实验先把标签、评测、baseline 定义清楚；
-- 如果前四个实验都过不了，后续实验的科研意义会大打折扣。
-
-## 当前建议的 stop/go 规则
-
-- 如果 `E1-E3` 之后，correct-label learned overlay 仍无法稳定优于纯规则 baseline：
-  - 暂停继续扩模型；
-  - 回到 surrogate task 定义，重做 tactical/situation 与最终目标的对齐。
-- 如果 `E1-E3` 之后，learned overlay 已能稳定优于 baseline：
-  - 优先做 `E4-E6`，把 intent 贡献和 league gate 完整化；
-  - `situation` 只作为后续候选，不抢当前主线。
+- 只有在 `B1 vs B0` 已经证明主线有效时，后面这些优化才有意义

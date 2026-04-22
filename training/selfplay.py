@@ -48,7 +48,7 @@ def _run_single(
     red_profile: Dict[str, str],
     blue_profile: Dict[str, str],
     max_steps: int,
-) -> Tuple[float, float]:
+) -> Tuple[float, float, Dict[str, object], Dict[str, object]]:
     env = TrainEnv()
     shared = _load_case_data(scenario_path, map_id)
     player_info = [
@@ -69,7 +69,7 @@ def _run_single(
         steps += 1
     red_score = float(state[RED].get("reward", 0.0))
     blue_score = float(state[BLUE].get("reward", 0.0))
-    return red_score, blue_score
+    return red_score, blue_score, red.get_policy_stats(), blue.get_policy_stats()
 
 
 def _paired_score(candidate_a: float, opponent_a: float, candidate_b: float, opponent_b: float) -> float:
@@ -97,19 +97,85 @@ def _bootstrap_league(league_path: Path) -> Dict[str, object]:
     return state
 
 
+def _resolved_path_string(value: str) -> str:
+    return str(Path(value).resolve())
+
+
+def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
+    merged = {
+        "move": {"total": 0, "learned": 0},
+        "shoot": {"total": 0, "learned": 0},
+    }
+    score_sums = {
+        "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
+        "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
+    }
+    traces: List[Dict[str, object]] = []
+    for payload in payloads:
+        counts = payload.get("counts", {}) if isinstance(payload, dict) else {}
+        score_means = payload.get("score_means", {}) if isinstance(payload, dict) else {}
+        for action_key in ("move", "shoot"):
+            action_counts = counts.get(action_key, {}) if isinstance(counts, dict) else {}
+            merged[action_key]["total"] += int(action_counts.get("total", 0))
+            merged[action_key]["learned"] += int(action_counts.get("learned", 0))
+            action_scores = score_means.get(action_key, {}) if isinstance(score_means, dict) else {}
+            samples = int(action_scores.get("samples", 0))
+            score_sums[action_key]["samples"] += samples
+            for metric in ("intent_bias", "situation_score", "combined_score"):
+                score_sums[action_key][metric] += float(action_scores.get(metric, 0.0)) * samples
+        if isinstance(payload, dict):
+            traces.extend(payload.get("trace_samples", [])[:6])
+
+    def coverage(total: int, learned: int) -> float:
+        if total <= 0:
+            return 0.0
+        return float(learned / total)
+
+    move_total = merged["move"]["total"]
+    move_learned = merged["move"]["learned"]
+    shoot_total = merged["shoot"]["total"]
+    shoot_learned = merged["shoot"]["learned"]
+    score_means = {}
+    for action_key, values in score_sums.items():
+        samples = int(values["samples"])
+        score_means[action_key] = {
+            "samples": samples,
+            "intent_bias": float(values["intent_bias"] / samples) if samples else 0.0,
+            "situation_score": float(values["situation_score"] / samples) if samples else 0.0,
+            "combined_score": float(values["combined_score"] / samples) if samples else 0.0,
+        }
+
+    return {
+        "counts": merged,
+        "learned_path_coverage": coverage(move_total + shoot_total, move_learned + shoot_learned),
+        "move_path_coverage": coverage(move_total, move_learned),
+        "shoot_path_coverage": coverage(shoot_total, shoot_learned),
+        "score_means": score_means,
+        "trace_samples": traces[:12],
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Shenji self-play league evaluation.")
     parser.add_argument("--config", default="configs/selfplay_baseline.yaml")
     parser.add_argument("--candidate", default="ai/weights")
     parser.add_argument("--incumbent", default="ai/weights")
+    parser.add_argument("--candidate-profile", default=None)
+    parser.add_argument("--incumbent-profile", default=None)
+    parser.add_argument("--allow-self-match-smoke", action="store_true")
     args = parser.parse_args()
 
     config = load_config(repo_root() / args.config)
+    if not args.allow_self_match_smoke and _resolved_path_string(args.candidate) == _resolved_path_string(args.incumbent):
+        raise SystemExit("candidate and incumbent must point to different artifact directories unless --allow-self-match-smoke is set.")
+
     set_seed(int(config["seed"]))
     run_dir = ensure_dir(repo_root() / config["output_root"] / f"league_{now_tag()}")
     league_dir = ensure_dir(repo_root() / config["league_dir"])
     league_state_path = league_dir / "league_state.json"
     league_state = _bootstrap_league(league_state_path)
+    candidate_profile = str(args.candidate_profile or config.get("candidate_profile", "challenger"))
+    incumbent_profile = str(args.incumbent_profile or config.get("incumbent_profile", "baseline"))
 
     maps_root = repo_root() / "land_wargame_sdk" / "Data" / "Data" / "maps"
     scenario_root = repo_root() / "land_wargame_sdk" / "Data" / "Data" / "scenarios"
@@ -133,10 +199,24 @@ def main() -> None:
             continue
         for idx in range(bucket_pairs):
             scenario_path, map_id = candidates[idx % len(candidates)]
-            challenger = {"artifacts": args.candidate, "profile": "challenger", "user_name": "CurrentAI"}
-            incumbent = {"artifacts": args.incumbent, "profile": "incumbent", "user_name": "IncumbentAI"}
-            red_score, blue_score = _run_single(scenario_path, map_id, challenger, incumbent, int(config["max_steps"]))
-            blue_red_score, blue_blue_score = _run_single(scenario_path, map_id, incumbent, challenger, int(config["max_steps"]))
+            challenger = {"artifacts": args.candidate, "profile": candidate_profile, "user_name": "CurrentAI"}
+            incumbent = {"artifacts": args.incumbent, "profile": incumbent_profile, "user_name": "IncumbentAI"}
+            red_score, blue_score, red_stats, blue_stats = _run_single(
+                scenario_path,
+                map_id,
+                challenger,
+                incumbent,
+                int(config["max_steps"]),
+            )
+            blue_red_score, blue_blue_score, blue_leg_red_stats, blue_leg_blue_stats = _run_single(
+                scenario_path,
+                map_id,
+                incumbent,
+                challenger,
+                int(config["max_steps"]),
+            )
+            candidate_stats = _merge_policy_stats(red_stats, blue_leg_blue_stats)
+            opponent_stats = _merge_policy_stats(blue_stats, blue_leg_red_stats)
             matches.append(
                 {
                     "scenario": scenario_path.name,
@@ -145,6 +225,12 @@ def main() -> None:
                     "paired_score": _paired_score(red_score, blue_score, blue_blue_score, blue_red_score),
                     "first_leg": {"candidate": red_score, "opponent": blue_score},
                     "second_leg": {"candidate": blue_blue_score, "opponent": blue_red_score},
+                    "candidate_artifacts": _resolved_path_string(args.candidate),
+                    "opponent_artifacts": _resolved_path_string(args.incumbent),
+                    "candidate_profile": candidate_profile,
+                    "opponent_profile": incumbent_profile,
+                    "candidate_policy_stats": candidate_stats,
+                    "opponent_policy_stats": opponent_stats,
                 }
             )
 
@@ -154,14 +240,23 @@ def main() -> None:
     exploiter_results = {}
     for profile in league_state["exploiters"]:
         profile_scores = []
+        profile_coverages = []
         for scenario_path, map_id in scenarios_by_bucket.get("complex", [])[:4]:
-            challenger = {"artifacts": args.candidate, "profile": "challenger", "user_name": "CurrentAI"}
+            challenger = {"artifacts": args.candidate, "profile": candidate_profile, "user_name": "CurrentAI"}
             exploiter = {"artifacts": args.incumbent, "profile": profile, "user_name": "ExploiterAI"}
-            score_a, score_b = _run_single(scenario_path, map_id, challenger, exploiter, int(config["max_steps"]))
+            score_a, score_b, candidate_stats, _ = _run_single(
+                scenario_path,
+                map_id,
+                challenger,
+                exploiter,
+                int(config["max_steps"]),
+            )
             profile_scores.append(1.0 if score_b > score_a else 0.0)
+            profile_coverages.append(float(candidate_stats.get("learned_path_coverage", 0.0)))
         exploiter_results[profile] = {
             "win_rate_vs_candidate": float(np.mean(profile_scores)) if profile_scores else 0.0,
             "matches": len(profile_scores),
+            "candidate_learned_path_coverage": float(np.mean(profile_coverages)) if profile_coverages else 0.0,
         }
 
     if decision["accepted"]:
@@ -177,6 +272,19 @@ def main() -> None:
     save_json(summary, run_dir / "rating.json")
     save_json(decision, run_dir / "promotion.json")
     save_json(exploiter_results, run_dir / "exploitability.json")
+    save_json(
+        {
+            "candidate": {
+                "artifacts": _resolved_path_string(args.candidate),
+                "profile": candidate_profile,
+            },
+            "incumbent": {
+                "artifacts": _resolved_path_string(args.incumbent),
+                "profile": incumbent_profile,
+            },
+        },
+        run_dir / "participants.json",
+    )
     dump_yaml(config, run_dir / "config.yaml")
     save_json(league_state, league_state_path)
     save_json(league_state, run_dir / "league_state.json")
@@ -188,6 +296,9 @@ def main() -> None:
                 f"- overall_point_estimate: `{summary['overall']['point_estimate']:.4f}`",
                 f"- overall_ci95_lower: `{summary['overall']['ci95'][0]:.4f}`",
                 f"- complex_point_estimate: `{summary['buckets'].get('complex', {}).get('point_estimate', 0.0):.4f}`",
+                f"- learned_path_coverage: `{summary['policy'].get('learned_path_coverage', 0.0):.4f}`",
+                f"- move_path_coverage: `{summary['policy'].get('move_path_coverage', 0.0):.4f}`",
+                f"- shoot_path_coverage: `{summary['policy'].get('shoot_path_coverage', 0.0):.4f}`",
                 f"- promotion_accepted: `{decision['accepted']}`",
             ]
         ),

@@ -42,9 +42,23 @@ def main() -> None:
     args = parser.parse_args()
 
     root = Path(args.experiments_root)
+    if not root.exists():
+        payload = {
+            "run_dir": None,
+            "event": "none",
+            "reason": f"实验根目录不存在: {root}",
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
     run_dirs = sorted([path for path in root.iterdir() if path.is_dir()], reverse=True)
     if not run_dirs:
-        raise SystemExit("No experiments found.")
+        payload = {
+            "run_dir": None,
+            "event": "none",
+            "reason": "实验根目录为空，暂无可判定结果。",
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
     event, reason = classify_event(run_dirs[0])
     payload = {
         "run_dir": str(run_dirs[0]),

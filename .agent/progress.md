@@ -1,31 +1,22 @@
-# Progress Log
+# Progress
 
 ## 本次任务摘要
 
-- 任务类型：科研路线审计 + 2-4 周优化路线设计
-- 工作范围：只读扫描 + 文档落盘
-- 代码实现：未改业务代码，未做训练、远程评测或大规模运行
+- 任务类型：实现 `LSTM + GCN` 主线收敛、修正主线错误、补远程运行清单
+- 本次范围：代码实现 + 本地轻量验证 + `.agent/*` 落盘
+- 未做内容：远程训练、远程评测、大规模运行
 
 ## 规则与上下文状态
 
-- 本地项目根 `AGENTS.md`：未发现文件
-- 本地 `.agent/context.md`：未发现文件
-- 执行方式：按用户贴出的项目 `AGENTS.md` 规则执行
-- bootstrap：
-  - 已执行 `C:\Users\lizilong\.codex\automations\weekly-skill-trigger-optimization\codex-runtime-ops.ps1 -Action bootstrap-task -BootstrapChain using-superpowers`
-  - `C:\Users\lizilong\.codex\.agent\task_bootstrap.json` 当前记录为 `bootstrapped`
+- 项目根 `AGENTS.md`：本地未发现
+- `.agent/context.md`：本地未发现
+- bootstrap：已执行
+  - 命令：`C:\Users\lizilong\.codex\automations\weekly-skill-trigger-optimization\codex-runtime-ops.ps1 -Action bootstrap-task -BootstrapChain using-superpowers`
+- 当前任务启动状态：`bootstrapped`
 
-## 本次实际扫描的文件与产物
+## 本次实际扫描与修改
 
-### 文档与历史参考
-
-- `README.md`
-- `ALGORITHM_OPTIMIZATION_PLAN.md`
-- 根目录旧 `findings.md`
-- 根目录旧 `task_plan.md`
-- 根目录旧 `progress.md`
-
-### 代码
+### 读取过的关键文件
 
 - `ai/agent.py`
 - `ai/policy.py`
@@ -33,103 +24,116 @@
 - `ai/features.py`
 - `training/common.py`
 - `training/data.py`
-- `training/maps.py`
-- `training/supervised.py`
-- `training/selfplay.py`
 - `training/evaluate.py`
+- `training/selfplay.py`
+- `training/supervised.py`
 - `scripts/report_progress.py`
-
-### 配置
-
 - `configs/supervised_baseline.yaml`
 - `configs/selfplay_baseline.yaml`
-
-### 实验与权重产物
-
-- `experiments/shenji_agent/20260327_141522/metrics.json`
-- `experiments/shenji_agent/20260327_141522/summary.md`
-- `experiments/shenji_agent/20260327_141522/slice_report.json`
-- `experiments/shenji_agent/league_20260327_141724/rating.json`
-- `experiments/shenji_agent/league_20260327_141724/promotion.json`
-- `experiments/shenji_agent/league_20260327_141724/exploitability.json`
-- `experiments/shenji_agent/league_20260327_141724/league_state.json`
-- `experiments/shenji_agent/league_20260327_141724/match_results.json`
-- `league/league_state.json`
 - `ai/weights/model_manifest.json`
+- `.agent/findings.md`
+- `.agent/task_plan.md`
+- `.agent/plans/research_route_optimization.md`
 
-### 数据与说明文件
+### 本次实际改动文件
 
-- `datasets/意图识别研究数据集WargameData_mini01/train.json`
-- `datasets/意图识别研究数据集WargameData_mini01/test.json`
-- `datasets/意图识别研究数据集WargameData_mini01/WargameData_mini01生成及使用说明.md`
-- `datasets/[重庆大学] 分队级陆战兵棋态势表征图数据集 WG-StateGraph/label.csv`
-- `datasets/[重庆大学] 分队级陆战兵棋态势表征图数据集 WG-StateGraph/Readme.md`
-- `datasets/陆战兵棋态势特征数据集/Wargame_Feature_Dataset.csv`
+- `ai/agent.py`
+- `ai/features.py`
+- `ai/policy.py`
+- `training/common.py`
+- `training/data.py`
+- `training/evaluate.py`
+- `training/selfplay.py`
+- `training/supervised.py`
+- `configs/supervised_baseline.yaml`
+- `configs/supervised_tactical_ablation.yaml`
+- `configs/selfplay_baseline.yaml`
+- `configs/selfplay_minimal.yaml`
+- `run_evaluation.py`
+- `scripts/report_progress.py`
+- `ai/weights/model_manifest.json`
+- `tests/__init__.py`
+- `tests/test_mainline_contract.py`
+- `.agent/findings.md`
+- `.agent/task_plan.md`
+- `.agent/progress.md`
+- `.agent/plans/research_route_optimization.md`
 
-## 关键证据来自哪里
+## 关键实现结果
 
-- 当前真实训练路线：
-  - `training/supervised.py`
-  - `training/data.py`
-  - `configs/supervised_baseline.yaml`
-- 当前模型真实接入点：
-  - `ai/agent.py`
-  - `ai/policy.py`
-- self-play / league 是否构成闭环：
-  - `training/selfplay.py`
-  - `training/evaluate.py`
-  - `experiments/shenji_agent/league_20260327_141724/*`
-- latest 状态是否有突破：
-  - `scripts/report_progress.py`
-  - 直接运行 `python scripts/report_progress.py --experiments-root experiments/shenji_agent`
-- 数据/标签语义：
-  - `WargameData_mini01生成及使用说明.md`
-  - `WG-StateGraph/Readme.md`
-  - `Wargame_Feature_Dataset.csv`
-  - `training/data.py`
+- 已移除 `ai/agent.py` 中旧的直载模型逻辑。
+- 已把 `ai/policy.py` 改为：
+  - 加载 `intent_lstm` 与 `situation_gcn`
+  - 在 `Move` / `Shoot` 上使用 `intent bias + GCN score`
+  - 输出 coverage / trace 统计
+- 已把默认训练主线改成 `intent + situation`
+- 已把 tactical 改成独立消融线
+- 已修正 self-play：
+  - 默认拒绝 `candidate == incumbent`
+  - 输出 `participants.json`
+  - 输出 learned-path coverage
+- 已修正 progress 脚本在空目录时报错
 
-## 已验证判断
+## Fresh verification evidence
 
-- 已验证：当前项目真实主线是“规则 agent + 局部 learned policy + supervised surrogate + self-play 脚手架”，不是端到端策略学习。
-- 已验证：`intent` 预测敌方短期方向，`tactical` 排序射击/目标点，`situation` 只做离线图分类。
-- 已验证：`ai/policy.py` 只加载 `intent_model.pt` 和 `tactical_model.pt`，不加载 `situation_model.pt`。
-- 已验证：`ai/agent.py` 中 learned policy 只影响 `Shoot` 与 `Move` 两个动作分支。
-- 已验证：latest league 运行中 `candidate == incumbent == ai/weights`，64 场比赛全部 `paired_score=0.5`。
-- 已验证：`report_progress.py` 对当前实验根输出 `event=none`。
-- 已验证：`tactical` 训练代码把最后一列 `整体移动方向` 当成标签，而不是第 4 列 `样本标签`。
-- 已验证：intent/state graph 的 bucket 映射对现有文件名体系明显失真。
+### 已完成
 
-## 未验证或本轮未做的内容
+1. 语法验证
+   - 命令：
+     - `C:\Users\lizilong\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe -m compileall ai training scripts tests`
+   - 结果：通过
 
-- 未验证：修正 tactical 标签后，当前路线是否会显著提升 paired score。
-- 未验证：`situation` 若接入主链，是否会带来任何正收益。
-- 未验证：更大模型、多任务训练、重型基础设施是否必要。
-- 未验证：远程服务器上是否存在更新的实验产物。本轮按用户要求未做远程训练、远程评测或远程同步。
+2. 轻量回归测试
+   - 命令：
+     - `C:\Users\lizilong\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe -m unittest tests.test_mainline_contract -v`
+   - 结果：4 项测试全部通过
+   - 覆盖：
+     - tactical 显式标签列
+     - self-play 同路径保护
+     - coverage 汇总逻辑
+     - `report_progress.py` 空目录返回 `none`
+
+3. 权重契约检查
+   - 结果：
+     - `ai/weights/model_manifest.json` 已切到 `intent_lstm` / `situation_gcn`
+     - 兼容旧文件仍保留在目录中，但默认 contract 已更新
+   - 注意：
+     - `ai/weights/*.pt` 与 `ai/weights/model_manifest.json` 被 `.gitignore` 排除，不会进入本次 git 提交
+     - 远程同步时必须显式带上整个 `ai/weights/` 目录
+
+### 未完成
+
+- 未完成：本机真实 `torch` 训练 / 推理验证
+- 原因：工作区自带 Python 缺少 `torch`，而系统 Python 初始化失败
+- 影响：本机无法证明新主线在真实模型加载下已经跑通，只能完成语法和轻量行为验证
 
 ## 当前阻塞点
 
-- 阻塞 1：现有离线 tactical 指标不可信，因为标签语义错误。
-- 阻塞 2：现有 bucket 报告不可信，因为 map 推断几乎退化。
-- 阻塞 3：现有 latest league 产物不构成有效 challenger-vs-incumbent 对比。
-- 阻塞 4：`situation` 线没有接入主决策链，导致其科研价值无法判断。
+### 阻塞 1
+
+- 本机无可用 `torch` 运行时
+- 影响：无法本地完成训练与 self-play 真跑
+- 最直接下一步：按 `.agent/task_plan.md` 中远程清单在 `/remote-home/lizilong/shenji_agent` 执行
+
+### 阻塞 2
+
+- 当前工作树存在若干与本任务无关的已删除文件
+- 影响：收尾提交时不能无差别 `git add -A`
+- 处理原则：只提交本次相关文件，不动这些外部改动
 
 ## 本次是否只做分析、未做实现
 
-- 是。本次只做审计、证据核对和方案落盘。
-- 未修改业务代码、训练脚本、配置逻辑或远程环境。
+- 否
+- 本次已完成真实代码实现与本地轻量验证
 
-## 本次收尾动作
+## 收尾动作
 
-- 已新建 `.agent/` 工作区并写入：
-  - `.agent/findings.md`
-  - `.agent/task_plan.md`
-  - `.agent/plans/research_route_optimization.md`
-  - `.agent/progress.md`
+- `.agent/*` 已更新
+- 远程操作清单已写入 `.agent/task_plan.md`
 - 已完成：
-  - 已校验文档写入磁盘并回读核心内容
-  - 已运行 `complete-task`，workflow fingerprint 为 `miaosuan-shenji-research-route-audit`
-  - 已执行 git 提交闭环；首个交付提交为 `16d7f9e Add research route audit and optimization plan`
-- 说明：
-  - lifecycle completion 已写入 `C:\Users\lizilong\.codex\.agent\task_bootstrap.json`
-  - workflow candidate 已追加到 `C:\Users\lizilong\.codex\.agent\workflow_candidates.jsonl`
-  - 远程无需执行
+  - `complete-task`
+  - workflow candidate 已记录到 `C:\Users\lizilong\.codex\.agent\workflow_candidates.jsonl`
+  - fingerprint: `shenji-lstm-gcn-mainline`
+- Git closeout：
+  - 将只 stage 本次相关文件
+  - `ai/weights/*` 继续通过文件同步进入远程，不进入本次提交

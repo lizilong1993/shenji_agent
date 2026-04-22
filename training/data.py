@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import ast
 import json
+import re
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -11,7 +13,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from ai.features import FEATURE_DIM, TACTICAL_FEATURE_DIM, action_feature_vector, find_operator, operator_to_feature
+from ai.features import FEATURE_DIM, TACTICAL_FEATURE_DIM, build_feature_similarity_graph, find_operator, operator_to_feature
 from .common import discover_dir, repo_root
 from .maps import infer_map_id_from_scenario_id
 
@@ -55,12 +57,39 @@ def _parse_list_like(value: object) -> List[float]:
     return []
 
 
-def _map_bucket_from_frame(frame: Dict[str, object], map_bucket_lookup: Dict[int, str]) -> str:
-    filename = str(frame.get("filename", ""))
-    map_id = infer_map_id_from_scenario_id(filename, map_bucket_lookup.keys())
-    if map_id is None:
-        return "medium"
-    return map_bucket_lookup.get(map_id, "medium")
+def _extract_numeric_tokens(value: str) -> List[str]:
+    return [token for token in re.findall(r"\d+", value) if token]
+
+
+def resolve_map_id_by_strategy(value: str, map_ids: Sequence[int], strategy: str) -> int:
+    tokens = _extract_numeric_tokens(value) or [value]
+    known = sorted({int(map_id) for map_id in map_ids}, key=lambda item: len(str(item)), reverse=True)
+    matches: List[int] = []
+    for token in tokens:
+        for candidate in known:
+            text = str(candidate)
+            if strategy == "prefix" and token.startswith(text):
+                matches.append(candidate)
+            elif strategy == "suffix" and token.endswith(text):
+                matches.append(candidate)
+            elif strategy == "exact" and token == text:
+                matches.append(candidate)
+    unique = sorted(set(matches), key=lambda item: len(str(item)), reverse=True)
+    if len(unique) == 1:
+        return unique[0]
+    if not unique:
+        fallback = infer_map_id_from_scenario_id(value, map_ids)
+        if fallback is not None:
+            return fallback
+        raise ValueError(f"Unable to resolve map_id from value={value!r} strategy={strategy}")
+    raise ValueError(f"Ambiguous map_id for value={value!r} strategy={strategy}: {unique}")
+
+
+def _bucket_from_filename(filename: str, map_bucket_lookup: Dict[int, str], *, strategy: str) -> str:
+    map_id = resolve_map_id_by_strategy(filename, list(map_bucket_lookup.keys()), strategy)
+    if map_id not in map_bucket_lookup:
+        raise ValueError(f"Resolved map_id={map_id} missing from bucket lookup for filename={filename!r}")
+    return map_bucket_lookup[map_id]
 
 
 @dataclass
@@ -80,14 +109,21 @@ class IntentSequenceDataset(Dataset):
         history_len: int,
         horizons: int,
         map_bucket_lookup: Dict[int, str],
+        map_id_strategy: str = "suffix",
         max_samples: Optional[int] = None,
     ) -> None:
         self.samples: List[IntentSample] = []
+        self.bucket_counts: Counter[str] = Counter()
+        self.map_id_strategy = map_id_strategy
         data = json.loads(json_path.read_text(encoding="utf-8"))
         for stream in data:
             frames = [frame for frame in stream if isinstance(frame, dict)]
             for idx in range(history_len - 1, len(frames)):
                 frame = frames[idx]
+                filename = str(frame.get("filename", "")).strip()
+                if not filename:
+                    raise ValueError(f"Intent sample missing filename in {json_path}")
+                bucket = _bucket_from_filename(filename, map_bucket_lookup, strategy=map_id_strategy)
                 for entry in frame.get("tank_enemy", []):
                     if len(entry) < 2 + horizons:
                         continue
@@ -103,15 +139,17 @@ class IntentSequenceDataset(Dataset):
                         IntentSample(
                             sequence=np.stack(features),
                             target=target,
-                            bucket=_map_bucket_from_frame(frame, map_bucket_lookup),
+                            bucket=bucket,
                             enemy_id=enemy_id,
                             enemy_pos=enemy_pos,
                         )
                     )
+                    self.bucket_counts[bucket] += 1
         if max_samples and len(self.samples) > max_samples:
             rng = np.random.default_rng(42)
             indices = rng.choice(len(self.samples), size=max_samples, replace=False)
             self.samples = [self.samples[int(idx)] for idx in sorted(indices.tolist())]
+            self.bucket_counts = Counter(sample.bucket for sample in self.samples)
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -128,11 +166,21 @@ class IntentSequenceDataset(Dataset):
 
 
 class TacticalPositionDataset(Dataset):
-    def __init__(self, csv_path: Path, *, max_rows: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        csv_path: Path,
+        *,
+        label_column: str = "样本标签",
+        max_rows: Optional[int] = None,
+    ) -> None:
         self.features: np.ndarray
         self.labels: np.ndarray
+        self.label_column = label_column
+        self.feature_columns: List[str] = []
+        self.label_distribution: Dict[str, int] = {}
         frame = _read_csv_with_fallback(csv_path, nrows=max_rows)
-        label_column = next((col for col in frame.columns if col.lower() == "label"), frame.columns[-1])
+        if label_column not in frame.columns:
+            raise ValueError(f"Expected tactical label column {label_column!r} in {csv_path}, got columns={frame.columns.tolist()}")
         numeric_columns = []
         derived_rows: List[np.ndarray] = []
         for column in frame.columns:
@@ -142,6 +190,7 @@ class TacticalPositionDataset(Dataset):
                 series = pd.to_numeric(frame[column], errors="coerce")
                 if series.notna().mean() > 0.8:
                     numeric_columns.append(series.fillna(0.0).to_numpy(dtype=np.float32))
+                    self.feature_columns.append(column)
                     continue
             except Exception:
                 pass
@@ -150,6 +199,7 @@ class TacticalPositionDataset(Dataset):
                 .map(lambda item: float(len(_parse_list_like(item))) if isinstance(item, str) or isinstance(item, list) else 0.0)
                 .to_numpy(dtype=np.float32)
             )
+            self.feature_columns.append(column)
 
         stacked = numeric_columns + derived_rows
         if stacked:
@@ -160,9 +210,11 @@ class TacticalPositionDataset(Dataset):
             features = np.pad(features, ((0, 0), (0, TACTICAL_FEATURE_DIM - features.shape[1])))
         elif features.shape[1] > TACTICAL_FEATURE_DIM:
             features = features[:, :TACTICAL_FEATURE_DIM]
+            self.feature_columns = self.feature_columns[:TACTICAL_FEATURE_DIM]
         labels = pd.to_numeric(frame[label_column], errors="coerce").fillna(0.0).to_numpy(dtype=np.float32)
         self.features = features
         self.labels = labels
+        self.label_distribution = {str(label): int(count) for label, count in Counter(labels.tolist()).items()}
 
     def __len__(self) -> int:
         return len(self.features)
@@ -175,11 +227,17 @@ class TacticalPositionDataset(Dataset):
 
 
 class StateGraphDataset(Dataset):
-    def __init__(self, root_dir: Path, *, map_bucket_lookup: Dict[int, str]) -> None:
+    def __init__(self, root_dir: Path, *, map_bucket_lookup: Dict[int, str], map_id_strategy: str = "prefix") -> None:
         labels = _read_csv_with_fallback(root_dir / "label.csv")
         self.label_lookup = {row["filename"]: float(row["label"]) for _, row in labels.iterrows()}
         self.files = sorted((root_dir / "encoded_nodes-features").glob("*.csv"))
         self.map_bucket_lookup = map_bucket_lookup
+        self.map_id_strategy = map_id_strategy
+        self.bucket_counts: Counter[str] = Counter()
+        for path in self.files:
+            filename = path.name.replace("encoded_", "").replace("_nodes_features.csv", ".json")
+            bucket = _bucket_from_filename(filename, self.map_bucket_lookup, strategy=self.map_id_strategy)
+            self.bucket_counts[bucket] += 1
 
     def __len__(self) -> int:
         return len(self.files)
@@ -199,21 +257,13 @@ class StateGraphDataset(Dataset):
             else:
                 fill_values = values[:num_nodes] + [0.0] * max(0, num_nodes - len(values))
                 features[:, feat_idx] = np.array(fill_values[:num_nodes], dtype=np.float32)
-        similarity = features @ features.T
-        np.fill_diagonal(similarity, 0.0)
-        adjacency = np.eye(num_nodes, dtype=np.float32)
-        if num_nodes > 1:
-            top_k = min(4, num_nodes - 1)
-            for row_idx in range(num_nodes):
-                neighbor_idx = np.argsort(similarity[row_idx])[-top_k:]
-                adjacency[row_idx, neighbor_idx] = 1.0
+        adjacency = build_feature_similarity_graph(features)
         return features, adjacency
 
     def __getitem__(self, idx: int) -> Dict[str, object]:
         path = self.files[idx]
         filename = path.name.replace("encoded_", "").replace("_nodes_features.csv", ".json")
-        map_id = infer_map_id_from_scenario_id(filename, self.map_bucket_lookup.keys())
-        bucket = self.map_bucket_lookup.get(map_id, "medium") if map_id is not None else "medium"
+        bucket = _bucket_from_filename(filename, self.map_bucket_lookup, strategy=self.map_id_strategy)
         features, adjacency = self._load_graph(path)
         label = self.label_lookup.get(filename, 0.0)
         return {

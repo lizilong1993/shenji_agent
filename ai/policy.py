@@ -7,19 +7,19 @@ from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
-from .features import action_feature_vector, find_operator, operator_to_feature
+from .features import FEATURE_DIM, build_feature_similarity_graph, operator_to_feature
 
 try:
     import torch
 
-    from .models import MultiHorizonIntentionModel, TacticalScorer
+    from .models import GraphSituationModel, MultiHorizonIntentionModel
 
     TORCH_AVAILABLE = True
 except ImportError:  # pragma: no cover
     TORCH_AVAILABLE = False
     torch = None  # type: ignore[assignment]
+    GraphSituationModel = None  # type: ignore[assignment]
     MultiHorizonIntentionModel = None  # type: ignore[assignment]
-    TacticalScorer = None  # type: ignore[assignment]
 
 
 _DIRECTION_STEPS = [
@@ -45,26 +45,80 @@ def _axial_to_hex(q: int, r: int) -> int:
     return r * 100 + col
 
 
+def _coverage(total: int, learned: int) -> float:
+    if total <= 0:
+        return 0.0
+    return float(learned / total)
+
+
 class LearnedPolicy:
     def __init__(self) -> None:
         self.history_len = 8
         self.faction: Optional[int] = None
         self.policy_profile = "challenger"
         self.intent_model = None
-        self.tactical_model = None
+        self.situation_model = None
         self.enemy_histories: Dict[int, Deque[np.ndarray]] = defaultdict(lambda: deque(maxlen=self.history_len))
         self.loaded_from: Optional[Path] = None
+        self.manifest: Dict[str, Any] = {}
+        self._observation_cache: Optional[Dict[str, Any]] = None
+        self._reset_diagnostics()
+
+    def _reset_diagnostics(self) -> None:
+        self.action_counts = {
+            "move": {"total": 0, "learned": 0},
+            "shoot": {"total": 0, "learned": 0},
+        }
+        self.score_totals = {
+            "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
+            "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
+        }
+        self.trace_samples: List[Dict[str, Any]] = []
+
+    def _load_intent_model(self, payload: Dict[str, Any]) -> Any:
+        hidden_dim = int(payload.get("hidden_dim") or payload["model_state"]["lstm.weight_ih_l0"].shape[0] // 4)
+        model = MultiHorizonIntentionModel(
+            input_dim=int(payload.get("feature_dim", FEATURE_DIM)),
+            hidden_dim=hidden_dim,
+            horizons=int(payload.get("horizons", 5)),
+            num_classes=int(payload.get("num_classes", 7)),
+        )
+        model.load_state_dict(payload["model_state"])
+        model.eval()
+        return model
+
+    def _load_situation_model(self, payload: Dict[str, Any]) -> Any:
+        hidden_dim = int(payload.get("hidden_dim") or payload["model_state"]["backbone.sage1.linear.weight"].shape[0])
+        model = GraphSituationModel(
+            num_features=int(payload.get("input_dim", FEATURE_DIM)),
+            hidden_dim=hidden_dim,
+        )
+        model.load_state_dict(payload["model_state"])
+        model.eval()
+        return model
+
+    def has_models(self) -> bool:
+        return self.intent_model is not None and self.situation_model is not None
 
     def configure(self, faction: int, artifact_dir: Optional[str] = None, policy_profile: str = "challenger") -> None:
         self.faction = faction
         self.policy_profile = policy_profile or "challenger"
+        self.history_len = 8
+        self.intent_model = None
+        self.situation_model = None
+        self.loaded_from = None
+        self.manifest = {}
+        self._observation_cache = None
         self.enemy_histories = defaultdict(lambda: deque(maxlen=self.history_len))
-        if not TORCH_AVAILABLE:
+        self._reset_diagnostics()
+        if not TORCH_AVAILABLE or self.policy_profile == "baseline":
             return
-        candidate_dirs = []
+
+        candidate_dirs: List[Path] = []
         if artifact_dir:
             candidate_dirs.append(Path(artifact_dir))
         candidate_dirs.append(Path(__file__).resolve().parent / "weights")
+
         for candidate_dir in candidate_dirs:
             manifest_path = candidate_dir / "model_manifest.json"
             if not manifest_path.exists():
@@ -72,28 +126,82 @@ class LearnedPolicy:
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.history_len = int(payload.get("history_len", self.history_len))
             self.enemy_histories = defaultdict(lambda: deque(maxlen=self.history_len))
-            intent_path = candidate_dir / payload.get("intent_model", "")
-            tactical_path = candidate_dir / payload.get("tactical_model", "")
-            if intent_path.exists():
-                model_state = torch.load(intent_path, map_location="cpu")
-                self.intent_model = MultiHorizonIntentionModel(
-                    input_dim=int(model_state.get("feature_dim", 108)),
-                    hidden_dim=128,
-                    horizons=int(model_state.get("horizons", 5)),
-                    num_classes=int(model_state.get("num_classes", 7)),
-                )
-                self.intent_model.load_state_dict(model_state["model_state"])
-                self.intent_model.eval()
-            if tactical_path.exists():
-                tactical_state = torch.load(tactical_path, map_location="cpu")
-                self.tactical_model = TacticalScorer(input_dim=int(tactical_state.get("input_dim", 32)))
-                self.tactical_model.load_state_dict(tactical_state["model_state"])
-                self.tactical_model.eval()
+
+            intent_name = payload.get("intent_lstm") or payload.get("intent_model")
+            situation_name = payload.get("situation_gcn") or payload.get("situation_model")
+            if not intent_name or not situation_name:
+                continue
+
+            intent_path = candidate_dir / intent_name
+            situation_path = candidate_dir / situation_name
+            if not intent_path.exists() or not situation_path.exists():
+                continue
+
+            intent_state = torch.load(intent_path, map_location="cpu")
+            situation_state = torch.load(situation_path, map_location="cpu")
+            self.intent_model = self._load_intent_model(intent_state)
+            self.situation_model = self._load_situation_model(situation_state)
             self.loaded_from = candidate_dir
+            self.manifest = payload
             return
 
     def reset(self) -> None:
         self.enemy_histories = defaultdict(lambda: deque(maxlen=self.history_len))
+        self._observation_cache = None
+        self._reset_diagnostics()
+
+    def note_action(self, action_type: str, used_learned: bool, trace: Optional[Dict[str, Any]] = None) -> None:
+        key = action_type.lower()
+        if key not in self.action_counts:
+            return
+        self.action_counts[key]["total"] += 1
+        if used_learned:
+            self.action_counts[key]["learned"] += 1
+        if trace:
+            totals = self.score_totals[key]
+            numeric_fields = ("intent_bias", "situation_score", "combined_score")
+            if any(field in trace for field in numeric_fields):
+                totals["samples"] += 1
+                for field in numeric_fields:
+                    totals[field] += float(trace.get(field, 0.0))
+            if len(self.trace_samples) < 12:
+                sample = {"action": key, "used_learned": used_learned}
+                for field in ("obj_id", "candidate_id", "intent_bias", "situation_score", "combined_score", "reason"):
+                    if field in trace:
+                        sample[field] = trace[field]
+                self.trace_samples.append(sample)
+
+    def get_diagnostics(self) -> Dict[str, Any]:
+        move_total = int(self.action_counts["move"]["total"])
+        move_learned = int(self.action_counts["move"]["learned"])
+        shoot_total = int(self.action_counts["shoot"]["total"])
+        shoot_learned = int(self.action_counts["shoot"]["learned"])
+        total_actions = move_total + shoot_total
+        learned_actions = move_learned + shoot_learned
+        score_means: Dict[str, Dict[str, float]] = {}
+        for key, totals in self.score_totals.items():
+            samples = int(totals["samples"])
+            score_means[key] = {
+                "intent_bias": float(totals["intent_bias"] / samples) if samples else 0.0,
+                "situation_score": float(totals["situation_score"] / samples) if samples else 0.0,
+                "combined_score": float(totals["combined_score"] / samples) if samples else 0.0,
+                "samples": samples,
+            }
+        return {
+            "policy_profile": self.policy_profile,
+            "loaded_from": str(self.loaded_from) if self.loaded_from else None,
+            "intent_model_loaded": self.intent_model is not None,
+            "situation_model_loaded": self.situation_model is not None,
+            "counts": {
+                "move": dict(self.action_counts["move"]),
+                "shoot": dict(self.action_counts["shoot"]),
+            },
+            "learned_path_coverage": _coverage(total_actions, learned_actions),
+            "move_path_coverage": _coverage(move_total, move_learned),
+            "shoot_path_coverage": _coverage(shoot_total, shoot_learned),
+            "score_means": score_means,
+            "trace_samples": list(self.trace_samples),
+        }
 
     def observe(self, observation: Dict[str, Any]) -> None:
         if self.faction is None:
@@ -103,6 +211,37 @@ class LearnedPolicy:
                 continue
             feature = operator_to_feature(operator, frame=observation, fallback_pos=operator.get("cur_hex"))
             self.enemy_histories[int(operator.get("obj_id"))].append(feature)
+        self._observation_cache = self._build_observation_cache(observation)
+
+    def _build_observation_cache(self, observation: Dict[str, Any]) -> Dict[str, Any]:
+        operators = list(observation.get("operators", []))
+        if not operators:
+            return {
+                "operators": [],
+                "features": np.zeros((1, FEATURE_DIM), dtype=np.float32),
+                "index_lookup": {},
+            }
+        features = np.stack(
+            [
+                operator_to_feature(operator, frame=observation, fallback_pos=operator.get("cur_hex"))
+                for operator in operators
+            ]
+        ).astype(np.float32)
+        index_lookup = {
+            int(operator.get("obj_id")): idx
+            for idx, operator in enumerate(operators)
+            if operator.get("obj_id") is not None
+        }
+        return {
+            "operators": operators,
+            "features": features,
+            "index_lookup": index_lookup,
+        }
+
+    def _ensure_observation_cache(self, observation: Dict[str, Any]) -> Dict[str, Any]:
+        if self._observation_cache is None:
+            self._observation_cache = self._build_observation_cache(observation)
+        return self._observation_cache
 
     def _intent_distribution(self, enemy_id: int) -> Optional[np.ndarray]:
         if self.intent_model is None or enemy_id not in self.enemy_histories:
@@ -113,17 +252,19 @@ class LearnedPolicy:
         while len(history) < self.history_len:
             history.insert(0, np.zeros_like(history[0]))
         tensor = torch.tensor(np.stack(history), dtype=torch.float32).unsqueeze(0)
-        with torch.no_grad():
+        with torch.inference_mode():
             logits = self.intent_model(tensor)[0, 0]
         return torch.softmax(logits, dim=-1).cpu().numpy()
 
     def predict_intent(self, enemy_id: int) -> Dict[str, Any]:
         distribution = self._intent_distribution(enemy_id)
         if distribution is None:
-            return {"top_direction": 0, "distribution": [1.0] + [0.0] * 6}
+            return {"top_direction": 0, "confidence": 0.0, "distribution": [1.0] + [0.0] * 6}
         top_direction = int(np.argmax(distribution))
+        confidence = float(np.max(distribution))
         return {
             "top_direction": top_direction,
+            "confidence": confidence,
             "distribution": distribution.tolist(),
         }
 
@@ -137,35 +278,83 @@ class LearnedPolicy:
         target = _axial_to_hex(q + dq, r + dr)
         return target if tactical_map.is_valid(target) else current_hex
 
-    def _score_tactical_vector(self, vector: np.ndarray) -> float:
-        if self.tactical_model is None:
+    def _score_counterfactual(self, observation: Dict[str, Any], overrides: Dict[int, Dict[str, Any]]) -> float:
+        if self.situation_model is None:
             return 0.0
-        with torch.no_grad():
-            tensor = torch.tensor(vector, dtype=torch.float32).unsqueeze(0)
-            return float(self.tactical_model(tensor).view(-1).item())
+        cache = self._ensure_observation_cache(observation)
+        index_lookup = cache["index_lookup"]
+        if not index_lookup:
+            return 0.0
+        features = np.array(cache["features"], copy=True)
+        for obj_id, operator in overrides.items():
+            row_idx = index_lookup.get(int(obj_id))
+            if row_idx is None:
+                continue
+            features[row_idx] = operator_to_feature(
+                operator,
+                frame=observation,
+                fallback_pos=operator.get("cur_hex"),
+            )
+        adjacency = build_feature_similarity_graph(features)
+        with torch.inference_mode():
+            x = torch.tensor(features, dtype=torch.float32)
+            adj = torch.tensor(adjacency, dtype=torch.float32)
+            return float(self.situation_model(x, adj).view(-1).item())
 
     def choose_shoot_candidate(
         self,
         operator: Dict[str, Any],
         candidates: List[Dict[str, Any]],
         observation: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
-        if not candidates:
-            return None
-        enemy_lookup = {item.get("obj_id"): item for item in observation.get("operators", [])}
-        scored: List[Tuple[float, Dict[str, Any]]] = []
+        tactical_map: Any,
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        if not candidates or not self.has_models():
+            return None, None
+        enemy_lookup = {
+            int(item["obj_id"]): item
+            for item in observation.get("operators", [])
+            if item.get("obj_id") is not None
+        }
+        best: Optional[Tuple[float, Dict[str, Any], Dict[str, Any]]] = None
+        operator_hex = int(operator.get("cur_hex", 0))
         for candidate in candidates:
-            target = enemy_lookup.get(candidate.get("target_obj_id"))
-            vector = action_feature_vector(operator, candidate, target_operator=target)
-            model_score = self._score_tactical_vector(vector)
-            target_hp = candidate.get("target_blood", target.get("blood", 100) if target else 100)
-            damage = candidate.get("damage", 10)
-            hit_prob = candidate.get("hit_prob", 0.5)
-            kill_bonus = 100.0 if target_hp <= damage else 0.0
-            profile_bonus = 10.0 if self.policy_profile == "aggressive_exploiter" else 0.0
-            score = model_score + kill_bonus + hit_prob * 50.0 - float(target_hp) * 0.1 + profile_bonus
-            scored.append((score, candidate))
-        return max(scored, key=lambda item: item[0])[1]
+            target_id = candidate.get("target_obj_id")
+            if target_id is None:
+                continue
+            target = enemy_lookup.get(int(target_id))
+            if target is None:
+                continue
+            intent = self.predict_intent(int(target_id))
+            predicted_hex = self.predict_location(int(target_id), int(target.get("cur_hex", 0)), tactical_map)
+            intent_bias = 0.0
+            if tactical_map is not None:
+                distance = tactical_map.get_distance(operator_hex, predicted_hex)
+                if distance >= 0:
+                    intent_bias = max(0.0, 8.0 - float(distance)) * float(intent["confidence"]) * 2.0
+
+            adjusted_target = dict(target)
+            expected_damage = float(candidate.get("damage", 0.0)) * float(candidate.get("hit_prob", 0.0))
+            adjusted_target["blood"] = max(0.0, float(target.get("blood", 0.0)) - expected_damage)
+            situation_score = self._score_counterfactual(observation, {int(target_id): adjusted_target})
+
+            target_hp = float(target.get("blood", 100.0))
+            attack_level = float(candidate.get("attack_level", 0.0))
+            hit_prob = float(candidate.get("hit_prob", 0.0))
+            kill_bonus = 50.0 if adjusted_target["blood"] <= 0 else 0.0
+            profile_bonus = 12.0 if self.policy_profile == "aggressive_exploiter" else 0.0
+            combined_score = situation_score * 100.0 + attack_level * 8.0 + hit_prob * 30.0 + intent_bias + kill_bonus + profile_bonus - target_hp * 0.05
+            trace = {
+                "obj_id": int(operator.get("obj_id", -1)),
+                "candidate_id": int(target_id),
+                "intent_bias": float(intent_bias),
+                "situation_score": float(situation_score),
+                "combined_score": float(combined_score),
+            }
+            if best is None or combined_score > best[0]:
+                best = (combined_score, candidate, trace)
+        if best is None:
+            return None, None
+        return best[1], best[2]
 
     def choose_city(
         self,
@@ -173,23 +362,53 @@ class LearnedPolicy:
         cities: Iterable[Dict[str, Any]],
         observation: Dict[str, Any],
         tactical_map: Any,
-    ) -> Optional[Dict[str, Any]]:
-        best: Optional[Tuple[float, Dict[str, Any]]] = None
-        visible_enemies = [enemy for enemy in observation.get("operators", []) if enemy.get("color") != self.faction]
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        if not self.has_models():
+            return None, None
+        operator_id = operator.get("obj_id")
+        if operator_id is None:
+            return None, None
+        visible_enemies = [
+            enemy
+            for enemy in observation.get("operators", [])
+            if enemy.get("color") != self.faction and enemy.get("obj_id") is not None
+        ]
+        best: Optional[Tuple[float, Dict[str, Any], Dict[str, Any]]] = None
         for city in cities:
-            vector = action_feature_vector(operator, {"move_path": []}, city=city)
-            model_score = self._score_tactical_vector(vector)
             city_hex = int(city.get("coord", 0))
+            adjusted_operator = dict(operator)
+            adjusted_operator["cur_hex"] = city_hex
+            adjusted_operator["cur_pos"] = 0
+            situation_score = self._score_counterfactual(observation, {int(operator_id): adjusted_operator})
+
             distance_penalty = 0.0
             if tactical_map is not None and operator.get("cur_hex"):
-                distance_penalty = tactical_map.get_distance(operator["cur_hex"], city_hex)
+                distance = tactical_map.get_distance(int(operator["cur_hex"]), city_hex)
+                if distance >= 0:
+                    distance_penalty = float(distance)
+
             threat_penalty = 0.0
             for enemy in visible_enemies:
-                predicted = self.predict_location(int(enemy["obj_id"]), int(enemy.get("cur_hex", 0)), tactical_map)
-                if tactical_map is not None:
-                    threat_penalty += max(0.0, 5.0 - tactical_map.get_distance(predicted, city_hex))
+                predicted_hex = self.predict_location(int(enemy["obj_id"]), int(enemy.get("cur_hex", 0)), tactical_map)
+                if tactical_map is None:
+                    continue
+                distance = tactical_map.get_distance(predicted_hex, city_hex)
+                if distance >= 0:
+                    threat_penalty += max(0.0, 6.0 - float(distance))
+
+            intent_bias = -threat_penalty
             occupy_bias = 8.0 if self.policy_profile == "occupy_exploiter" else 0.0
-            score = model_score + float(city.get("value", 0)) * 0.2 + occupy_bias - distance_penalty * 0.3 - threat_penalty
-            if best is None or score > best[0]:
-                best = (score, city)
-        return best[1] if best else None
+            city_value = float(city.get("value", 0.0))
+            combined_score = situation_score * 100.0 + city_value * 0.2 + occupy_bias + intent_bias - distance_penalty * 0.35
+            trace = {
+                "obj_id": int(operator_id),
+                "candidate_id": city_hex,
+                "intent_bias": float(intent_bias),
+                "situation_score": float(situation_score),
+                "combined_score": float(combined_score),
+            }
+            if best is None or combined_score > best[0]:
+                best = (combined_score, city, trace)
+        if best is None:
+            return None, None
+        return best[1], best[2]

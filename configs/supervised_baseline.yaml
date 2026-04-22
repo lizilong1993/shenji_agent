@@ -1,6 +1,13 @@
 seed: 42
 output_root: experiments/shenji_agent
 publish_to_ai_weights: true
+dataset_contract:
+  intent:
+    map_id_strategy: suffix
+  situation:
+    map_id_strategy: prefix
+  tactical:
+    label_col: 样本标签
 intent:
   enabled: true
   history_len: 8
@@ -12,7 +19,7 @@ intent:
   max_train_samples: 4096
   max_val_samples: 1024
 tactical:
-  enabled: true
+  enabled: false
   batch_size: 512
   epochs: 3
   hidden_dim: 128

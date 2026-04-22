@@ -31,10 +31,72 @@ def simple_elo(win_rate: float) -> float:
     return -400.0 * math.log10((1 / win_rate) - 1)
 
 
+def _merge_policy_stats(matches: Iterable[Dict[str, object]]) -> Dict[str, object]:
+    totals = {
+        "move_total": 0,
+        "move_learned": 0,
+        "shoot_total": 0,
+        "shoot_learned": 0,
+        "score_sums": {
+            "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
+            "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
+        },
+    }
+    for match in matches:
+        stats = match.get("candidate_policy_stats", {})
+        counts = stats.get("counts", {}) if isinstance(stats, dict) else {}
+        move_counts = counts.get("move", {}) if isinstance(counts, dict) else {}
+        shoot_counts = counts.get("shoot", {}) if isinstance(counts, dict) else {}
+        totals["move_total"] += int(move_counts.get("total", 0))
+        totals["move_learned"] += int(move_counts.get("learned", 0))
+        totals["shoot_total"] += int(shoot_counts.get("total", 0))
+        totals["shoot_learned"] += int(shoot_counts.get("learned", 0))
+        score_means = stats.get("score_means", {}) if isinstance(stats, dict) else {}
+        for action_key in ("move", "shoot"):
+            action_scores = score_means.get(action_key, {}) if isinstance(score_means, dict) else {}
+            samples = int(action_scores.get("samples", 0))
+            totals["score_sums"][action_key]["samples"] += samples
+            for metric in ("intent_bias", "situation_score", "combined_score"):
+                totals["score_sums"][action_key][metric] += float(action_scores.get(metric, 0.0)) * samples
+
+    def coverage(total: int, learned: int) -> float:
+        if total <= 0:
+            return 0.0
+        return float(learned / total)
+
+    score_means = {}
+    for action_key, values in totals["score_sums"].items():
+        samples = int(values["samples"])
+        score_means[action_key] = {
+            "samples": samples,
+            "intent_bias": float(values["intent_bias"] / samples) if samples else 0.0,
+            "situation_score": float(values["situation_score"] / samples) if samples else 0.0,
+            "combined_score": float(values["combined_score"] / samples) if samples else 0.0,
+        }
+
+    move_total = int(totals["move_total"])
+    move_learned = int(totals["move_learned"])
+    shoot_total = int(totals["shoot_total"])
+    shoot_learned = int(totals["shoot_learned"])
+    total_actions = move_total + shoot_total
+    learned_actions = move_learned + shoot_learned
+    return {
+        "learned_path_coverage": coverage(total_actions, learned_actions),
+        "move_path_coverage": coverage(move_total, move_learned),
+        "shoot_path_coverage": coverage(shoot_total, shoot_learned),
+        "counts": {
+            "move": {"total": move_total, "learned": move_learned},
+            "shoot": {"total": shoot_total, "learned": shoot_learned},
+        },
+        "score_means": score_means,
+    }
+
+
 def summarize_matches(matches: Iterable[Dict[str, object]]) -> Dict[str, object]:
+    match_list = list(matches)
     overall_scores: List[float] = []
     by_bucket: Dict[str, List[float]] = defaultdict(list)
-    for match in matches:
+    for match in match_list:
         score = float(match.get("paired_score", 0.0))
         bucket = str(match.get("bucket", "medium"))
         overall_scores.append(score)
@@ -57,12 +119,14 @@ def summarize_matches(matches: Iterable[Dict[str, object]]) -> Dict[str, object]
             "count": len(overall_scores),
         },
         "buckets": buckets,
+        "policy": _merge_policy_stats(match_list),
     }
 
 
 def promotion_decision(summary: Dict[str, object], config: Dict[str, object]) -> Dict[str, object]:
     overall = summary["overall"]
     buckets = summary["buckets"]
+    policy = summary.get("policy", {})
     complex_bucket = buckets.get("complex", {"point_estimate": 0.0, "ci95": (0.0, 0.0)})
     failures = []
     if overall["point_estimate"] < config["overall_point_estimate_min"]:
@@ -73,10 +137,14 @@ def promotion_decision(summary: Dict[str, object], config: Dict[str, object]) ->
         failures.append("complex_point_estimate")
     if complex_bucket["ci95"][0] <= config["complex_ci_lower_min"]:
         failures.append("complex_ci_lower")
+    min_learned_coverage = float(config.get("min_learned_path_coverage", 0.0))
+    if min_learned_coverage > 0.0 and float(policy.get("learned_path_coverage", 0.0)) < min_learned_coverage:
+        failures.append("learned_path_coverage")
     return {
         "accepted": not failures,
         "failures": failures,
         "elo_delta_lower_bound": overall["elo"],
+        "learned_path_coverage": float(policy.get("learned_path_coverage", 0.0)),
     }
 
 
