@@ -125,7 +125,11 @@
   - `.agent/task_plan.md`
   - `.agent/plans/research_route_optimization.md`
   - `.agent/progress.md`
-- 待执行：
-  - 校验文档已写入磁盘
-  - 运行 `complete-task` 记录 workflow candidate
-  - 执行一次 `git commit` 形成提交闭环
+- 已完成：
+  - 已校验文档写入磁盘并回读核心内容
+  - 已运行 `complete-task`，workflow fingerprint 为 `miaosuan-shenji-research-route-audit`
+  - 已执行 git 提交闭环；首个交付提交为 `16d7f9e Add research route audit and optimization plan`
+- 说明：
+  - lifecycle completion 已写入 `C:\Users\lizilong\.codex\.agent\task_bootstrap.json`
+  - workflow candidate 已追加到 `C:\Users\lizilong\.codex\.agent\workflow_candidates.jsonl`
+  - 远程无需执行
