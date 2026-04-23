@@ -144,6 +144,24 @@ class MainlineContractTest(unittest.TestCase):
         self.assertIs(env_class, MockTrainEnv)
         self.assertEqual(backend, "mock_train_env.MockTrainEnv")
 
+    def test_weapon_lock_ignores_invalid_cur_hex(self) -> None:
+        from ai.agent import ActionType, Agent, Map
+
+        agent = Agent(seed=0)
+        agent.seat = 1
+        agent.map = Map({"map_data": [[{"roads": [0], "neighbors": []}]]}, [[]], None)
+        agent.map_data = agent.map.get_map_data()
+        agent.observation = {
+            "operators": [
+                {
+                    "obj_id": 7,
+                    "cur_hex": 9900,
+                }
+            ]
+        }
+
+        self.assertIsNone(agent._generate_action(7, ActionType.WeaponLock, []))
+
     def test_tactical_dataset_uses_explicit_label_column(self) -> None:
         _install_fake_torch()
         from training.data import TacticalPositionDataset

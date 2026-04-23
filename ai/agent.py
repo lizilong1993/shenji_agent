@@ -834,10 +834,17 @@ class Agent:
             return None
         if action_type == ActionType.WeaponLock:
             bop = self.get_bop(obj_id)
-            if not bop or self.map_data is None:
+            if not bop or not self.map or self.map_data is None:
+                return None
+            try:
+                cur_hex = int(bop.get("cur_hex", -1))
+            except (TypeError, ValueError):
+                return None
+            if not self.map.is_valid(cur_hex):
                 return None
             prob_weaponlock = 0.001
-            if max(self.map_data[bop["cur_hex"] // 100][bop["cur_hex"] % 100]["roads"]) > 0 or self._rng.random() < prob_weaponlock:
+            roads = self.map_data[cur_hex // 100][cur_hex % 100].get("roads") or []
+            if (roads and max(roads) > 0) or self._rng.random() < prob_weaponlock:
                 return {"actor": self.seat, "obj_id": obj_id, "type": ActionType.WeaponLock}
             return None
         if action_type == ActionType.WeaponUnFold:
