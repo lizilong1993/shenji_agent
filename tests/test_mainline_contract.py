@@ -199,6 +199,36 @@ class MainlineContractTest(unittest.TestCase):
 
         self.assertEqual(_AGENT_RUNTIME_LOG_LEVEL, logging.CRITICAL)
 
+    def test_selfplay_caps_torch_cpu_inference_threads(self) -> None:
+        from training.selfplay import _configure_torch_cpu_inference_threads
+
+        class FakeTorch:
+            def __init__(self) -> None:
+                self.num_threads = 72
+                self.num_interop_threads = 72
+
+            def set_num_threads(self, value: int) -> None:
+                self.num_threads = value
+
+            def set_num_interop_threads(self, value: int) -> None:
+                self.num_interop_threads = value
+
+            def get_num_threads(self) -> int:
+                return self.num_threads
+
+            def get_num_interop_threads(self) -> int:
+                return self.num_interop_threads
+
+        fake_torch = FakeTorch()
+
+        def fake_import(name: str) -> object:
+            if name == "torch":
+                return fake_torch
+            raise AssertionError(f"unexpected import: {name}")
+
+        configured = _configure_torch_cpu_inference_threads(fake_import)
+        self.assertEqual(configured, {"num_threads": 1, "num_interop_threads": 1})
+
     def test_weapon_lock_ignores_invalid_cur_hex(self) -> None:
         from ai.agent import ActionType, Agent, Map
 

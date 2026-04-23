@@ -28,6 +28,22 @@ _AGENT_CLASS_CACHE: Dict[str, type[Any]] = {}
 _AGENT_RUNTIME_LOG_LEVEL = logging.CRITICAL
 
 
+def _configure_torch_cpu_inference_threads(
+    import_module: Callable[[str], Any] = importlib.import_module,
+) -> Dict[str, int] | None:
+    try:
+        torch = import_module("torch")
+    except ImportError:
+        return None
+
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
+    return {
+        "num_threads": int(torch.get_num_threads()),
+        "num_interop_threads": int(torch.get_num_interop_threads()),
+    }
+
+
 def _resolve_train_env_class(
     import_module: Callable[[str], Any] = importlib.import_module,
 ) -> Tuple[type[Any], str]:
@@ -369,6 +385,7 @@ def main() -> None:
     if not args.allow_self_match_smoke and _resolved_path_string(args.candidate) == _resolved_path_string(args.incumbent):
         raise SystemExit("candidate and incumbent must point to different artifact directories unless --allow-self-match-smoke is set.")
 
+    _configure_torch_cpu_inference_threads()
     set_seed(int(config["seed"]))
     run_dir = ensure_dir(repo_root() / config["output_root"] / f"league_{now_tag()}")
     league_dir = ensure_dir(repo_root() / config["league_dir"])
