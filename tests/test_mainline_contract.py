@@ -192,6 +192,13 @@ class MainlineContractTest(unittest.TestCase):
         self.assertEqual(partial["completed_pairs"], 2)
         self.assertEqual(len(partial["matches"]), 2)
 
+    def test_selfplay_runtime_uses_critical_log_level(self) -> None:
+        import logging
+
+        from training.selfplay import _AGENT_RUNTIME_LOG_LEVEL
+
+        self.assertEqual(_AGENT_RUNTIME_LOG_LEVEL, logging.CRITICAL)
+
     def test_weapon_lock_ignores_invalid_cur_hex(self) -> None:
         from ai.agent import ActionType, Agent, Map
 

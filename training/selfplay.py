@@ -25,6 +25,7 @@ _SNAPSHOT_ROLE_TO_PROFILE = {
 _TRAIN_ENV_CLASS: type[Any] | None = None
 _TRAIN_ENV_BACKEND: str | None = None
 _AGENT_CLASS_CACHE: Dict[str, type[Any]] = {}
+_AGENT_RUNTIME_LOG_LEVEL = logging.CRITICAL
 
 
 def _resolve_train_env_class(
@@ -87,8 +88,8 @@ def _run_single(
     ]
     env_info = {**shared, "player_info": player_info}
     state = env.setup(env_info)
-    red = red_profile["agent_class"](log_level=logging.WARNING)
-    blue = blue_profile["agent_class"](log_level=logging.WARNING)
+    red = red_profile["agent_class"](log_level=_AGENT_RUNTIME_LOG_LEVEL)
+    blue = blue_profile["agent_class"](log_level=_AGENT_RUNTIME_LOG_LEVEL)
     red.setup({**shared, "seat": 1, "faction": 0, "role": 1, "user_name": red_profile["user_name"], "policy_profile": red_profile["profile"], "policy_artifacts_dir": red_profile["artifacts"], "state": state})
     blue.setup({**shared, "seat": 11, "faction": 1, "role": 1, "user_name": blue_profile["user_name"], "policy_profile": blue_profile["profile"], "policy_artifacts_dir": blue_profile["artifacts"], "state": state})
     done = False
