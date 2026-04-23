@@ -86,6 +86,30 @@ class MainlineContractTest(unittest.TestCase):
             {"scenario_1.json", "scenario_2.json", "scenario_3.json"},
         )
 
+    def test_selfplay_resolves_incumbent_profile_from_snapshot_role(self) -> None:
+        from training.selfplay import _participant_payload, _resolve_incumbent_profile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            learned_dir = root / "learned"
+            learned_dir.mkdir()
+            (learned_dir / "model_manifest.json").write_text(
+                json.dumps({"snapshot_role": "accepted_learned_mainline", "generated_at": "20260423_000000"}),
+                encoding="utf-8",
+            )
+            baseline_dir = root / "baseline"
+            baseline_dir.mkdir()
+            (baseline_dir / "model_manifest.json").write_text(
+                json.dumps({"snapshot_role": "bootstrap_rule_baseline"}),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(_resolve_incumbent_profile(str(learned_dir), None, "baseline"), "incumbent")
+            self.assertEqual(_resolve_incumbent_profile(str(baseline_dir), None, "baseline"), "baseline")
+            participant = _participant_payload(str(learned_dir), "incumbent")
+            self.assertEqual(participant["profile"], "incumbent")
+            self.assertEqual(participant["snapshot_role"], "accepted_learned_mainline")
+
     def test_tactical_dataset_uses_explicit_label_column(self) -> None:
         _install_fake_torch()
         from training.data import TacticalPositionDataset
@@ -124,6 +148,44 @@ class MainlineContractTest(unittest.TestCase):
             ),
             53,
         )
+
+    def test_selfplay_merge_policy_stats_keeps_model_load_diagnostics(self) -> None:
+        from training.selfplay import _merge_policy_stats
+
+        merged = _merge_policy_stats(
+            {
+                "policy_profile": "incumbent",
+                "loaded_from": "/tmp/strongest",
+                "intent_model_loaded": True,
+                "situation_model_loaded": True,
+                "counts": {
+                    "move": {"total": 1, "learned": 1},
+                    "shoot": {"total": 0, "learned": 0},
+                },
+                "score_means": {
+                    "move": {"samples": 1, "intent_bias": 1.0, "situation_score": 0.4, "combined_score": 2.0},
+                    "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
+                },
+            },
+            {
+                "policy_profile": "incumbent",
+                "loaded_from": "/tmp/strongest",
+                "intent_model_loaded": True,
+                "situation_model_loaded": True,
+                "counts": {
+                    "move": {"total": 1, "learned": 1},
+                    "shoot": {"total": 1, "learned": 1},
+                },
+                "score_means": {
+                    "move": {"samples": 1, "intent_bias": 3.0, "situation_score": 0.6, "combined_score": 4.0},
+                    "shoot": {"samples": 1, "intent_bias": 2.0, "situation_score": 0.7, "combined_score": 5.0},
+                },
+            },
+        )
+        self.assertEqual(merged["policy_profiles"], ["incumbent"])
+        self.assertEqual(merged["loaded_from_dirs"], ["/tmp/strongest"])
+        self.assertEqual(merged["intent_model_loaded_count"], 2)
+        self.assertEqual(merged["situation_model_loaded_count"], 2)
 
     def test_summarize_matches_reports_policy_coverage(self) -> None:
         _install_fake_torch()

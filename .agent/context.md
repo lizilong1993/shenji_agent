@@ -15,7 +15,7 @@
   - `training/evaluate.py`
   - `scripts/report_progress.py`
   - 最新 `experiments/shenji_agent/*`
-- 当前已接受 strongest code baseline：`8c3a509d54d6bd3770b389df3829cbfe5389ee76`
+- 当前已接受 strongest code baseline：`bb26fd52af4aec9029643c8f3666237eb06a1a6d`
 - 当前 strongest weights snapshot：`/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights`
 - strongest bootstrap 来源：`ai/weights_incumbent_rule`
 
@@ -45,9 +45,21 @@
   - `participants.json` 显示 candidate=`ai/weights`，incumbent=`ai/weights_incumbent_rule`
   - 但该 run 只有 16 个 paired 项，且缺少 `map_list.json`
   - 因此它不是 `program.md` 认可的正式 strongest 晋升证据
+- `experiments/shenji_agent/20260423_024736`
+  - Round 1 fresh supervised run
+  - `intent` 仍为 `medium`
+  - `situation` 已修正为 `complex`
+- `experiments/shenji_agent/league_20260423_024928`
+  - Round 1 正式 candidate-vs-bootstrap-strongest 窗口
+  - 100 paired 完成，candidate 明确打赢 bootstrap strongest baseline
+- `experiments/shenji_agent/league_20260423_032802`
+  - hard-stop 检查窗口
+  - 100 paired 完成
+  - 未通过 stop，唯一失败项是 `move_path_coverage`
+  - incumbent 仍以 `baseline` profile 运行 strongest snapshot
 
 ## 研究优先级
 
-1. 先修正数据 / map-id 合同，确保监督证据可信。
-2. 再用 fresh candidate 按 100 paired 协议与 strongest snapshot 正式比较。
-3. 只有正式比较打赢 strongest，才更新 strongest snapshot。
+1. 修正 strongest snapshot / incumbent profile 合同，确保 candidate 真正在打 strongest learned incumbent。
+2. 在协议可信后，再追 `move_path_coverage = 0.0` 的根因。
+3. 只有满足 hard-stop 的 coverage 与连续窗口条件，才允许停机。

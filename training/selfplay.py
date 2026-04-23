@@ -4,8 +4,9 @@ import argparse
 import json
 import logging
 import pickle
+import random
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
@@ -22,6 +23,10 @@ except ImportError:  # pragma: no cover
 
 
 RED, BLUE = 0, 1
+_SNAPSHOT_ROLE_TO_PROFILE = {
+    "bootstrap_rule_baseline": "baseline",
+    "accepted_learned_mainline": "incumbent",
+}
 
 
 def _load_case_data(scenario_path: Path, map_id: int) -> Dict[str, object]:
@@ -83,6 +88,54 @@ def _paired_score(candidate_a: float, opponent_a: float, candidate_b: float, opp
     return (outcome(candidate_a, opponent_a) + outcome(candidate_b, opponent_b)) / 2.0
 
 
+def _collect_scenario_candidates(scenario_root: Path, bucket_lookup: Dict[int, str]) -> List[Dict[str, Any]]:
+    candidates: List[Dict[str, Any]] = []
+    for scenario_path in sorted(scenario_root.glob("*.json")):
+        scenario_id = scenario_path.stem
+        map_id = infer_map_id_from_scenario_id(scenario_id, bucket_lookup.keys())
+        if map_id is None:
+            continue
+        candidates.append(
+            {
+                "scenario": scenario_path.name,
+                "map_id": int(map_id),
+                "bucket": str(bucket_lookup.get(map_id, "medium")),
+            }
+        )
+    return candidates
+
+
+def _build_paired_map_list(scenario_candidates: List[Dict[str, Any]], paired_matches: int) -> Dict[str, Any]:
+    if paired_matches <= 0:
+        raise SystemExit("paired_matches must be positive for self-play evaluation.")
+    if not scenario_candidates:
+        raise SystemExit("No valid scenarios found under land_wargame_sdk/Data/Data/scenarios for self-play evaluation.")
+
+    unique_prefix = random.sample(scenario_candidates, k=min(paired_matches, len(scenario_candidates)))
+    ordered_items = list(unique_prefix)
+    duplicates_used = paired_matches > len(unique_prefix)
+    while len(ordered_items) < paired_matches:
+        ordered_items.append(random.choice(scenario_candidates))
+
+    return {
+        "sampling_protocol": "unique_first_then_replacement",
+        "scenario_source": "land_wargame_sdk/Data/Data/scenarios/*.json",
+        "requested_pairs": paired_matches,
+        "candidate_pool_size": len(scenario_candidates),
+        "unique_item_count_before_replacement": min(paired_matches, len(scenario_candidates)),
+        "duplicates_used": duplicates_used,
+        "items": [
+            {
+                "scenario": str(item["scenario"]),
+                "map_id": int(item["map_id"]),
+                "bucket": str(item["bucket"]),
+                "order_index": order_index,
+            }
+            for order_index, item in enumerate(ordered_items)
+        ],
+    }
+
+
 def _bootstrap_league(league_path: Path) -> Dict[str, object]:
     if league_path.exists():
         return json.loads(league_path.read_text(encoding="utf-8"))
@@ -95,6 +148,33 @@ def _bootstrap_league(league_path: Path) -> Dict[str, object]:
     }
     save_json(state, league_path)
     return state
+
+
+def _load_artifact_manifest(artifacts: str) -> Dict[str, Any]:
+    manifest_path = Path(artifacts) / "model_manifest.json"
+    if not manifest_path.exists():
+        return {}
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def _resolve_incumbent_profile(artifacts: str, requested_profile: str | None, fallback_profile: str) -> str:
+    if requested_profile:
+        return str(requested_profile)
+    manifest = _load_artifact_manifest(artifacts)
+    snapshot_role = str(manifest.get("snapshot_role", "")).strip()
+    return _SNAPSHOT_ROLE_TO_PROFILE.get(snapshot_role, str(fallback_profile))
+
+
+def _participant_payload(artifacts: str, profile: str) -> Dict[str, Any]:
+    manifest = _load_artifact_manifest(artifacts)
+    payload: Dict[str, Any] = {
+        "artifacts": _resolved_path_string(artifacts),
+        "profile": profile,
+    }
+    if manifest:
+        payload["snapshot_role"] = manifest.get("snapshot_role")
+        payload["manifest_generated_at"] = manifest.get("generated_at")
+    return payload
 
 
 def _resolved_path_string(value: str) -> str:
@@ -111,6 +191,10 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
         "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
     }
     traces: List[Dict[str, object]] = []
+    policy_profiles = set()
+    loaded_from_dirs = set()
+    intent_model_loaded_count = 0
+    situation_model_loaded_count = 0
     for payload in payloads:
         counts = payload.get("counts", {}) if isinstance(payload, dict) else {}
         score_means = payload.get("score_means", {}) if isinstance(payload, dict) else {}
@@ -125,6 +209,14 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
                 score_sums[action_key][metric] += float(action_scores.get(metric, 0.0)) * samples
         if isinstance(payload, dict):
             traces.extend(payload.get("trace_samples", [])[:6])
+            profile = payload.get("policy_profile")
+            if profile:
+                policy_profiles.add(str(profile))
+            loaded_from = payload.get("loaded_from")
+            if loaded_from:
+                loaded_from_dirs.add(str(loaded_from))
+            intent_model_loaded_count += int(bool(payload.get("intent_model_loaded")))
+            situation_model_loaded_count += int(bool(payload.get("situation_model_loaded")))
 
     def coverage(total: int, learned: int) -> float:
         if total <= 0:
@@ -151,6 +243,10 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
         "move_path_coverage": coverage(move_total, move_learned),
         "shoot_path_coverage": coverage(shoot_total, shoot_learned),
         "score_means": score_means,
+        "policy_profiles": sorted(policy_profiles),
+        "loaded_from_dirs": sorted(loaded_from_dirs),
+        "intent_model_loaded_count": intent_model_loaded_count,
+        "situation_model_loaded_count": situation_model_loaded_count,
         "trace_samples": traces[:12],
     }
 
@@ -175,67 +271,67 @@ def main() -> None:
     league_state_path = league_dir / "league_state.json"
     league_state = _bootstrap_league(league_state_path)
     candidate_profile = str(args.candidate_profile or config.get("candidate_profile", "challenger"))
-    incumbent_profile = str(args.incumbent_profile or config.get("incumbent_profile", "baseline"))
+    incumbent_profile = _resolve_incumbent_profile(
+        args.incumbent,
+        args.incumbent_profile,
+        str(config.get("incumbent_profile", "baseline")),
+    )
 
     maps_root = repo_root() / "land_wargame_sdk" / "Data" / "Data" / "maps"
     scenario_root = repo_root() / "land_wargame_sdk" / "Data" / "Data" / "scenarios"
     records = build_map_catalog(maps_root, repo_root() / "training" / "cache" / "map_catalog.json")
     bucket_lookup = map_bucket_lookup(records)
+    scenario_candidates = _collect_scenario_candidates(scenario_root, bucket_lookup)
+    paired_map_list = _build_paired_map_list(scenario_candidates, int(config["paired_matches"]))
+    save_json(paired_map_list, run_dir / "map_list.json")
     scenarios_by_bucket: Dict[str, List[Tuple[Path, int]]] = {"simple": [], "medium": [], "complex": []}
-    for scenario_path in sorted(scenario_root.glob("*.json")):
-        scenario_id = scenario_path.stem
-        map_id = infer_map_id_from_scenario_id(scenario_id, bucket_lookup.keys())
-        if map_id is None:
-            continue
-        scenarios_by_bucket[bucket_lookup[map_id]].append((scenario_path, map_id))
+    for item in scenario_candidates:
+        scenario_path = scenario_root / str(item["scenario"])
+        scenarios_by_bucket[str(item["bucket"])].append((scenario_path, int(item["map_id"])))
 
     matches: List[Dict[str, object]] = []
-    total_pairs = int(config["paired_matches"])
-    ratios = config["map_sampling"]
-    for bucket, ratio in ratios.items():
-        bucket_pairs = max(1, int(round(total_pairs * float(ratio))))
-        candidates = scenarios_by_bucket.get(bucket, [])
-        if not candidates:
-            continue
-        for idx in range(bucket_pairs):
-            scenario_path, map_id = candidates[idx % len(candidates)]
-            challenger = {"artifacts": args.candidate, "profile": candidate_profile, "user_name": "CurrentAI"}
-            incumbent = {"artifacts": args.incumbent, "profile": incumbent_profile, "user_name": "IncumbentAI"}
-            red_score, blue_score, red_stats, blue_stats = _run_single(
-                scenario_path,
-                map_id,
-                challenger,
-                incumbent,
-                int(config["max_steps"]),
-            )
-            blue_red_score, blue_blue_score, blue_leg_red_stats, blue_leg_blue_stats = _run_single(
-                scenario_path,
-                map_id,
-                incumbent,
-                challenger,
-                int(config["max_steps"]),
-            )
-            candidate_stats = _merge_policy_stats(red_stats, blue_leg_blue_stats)
-            opponent_stats = _merge_policy_stats(blue_stats, blue_leg_red_stats)
-            matches.append(
-                {
-                    "scenario": scenario_path.name,
-                    "bucket": bucket,
-                    "map_id": map_id,
-                    "paired_score": _paired_score(red_score, blue_score, blue_blue_score, blue_red_score),
-                    "first_leg": {"candidate": red_score, "opponent": blue_score},
-                    "second_leg": {"candidate": blue_blue_score, "opponent": blue_red_score},
-                    "candidate_artifacts": _resolved_path_string(args.candidate),
-                    "opponent_artifacts": _resolved_path_string(args.incumbent),
-                    "candidate_profile": candidate_profile,
-                    "opponent_profile": incumbent_profile,
-                    "candidate_policy_stats": candidate_stats,
-                    "opponent_policy_stats": opponent_stats,
-                }
-            )
+    for map_item in paired_map_list["items"]:
+        scenario_path = scenario_root / str(map_item["scenario"])
+        map_id = int(map_item["map_id"])
+        bucket = str(map_item["bucket"])
+        order_index = int(map_item["order_index"])
+        challenger = {"artifacts": args.candidate, "profile": candidate_profile, "user_name": "CurrentAI"}
+        incumbent = {"artifacts": args.incumbent, "profile": incumbent_profile, "user_name": "IncumbentAI"}
+        red_score, blue_score, red_stats, blue_stats = _run_single(
+            scenario_path,
+            map_id,
+            challenger,
+            incumbent,
+            int(config["max_steps"]),
+        )
+        blue_red_score, blue_blue_score, blue_leg_red_stats, blue_leg_blue_stats = _run_single(
+            scenario_path,
+            map_id,
+            incumbent,
+            challenger,
+            int(config["max_steps"]),
+        )
+        candidate_stats = _merge_policy_stats(red_stats, blue_leg_blue_stats)
+        opponent_stats = _merge_policy_stats(blue_stats, blue_leg_red_stats)
+        matches.append(
+            {
+                "scenario": scenario_path.name,
+                "bucket": bucket,
+                "map_id": map_id,
+                "order_index": order_index,
+                "paired_score": _paired_score(red_score, blue_score, blue_blue_score, blue_red_score),
+                "first_leg": {"candidate": red_score, "opponent": blue_score},
+                "second_leg": {"candidate": blue_blue_score, "opponent": blue_red_score},
+                "candidate_artifacts": _resolved_path_string(args.candidate),
+                "opponent_artifacts": _resolved_path_string(args.incumbent),
+                "candidate_profile": candidate_profile,
+                "opponent_profile": incumbent_profile,
+                "candidate_policy_stats": candidate_stats,
+                "opponent_policy_stats": opponent_stats,
+            }
+        )
 
     summary = summarize_matches(matches)
-    decision = promotion_decision(summary, config["promotion_gate"])
 
     exploiter_results = {}
     for profile in league_state["exploiters"]:
@@ -259,6 +355,8 @@ def main() -> None:
             "candidate_learned_path_coverage": float(np.mean(profile_coverages)) if profile_coverages else 0.0,
         }
 
+    decision = promotion_decision(summary, config["promotion_gate"], exploiter_results)
+
     if decision["accepted"]:
         league_state["consecutive_windows"] = int(league_state.get("consecutive_windows", 0)) + 1
     else:
@@ -274,14 +372,8 @@ def main() -> None:
     save_json(exploiter_results, run_dir / "exploitability.json")
     save_json(
         {
-            "candidate": {
-                "artifacts": _resolved_path_string(args.candidate),
-                "profile": candidate_profile,
-            },
-            "incumbent": {
-                "artifacts": _resolved_path_string(args.incumbent),
-                "profile": incumbent_profile,
-            },
+            "candidate": _participant_payload(args.candidate, candidate_profile),
+            "incumbent": _participant_payload(args.incumbent, incumbent_profile),
         },
         run_dir / "participants.json",
     )
@@ -293,13 +385,19 @@ def main() -> None:
             [
                 "# Shenji Self-Play Summary",
                 "",
+                f"- paired_map_items: `{len(paired_map_list['items'])}`",
+                f"- map_list_duplicates_used: `{paired_map_list['duplicates_used']}`",
                 f"- overall_point_estimate: `{summary['overall']['point_estimate']:.4f}`",
                 f"- overall_ci95_lower: `{summary['overall']['ci95'][0]:.4f}`",
                 f"- complex_point_estimate: `{summary['buckets'].get('complex', {}).get('point_estimate', 0.0):.4f}`",
+                f"- complex_ci95_lower: `{summary['buckets'].get('complex', {}).get('ci95', [0.0, 0.0])[0]:.4f}`",
                 f"- learned_path_coverage: `{summary['policy'].get('learned_path_coverage', 0.0):.4f}`",
                 f"- move_path_coverage: `{summary['policy'].get('move_path_coverage', 0.0):.4f}`",
                 f"- shoot_path_coverage: `{summary['policy'].get('shoot_path_coverage', 0.0):.4f}`",
+                f"- elo_delta_lower_bound: `{decision.get('elo_delta_lower_bound', 0.0):.4f}`",
+                f"- max_exploiter_win_rate: `{decision.get('max_exploiter_win_rate', 0.0):.4f}`",
                 f"- promotion_accepted: `{decision['accepted']}`",
+                f"- promotion_failures: `{decision.get('failures', [])}`",
             ]
         ),
         encoding="utf-8",

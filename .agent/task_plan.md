@@ -1,30 +1,32 @@
-# Round 1 Task Plan
+# Round 2 Task Plan
 
 ## 本轮假设
 
-`training/data.py` 当前直接在整条文件名上抓数字做 map-id 推断，会把时间戳和随机串里的数字误判成地图号。把解析面收窄到文件名第二段并继续做 suffix 匹配，能修正 `intent_lstm + situation_gcn` 主线的 bucket 合同，并给后续训练/正式比较提供可信监督证据。
+Round 1 之后 strongest snapshot 已经更新为 learned weights，但 `training.selfplay` 仍默认把 incumbent 作为 `baseline` profile 运行。`LearnedPolicy.configure()` 在 `policy_profile == "baseline"` 时直接跳过模型加载，这意味着后续 arena 并没有真正拿 `artifacts/best_agent/weights` 里的 strongest learned agent 当 incumbent。先修正 strongest snapshot / incumbent profile 合同，才能继续做可信的 candidate-vs-strongest 研究循环。
 
 ## 计划改动
 
-1. 在 `training/data.py` 增加 `filename_segment_index` 合同，并让 `IntentSequenceDataset` / `StateGraphDataset` 都支持按指定段解析 map id。
-2. 把 `configs/supervised_baseline.yaml` 的 `intent` 和 `situation` 都切到 `filename_segment_index: 1`；`situation` 同时改为 `map_id_strategy: suffix`。
-3. 给 `tests/test_mainline_contract.py` 增加回归测试，覆盖“随机串数字不能污染 map-id 解析”。
-4. 通过轻量验证后，用 `configs/supervised_baseline.yaml` 重训 candidate，再按 100 个 paired 地图协议做 candidate vs strongest 正式比较。
+1. 在 strongest snapshot 中引入可落盘的角色元数据，显式区分 `bootstrap_rule_baseline` 与 `accepted_learned_mainline`。
+2. 修改 `training.selfplay.py` 的 incumbent profile 选择逻辑：
+   - bootstrap rule baseline 继续走 `baseline`
+   - accepted learned mainline 必须走 learned incumbent profile，而不是规则回退
+3. 增加回归测试，覆盖 strongest snapshot 元数据与 incumbent profile 解析。
+4. 轻量验证后重训 candidate，并重新做 100 paired candidate-vs-strongest 正式比较。
 
 ## 本轮成功判据
 
+- self-play 正式比较里的 `participants.json` / 诊断信息能证明 incumbent 真正从 `artifacts/best_agent/weights` 加载 strongest learned weights。
 - `python -m compileall ai training scripts tests` 通过。
 - `python -m unittest tests.test_mainline_contract -v` 通过。
-- fresh supervised run 的 `slice_report.json` 不再把 state-graph 数据误归到 `simple` 桶。
-- `python -m training.selfplay --config configs/selfplay_baseline.yaml --candidate ai/weights --incumbent artifacts/best_agent/weights` 完整跑完 100 个 paired 地图，并且 candidate 的最终汇总胜率高于当前 strongest baseline。
+- fresh 100 paired candidate-vs-strongest 正式比较有效落盘，并且 candidate 胜率高于当前 strongest learned snapshot。
 
 ## 本轮失败判据
 
-- 解析仍然出现 map-id 歧义，或 fresh supervised run 依旧产出明显失真的 bucket 分布。
-- 训练 / 正式比较无法运行，或 100 paired 协议无法完整落盘。
-- candidate 最终汇总胜率未高于 strongest baseline。
+- incumbent 仍以 `baseline` profile 忽略 strongest learned weights。
+- 修正协议后 candidate 无法胜过 strongest learned snapshot。
+- 正式比较无法完成 100 paired 协议或结果不可判定。
 
 ## 下一轮入口
 
-- 如果 bucket 合同修正后 self-play 仍无增益，下一轮优先检查 `ai/policy.py` 的 `Move/Shoot` 接入宽度与打分逻辑。
-- 如果现有数据集无法从可用元数据中稳定恢复地图真值，则停止并把“缺失显式 map metadata”记为 blocker。
+- 如果协议修正后 arena 仍无法满足 hard-stop，下一轮优先追 `move_path_coverage = 0.0` 的根因，扩大真实 move 决策触发面。
+- 如果 strongest snapshot 元数据不足以区分 rule baseline 与 learned snapshot，则把 snapshot contract 缺失列为 blocker。
