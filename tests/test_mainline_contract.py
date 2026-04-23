@@ -110,6 +110,40 @@ class MainlineContractTest(unittest.TestCase):
             self.assertEqual(participant["profile"], "incumbent")
             self.assertEqual(participant["snapshot_role"], "accepted_learned_mainline")
 
+    def test_selfplay_prefers_train_env_backend_over_mock(self) -> None:
+        from training.selfplay import _resolve_train_env_class
+
+        class TrainEnv:
+            pass
+
+        def fake_import(name: str) -> object:
+            if name == "land_wargame_train_env":
+                raise ImportError("linux alias missing")
+            if name == "train_env":
+                return types.SimpleNamespace(TrainEnv=TrainEnv)
+            raise AssertionError(f"unexpected import: {name}")
+
+        env_class, backend = _resolve_train_env_class(fake_import)
+        self.assertIs(env_class, TrainEnv)
+        self.assertEqual(backend, "train_env.TrainEnv")
+
+    def test_selfplay_falls_back_to_mock_only_when_real_env_missing(self) -> None:
+        from training.selfplay import _resolve_train_env_class
+
+        class MockTrainEnv:
+            pass
+
+        def fake_import(name: str) -> object:
+            if name in {"land_wargame_train_env", "train_env"}:
+                raise ImportError("missing")
+            if name == "mock_train_env":
+                return types.SimpleNamespace(MockTrainEnv=MockTrainEnv)
+            raise AssertionError(f"unexpected import: {name}")
+
+        env_class, backend = _resolve_train_env_class(fake_import)
+        self.assertIs(env_class, MockTrainEnv)
+        self.assertEqual(backend, "mock_train_env.MockTrainEnv")
+
     def test_tactical_dataset_uses_explicit_label_column(self) -> None:
         _install_fake_torch()
         from training.data import TacticalPositionDataset

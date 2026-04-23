@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import logging
 import pickle
 import random
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
 
@@ -14,12 +15,7 @@ from .common import dump_yaml, ensure_dir, load_config, now_tag, repo_root, save
 from .evaluate import promotion_decision, summarize_matches
 from .maps import build_map_catalog, infer_map_id_from_scenario_id, map_bucket_lookup
 
-try:
-    from ai.agent import Agent
-    from land_wargame_train_env import TrainEnv
-except ImportError:  # pragma: no cover
-    from ai.agent import Agent
-    from mock_train_env import MockTrainEnv as TrainEnv
+from ai.agent import Agent
 
 
 RED, BLUE = 0, 1
@@ -27,6 +23,34 @@ _SNAPSHOT_ROLE_TO_PROFILE = {
     "bootstrap_rule_baseline": "baseline",
     "accepted_learned_mainline": "incumbent",
 }
+_TRAIN_ENV_CLASS: type[Any] | None = None
+_TRAIN_ENV_BACKEND: str | None = None
+
+
+def _resolve_train_env_class(
+    import_module: Callable[[str], Any] = importlib.import_module,
+) -> Tuple[type[Any], str]:
+    for module_name, class_name in (
+        ("land_wargame_train_env", "TrainEnv"),
+        ("train_env", "TrainEnv"),
+    ):
+        try:
+            module = import_module(module_name)
+        except ImportError:
+            continue
+        env_class = getattr(module, class_name, None)
+        if env_class is not None:
+            return env_class, f"{module_name}.{class_name}"
+
+    mock_module = import_module("mock_train_env")
+    return mock_module.MockTrainEnv, "mock_train_env.MockTrainEnv"
+
+
+def _train_env_runtime() -> Tuple[type[Any], str]:
+    global _TRAIN_ENV_CLASS, _TRAIN_ENV_BACKEND
+    if _TRAIN_ENV_CLASS is None or _TRAIN_ENV_BACKEND is None:
+        _TRAIN_ENV_CLASS, _TRAIN_ENV_BACKEND = _resolve_train_env_class()
+    return _TRAIN_ENV_CLASS, _TRAIN_ENV_BACKEND
 
 
 def _load_case_data(scenario_path: Path, map_id: int) -> Dict[str, object]:
@@ -54,7 +78,8 @@ def _run_single(
     blue_profile: Dict[str, str],
     max_steps: int,
 ) -> Tuple[float, float, Dict[str, object], Dict[str, object]]:
-    env = TrainEnv()
+    env_class, _ = _train_env_runtime()
+    env = env_class()
     shared = _load_case_data(scenario_path, map_id)
     player_info = [
         {"seat": 1, "faction": 0, "role": 1, "user_name": red_profile["user_name"], "user_id": 1},
@@ -276,6 +301,11 @@ def main() -> None:
         args.incumbent_profile,
         str(config.get("incumbent_profile", "baseline")),
     )
+    _, env_backend = _train_env_runtime()
+    if env_backend == "mock_train_env.MockTrainEnv":
+        raise SystemExit(
+            "Formal self-play evaluation requires a real TrainEnv backend; resolved mock_train_env.MockTrainEnv instead."
+        )
 
     maps_root = repo_root() / "land_wargame_sdk" / "Data" / "Data" / "maps"
     scenario_root = repo_root() / "land_wargame_sdk" / "Data" / "Data" / "scenarios"
@@ -366,12 +396,13 @@ def main() -> None:
         league_state["champion"] = args.candidate
         league_state["consecutive_windows"] = 0
 
-    save_json({"matches": matches}, run_dir / "match_results.json")
+    save_json({"env_backend": env_backend, "matches": matches}, run_dir / "match_results.json")
     save_json(summary, run_dir / "rating.json")
     save_json(decision, run_dir / "promotion.json")
     save_json(exploiter_results, run_dir / "exploitability.json")
     save_json(
         {
+            "env_backend": env_backend,
             "candidate": _participant_payload(args.candidate, candidate_profile),
             "incumbent": _participant_payload(args.incumbent, incumbent_profile),
         },
@@ -385,6 +416,7 @@ def main() -> None:
             [
                 "# Shenji Self-Play Summary",
                 "",
+                f"- env_backend: `{env_backend}`",
                 f"- paired_map_items: `{len(paired_map_list['items'])}`",
                 f"- map_list_duplicates_used: `{paired_map_list['duplicates_used']}`",
                 f"- overall_point_estimate: `{summary['overall']['point_estimate']:.4f}`",
