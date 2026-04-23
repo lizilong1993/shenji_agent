@@ -4,8 +4,10 @@ publish_to_ai_weights: false
 dataset_contract:
   intent:
     map_id_strategy: suffix
+    filename_segment_index: 1
   situation:
-    map_id_strategy: prefix
+    map_id_strategy: suffix
+    filename_segment_index: 1
   tactical:
     label_col: 样本标签
 intent:

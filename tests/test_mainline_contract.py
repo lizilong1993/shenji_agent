@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,55 @@ def _install_fake_torch() -> None:
 
 
 class MainlineContractTest(unittest.TestCase):
+    def test_selfplay_builds_ordered_unique_first_map_list(self) -> None:
+        from training.selfplay import _build_paired_map_list, _collect_scenario_candidates
+
+        with tempfile.TemporaryDirectory() as tmp:
+            scenario_root = Path(tmp)
+            bucket_lookup = {}
+            for idx in range(1, 121):
+                (scenario_root / f"scenario_{idx}.json").write_text("{}", encoding="utf-8")
+                bucket_lookup[idx] = "complex" if idx % 3 == 0 else ("medium" if idx % 3 == 1 else "simple")
+            candidates = _collect_scenario_candidates(scenario_root, bucket_lookup)
+
+        random.seed(42)
+        payload = _build_paired_map_list(candidates, 100)
+        items = payload["items"]
+
+        self.assertEqual(payload["sampling_protocol"], "unique_first_then_replacement")
+        self.assertEqual(payload["candidate_pool_size"], 120)
+        self.assertFalse(payload["duplicates_used"])
+        self.assertEqual(len(items), 100)
+        self.assertEqual([item["order_index"] for item in items], list(range(100)))
+        self.assertEqual(len({item["scenario"] for item in items}), 100)
+        self.assertTrue(
+            all({"scenario", "map_id", "bucket", "order_index"}.issubset(item.keys()) for item in items)
+        )
+
+    def test_selfplay_backfills_duplicates_only_after_unique_pool(self) -> None:
+        from training.selfplay import _build_paired_map_list, _collect_scenario_candidates
+
+        with tempfile.TemporaryDirectory() as tmp:
+            scenario_root = Path(tmp)
+            bucket_lookup = {1: "simple", 2: "medium", 3: "complex"}
+            for idx in bucket_lookup:
+                (scenario_root / f"scenario_{idx}.json").write_text("{}", encoding="utf-8")
+            candidates = _collect_scenario_candidates(scenario_root, bucket_lookup)
+
+        random.seed(7)
+        payload = _build_paired_map_list(candidates, 10)
+        items = payload["items"]
+
+        self.assertTrue(payload["duplicates_used"])
+        self.assertEqual(payload["candidate_pool_size"], 3)
+        self.assertEqual(payload["unique_item_count_before_replacement"], 3)
+        self.assertEqual(len(items), 10)
+        self.assertEqual(len({item["scenario"] for item in items[:3]}), 3)
+        self.assertEqual(
+            {item["scenario"] for item in items},
+            {"scenario_1.json", "scenario_2.json", "scenario_3.json"},
+        )
+
     def test_tactical_dataset_uses_explicit_label_column(self) -> None:
         _install_fake_torch()
         from training.data import TacticalPositionDataset
@@ -51,6 +101,29 @@ class MainlineContractTest(unittest.TestCase):
             dataset = TacticalPositionDataset(csv_path, label_column="样本标签")
         self.assertEqual(dataset.labels.tolist(), [1.0, 0.0])
         self.assertEqual(dataset.label_column, "样本标签")
+
+    def test_map_id_resolution_can_be_scoped_to_filename_segment(self) -> None:
+        _install_fake_torch()
+        from training.data import resolve_map_id_by_strategy
+
+        self.assertEqual(
+            resolve_map_id_by_strategy(
+                "20210109101817255-201033039601-Liquidator-DemoAI-t83lvwyW.zip",
+                [83, 9601],
+                "suffix",
+                filename_segment_index=1,
+            ),
+            9601,
+        )
+        self.assertEqual(
+            resolve_map_id_by_strategy(
+                "20210730145902084-2110431553-zBv9bHRr.json",
+                [53, 84],
+                "suffix",
+                filename_segment_index=1,
+            ),
+            53,
+        )
 
     def test_summarize_matches_reports_policy_coverage(self) -> None:
         _install_fake_torch()
@@ -77,6 +150,67 @@ class MainlineContractTest(unittest.TestCase):
         self.assertAlmostEqual(summary["policy"]["move_path_coverage"], 0.5)
         self.assertAlmostEqual(summary["policy"]["shoot_path_coverage"], 1.0)
 
+    def test_promotion_decision_enforces_sota_stop_guards(self) -> None:
+        _install_fake_torch()
+        from training.evaluate import promotion_decision
+
+        summary = {
+            "overall": {"point_estimate": 0.62, "ci95": (0.56, 0.67), "elo": 84.0, "count": 100},
+            "buckets": {
+                "complex": {"point_estimate": 0.61, "ci95": (0.56, 0.66), "count": 50},
+                "medium": {"point_estimate": 0.58, "ci95": (0.52, 0.63), "count": 30},
+                "simple": {"point_estimate": 0.57, "ci95": (0.50, 0.64), "count": 20},
+            },
+            "policy": {
+                "learned_path_coverage": 0.34,
+                "move_path_coverage": 0.24,
+                "shoot_path_coverage": 0.21,
+            },
+        }
+        decision = promotion_decision(
+            summary,
+            {
+                "overall_point_estimate_min": 0.60,
+                "overall_ci_lower_min": 0.55,
+                "complex_point_estimate_min": 0.60,
+                "complex_ci_lower_min": 0.55,
+                "min_learned_path_coverage": 0.30,
+                "min_move_path_coverage": 0.20,
+                "min_shoot_path_coverage": 0.20,
+                "elo_delta_lower_min": 35.0,
+                "max_bucket_regression": 0.03,
+                "max_exploiter_win_rate": 0.45,
+            },
+            {
+                "aggressive_exploiter": {"win_rate_vs_candidate": 0.42},
+                "occupy_exploiter": {"win_rate_vs_candidate": 0.40},
+            },
+        )
+        self.assertTrue(decision["accepted"])
+        self.assertGreaterEqual(decision["elo_delta_lower_bound"], 35.0)
+        self.assertAlmostEqual(decision["max_exploiter_win_rate"], 0.42)
+
+        blocked = promotion_decision(
+            summary,
+            {
+                "overall_point_estimate_min": 0.60,
+                "overall_ci_lower_min": 0.55,
+                "complex_point_estimate_min": 0.60,
+                "complex_ci_lower_min": 0.55,
+                "min_learned_path_coverage": 0.30,
+                "min_move_path_coverage": 0.20,
+                "min_shoot_path_coverage": 0.20,
+                "elo_delta_lower_min": 35.0,
+                "max_bucket_regression": 0.03,
+                "max_exploiter_win_rate": 0.45,
+            },
+            {
+                "aggressive_exploiter": {"win_rate_vs_candidate": 0.48},
+            },
+        )
+        self.assertFalse(blocked["accepted"])
+        self.assertIn("exploiter_win_rate", blocked["failures"])
+
     def test_selfplay_rejects_same_candidate_and_incumbent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config_path = Path(tmp) / "config.json"
@@ -88,7 +222,6 @@ class MainlineContractTest(unittest.TestCase):
                         "league_dir": "league",
                         "paired_matches": 2,
                         "max_steps": 10,
-                        "map_sampling": {"complex": 1.0},
                         "promotion_gate": {
                             "overall_point_estimate_min": 0.5,
                             "overall_ci_lower_min": 0.4,

@@ -46,12 +46,14 @@ def train_intent_model(
     history_len = int(config["history_len"])
     horizons = int(config["horizons"])
     map_id_strategy = str(dataset_contract.get("map_id_strategy", "suffix"))
+    filename_segment_index = dataset_contract.get("filename_segment_index")
     train_dataset = IntentSequenceDataset(
         training_files["intent_train"],
         history_len=history_len,
         horizons=horizons,
         map_bucket_lookup=bucket_lookup,
         map_id_strategy=map_id_strategy,
+        filename_segment_index=int(filename_segment_index) if filename_segment_index is not None else None,
         max_samples=config.get("max_train_samples"),
     )
     val_dataset = IntentSequenceDataset(
@@ -60,6 +62,7 @@ def train_intent_model(
         horizons=horizons,
         map_bucket_lookup=bucket_lookup,
         map_id_strategy=map_id_strategy,
+        filename_segment_index=int(filename_segment_index) if filename_segment_index is not None else None,
         max_samples=config.get("max_val_samples"),
     )
     train_loader = DataLoader(train_dataset, batch_size=int(config["batch_size"]), shuffle=True)
@@ -135,6 +138,7 @@ def train_intent_model(
         },
         "schema": {
             "map_id_strategy": map_id_strategy,
+            "filename_segment_index": int(filename_segment_index) if filename_segment_index is not None else None,
             "history_len": history_len,
             "horizons": horizons,
         },
@@ -211,10 +215,12 @@ def train_situation_model(
     run_dir: Path,
 ) -> Dict[str, object]:
     map_id_strategy = str(dataset_contract.get("map_id_strategy", "prefix"))
+    filename_segment_index = dataset_contract.get("filename_segment_index")
     dataset = StateGraphDataset(
         training_files["state_graph_root"],
         map_bucket_lookup=bucket_lookup,
         map_id_strategy=map_id_strategy,
+        filename_segment_index=int(filename_segment_index) if filename_segment_index is not None else None,
     )
     indices = np.arange(len(dataset))
     if len(indices) < 2:
@@ -263,6 +269,7 @@ def train_situation_model(
         "bucket_counts": _counter_to_dict(dataset.bucket_counts),
         "schema": {
             "map_id_strategy": map_id_strategy,
+            "filename_segment_index": int(filename_segment_index) if filename_segment_index is not None else None,
         },
         "artifact": weight_path.name,
     }

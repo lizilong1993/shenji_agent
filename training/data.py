@@ -61,8 +61,27 @@ def _extract_numeric_tokens(value: str) -> List[str]:
     return [token for token in re.findall(r"\d+", value) if token]
 
 
-def resolve_map_id_by_strategy(value: str, map_ids: Sequence[int], strategy: str) -> int:
-    tokens = _extract_numeric_tokens(value) or [value]
+def _select_filename_segment(value: str, filename_segment_index: Optional[int]) -> str:
+    if filename_segment_index is None:
+        return value
+    segments = value.split("-")
+    index = filename_segment_index if filename_segment_index >= 0 else len(segments) + filename_segment_index
+    if index < 0 or index >= len(segments):
+        raise ValueError(
+            f"filename_segment_index={filename_segment_index} out of range for value={value!r}"
+        )
+    return segments[index]
+
+
+def resolve_map_id_by_strategy(
+    value: str,
+    map_ids: Sequence[int],
+    strategy: str,
+    *,
+    filename_segment_index: Optional[int] = None,
+) -> int:
+    resolution_value = _select_filename_segment(value, filename_segment_index)
+    tokens = _extract_numeric_tokens(resolution_value) or [resolution_value]
     known = sorted({int(map_id) for map_id in map_ids}, key=lambda item: len(str(item)), reverse=True)
     matches: List[int] = []
     for token in tokens:
@@ -78,15 +97,30 @@ def resolve_map_id_by_strategy(value: str, map_ids: Sequence[int], strategy: str
     if len(unique) == 1:
         return unique[0]
     if not unique:
-        fallback = infer_map_id_from_scenario_id(value, map_ids)
+        fallback = infer_map_id_from_scenario_id(resolution_value, map_ids)
         if fallback is not None:
             return fallback
-        raise ValueError(f"Unable to resolve map_id from value={value!r} strategy={strategy}")
-    raise ValueError(f"Ambiguous map_id for value={value!r} strategy={strategy}: {unique}")
+        raise ValueError(
+            f"Unable to resolve map_id from value={value!r} strategy={strategy} filename_segment_index={filename_segment_index}"
+        )
+    raise ValueError(
+        f"Ambiguous map_id for value={value!r} strategy={strategy} filename_segment_index={filename_segment_index}: {unique}"
+    )
 
 
-def _bucket_from_filename(filename: str, map_bucket_lookup: Dict[int, str], *, strategy: str) -> str:
-    map_id = resolve_map_id_by_strategy(filename, list(map_bucket_lookup.keys()), strategy)
+def _bucket_from_filename(
+    filename: str,
+    map_bucket_lookup: Dict[int, str],
+    *,
+    strategy: str,
+    filename_segment_index: Optional[int] = None,
+) -> str:
+    map_id = resolve_map_id_by_strategy(
+        filename,
+        list(map_bucket_lookup.keys()),
+        strategy,
+        filename_segment_index=filename_segment_index,
+    )
     if map_id not in map_bucket_lookup:
         raise ValueError(f"Resolved map_id={map_id} missing from bucket lookup for filename={filename!r}")
     return map_bucket_lookup[map_id]
@@ -110,11 +144,13 @@ class IntentSequenceDataset(Dataset):
         horizons: int,
         map_bucket_lookup: Dict[int, str],
         map_id_strategy: str = "suffix",
+        filename_segment_index: Optional[int] = None,
         max_samples: Optional[int] = None,
     ) -> None:
         self.samples: List[IntentSample] = []
         self.bucket_counts: Counter[str] = Counter()
         self.map_id_strategy = map_id_strategy
+        self.filename_segment_index = filename_segment_index
         data = json.loads(json_path.read_text(encoding="utf-8"))
         for stream in data:
             frames = [frame for frame in stream if isinstance(frame, dict)]
@@ -123,7 +159,12 @@ class IntentSequenceDataset(Dataset):
                 filename = str(frame.get("filename", "")).strip()
                 if not filename:
                     raise ValueError(f"Intent sample missing filename in {json_path}")
-                bucket = _bucket_from_filename(filename, map_bucket_lookup, strategy=map_id_strategy)
+                bucket = _bucket_from_filename(
+                    filename,
+                    map_bucket_lookup,
+                    strategy=map_id_strategy,
+                    filename_segment_index=filename_segment_index,
+                )
                 for entry in frame.get("tank_enemy", []):
                     if len(entry) < 2 + horizons:
                         continue
@@ -227,16 +268,29 @@ class TacticalPositionDataset(Dataset):
 
 
 class StateGraphDataset(Dataset):
-    def __init__(self, root_dir: Path, *, map_bucket_lookup: Dict[int, str], map_id_strategy: str = "prefix") -> None:
+    def __init__(
+        self,
+        root_dir: Path,
+        *,
+        map_bucket_lookup: Dict[int, str],
+        map_id_strategy: str = "prefix",
+        filename_segment_index: Optional[int] = None,
+    ) -> None:
         labels = _read_csv_with_fallback(root_dir / "label.csv")
         self.label_lookup = {row["filename"]: float(row["label"]) for _, row in labels.iterrows()}
         self.files = sorted((root_dir / "encoded_nodes-features").glob("*.csv"))
         self.map_bucket_lookup = map_bucket_lookup
         self.map_id_strategy = map_id_strategy
+        self.filename_segment_index = filename_segment_index
         self.bucket_counts: Counter[str] = Counter()
         for path in self.files:
             filename = path.name.replace("encoded_", "").replace("_nodes_features.csv", ".json")
-            bucket = _bucket_from_filename(filename, self.map_bucket_lookup, strategy=self.map_id_strategy)
+            bucket = _bucket_from_filename(
+                filename,
+                self.map_bucket_lookup,
+                strategy=self.map_id_strategy,
+                filename_segment_index=self.filename_segment_index,
+            )
             self.bucket_counts[bucket] += 1
 
     def __len__(self) -> int:
@@ -263,7 +317,12 @@ class StateGraphDataset(Dataset):
     def __getitem__(self, idx: int) -> Dict[str, object]:
         path = self.files[idx]
         filename = path.name.replace("encoded_", "").replace("_nodes_features.csv", ".json")
-        bucket = _bucket_from_filename(filename, self.map_bucket_lookup, strategy=self.map_id_strategy)
+        bucket = _bucket_from_filename(
+            filename,
+            self.map_bucket_lookup,
+            strategy=self.map_id_strategy,
+            filename_segment_index=self.filename_segment_index,
+        )
         features, adjacency = self._load_graph(path)
         label = self.label_lookup.get(filename, 0.0)
         return {
