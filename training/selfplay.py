@@ -6,17 +6,16 @@ import json
 import logging
 import pickle
 import random
+import sys
+import types
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
 
-from .common import dump_yaml, ensure_dir, load_config, now_tag, repo_root, save_json, set_seed
+from .common import dump_yaml, ensure_dir, git_head_sha, git_show_text, load_config, now_tag, repo_root, save_json, set_seed
 from .evaluate import promotion_decision, summarize_matches
 from .maps import build_map_catalog, infer_map_id_from_scenario_id, map_bucket_lookup
-
-from ai.agent import Agent
-
 
 RED, BLUE = 0, 1
 _SNAPSHOT_ROLE_TO_PROFILE = {
@@ -25,6 +24,7 @@ _SNAPSHOT_ROLE_TO_PROFILE = {
 }
 _TRAIN_ENV_CLASS: type[Any] | None = None
 _TRAIN_ENV_BACKEND: str | None = None
+_AGENT_CLASS_CACHE: Dict[str, type[Any]] = {}
 
 
 def _resolve_train_env_class(
@@ -74,8 +74,8 @@ def _load_case_data(scenario_path: Path, map_id: int) -> Dict[str, object]:
 def _run_single(
     scenario_path: Path,
     map_id: int,
-    red_profile: Dict[str, str],
-    blue_profile: Dict[str, str],
+    red_profile: Dict[str, Any],
+    blue_profile: Dict[str, Any],
     max_steps: int,
 ) -> Tuple[float, float, Dict[str, object], Dict[str, object]]:
     env_class, _ = _train_env_runtime()
@@ -87,8 +87,8 @@ def _run_single(
     ]
     env_info = {**shared, "player_info": player_info}
     state = env.setup(env_info)
-    red = Agent(log_level=logging.WARNING)
-    blue = Agent(log_level=logging.WARNING)
+    red = red_profile["agent_class"](log_level=logging.WARNING)
+    blue = blue_profile["agent_class"](log_level=logging.WARNING)
     red.setup({**shared, "seat": 1, "faction": 0, "role": 1, "user_name": red_profile["user_name"], "policy_profile": red_profile["profile"], "policy_artifacts_dir": red_profile["artifacts"], "state": state})
     blue.setup({**shared, "seat": 11, "faction": 1, "role": 1, "user_name": blue_profile["user_name"], "policy_profile": blue_profile["profile"], "policy_artifacts_dir": blue_profile["artifacts"], "state": state})
     done = False
@@ -182,6 +182,53 @@ def _load_artifact_manifest(artifacts: str) -> Dict[str, Any]:
     return json.loads(manifest_path.read_text(encoding="utf-8"))
 
 
+def _load_agent_class_from_commit(commit_sha: str) -> type[Any]:
+    cached = _AGENT_CLASS_CACHE.get(commit_sha)
+    if cached is not None:
+        return cached
+
+    package_name = f"_selfplay_snapshot_{commit_sha[:12]}"
+    package = sys.modules.get(package_name)
+    if package is None:
+        package = types.ModuleType(package_name)
+        package.__path__ = []  # type: ignore[attr-defined]
+        package.__package__ = package_name
+        sys.modules[package_name] = package
+
+    for module_name in ("features", "models", "policy", "agent"):
+        qualified_name = f"{package_name}.{module_name}"
+        if qualified_name in sys.modules:
+            continue
+        source = git_show_text(f"{commit_sha}:ai/{module_name}.py", cwd=repo_root())
+        module = types.ModuleType(qualified_name)
+        module.__file__ = f"{commit_sha}:ai/{module_name}.py"
+        module.__package__ = package_name
+        sys.modules[qualified_name] = module
+        exec(compile(source, module.__file__, "exec"), module.__dict__)
+
+    agent_class = getattr(sys.modules[f"{package_name}.agent"], "Agent")
+    _AGENT_CLASS_CACHE[commit_sha] = agent_class
+    return agent_class
+
+
+def _resolve_source_commit_sha(artifacts: str, fallback_commit_sha: str) -> str:
+    manifest = _load_artifact_manifest(artifacts)
+    commit_sha = str(manifest.get("source_commit_sha", "")).strip()
+    return commit_sha or str(fallback_commit_sha)
+
+
+def _build_participant_spec(artifacts: str, profile: str, fallback_commit_sha: str, user_name: str) -> Dict[str, Any]:
+    source_commit_sha = _resolve_source_commit_sha(artifacts, fallback_commit_sha)
+    return {
+        "artifacts": artifacts,
+        "profile": profile,
+        "user_name": user_name,
+        "source_commit_sha": source_commit_sha,
+        "code_origin": f"git:{source_commit_sha}",
+        "agent_class": _load_agent_class_from_commit(source_commit_sha),
+    }
+
+
 def _resolve_incumbent_profile(artifacts: str, requested_profile: str | None, fallback_profile: str) -> str:
     if requested_profile:
         return str(requested_profile)
@@ -190,11 +237,13 @@ def _resolve_incumbent_profile(artifacts: str, requested_profile: str | None, fa
     return _SNAPSHOT_ROLE_TO_PROFILE.get(snapshot_role, str(fallback_profile))
 
 
-def _participant_payload(artifacts: str, profile: str) -> Dict[str, Any]:
+def _participant_payload(artifacts: str, profile: str, source_commit_sha: str, code_origin: str) -> Dict[str, Any]:
     manifest = _load_artifact_manifest(artifacts)
     payload: Dict[str, Any] = {
         "artifacts": _resolved_path_string(artifacts),
         "profile": profile,
+        "source_commit_sha": source_commit_sha,
+        "code_origin": code_origin,
     }
     if manifest:
         payload["snapshot_role"] = manifest.get("snapshot_role")
@@ -295,12 +344,15 @@ def main() -> None:
     league_dir = ensure_dir(repo_root() / config["league_dir"])
     league_state_path = league_dir / "league_state.json"
     league_state = _bootstrap_league(league_state_path)
+    current_head_sha = git_head_sha(repo_root())
     candidate_profile = str(args.candidate_profile or config.get("candidate_profile", "challenger"))
     incumbent_profile = _resolve_incumbent_profile(
         args.incumbent,
         args.incumbent_profile,
         str(config.get("incumbent_profile", "baseline")),
     )
+    candidate_participant = _build_participant_spec(args.candidate, candidate_profile, current_head_sha, "CurrentAI")
+    incumbent_participant = _build_participant_spec(args.incumbent, incumbent_profile, current_head_sha, "IncumbentAI")
     _, env_backend = _train_env_runtime()
     if env_backend == "mock_train_env.MockTrainEnv":
         raise SystemExit(
@@ -325,20 +377,18 @@ def main() -> None:
         map_id = int(map_item["map_id"])
         bucket = str(map_item["bucket"])
         order_index = int(map_item["order_index"])
-        challenger = {"artifacts": args.candidate, "profile": candidate_profile, "user_name": "CurrentAI"}
-        incumbent = {"artifacts": args.incumbent, "profile": incumbent_profile, "user_name": "IncumbentAI"}
         red_score, blue_score, red_stats, blue_stats = _run_single(
             scenario_path,
             map_id,
-            challenger,
-            incumbent,
+            candidate_participant,
+            incumbent_participant,
             int(config["max_steps"]),
         )
         blue_red_score, blue_blue_score, blue_leg_red_stats, blue_leg_blue_stats = _run_single(
             scenario_path,
             map_id,
-            incumbent,
-            challenger,
+            incumbent_participant,
+            candidate_participant,
             int(config["max_steps"]),
         )
         candidate_stats = _merge_policy_stats(red_stats, blue_leg_blue_stats)
@@ -354,6 +404,10 @@ def main() -> None:
                 "second_leg": {"candidate": blue_blue_score, "opponent": blue_red_score},
                 "candidate_artifacts": _resolved_path_string(args.candidate),
                 "opponent_artifacts": _resolved_path_string(args.incumbent),
+                "candidate_source_commit_sha": candidate_participant["source_commit_sha"],
+                "opponent_source_commit_sha": incumbent_participant["source_commit_sha"],
+                "candidate_code_origin": candidate_participant["code_origin"],
+                "opponent_code_origin": incumbent_participant["code_origin"],
                 "candidate_profile": candidate_profile,
                 "opponent_profile": incumbent_profile,
                 "candidate_policy_stats": candidate_stats,
@@ -365,16 +419,15 @@ def main() -> None:
 
     exploiter_results = {}
     for profile in league_state["exploiters"]:
+        exploiter_participant = _build_participant_spec(args.incumbent, profile, current_head_sha, "ExploiterAI")
         profile_scores = []
         profile_coverages = []
         for scenario_path, map_id in scenarios_by_bucket.get("complex", [])[:4]:
-            challenger = {"artifacts": args.candidate, "profile": candidate_profile, "user_name": "CurrentAI"}
-            exploiter = {"artifacts": args.incumbent, "profile": profile, "user_name": "ExploiterAI"}
             score_a, score_b, candidate_stats, _ = _run_single(
                 scenario_path,
                 map_id,
-                challenger,
-                exploiter,
+                candidate_participant,
+                exploiter_participant,
                 int(config["max_steps"]),
             )
             profile_scores.append(1.0 if score_b > score_a else 0.0)
@@ -403,8 +456,18 @@ def main() -> None:
     save_json(
         {
             "env_backend": env_backend,
-            "candidate": _participant_payload(args.candidate, candidate_profile),
-            "incumbent": _participant_payload(args.incumbent, incumbent_profile),
+            "candidate": _participant_payload(
+                args.candidate,
+                candidate_profile,
+                candidate_participant["source_commit_sha"],
+                candidate_participant["code_origin"],
+            ),
+            "incumbent": _participant_payload(
+                args.incumbent,
+                incumbent_profile,
+                incumbent_participant["source_commit_sha"],
+                incumbent_participant["code_origin"],
+            ),
         },
         run_dir / "participants.json",
     )
@@ -419,6 +482,8 @@ def main() -> None:
                 f"- env_backend: `{env_backend}`",
                 f"- paired_map_items: `{len(paired_map_list['items'])}`",
                 f"- map_list_duplicates_used: `{paired_map_list['duplicates_used']}`",
+                f"- candidate_source_commit_sha: `{candidate_participant['source_commit_sha']}`",
+                f"- incumbent_source_commit_sha: `{incumbent_participant['source_commit_sha']}`",
                 f"- overall_point_estimate: `{summary['overall']['point_estimate']:.4f}`",
                 f"- overall_ci95_lower: `{summary['overall']['ci95'][0]:.4f}`",
                 f"- complex_point_estimate: `{summary['buckets'].get('complex', {}).get('point_estimate', 0.0):.4f}`",

@@ -14,7 +14,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset, Subset
 
 from ai.models import GraphSituationModel, MultiHorizonIntentionModel, TacticalScorer
-from .common import copy_publish_artifacts, dump_yaml, ensure_dir, load_config, now_tag, repo_root, safe_device, save_json, set_seed
+from .common import copy_publish_artifacts, dump_yaml, ensure_dir, git_head_sha, load_config, now_tag, repo_root, safe_device, save_json, set_seed
 from .data import IntentSequenceDataset, StateGraphDataset, TacticalPositionDataset, discover_training_files
 from .maps import build_map_catalog, map_bucket_lookup
 
@@ -368,6 +368,7 @@ def main() -> None:
     if config.get("publish_to_ai_weights", False):
         manifest = {
             "generated_at": now_tag(),
+            "source_commit_sha": git_head_sha(repo_root()),
             "history_len": int(config["intent"]["history_len"]),
             "horizons": int(config["intent"]["horizons"]),
             "intent_lstm": "intent_lstm.pt",

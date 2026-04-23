@@ -87,14 +87,20 @@ class MainlineContractTest(unittest.TestCase):
         )
 
     def test_selfplay_resolves_incumbent_profile_from_snapshot_role(self) -> None:
-        from training.selfplay import _participant_payload, _resolve_incumbent_profile
+        from training.selfplay import _participant_payload, _resolve_incumbent_profile, _resolve_source_commit_sha
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             learned_dir = root / "learned"
             learned_dir.mkdir()
             (learned_dir / "model_manifest.json").write_text(
-                json.dumps({"snapshot_role": "accepted_learned_mainline", "generated_at": "20260423_000000"}),
+                json.dumps(
+                    {
+                        "snapshot_role": "accepted_learned_mainline",
+                        "generated_at": "20260423_000000",
+                        "source_commit_sha": "abc123",
+                    }
+                ),
                 encoding="utf-8",
             )
             baseline_dir = root / "baseline"
@@ -106,9 +112,13 @@ class MainlineContractTest(unittest.TestCase):
 
             self.assertEqual(_resolve_incumbent_profile(str(learned_dir), None, "baseline"), "incumbent")
             self.assertEqual(_resolve_incumbent_profile(str(baseline_dir), None, "baseline"), "baseline")
-            participant = _participant_payload(str(learned_dir), "incumbent")
+            self.assertEqual(_resolve_source_commit_sha(str(learned_dir), "fallback"), "abc123")
+            self.assertEqual(_resolve_source_commit_sha(str(baseline_dir), "fallback"), "fallback")
+            participant = _participant_payload(str(learned_dir), "incumbent", "abc123", "git:abc123")
             self.assertEqual(participant["profile"], "incumbent")
             self.assertEqual(participant["snapshot_role"], "accepted_learned_mainline")
+            self.assertEqual(participant["source_commit_sha"], "abc123")
+            self.assertEqual(participant["code_origin"], "git:abc123")
 
     def test_selfplay_prefers_train_env_backend_over_mock(self) -> None:
         from training.selfplay import _resolve_train_env_class
@@ -143,6 +153,18 @@ class MainlineContractTest(unittest.TestCase):
         env_class, backend = _resolve_train_env_class(fake_import)
         self.assertIs(env_class, MockTrainEnv)
         self.assertEqual(backend, "mock_train_env.MockTrainEnv")
+
+    def test_selfplay_can_load_agent_class_from_git_commit(self) -> None:
+        from training.common import git_head_sha
+        from training.selfplay import _load_agent_class_from_commit
+
+        for module_name in list(sys.modules):
+            if module_name == "torch" or module_name.startswith("torch."):
+                sys.modules.pop(module_name, None)
+        commit_sha = git_head_sha(REPO_ROOT)
+        agent_class = _load_agent_class_from_commit(commit_sha)
+        self.assertEqual(agent_class.__name__, "Agent")
+        self.assertTrue(agent_class.__module__.startswith("_selfplay_snapshot_"))
 
     def test_weapon_lock_ignores_invalid_cur_hex(self) -> None:
         from ai.agent import ActionType, Agent, Map

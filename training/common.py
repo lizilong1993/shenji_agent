@@ -4,6 +4,7 @@ import json
 import os
 import random
 import shutil
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -109,3 +110,25 @@ def copy_publish_artifacts(run_dir: Path, publish_dir: Path, manifest: Dict[str,
 def env_or_default(name: str, default: str) -> str:
     value = os.environ.get(name)
     return value if value else default
+
+
+def git_head_sha(cwd: Optional[Path | str] = None) -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(cwd or repo_root()),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def git_show_text(spec: str, cwd: Optional[Path | str] = None) -> str:
+    result = subprocess.run(
+        ["git", "show", spec],
+        cwd=str(cwd or repo_root()),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout
