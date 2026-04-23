@@ -229,6 +229,35 @@ def _build_participant_spec(artifacts: str, profile: str, fallback_commit_sha: s
     }
 
 
+def _save_progress_snapshot(
+    run_dir: Path,
+    *,
+    env_backend: str,
+    matches: List[Dict[str, object]],
+    total_pairs: int,
+    candidate: Dict[str, Any],
+    incumbent: Dict[str, Any],
+) -> None:
+    save_json(
+        {
+            "env_backend": env_backend,
+            "completed_pairs": len(matches),
+            "total_pairs": total_pairs,
+            "candidate_source_commit_sha": candidate["source_commit_sha"],
+            "incumbent_source_commit_sha": incumbent["source_commit_sha"],
+        },
+        run_dir / "progress.json",
+    )
+    save_json(
+        {
+            "env_backend": env_backend,
+            "completed_pairs": len(matches),
+            "matches": matches,
+        },
+        run_dir / "partial_match_results.json",
+    )
+
+
 def _resolve_incumbent_profile(artifacts: str, requested_profile: str | None, fallback_profile: str) -> str:
     if requested_profile:
         return str(requested_profile)
@@ -372,6 +401,14 @@ def main() -> None:
         scenarios_by_bucket[str(item["bucket"])].append((scenario_path, int(item["map_id"])))
 
     matches: List[Dict[str, object]] = []
+    _save_progress_snapshot(
+        run_dir,
+        env_backend=env_backend,
+        matches=matches,
+        total_pairs=len(paired_map_list["items"]),
+        candidate=candidate_participant,
+        incumbent=incumbent_participant,
+    )
     for map_item in paired_map_list["items"]:
         scenario_path = scenario_root / str(map_item["scenario"])
         map_id = int(map_item["map_id"])
@@ -413,6 +450,14 @@ def main() -> None:
                 "candidate_policy_stats": candidate_stats,
                 "opponent_policy_stats": opponent_stats,
             }
+        )
+        _save_progress_snapshot(
+            run_dir,
+            env_backend=env_backend,
+            matches=matches,
+            total_pairs=len(paired_map_list["items"]),
+            candidate=candidate_participant,
+            incumbent=incumbent_participant,
         )
 
     summary = summarize_matches(matches)

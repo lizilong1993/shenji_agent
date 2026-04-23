@@ -166,6 +166,32 @@ class MainlineContractTest(unittest.TestCase):
         self.assertEqual(agent_class.__name__, "Agent")
         self.assertTrue(agent_class.__module__.startswith("_selfplay_snapshot_"))
 
+    def test_selfplay_progress_snapshot_persists_completed_pairs(self) -> None:
+        from training.selfplay import _save_progress_snapshot
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            candidate = {"source_commit_sha": "candsha"}
+            incumbent = {"source_commit_sha": "incsha"}
+            matches = [{"order_index": 0, "paired_score": 1.0}, {"order_index": 1, "paired_score": 0.5}]
+            _save_progress_snapshot(
+                run_dir,
+                env_backend="train_env.TrainEnv",
+                matches=matches,
+                total_pairs=100,
+                candidate=candidate,
+                incumbent=incumbent,
+            )
+            progress = json.loads((run_dir / "progress.json").read_text(encoding="utf-8"))
+            partial = json.loads((run_dir / "partial_match_results.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(progress["completed_pairs"], 2)
+        self.assertEqual(progress["total_pairs"], 100)
+        self.assertEqual(progress["candidate_source_commit_sha"], "candsha")
+        self.assertEqual(progress["incumbent_source_commit_sha"], "incsha")
+        self.assertEqual(partial["completed_pairs"], 2)
+        self.assertEqual(len(partial["matches"]), 2)
+
     def test_weapon_lock_ignores_invalid_cur_hex(self) -> None:
         from ai.agent import ActionType, Agent, Map
 
