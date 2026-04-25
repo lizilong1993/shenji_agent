@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
@@ -56,6 +57,8 @@ class LearnedPolicy:
         self.history_len = 8
         self.faction: Optional[int] = None
         self.policy_profile = "challenger"
+        self.device = "cpu"
+        self.requested_device = "auto"
         self.intent_model = None
         self.situation_model = None
         self.enemy_histories: Dict[int, Deque[np.ndarray]] = defaultdict(lambda: deque(maxlen=self.history_len))
@@ -100,10 +103,45 @@ class LearnedPolicy:
     def has_models(self) -> bool:
         return self.intent_model is not None and self.situation_model is not None
 
+    def _resolve_device(self) -> str:
+        if not TORCH_AVAILABLE:
+            return "cpu"
+        requested = (os.environ.get("SHENJI_POLICY_DEVICE") or "auto").strip()
+        self.requested_device = requested or "auto"
+        normalized = self.requested_device.lower()
+        cuda = getattr(torch, "cuda", None)
+        is_available = getattr(cuda, "is_available", None)
+        try:
+            cuda_available = callable(is_available) and bool(is_available())
+        except Exception:
+            cuda_available = False
+        if normalized == "auto":
+            return "cuda" if cuda_available else "cpu"
+        if normalized.startswith("cuda") and not cuda_available:
+            return "cpu"
+        if normalized == "cpu" or normalized.startswith("cuda"):
+            return normalized
+        return self.requested_device
+
+    def _move_to_device(self, value: Any) -> Any:
+        to_method = getattr(value, "to", None)
+        if callable(to_method):
+            return to_method(self.device)
+        return value
+
+    def _load_models(self, intent_path: Path, situation_path: Path) -> Tuple[Any, Any]:
+        intent_state = torch.load(intent_path, map_location="cpu")
+        situation_state = torch.load(situation_path, map_location="cpu")
+        return self._move_to_device(self._load_intent_model(intent_state)), self._move_to_device(
+            self._load_situation_model(situation_state)
+        )
+
     def configure(self, faction: int, artifact_dir: Optional[str] = None, policy_profile: str = "challenger") -> None:
         self.faction = faction
         self.policy_profile = policy_profile or "challenger"
         self.history_len = 8
+        self.device = "cpu"
+        self.requested_device = "auto"
         self.intent_model = None
         self.situation_model = None
         self.loaded_from = None
@@ -113,6 +151,7 @@ class LearnedPolicy:
         self._reset_diagnostics()
         if not TORCH_AVAILABLE or self.policy_profile == "baseline":
             return
+        self.device = self._resolve_device()
 
         candidate_dirs: List[Path] = []
         if artifact_dir:
@@ -137,10 +176,13 @@ class LearnedPolicy:
             if not intent_path.exists() or not situation_path.exists():
                 continue
 
-            intent_state = torch.load(intent_path, map_location="cpu")
-            situation_state = torch.load(situation_path, map_location="cpu")
-            self.intent_model = self._load_intent_model(intent_state)
-            self.situation_model = self._load_situation_model(situation_state)
+            try:
+                self.intent_model, self.situation_model = self._load_models(intent_path, situation_path)
+            except Exception:
+                if self.device == "cpu":
+                    raise
+                self.device = "cpu"
+                self.intent_model, self.situation_model = self._load_models(intent_path, situation_path)
             self.loaded_from = candidate_dir
             self.manifest = payload
             return
@@ -189,6 +231,8 @@ class LearnedPolicy:
             }
         return {
             "policy_profile": self.policy_profile,
+            "device": self.device,
+            "requested_device": self.requested_device,
             "loaded_from": str(self.loaded_from) if self.loaded_from else None,
             "intent_model_loaded": self.intent_model is not None,
             "situation_model_loaded": self.situation_model is not None,
@@ -243,7 +287,7 @@ class LearnedPolicy:
             self._observation_cache = self._build_observation_cache(observation)
         return self._observation_cache
 
-    def _intent_distribution(self, enemy_id: int) -> Optional[np.ndarray]:
+    def _intent_distribution(self, enemy_id: int) -> Optional[List[float]]:
         if self.intent_model is None or enemy_id not in self.enemy_histories:
             return None
         history = list(self.enemy_histories[enemy_id])
@@ -251,21 +295,21 @@ class LearnedPolicy:
             return None
         while len(history) < self.history_len:
             history.insert(0, np.zeros_like(history[0]))
-        tensor = torch.tensor(np.stack(history), dtype=torch.float32).unsqueeze(0)
+        tensor = self._move_to_device(torch.tensor(np.stack(history), dtype=torch.float32).unsqueeze(0))
         with torch.inference_mode():
             logits = self.intent_model(tensor)[0, 0]
-        return torch.softmax(logits, dim=-1).cpu().numpy()
+        return torch.softmax(logits, dim=-1).detach().cpu().tolist()
 
     def predict_intent(self, enemy_id: int) -> Dict[str, Any]:
         distribution = self._intent_distribution(enemy_id)
         if distribution is None:
             return {"top_direction": 0, "confidence": 0.0, "distribution": [1.0] + [0.0] * 6}
-        top_direction = int(np.argmax(distribution))
-        confidence = float(np.max(distribution))
+        top_direction = max(range(len(distribution)), key=distribution.__getitem__)
+        confidence = float(distribution[top_direction])
         return {
             "top_direction": top_direction,
             "confidence": confidence,
-            "distribution": distribution.tolist(),
+            "distribution": [float(score) for score in distribution],
         }
 
     def predict_location(self, enemy_id: int, current_hex: int, tactical_map: Any) -> int:
@@ -297,8 +341,8 @@ class LearnedPolicy:
             )
         adjacency = build_feature_similarity_graph(features)
         with torch.inference_mode():
-            x = torch.tensor(features, dtype=torch.float32)
-            adj = torch.tensor(adjacency, dtype=torch.float32)
+            x = self._move_to_device(torch.tensor(features, dtype=torch.float32))
+            adj = self._move_to_device(torch.tensor(adjacency, dtype=torch.float32))
             return float(self.situation_model(x, adj).view(-1).item())
 
     def choose_shoot_candidate(
