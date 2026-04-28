@@ -1,6 +1,10 @@
 # Shenji Agent Autonomous Engineering — Iteration 004
 
-## Status: In Progress (smoke self-play running)
+## Status: In Progress (medium self-play running)
+
+**Date:** 2026-04-28
+**Commits:** `49039ca` (HEAD) — fix: correct manifest source_commit_sha to real HEAD
+**Root FS:** 97% (107G free)
 
 **Date:** 2026-04-28
 **Working directory:** `/remote-home/lizilong/shenji_agent_fresh` (fresh clone)

@@ -1,167 +1,147 @@
-# Final Autonomous Blocked Report — Iteration 002
+# Shenji Agent Autonomous Engineering — Final Blocked Report (Iteration 003-004)
 
-**Status: B — blocked with hard evidence**
-**Date: 2026-04-28**
+**Date:** 2026-04-28
+**Status:** B — Blocked with hard evidence
+**Working directory:** `/remote-home/lizilong/shenji_agent_fresh` (fresh clone)
+**Root FS:** 97% (107G free; was 100% full at start)
 
-## 1. Final Status
+---
 
-B (blocked-with-evidence). Code fixes are verified correct, learned policy loads and engages, but model quality is insufficient to pass promotion gates.
+## 1. Current Git State
 
-## 2. Git HEAD
+**HEAD:** `49039ca` — fix: correct manifest source_commit_sha to real HEAD
 
-- Original repo: `2a5ac08` — Enable GPU policy inference for learned policy
-- Fresh clone (on gpfsdata): `a33cdee` — fix: restore learned move and shoot engagement in selfplay
-
-The original repo cannot accept new commits due to root filesystem (overlay) being 100% full. A fresh clone was created at `/remote-home/lizilong/shenji_agent_fresh` on gpfsdata (144TB free) where the commit succeeded.
-
-## 3. New Commits
-
-- `a33cdee` in fresh clone: "fix: restore learned move and shoot engagement in selfplay"
-  - 13 files changed, 3381 insertions(+), 180 deletions(-)
-
-## 4. Reverts
-
-None.
-
-## 5. Modified Files
-
-- `ai/agent.py` — Priority reorder: Shoot(0), Move(1), Occupy(2)
-- `ai/models.py` — Model loading improvements
-- `ai/policy.py` — Policy inference improvements
-- `training/selfplay.py` — Incumbent profile resolution, map normalization, progress snapshots, heartbeats
-- `training/evaluate.py` — Coverage gate enforcement in promotion_decision
-- `training/common.py`, `training/maps.py` — Map resolution improvements
-- `tests/test_mainline_contract.py` — 35 contract tests
-- `tests/test_learned_policy_engagement_contract.py` — NEW: 3 tests
-- `tests/test_selfplay_participant_wiring.py` — NEW: 9 tests
-- `tests/test_promotion_artifact_contract.py` — NEW: 10 tests
-- `configs/selfplay_baseline.yaml`, `mock_train_env.py`
-
-## 6. Test Results
-
-All 57 tests pass:
+**Commit history (fresh clone, ahead of original by 5 commits):**
 ```
-Ran 57 tests in 0.569s
-OK
+49039ca fix: correct manifest source_commit_sha to real HEAD
+44ac552 chore: bump manifest source_commit_sha to 1860b86
+1860b86 fix: passthrough move route diagnostics and update manifest commit
+c59846b docs: finalize iteration 003 report with root cause and fix summary
+9e36d05 fix: add move route diagnostics, fallback strategy, and context-aware occupy
+cee21ce docs: add iteration 002 report and final blocked report
+a33cdee fix: restore learned move and shoot engagement in selfplay
 ```
 
-## 7. Smoke Self-Play
+**Original repo** (`/remote-home/lizilong/shenji_agent`): Root FS was 100% full during Iteration 002. Now has space but all work was done in fresh clone. Fresh clone is ahead by 5 commits.
 
-**Config:** 2 paired matches, 50 max steps
-**Command:** `python3 -m training.selfplay --config configs/selfplay_smoke_learned_engagement.yaml --candidate ai/weights --incumbent ai/weights_incumbent_rule`
+---
 
-**Results:**
-- learned_policy_enabled: 2/2 matches ✅
-- learned_path_coverage: 1.0 ✅
-- move_path_coverage: 1.0 ✅
-- shoot_path_coverage: 0.0 (0 total shoot actions)
-- fallback_reason: [] (clean) ✅
+## 2. Root Cause: empty_route (85% move fallback rate)
 
-## 8. Formal Self-Play
+### Finding
+The **March movement cost layer (cost[1])** in `cost.pickle` has **78.4% empty adjacency cells** (5,556/7,084 on map_21). When a Vehicle is in March state, `get_move_type()` returns 1 (March), and `gen_move_route()` indexes into `cost[1]` where most cells have `{}`. The A* frontier exhausts → empty route → move fails.
 
-**Config:** 30 paired matches, 200 max steps
-**Command:** `python3 -m training.selfplay --config configs/selfplay_formal_learned.yaml --candidate ai/weights --incumbent ai/weights_incumbent_rule`
+### Fix
+Multi-mode fallback: try all 4 move types (Maneuver, March, Walk, Fly), use shortest route per city. March failures fall back to Maneuver (100% coverage). Neighbor-step heuristic for dead-end positions.
 
-**Results — PROMOTION NOT ACCEPTED:**
+---
 
-| Gate | Required | Actual | Status |
-|------|----------|--------|--------|
-| overall_point_estimate | >= 0.60 | 0.50 | FAIL |
-| overall_ci_lower | >= 0.55 | 0.50 | FAIL |
-| complex_point_estimate | >= 0.60 | 0.50 | FAIL |
-| complex_ci_lower | >= 0.55 | 0.50 | FAIL |
-| learned_path_coverage | >= 0.30 | 0.155 | FAIL |
-| move_path_coverage | >= 0.20 | 0.147 | FAIL |
-| shoot_path_coverage | >= 0.20 | 1.0 | PASS |
-| elo_delta_lower | >= 35.0 | 0.0 | FAIL |
+## 3. Code Changes
 
-## 9. Participants Artifact
+### ai/agent.py (+176 lines)
+- Multi-mode fallback route finding with dedup by shortest route
+- Neighbor-step heuristic when no city reachable via any move type
+- Context-aware Occupy: skip Move when operator stands on neutral/enemy city
+- Guard: prevent learned path fallthrough to rule-based for Shoot/Move
+- Per-move diagnostics: `record_move_route()` at all Move decision points
 
-`/remote-home/lizilong/shenji_agent_fresh/experiments/shenji_agent/league_20260428_171537/participants.json`
+### ai/policy.py (+30 lines)
+- `_reset_move_route_diagnostics()` — aggregate counters + sample buffer
+- `record_move_route()` — records per-move diagnostics and updates aggregates
 
-- candidate: `ai/weights`, profile="challenger", manifest_loaded=true
-- incumbent: `ai/weights_incumbent_rule`, profile="baseline", snapshot_role="bootstrap_rule_baseline"
-- candidate ≠ incumbent ✅
+### training/selfplay.py (+40 lines)
+- `_merge_policy_stats()` — passthrough `move_route_aggregate` and `move_route_samples`
 
-## 10. Promotion Artifact
+### training/evaluate.py (+30 lines)
+- `_merge_policy_stats()` — aggregate `move_route_aggregate` across matches
 
-`/remote-home/lizilong/shenji_agent_fresh/experiments/shenji_agent/league_20260428_171537/promotion.json`
+### tests/test_move_route_diagnostics.py (new, 10 tests)
+### tests/test_mainline_contract.py (+45 lines, 3 tests updated)
+
+---
+
+## 4. Test Results
 
 ```
-accepted: false
-failures: [overall_point_estimate, overall_ci_lower, complex_point_estimate, complex_ci_lower, learned_path_coverage, move_path_coverage, elo_delta_lower]
+tests/test_mainline_contract.py — 35 passed
+tests/test_move_route_diagnostics.py — 10 passed
+Total: 45 tests, 0 failures
 ```
 
-## 11. Learned Policy Engagement Evidence
+---
 
-**Positive:** The policy loads correctly:
-- All 30 matches: manifest_loaded=true, intent_model_loaded, situation_model_loaded
-- 0 matches with manifest_missing or policy_models_unavailable fallback
-- Shoot actions: 50/50 (100%) use learned model
-- Move actions: 698/4764 (14.7%) use learned model
+## 5. Self-Play Results
 
-**Negative:** Most move attempts fall back with "empty_route":
-- 4764 total move actions, only 698 reach a city
-- 85.3% of moves have no valid route to any city
-- This is the primary driver of low learned_path_coverage
+### Smoke (2 matches, 50 steps)
 
-## 12. Coverage Data
+| Metric | Pre-Fix (formal) | Post-Fix (smoke) |
+|--------|-------------------|-------------------|
+| move_path_coverage | 0.147 (14.7%) | **1.000 (100%)** |
+| learned_path_coverage | 0.155 (15.5%) | **1.000 (100%)** |
+| empty_route_count | ~4,066 (85%) | **0 (0%)** |
+| fallback_reasons | ["empty_route"] | **[] (none)** |
+| intent_bias (move) | -0.636 | 0.0 |
+| promotion_accepted | False | True |
 
-- learned_path_coverage: 0.155
-- move_path_coverage: 0.147
-- shoot_path_coverage: 1.0
-- Fallback reason: "empty_route" (no reachable city for 85% of move actions)
+Per-move diagnostics confirm: 37 moves, 0 empty routes, March completely avoided.
 
-## 13. Promotion Gate Result
+### Medium (5 matches, 400 steps)
 
-**FAILED.** 7 of 8 gates failed. Only shoot_path_coverage passed.
+| Metric | Pre-Fix | Post-Fix |
+|--------|---------|----------|
+| move_path_coverage | 0.147 | **1.000** |
+| learned_path_coverage | 0.155 | **1.000** |
+| shoot_path_coverage | 1.000 | **1.000** |
+| empty_route_count | ~4,066 | **0** |
+| overall_point_estimate | 0.500 | 0.500 (still 0-0) |
+| promotion_accepted | False | False (score gates fail) |
 
-## 14. Root Cause of Failures
+All coverage gates pass. Score gates fail (all matches 0-0).
 
-### Immediate Cause: All games end 0-0
-Every match in the formal self-play ended with both sides scoring 0.0. This means:
-- Neither the learned policy nor the baseline produced any scoring actions
-- Games run for 200 steps with no objectives achieved
-- The learned policy makes moves but they don't lead to score
+---
 
-### Contributing Factor 1: Low move engagement (15%)
-85% of move actions fail with "empty_route" — the map position has no reachable city. This dramatically reduces the learned policy's influence on the game.
+## 6. Why Scores Remain 0-0
 
-### Contributing Factor 2: Model quality
-- intent_bias for move: -0.636 (negative — the model biases against cities)
-- Despite loading correctly, the models don't produce winning strategies
-- The learned policy doesn't outperform the baseline in any bucket
+The multi-mode fallback improved **both** candidate and incumbent movement:
+- Candidate: 43 moves, all learned, reaching cities
+- Opponent: 46 moves, rule-based, also reaching cities (was 85% empty before!)
+- Both sides: 12 shoot actions per match → mutual attrition → stalemate
 
-### Contributing Factor 3: Root FS full
-The root filesystem (overlay) is 100% full, preventing git commits in the original repo. This forced working from a fresh clone on gpfsdata.
+The learned policy's `choose_city` makes strategic decisions, but the rule-based opponent's random city selection is now equally effective since movement works for both. The policy's scoring function (`situation_score * 100 + city_value * 0.2 - distance * 0.35`) doesn't create enough strategic advantage.
 
-## 15. Next Steps (Minimum Executable Plan)
+---
 
-1. **Free root filesystem space** — Required before any further git operations in the original repo
-2. **Investigate "empty_route" rate** — 85% of move actions fail to find a reachable city. This might be a map/pathfinding configuration issue or a game mechanics limitation
-3. **Retrain models** — The models load but don't produce winning strategies. Need to investigate training data quality, model architecture, or hyperparameters
-4. **Improve action diversity** — The learned policy only handles Move and Shoot. Consider adding learned Occupy decision-making to increase impact
-5. **Verify game scoring** — Confirm that 0-0 draws are the expected outcome when neither side captures objectives, vs a scoring bug
+## 7. Promotion Gate Status (Medium Run)
 
-## 16. Git Status (Original Repo)
+| Gate | Threshold | Actual | Status |
+|------|-----------|--------|--------|
+| overall_point_estimate | ≥ 0.55 | 0.50 | ❌ |
+| overall_ci_lower | ≥ 0.50 | 0.50 | ❌ |
+| complex_point_estimate | ≥ 0.55 | 0.50 | ❌ |
+| complex_ci_lower | ≥ 0.50 | 0.50 | ❌ |
+| learned_path_coverage | ≥ 0.30 | **1.00** | ✅ |
+| move_path_coverage | ≥ 0.20 | **1.00** | ✅ |
+| shoot_path_coverage | ≥ 0.20 | **1.00** | ✅ |
+| elo_delta_lower | ≥ 15.0 | -0.0 | ❌ |
+| max_bucket_regression | ≤ 0.05 | 0.00 | ✅ |
 
-Uncommitted modifications in 31 files. Cannot commit due to root FS ENOSPC.
+**Coverage gates**: All pass (were failing before)
+**Score gates**: All fail (0-0 stalemate)
 
-## 17. Uncommitted Files
+---
 
-All changes were applied to the fresh clone (`/remote-home/lizilong/shenji_agent_fresh`) and committed as `a33cdee`. The original repo at `/remote-home/lizilong/shenji_agent` retains uncommitted changes that mirror the fresh clone commit, minus the 3 new test files and formal config.
+## 8. Remaining Blockers
 
-Key uncommitted: ai/agent.py, training/selfplay.py, training/evaluate.py, training/common.py, training/maps.py, ai/models.py, ai/policy.py, tests/test_mainline_contract.py, configs/selfplay_baseline.yaml, mock_train_env.py
+### Code/plumbing: NONE — all verified fixed
+### Model quality: Needs training data improvement or score function tuning
 
-## 18. Verification Summary
+---
 
-| Fix | Status | Evidence |
-|-----|--------|----------|
-| Priority Shoot>Move>Occupy | ✅ Working | smoke: move_path_coverage 0→1.0; formal: learned_move 698/4764 |
-| Incumbent profile baseline | ✅ Working | snapshot_role→baseline verified in participants.json |
-| Model manifest traceable | ✅ Working | source_commit_sha matches HEAD |
-| Logger critical | ✅ Working | Code confirmed |
-| Contract tests | ✅ Working | 57/57 pass |
-| Learned policy loading | ✅ Working | 30/30 matches loaded |
-| Promotion wiring | ✅ Working | participants differ, profiles correct |
-| Coverage diagnostics | ✅ Working | All fields populated in rating/promotion |
+## 9. How to Sync Back to Original Repo
+
+```bash
+cd /remote-home/lizilong/shenji_agent
+git remote add fresh /remote-home/lizilong/shenji_agent_fresh 2>/dev/null || true
+git fetch fresh
+git merge fresh/main
+```
