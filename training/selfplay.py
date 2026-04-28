@@ -715,7 +715,7 @@ def _build_match_policy_diagnostics(
         "intent_model_loaded": intent_model_loaded,
         "situation_model_loaded": situation_model_loaded,
         "tactical_model_present": tactical_model_present,
-        "tactical_model_loaded": False,
+        "tactical_model_loaded": bool(stats.get("tactical_model_loaded_count", 0) > 0),
         "learned_policy_requested": learned_policy_requested,
         "learned_policy_enabled": learned_policy_enabled,
         "fallback_reason": fallback_reasons,
@@ -733,8 +733,8 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
         "shoot": {"total": 0, "learned": 0},
     }
     score_sums = {
-        "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
-        "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
+        "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "combined_score": 0.0},
+        "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "combined_score": 0.0},
     }
     traces: List[Dict[str, object]] = []
     policy_profiles = set()
@@ -742,6 +742,7 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
     loaded_from_dirs = set()
     intent_model_loaded_count = 0
     situation_model_loaded_count = 0
+    tactical_model_loaded_count = 0
     move_route_samples: List[Dict[str, object]] = []
     move_route_agg_merged = {
         "total_attempts": 0,
@@ -760,7 +761,7 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
             action_scores = score_means.get(action_key, {}) if isinstance(score_means, dict) else {}
             samples = int(action_scores.get("samples", 0))
             score_sums[action_key]["samples"] += samples
-            for metric in ("intent_bias", "situation_score", "combined_score"):
+            for metric in ("intent_bias", "situation_score", "tactical_score", "combined_score"):
                 score_sums[action_key][metric] += float(action_scores.get(metric, 0.0)) * samples
         if isinstance(payload, dict):
             traces.extend(payload.get("trace_samples", [])[:6])
@@ -775,6 +776,7 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
                 loaded_from_dirs.add(str(loaded_from))
             intent_model_loaded_count += int(bool(payload.get("intent_model_loaded")))
             situation_model_loaded_count += int(bool(payload.get("situation_model_loaded")))
+            tactical_model_loaded_count += int(bool(payload.get("tactical_model_loaded")))
             route_agg = payload.get("move_route_aggregate", {})
             if isinstance(route_agg, dict):
                 move_route_agg_merged["total_attempts"] += int(route_agg.get("total_attempts", 0))
@@ -822,6 +824,7 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
         "loaded_from_dirs": sorted(loaded_from_dirs),
         "intent_model_loaded_count": intent_model_loaded_count,
         "situation_model_loaded_count": situation_model_loaded_count,
+        "tactical_model_loaded_count": tactical_model_loaded_count,
         "trace_samples": traces[:12],
         "move_route_aggregate": move_route_agg_merged,
         "move_route_samples": move_route_samples[:50],
