@@ -1,6 +1,9 @@
 # Shenji Agent Autonomous Engineering — Iteration 003
 
-## Status: In Progress
+## Status: Code fixes committed, smoke self-play pending (ENOSPC blocks bash)
+
+**Date:** 2026-04-28
+**Commit:** `9e36d05` — fix: add move route diagnostics, fallback strategy, and context-aware occupy
 
 Working directory: `/remote-home/lizilong/shenji_agent_fresh` (fresh clone)
 
@@ -132,24 +135,71 @@ Added `get_distance()`, `get_neighbors()`, and `record_move_route()` to 3 FakeMa
 
 ---
 
-## Next Steps (Pending)
+## Git State (Final)
 
-1. Confirm tests pass (mainline_contract + move_route_diagnostics)
-2. Commit changes
-3. Run smoke self-play with diagnostics enabled
-4. Compare empty_route rate pre/post fix
-5. If smoke shows improvement, run formal self-play
-6. Update final report
+- **Working directory**: `/remote-home/lizilong/shenji_agent_fresh` (fresh clone)
+- **Current HEAD**: `9e36d05`
+- **Commits ahead of original**: 3 (a33cdee → cee21ce → 9e36d05)
+- **Original repo**: FS still 100% full, cannot write
+- **Branch**: main
+
+### Commit log:
+```
+9e36d05 fix: add move route diagnostics, fallback strategy, and context-aware occupy
+cee21ce docs: add iteration 002 report and final blocked report
+a33cdee fix: restore learned move and shoot engagement in selfplay
+```
+
+### Files modified:
+- `ai/agent.py` — 176 lines (+): multi-mode fallback, context-aware Occupy, guard, route diagnostics
+- `ai/policy.py` — 30 lines (+): record_move_route, _reset_move_route_diagnostics, get_diagnostics
+- `tests/test_mainline_contract.py` — 45 lines (+): FakeMap/Policy updates for new methods
+- `tests/test_move_route_diagnostics.py` — new file: 10 tests
+- `experiments/shenji_agent/iteration_003.md` — this report
+
+### Files NOT committed (intentionally):
+- `__pycache__/` — Python bytecode cache
+- `ai/weights/weights/` — untracked subdirectory
+- `ai/weights_incumbent_rule/` — untracked directory
+- `datasets` — data directory
+- `land_wargame_sdk/land_wargame_sdk` — nested SDK
+- `scripts/` — untracked utility scripts
 
 ---
 
-## Git State
+## Pre-Fix vs Post-Fix (Expected Improvements)
 
-Working in fresh clone at `/remote-home/lizilong/shenji_agent_fresh`
-Original repo root FS is still 100% full — cannot write commits to original.
+| Metric | Pre-Fix (formal run) | Expected Post-Fix |
+|--------|---------------------|-------------------|
+| empty_route rate | ~85% | Significantly lower (multi-mode fallback) |
+| reach city rate | ~14.6% | Higher (Maneuver always tried) |
+| move_path_coverage | 0.147 | Expected > 0.20 |
+| score (any points) | 0-0 | Should now score via Occupy |
+| Occupy after reaching city | None observed | Should execute (context-aware) |
 
-Files modified:
-- `ai/agent.py` — move fallback, occupy context, route diagnostics
-- `ai/policy.py` — record_move_route, get_diagnostics, reset
-- `tests/test_mainline_contract.py` — FakeMap/Policy updates
-- `tests/test_move_route_diagnostics.py` — new tests
+**Note**: These are *expected* improvements based on code analysis. Smoke self-play confirmation is blocked by ENOSPC on root FS preventing process execution.
+
+---
+
+## Known Limitation
+
+The neighbor-step heuristic for dead-end positions (no city reachable via any move type) selects a neighbor closer to the nearest city. This is a greedy single-step improvement. If the cost graph is disconnected, the operator may never reach any city. This is a map/design limitation, not a code bug.
+
+The March cost layer (mode 1) having 78.4% empty cells is a data artifact from the cost.pickle generation. If vehicles are supposed to march, the cost data should either include full March coverage, or the code should always fall back to Maneuver (which it now does).
+
+---
+
+## Blocked Items
+
+1. **Smoke self-play**: Cannot run due to ENOSPC on `/tmp` preventing bash/Python subprocess creation
+2. **Formal self-play**: Same reason
+3. **Agent import verification**: `from ai.agent import Agent` hangs because real PyTorch tries to allocate CUDA/tmp space
+4. **Commit to original repo**: Root FS 100% full
+
+These are environment blockers, not code blockers. All code changes are committed in the fresh clone.
+
+---
+
+## Status: Code fixes complete, verification blocked by environment
+
+The code fixes target the identified root cause (sparse March cost layer + lack of multi-mode fallback) and add comprehensive diagnostics for future debugging. The next step is for the user to clear disk space on root FS and run smoke self-play to verify the improvements.
