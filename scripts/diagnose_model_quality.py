@@ -185,6 +185,11 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
         result["manifest_generated_at"] = manifest.get("generated_at")
         result["manifest_source_commit"] = manifest.get("source_commit_sha")
         result["manifest_managed_files"] = manifest.get("managed_files", [])
+        result["normalizer_applied_in_training"] = bool(manifest.get("situation_training_applied_normalizer", False))
+        result["normalizer_manifest_feature_dim"] = manifest.get("situation_normalizer_feature_dim")
+        result["normalizer_manifest_kind"] = manifest.get("situation_normalizer_kind")
+    else:
+        result["normalizer_applied_in_training"] = False
 
     # Check managed files
     managed = manifest.get("managed_files", []) if manifest else []
@@ -196,6 +201,9 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
     if situation_model is not None:
         try:
             feat_dim = int(situation_payload.get("input_dim", 108)) if situation_payload else 108
+            result["situation_checkpoint_training_applied_normalizer"] = bool(
+                situation_payload.get("training_applied_normalizer", False)
+            ) if situation_payload else False
             num_nodes_list = [4, 8, 16]
             pre_sigmoid_vals = []
             sigmoid_vals = []
@@ -287,8 +295,16 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
             if key in normalizer:
                 result["normalizer_feature_count"] = len(normalizer[key])
                 break
+        result["normalizer_zero_std_count"] = int(normalizer.get("zero_std_count", 0))
+        expected_dim = int(situation_payload.get("input_dim", 108)) if situation_payload else 108
+        result["normalizer_loaded_in_inference"] = result.get("normalizer_feature_count") == expected_dim
+        if not result["normalizer_loaded_in_inference"]:
+            result["warnings"].append("normalizer_feature_dim_mismatch")
     else:
+        result["normalizer_loaded_in_inference"] = False
         result["warnings"].append("normalizer_missing")
+    if not result.get("normalizer_applied_in_training", False):
+        result["warnings"].append("normalizer_not_applied_in_training")
 
     # Datasets availability
     if datasets_dir is not None and datasets_dir.exists():
@@ -360,6 +376,8 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
         recs.append("train_tactical_model")
     if not result["normalizer_loaded"]:
         recs.append("save_feature_normalizer")
+    if not result.get("normalizer_applied_in_training", False):
+        recs.append("apply_normalizer_during_training")
     if result["warnings"]:
         if "situation_per_node_zero_variance" in result["warnings"]:
             recs.append("retrain_situation_with_normalized_features")

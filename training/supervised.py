@@ -19,6 +19,36 @@ from .data import IntentSequenceDataset, StateGraphDataset, TacticalPositionData
 from .maps import build_map_catalog, map_bucket_lookup
 
 
+def _fit_feature_normalizer(feature_batches: Iterable[np.ndarray]) -> Dict[str, object]:
+    stacked = np.concatenate([np.asarray(batch, dtype=np.float32) for batch in feature_batches], axis=0)
+    feat_mean = stacked.mean(axis=0).astype(np.float32)
+    raw_std = stacked.std(axis=0).astype(np.float32)
+    zero_std_mask = raw_std < 1e-8
+    safe_std = np.where(zero_std_mask, 1.0, raw_std).astype(np.float32)
+    return {
+        "feature_mean": feat_mean.tolist(),
+        "feature_std": safe_std.tolist(),
+        "feature_std_raw": raw_std.tolist(),
+        "feature_dim": int(stacked.shape[1]),
+        "num_samples": int(stacked.shape[0]),
+        "zero_std_count": int(np.sum(zero_std_mask)),
+        "zero_std_features": [int(idx) for idx in np.where(zero_std_mask)[0].tolist()],
+        "fitted_on": "situation_train_split",
+        "normalizer_kind": "per_dimension_zscore",
+    }
+
+
+def _apply_feature_normalizer(features: torch.Tensor, normalizer: Dict[str, object]) -> torch.Tensor:
+    mean = torch.tensor(normalizer["feature_mean"], dtype=features.dtype, device=features.device)
+    std = torch.tensor(normalizer["feature_std"], dtype=features.dtype, device=features.device)
+    if mean.numel() != features.shape[1] or std.numel() != features.shape[1]:
+        raise ValueError(
+            f"Normalizer feature_dim mismatch: features={features.shape[1]} "
+            f"mean={mean.numel()} std={std.numel()}"
+        )
+    return (features - mean) / std
+
+
 def _bucket_metrics(records: Iterable[Tuple[str, bool]]) -> Dict[str, float]:
     grouped: Dict[str, List[float]] = defaultdict(list)
     for bucket, hit in records:
@@ -227,20 +257,13 @@ def train_situation_model(
         return {"skipped": True, "reason": "not_enough_graph_samples"}
     train_idx, val_idx = train_test_split(indices, test_size=0.2, random_state=42, shuffle=True)
 
-    # Compute feature normalizer from training data
-    all_features = []
+    # Fit on train split only. The same transform is applied to train, val, and
+    # later inference through the published normalizer artifact.
+    train_feature_batches = []
     for idx in train_idx.tolist():
         sample = dataset[idx]
-        all_features.append(sample["x"].numpy())
-    stacked = np.concatenate(all_features, axis=0)
-    feat_mean = stacked.mean(axis=0).tolist()
-    feat_std = stacked.std(axis=0).tolist()
-    normalizer = {
-        "feature_mean": feat_mean,
-        "feature_std": feat_std,
-        "feature_dim": int(stacked.shape[1]),
-        "num_samples": int(stacked.shape[0]),
-    }
+        train_feature_batches.append(sample["x"].numpy())
+    normalizer = _fit_feature_normalizer(train_feature_batches)
     normalizer_path = run_dir / "situation_feature_normalizer.json"
     save_json(normalizer, normalizer_path)
 
@@ -254,7 +277,8 @@ def train_situation_model(
         for idx in train_idx.tolist():
             sample = dataset[idx]
             optimizer.zero_grad()
-            pred = model(sample["x"].to(device), sample["adj"].to(device))
+            x = _apply_feature_normalizer(sample["x"].to(device), normalizer)
+            pred = model(x, sample["adj"].to(device))
             loss = criterion(pred.view(-1), sample["y"].to(device).view(-1))
             loss.backward()
             optimizer.step()
@@ -266,7 +290,8 @@ def train_situation_model(
     with torch.no_grad():
         for idx in val_idx.tolist():
             sample = dataset[idx]
-            pred = model(sample["x"].to(device), sample["adj"].to(device)).view(-1).item()
+            x = _apply_feature_normalizer(sample["x"].to(device), normalizer)
+            pred = model(x, sample["adj"].to(device)).view(-1).item()
             label = sample["y"].view(-1).item()
             hits.append((sample["bucket"], (pred >= 0.5) == (label >= 0.5)))
 
@@ -276,6 +301,8 @@ def train_situation_model(
             "model_state": model.state_dict(),
             "input_dim": 108,
             "hidden_dim": int(config["hidden_dim"]),
+            "training_applied_normalizer": True,
+            "normalizer_kind": normalizer["normalizer_kind"],
         },
         weight_path,
     )
@@ -292,8 +319,12 @@ def train_situation_model(
         "artifact": weight_path.name,
         "normalizer": {
             "path": normalizer_path.name,
-            "feature_dim": int(stacked.shape[1]),
-            "num_samples": int(stacked.shape[0]),
+            "kind": normalizer["normalizer_kind"],
+            "fitted_on": normalizer["fitted_on"],
+            "feature_dim": int(normalizer["feature_dim"]),
+            "num_samples": int(normalizer["num_samples"]),
+            "zero_std_count": int(normalizer["zero_std_count"]),
+            "training_applied_normalizer": True,
         },
     }
 
@@ -318,8 +349,37 @@ def build_summary(metrics: Dict[str, object], run_dir: Path) -> None:
         f"- intent_bucket_counts_train: `{metrics['intent']['bucket_counts']['train']}`",
         f"- intent_bucket_counts_val: `{metrics['intent']['bucket_counts']['val']}`",
         f"- situation_bucket_counts: `{metrics['situation'].get('bucket_counts', {})}`",
+        f"- situation_normalizer: `{metrics['situation'].get('normalizer', {})}`",
     ]
     (run_dir / "summary.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _build_model_manifest(config: Dict[str, object], metrics: Dict[str, object], *, tactical_skipped: bool) -> Dict[str, object]:
+    managed_files = [
+        "intent_lstm.pt",
+        "situation_gcn.pt",
+        "situation_feature_normalizer.json",
+        "model_manifest.json",
+    ]
+    if not tactical_skipped:
+        managed_files.append("tactical_model.pt")
+    situation_normalizer = metrics["situation"].get("normalizer", {})
+    return {
+        "generated_at": now_tag(),
+        "source_commit_sha": git_head_sha(repo_root()),
+        "history_len": int(config["intent"]["history_len"]),
+        "horizons": int(config["intent"]["horizons"]),
+        "intent_lstm": "intent_lstm.pt",
+        "situation_gcn": "situation_gcn.pt",
+        "situation_feature_normalizer": "situation_feature_normalizer.json",
+        "situation_normalizer_kind": situation_normalizer.get("kind"),
+        "situation_normalizer_fitted_on": situation_normalizer.get("fitted_on"),
+        "situation_normalizer_feature_dim": situation_normalizer.get("feature_dim"),
+        "situation_normalizer_zero_std_count": situation_normalizer.get("zero_std_count"),
+        "situation_training_applied_normalizer": situation_normalizer.get("training_applied_normalizer"),
+        "tactical_model": "tactical_model.pt" if not tactical_skipped else None,
+        "managed_files": managed_files,
+    }
 
 
 def main() -> None:
@@ -389,26 +449,8 @@ def main() -> None:
     build_summary(metrics, run_dir)
 
     if config.get("publish_to_ai_weights", False):
-        managed_files = [
-            "intent_lstm.pt",
-            "situation_gcn.pt",
-            "situation_feature_normalizer.json",
-            "model_manifest.json",
-        ]
         tactical_skipped = tactical_metrics.get("skipped", False)
-        if not tactical_skipped:
-            managed_files.append("tactical_model.pt")
-        manifest = {
-            "generated_at": now_tag(),
-            "source_commit_sha": git_head_sha(repo_root()),
-            "history_len": int(config["intent"]["history_len"]),
-            "horizons": int(config["intent"]["horizons"]),
-            "intent_lstm": "intent_lstm.pt",
-            "situation_gcn": "situation_gcn.pt",
-            "situation_feature_normalizer": "situation_feature_normalizer.json",
-            "tactical_model": "tactical_model.pt" if not tactical_skipped else None,
-            "managed_files": managed_files,
-        }
+        manifest = _build_model_manifest(config, metrics, tactical_skipped=tactical_skipped)
         copy_publish_artifacts(run_dir, repo_root() / "ai" / "weights", manifest)
 
 

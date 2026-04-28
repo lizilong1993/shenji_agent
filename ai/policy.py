@@ -85,6 +85,18 @@ class LearnedPolicy:
             "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "combined_score": 0.0},
             "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "combined_score": 0.0},
         }
+        self.normalizer_diagnostics = {
+            "normalizer_loaded": False,
+            "normalizer_applied_count": 0,
+            "normalizer_mismatch_count": 0,
+            "feature_dim_before_norm": None,
+            "feature_mean_before_norm": None,
+            "feature_std_before_norm": None,
+            "feature_mean_after_norm": None,
+            "feature_std_after_norm": None,
+            "normalizer_feature_dim": None,
+            "normalizer_mismatch_reason": None,
+        }
         self.trace_samples: List[Dict[str, Any]] = []
         self._reset_move_route_diagnostics()
 
@@ -315,6 +327,7 @@ class LearnedPolicy:
             "situation_model_loaded": self.situation_model is not None,
             "tactical_model_loaded": self.tactical_model is not None,
             "normalizer_loaded": self.has_normalizer(),
+            "normalizer_diagnostics": dict(self.normalizer_diagnostics),
             "counts": {
                 "move": dict(self.action_counts["move"]),
                 "shoot": dict(self.action_counts["shoot"]),
@@ -424,6 +437,7 @@ class LearnedPolicy:
             return 0.0
 
         features = np.stack(feature_list).astype(np.float32)
+        self.normalizer_diagnostics["normalizer_loaded"] = self.has_normalizer()
         index_lookup = {op_id: idx for idx, op_id in enumerate(operator_ids)}
 
         override_row = None
@@ -440,13 +454,28 @@ class LearnedPolicy:
 
         adjacency = build_feature_similarity_graph(features)
 
-        # Apply training normalizer if available
+        # Apply the same train-split normalizer used during supervised training.
         if self._feature_normalizer:
             feat_mean = np.array(self._feature_normalizer.get("feature_mean", []), dtype=np.float32)
             feat_std = np.array(self._feature_normalizer.get("feature_std", []), dtype=np.float32)
+            self.normalizer_diagnostics["feature_dim_before_norm"] = int(features.shape[1])
+            self.normalizer_diagnostics["feature_mean_before_norm"] = float(np.mean(features))
+            self.normalizer_diagnostics["feature_std_before_norm"] = float(np.std(features))
+            self.normalizer_diagnostics["normalizer_feature_dim"] = int(len(feat_mean))
             if len(feat_mean) == features.shape[1] and len(feat_std) == features.shape[1]:
                 feat_std = np.where(feat_std < 1e-8, 1.0, feat_std)
                 features = (features - feat_mean) / feat_std
+                self.normalizer_diagnostics["normalizer_applied_count"] += 1
+                self.normalizer_diagnostics["feature_mean_after_norm"] = float(np.mean(features))
+                self.normalizer_diagnostics["feature_std_after_norm"] = float(np.std(features))
+                self.normalizer_diagnostics["normalizer_mismatch_reason"] = None
+            else:
+                self.normalizer_diagnostics["normalizer_mismatch_count"] += 1
+                self.normalizer_diagnostics["normalizer_mismatch_reason"] = (
+                    f"feature_dim={features.shape[1]} mean_dim={len(feat_mean)} std_dim={len(feat_std)}"
+                )
+        else:
+            self.normalizer_diagnostics["normalizer_mismatch_reason"] = "normalizer_missing"
 
         with _torch_inference_mode():
             x = self._move_to_device(torch.tensor(features, dtype=torch.float32))
