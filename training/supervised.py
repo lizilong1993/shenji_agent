@@ -226,6 +226,24 @@ def train_situation_model(
     if len(indices) < 2:
         return {"skipped": True, "reason": "not_enough_graph_samples"}
     train_idx, val_idx = train_test_split(indices, test_size=0.2, random_state=42, shuffle=True)
+
+    # Compute feature normalizer from training data
+    all_features = []
+    for idx in train_idx.tolist():
+        sample = dataset[idx]
+        all_features.append(sample["x"].numpy())
+    stacked = np.concatenate(all_features, axis=0)
+    feat_mean = stacked.mean(axis=0).tolist()
+    feat_std = stacked.std(axis=0).tolist()
+    normalizer = {
+        "feature_mean": feat_mean,
+        "feature_std": feat_std,
+        "feature_dim": int(stacked.shape[1]),
+        "num_samples": int(stacked.shape[0]),
+    }
+    normalizer_path = run_dir / "situation_feature_normalizer.json"
+    save_json(normalizer, normalizer_path)
+
     model = GraphSituationModel(num_features=108, hidden_dim=int(config["hidden_dim"])).to(device)
     criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=float(config["learning_rate"]))
@@ -272,6 +290,11 @@ def train_situation_model(
             "filename_segment_index": int(filename_segment_index) if filename_segment_index is not None else None,
         },
         "artifact": weight_path.name,
+        "normalizer": {
+            "path": normalizer_path.name,
+            "feature_dim": int(stacked.shape[1]),
+            "num_samples": int(stacked.shape[0]),
+        },
     }
 
 
@@ -366,6 +389,15 @@ def main() -> None:
     build_summary(metrics, run_dir)
 
     if config.get("publish_to_ai_weights", False):
+        managed_files = [
+            "intent_lstm.pt",
+            "situation_gcn.pt",
+            "situation_feature_normalizer.json",
+            "model_manifest.json",
+        ]
+        tactical_skipped = tactical_metrics.get("skipped", False)
+        if not tactical_skipped:
+            managed_files.append("tactical_model.pt")
         manifest = {
             "generated_at": now_tag(),
             "source_commit_sha": git_head_sha(repo_root()),
@@ -373,14 +405,9 @@ def main() -> None:
             "horizons": int(config["intent"]["horizons"]),
             "intent_lstm": "intent_lstm.pt",
             "situation_gcn": "situation_gcn.pt",
-            "managed_files": [
-                "intent_lstm.pt",
-                "situation_gcn.pt",
-                "intent_model.pt",
-                "situation_model.pt",
-                "tactical_model.pt",
-                "model_manifest.json",
-            ],
+            "situation_feature_normalizer": "situation_feature_normalizer.json",
+            "tactical_model": "tactical_model.pt" if not tactical_skipped else None,
+            "managed_files": managed_files,
         }
         copy_publish_artifacts(run_dir, repo_root() / "ai" / "weights", manifest)
 

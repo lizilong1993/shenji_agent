@@ -1,0 +1,51 @@
+# Supervised training config for score-quality models
+# Iteration 006: Enable tactical, save feature normalizer, improve intent move bias
+
+seed: 42
+output_root: experiments/shenji_agent
+publish_to_ai_weights: true
+
+dataset_contract:
+  intent:
+    map_id_strategy: suffix
+    filename_segment_index: 1
+  situation:
+    map_id_strategy: suffix
+    filename_segment_index: 1
+  tactical:
+    label_col: 样本标签
+
+intent:
+  enabled: true
+  history_len: 8
+  horizons: 5
+  batch_size: 64
+  epochs: 5
+  hidden_dim: 128
+  learning_rate: 0.001
+  max_train_samples: 4096
+  max_val_samples: 1024
+
+tactical:
+  enabled: true
+  batch_size: 512
+  epochs: 5
+  hidden_dim: 128
+  learning_rate: 0.001
+  max_rows: 50000
+
+situation:
+  enabled: true
+  epochs: 12
+  hidden_dim: 64
+  learning_rate: 0.001
+
+map_sampling:
+  train:
+    complex: 0.45
+    medium: 0.30
+    simple: 0.25
+  promotion_eval:
+    complex: 0.50
+    medium: 0.30
+    simple: 0.20

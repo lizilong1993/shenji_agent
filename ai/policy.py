@@ -8,12 +8,12 @@ from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
-from .features import FEATURE_DIM, build_feature_similarity_graph, operator_to_feature
+from .features import FEATURE_DIM, TACTICAL_FEATURE_DIM, action_feature_vector, build_feature_similarity_graph, operator_to_feature, operator_to_graph_feature
 
 try:
     import torch
 
-    from .models import GraphSituationModel, MultiHorizonIntentionModel
+    from .models import GraphSituationModel, MultiHorizonIntentionModel, TacticalScorer
 
     TORCH_AVAILABLE = True
 except ImportError:  # pragma: no cover
@@ -21,6 +21,7 @@ except ImportError:  # pragma: no cover
     torch = None  # type: ignore[assignment]
     GraphSituationModel = None  # type: ignore[assignment]
     MultiHorizonIntentionModel = None  # type: ignore[assignment]
+    TacticalScorer = None  # type: ignore[assignment]
 
 
 def _torch_inference_mode():
@@ -67,6 +68,8 @@ class LearnedPolicy:
         self.requested_device = "auto"
         self.intent_model = None
         self.situation_model = None
+        self.tactical_model = None
+        self._feature_normalizer: Dict[str, Any] = {}
         self.enemy_histories: Dict[int, Deque[np.ndarray]] = defaultdict(lambda: deque(maxlen=self.history_len))
         self.loaded_from: Optional[Path] = None
         self.manifest: Dict[str, Any] = {}
@@ -79,8 +82,8 @@ class LearnedPolicy:
             "shoot": {"total": 0, "learned": 0},
         }
         self.score_totals = {
-            "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
-            "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
+            "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "combined_score": 0.0},
+            "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "combined_score": 0.0},
         }
         self.trace_samples: List[Dict[str, Any]] = []
         self._reset_move_route_diagnostics()
@@ -107,8 +110,31 @@ class LearnedPolicy:
         model.eval()
         return model
 
+    def _load_tactical_model(self, payload: Dict[str, Any]) -> Any:
+        hidden_dim = int(payload["model_state"]["model.0.weight"].shape[0])
+        model = TacticalScorer(
+            input_dim=int(payload.get("input_dim", 32)),
+            hidden_dim=hidden_dim,
+        )
+        model.load_state_dict(payload["model_state"])
+        model.eval()
+        return model
+
+    def _load_normalizer(self, artifact_dir: Path) -> Dict[str, Any]:
+        for name in ("situation_feature_normalizer.json", "feature_normalizer.json"):
+            path = artifact_dir / name
+            if path.exists():
+                return json.loads(path.read_text(encoding="utf-8"))
+        return {}
+
     def has_models(self) -> bool:
         return self.intent_model is not None and self.situation_model is not None
+
+    def has_tactical(self) -> bool:
+        return self.tactical_model is not None
+
+    def has_normalizer(self) -> bool:
+        return bool(self._feature_normalizer)
 
     def _resolve_device(self) -> str:
         if not TORCH_AVAILABLE:
@@ -151,6 +177,8 @@ class LearnedPolicy:
         self.requested_device = "auto"
         self.intent_model = None
         self.situation_model = None
+        self.tactical_model = None
+        self._feature_normalizer = {}
         self.loaded_from = None
         self.manifest = {}
         self._observation_cache = None
@@ -192,6 +220,19 @@ class LearnedPolicy:
                 self.intent_model, self.situation_model = self._load_models(intent_path, situation_path)
             self.loaded_from = candidate_dir
             self.manifest = payload
+
+            # Load normalizer
+            self._feature_normalizer = self._load_normalizer(candidate_dir)
+
+            # Load tactical model if available
+            tactical_name = payload.get("tactical_model") or "tactical_model.pt"
+            tactical_path = candidate_dir / tactical_name
+            if tactical_path.exists():
+                try:
+                    tactical_state = torch.load(tactical_path, map_location="cpu")
+                    self.tactical_model = self._move_to_device(self._load_tactical_model(tactical_state))
+                except Exception:
+                    pass
             return
 
     def reset(self) -> None:
@@ -208,14 +249,15 @@ class LearnedPolicy:
             self.action_counts[key]["learned"] += 1
         if trace:
             totals = self.score_totals[key]
-            numeric_fields = ("intent_bias", "situation_score", "combined_score")
+            numeric_fields = ("intent_bias", "situation_score", "tactical_score", "combined_score")
             if any(field in trace for field in numeric_fields):
                 totals["samples"] += 1
                 for field in numeric_fields:
-                    totals[field] += float(trace.get(field, 0.0))
+                    if field in trace:
+                        totals[field] = totals.get(field, 0.0) + float(trace.get(field, 0.0))
             if len(self.trace_samples) < 12:
                 sample = {"action": key, "used_learned": used_learned}
-                for field in ("obj_id", "candidate_id", "intent_bias", "situation_score", "combined_score", "reason"):
+                for field in ("obj_id", "candidate_id", "intent_bias", "situation_score", "tactical_score", "combined_score", "reason"):
                     if field in trace:
                         sample[field] = trace[field]
                 self.trace_samples.append(sample)
@@ -260,6 +302,7 @@ class LearnedPolicy:
             score_means[key] = {
                 "intent_bias": float(totals["intent_bias"] / samples) if samples else 0.0,
                 "situation_score": float(totals["situation_score"] / samples) if samples else 0.0,
+                "tactical_score": float(totals["tactical_score"] / samples) if samples else 0.0,
                 "combined_score": float(totals["combined_score"] / samples) if samples else 0.0,
                 "samples": samples,
             }
@@ -270,6 +313,8 @@ class LearnedPolicy:
             "loaded_from": str(self.loaded_from) if self.loaded_from else None,
             "intent_model_loaded": self.intent_model is not None,
             "situation_model_loaded": self.situation_model is not None,
+            "tactical_model_loaded": self.tactical_model is not None,
+            "normalizer_loaded": self.has_normalizer(),
             "counts": {
                 "move": dict(self.action_counts["move"]),
                 "shoot": dict(self.action_counts["shoot"]),
@@ -361,28 +406,48 @@ class LearnedPolicy:
     def _score_counterfactual(self, observation: Dict[str, Any], overrides: Dict[int, Dict[str, Any]]) -> float:
         if self.situation_model is None:
             return 0.0
-        cache = self._ensure_observation_cache(observation)
-        index_lookup = cache["index_lookup"]
-        if not index_lookup:
+        operators = list(observation.get("operators", []))
+        if not operators:
             return 0.0
-        features = np.array(cache["features"], copy=True)
+
+        # Build features using training-compatible format (operator_to_graph_feature)
+        feature_list = []
+        operator_ids = []
+        for op in operators:
+            op_id = op.get("obj_id")
+            if op_id is None:
+                continue
+            feature_list.append(operator_to_graph_feature(op, frame=observation, fallback_pos=op.get("cur_hex")))
+            operator_ids.append(int(op_id))
+
+        if not feature_list:
+            return 0.0
+
+        features = np.stack(feature_list).astype(np.float32)
+        index_lookup = {op_id: idx for idx, op_id in enumerate(operator_ids)}
+
         override_row = None
         for obj_id, operator in overrides.items():
             row_idx = index_lookup.get(int(obj_id))
             if row_idx is None:
                 continue
-            features[row_idx] = operator_to_feature(
+            features[row_idx] = operator_to_graph_feature(
                 operator,
                 frame=observation,
                 fallback_pos=operator.get("cur_hex"),
             )
             override_row = row_idx
+
         adjacency = build_feature_similarity_graph(features)
-        num_nodes = features.shape[0]
-        if num_nodes > 1:
-            feat_std = np.std(features, axis=0, keepdims=True)
-            feat_std = np.where(feat_std < 1e-8, 1.0, feat_std)
-            features = (features - np.mean(features, axis=0, keepdims=True)) / feat_std
+
+        # Apply training normalizer if available
+        if self._feature_normalizer:
+            feat_mean = np.array(self._feature_normalizer.get("feature_mean", []), dtype=np.float32)
+            feat_std = np.array(self._feature_normalizer.get("feature_std", []), dtype=np.float32)
+            if len(feat_mean) == features.shape[1] and len(feat_std) == features.shape[1]:
+                feat_std = np.where(feat_std < 1e-8, 1.0, feat_std)
+                features = (features - feat_mean) / feat_std
+
         with _torch_inference_mode():
             x = self._move_to_device(torch.tensor(features, dtype=torch.float32))
             adj = self._move_to_device(torch.tensor(adjacency, dtype=torch.float32))
@@ -390,6 +455,23 @@ class LearnedPolicy:
             if override_row is not None and 0 <= override_row < node_scores.shape[0]:
                 return float(node_scores[override_row].item())
             return float(node_scores.mean().item())
+
+    def _tactical_score(
+        self,
+        operator: Dict[str, Any],
+        candidate: Dict[str, Any],
+        *,
+        target_operator: Optional[Dict[str, Any]] = None,
+        city: Optional[Dict[str, Any]] = None,
+    ) -> float:
+        """Evaluate action quality using the tactical model (BCE logit, higher = better)."""
+        if self.tactical_model is None:
+            return 0.0
+        features = action_feature_vector(operator, candidate, target_operator=target_operator, city=city)
+        tensor = self._move_to_device(torch.tensor(features, dtype=torch.float32).unsqueeze(0))
+        with _torch_inference_mode():
+            logit = self.tactical_model(tensor).item()
+        return float(logit)
 
     def choose_shoot_candidate(
         self,
@@ -436,6 +518,8 @@ class LearnedPolicy:
             situation_contribution = 0.0
             if situation_score > 1e-6:
                 situation_contribution = situation_score * 100.0
+            tactical_score = self._tactical_score(operator, candidate, target_operator=target)
+            tactical_contribution = float(torch.sigmoid(torch.tensor(tactical_score)).item()) * 20.0
             combined_score = (
                 situation_contribution
                 + attack_level * 8.0
@@ -445,12 +529,14 @@ class LearnedPolicy:
                 + profile_bonus
                 + target_value * 0.3
                 - target_hp * 0.05
+                + tactical_contribution
             )
             trace = {
                 "obj_id": int(operator.get("obj_id", -1)),
                 "candidate_id": int(target_id),
                 "intent_bias": float(intent_bias),
                 "situation_score": float(situation_score),
+                "tactical_score": float(tactical_score),
                 "combined_score": float(combined_score),
             }
             if best is None or combined_score > best[0]:
@@ -520,6 +606,13 @@ class LearnedPolicy:
             if situation_score > 1e-6:
                 situation_contribution = situation_score * 100.0
 
+            # Tactical model evaluates the move-to-city action
+            move_candidate = {
+                "move_path": [int(operator.get("cur_hex", 0)), city_hex],
+            }
+            tactical_score = self._tactical_score(operator, move_candidate, city=city)
+            tactical_contribution = float(torch.sigmoid(torch.tensor(tactical_score)).item()) * 20.0
+
             combined_score = (
                 situation_contribution
                 + city_value * 0.5
@@ -528,12 +621,14 @@ class LearnedPolicy:
                 + occupy_bias
                 + intent_bias
                 - distance_penalty * 0.08
+                + tactical_contribution
             )
             trace = {
                 "obj_id": int(operator_id),
                 "candidate_id": city_hex,
                 "intent_bias": float(intent_bias),
                 "situation_score": float(situation_score),
+                "tactical_score": float(tactical_score),
                 "combined_score": float(combined_score),
             }
             if best is None or combined_score > best[0]:

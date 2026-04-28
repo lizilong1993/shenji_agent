@@ -1,16 +1,17 @@
 {
-  "generated_at": "20260427_025901",
-  "source_commit_sha": "9ba20f3b21363e17eef5fb33553453c3b5814955",
+  "generated_at": "20260428_223958",
+  "source_commit_sha": "57708f65831ec53f3a82fca0468d71461ff8a661",
   "history_len": 8,
   "horizons": 5,
   "intent_lstm": "intent_lstm.pt",
   "situation_gcn": "situation_gcn.pt",
+  "situation_feature_normalizer": "situation_feature_normalizer.json",
+  "tactical_model": "tactical_model.pt",
   "managed_files": [
     "intent_lstm.pt",
     "situation_gcn.pt",
-    "intent_model.pt",
-    "situation_model.pt",
-    "tactical_model.pt",
-    "model_manifest.json"
+    "situation_feature_normalizer.json",
+    "model_manifest.json",
+    "tactical_model.pt"
   ]
 }

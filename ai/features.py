@@ -161,6 +161,110 @@ def action_feature_vector(
     return vector
 
 
+GRAPH_FEATURE_FIELDS_73 = [
+    ("op_id", "obj_id"),
+    ("color", "color"),
+    ("basic_speed", "basic_speed"),
+    ("A1", "A1"),
+    ("stack", "stack"),
+    ("guide_ability", "guide_ability"),
+    ("value", "value"),
+    ("cur_hex", "cur_hex"),
+    ("cur_pos", "cur_pos"),
+    ("speed", "speed"),
+    ("flag_force_stop", "flag_force_stop"),
+    ("stop", "stop"),
+    ("blood", "blood"),
+    ("tire_accumulate_time", "tire_accumulate_time"),
+    ("keep", "keep"),
+    ("on_board", "on_board"),
+    ("alive_remain_time", "alive_remain_time"),
+    ("weapon_unfold_state", "weapon_unfold_state"),
+]
+
+
+def operator_to_graph_feature(
+    operator: Optional[Dict[str, Any]],
+    *,
+    frame: Optional[Dict[str, Any]] = None,
+    fallback_pos: Optional[int] = None,
+) -> np.ndarray:
+    """Convert an operator to the 73-dim feature vector matching the StateGraph CSV format.
+
+    This matches the column order used in WG-StateGraph encoded_nodes-features/*.csv
+    training data, without scaling. Values are raw as in the training CSVs.
+    """
+    vector = np.zeros(FEATURE_DIM, dtype=np.float32)
+    op = operator or {}
+
+    for idx, (csv_col, op_field) in enumerate(GRAPH_FEATURE_FIELDS_73):
+        raw = _as_float(op.get(op_field))
+        if csv_col in ("cur_hex", "op_id") and raw == 0 and fallback_pos is not None:
+            raw = float(fallback_pos)
+        vector[idx] = raw
+
+    vector[18] = 0.0  # stationary_count (not available from observation)
+    vector[19] = 0.0  # altitude
+    vector[20] = 0.0  # changing_altitude
+    vector[21] = 0.0  # changing_altitude_remain_time
+
+    # wid_* columns [22-35]: weapons carried by specific weapon ID
+    weapon_ids = op.get("carry_weapon_ids")
+    if isinstance(weapon_ids, list):
+        known_wids = [37, 43, 84, 56, 73, 29, 35, 71, 74, 36, 54, 69, 76, 72]
+        for j, wid in enumerate(known_wids):
+            vector[22 + j] = 1.0 if wid in weapon_ids else 0.0
+
+    # re_bullet_* columns [36-39]: remaining bullets by weapon ID
+    remain_bullet = op.get("remain_bullet_nums", {})
+    if isinstance(remain_bullet, dict):
+        known_re_bullets = [37, 43, 84, 56]
+        for j, wid in enumerate(known_re_bullets):
+            vector[36 + j] = float(remain_bullet.get(str(wid), 0))
+
+    # be_seen_bullet_* columns [40-43]: bullet types visible
+    see_enemy = op.get("see_enemy_bop_ids", [])
+    if isinstance(see_enemy, list):
+        known_bullets = [0, 100, 101, 102]
+        for j, bid in enumerate(known_bullets):
+            vector[40 + j] = 1.0 if bid in see_enemy else 0.0
+
+    # type_* one-hot [44-46]
+    op_type = int(_as_float(op.get("type")))
+    vector[44 + min(op_type, 2)] = 1.0
+
+    # name_* one-hot [47-53] — operator name is typically the type/subtype string
+    vector[47] = 1.0  # default name_0
+
+    # subtype_* one-hot [54-59]
+    op_subtype = int(_as_float(op.get("sub_type")))
+    vector[54 + min(op_subtype, 5)] = 1.0
+
+    # armor_* binned [60-64]
+    armor_val = _as_float(op.get("armor"))
+    armor_bin = min(int(armor_val / 50), 4)
+    vector[60 + armor_bin] = 1.0
+
+    # move_state_* one-hot [65-68]
+    move_state = int(_as_float(op.get("move_state")))
+    vector[65 + min(move_state, 3)] = 1.0
+
+    # tire_* one-hot [69-70]
+    tire_val = _as_float(op.get("tire"))
+    tire_bin = 0 if tire_val < 50 else 1
+    vector[69 + min(tire_bin, 1)] = 1.0
+
+    # Derived count fields [71-73]
+    move_path = op.get("move_path")
+    vector[70] = float(len(move_path)) if isinstance(move_path, (list, tuple)) else 0.0
+    passenger_ids = op.get("passenger_ids")
+    vector[71] = float(len(passenger_ids)) if isinstance(passenger_ids, (list, tuple)) else 0.0
+    see_enemy_bop = op.get("see_enemy_bop_ids")
+    vector[72] = float(len(see_enemy_bop)) if isinstance(see_enemy_bop, (list, tuple)) else 0.0
+
+    return vector
+
+
 def mean_feature(features: Iterable[np.ndarray]) -> np.ndarray:
     items = list(features)
     if not items:
