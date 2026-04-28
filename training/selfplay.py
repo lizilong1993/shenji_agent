@@ -742,6 +742,14 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
     loaded_from_dirs = set()
     intent_model_loaded_count = 0
     situation_model_loaded_count = 0
+    move_route_samples: List[Dict[str, object]] = []
+    move_route_agg_merged = {
+        "total_attempts": 0,
+        "empty_route_count": 0,
+        "reachable_city_total": 0,
+        "by_move_type": {},
+        "route_failure_reasons": {},
+    }
     for payload in payloads:
         counts = payload.get("counts", {}) if isinstance(payload, dict) else {}
         score_means = payload.get("score_means", {}) if isinstance(payload, dict) else {}
@@ -767,6 +775,22 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
                 loaded_from_dirs.add(str(loaded_from))
             intent_model_loaded_count += int(bool(payload.get("intent_model_loaded")))
             situation_model_loaded_count += int(bool(payload.get("situation_model_loaded")))
+            route_agg = payload.get("move_route_aggregate", {})
+            if isinstance(route_agg, dict):
+                move_route_agg_merged["total_attempts"] += int(route_agg.get("total_attempts", 0))
+                move_route_agg_merged["empty_route_count"] += int(route_agg.get("empty_route_count", 0))
+                move_route_agg_merged["reachable_city_total"] += int(route_agg.get("reachable_city_total", 0))
+                for mt, mt_data in route_agg.get("by_move_type", {}).items():
+                    existing = move_route_agg_merged["by_move_type"].setdefault(str(mt), {"total": 0, "empty": 0})
+                    if isinstance(mt_data, dict):
+                        existing["total"] += int(mt_data.get("total", 0))
+                        existing["empty"] += int(mt_data.get("empty", 0))
+                for reason, count in route_agg.get("route_failure_reasons", {}).items():
+                    r = str(reason)
+                    move_route_agg_merged["route_failure_reasons"][r] = move_route_agg_merged["route_failure_reasons"].get(r, 0) + int(count)
+            route_samples = payload.get("move_route_samples", [])
+            if isinstance(route_samples, list):
+                move_route_samples.extend(route_samples)
 
     def coverage(total: int, learned: int) -> float:
         if total <= 0:
@@ -799,6 +823,8 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
         "intent_model_loaded_count": intent_model_loaded_count,
         "situation_model_loaded_count": situation_model_loaded_count,
         "trace_samples": traces[:12],
+        "move_route_aggregate": move_route_agg_merged,
+        "move_route_samples": move_route_samples[:50],
     }
 
 

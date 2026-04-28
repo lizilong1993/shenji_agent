@@ -50,6 +50,13 @@ def _merge_policy_stats(matches: Iterable[Dict[str, object]]) -> Dict[str, objec
             "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
             "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
         },
+        "move_route_agg": {
+            "total_attempts": 0,
+            "empty_route_count": 0,
+            "reachable_city_total": 0,
+            "by_move_type": {},
+            "route_failure_reasons": {},
+        },
     }
     for match in matches:
         stats = match.get("candidate_policy_stats", {})
@@ -88,6 +95,19 @@ def _merge_policy_stats(matches: Iterable[Dict[str, object]]) -> Dict[str, objec
                 totals["fallback_reasons"].update(str(reason) for reason in fallback_reason if reason)
             elif fallback_reason:
                 totals["fallback_reasons"].add(str(fallback_reason))
+        route_agg = stats.get("move_route_aggregate", {})
+        if isinstance(route_agg, dict):
+            totals["move_route_agg"]["total_attempts"] += int(route_agg.get("total_attempts", 0))
+            totals["move_route_agg"]["empty_route_count"] += int(route_agg.get("empty_route_count", 0))
+            totals["move_route_agg"]["reachable_city_total"] += int(route_agg.get("reachable_city_total", 0))
+            for mt, mt_data in route_agg.get("by_move_type", {}).items():
+                existing = totals["move_route_agg"]["by_move_type"].setdefault(str(mt), {"total": 0, "empty": 0})
+                if isinstance(mt_data, dict):
+                    existing["total"] += int(mt_data.get("total", 0))
+                    existing["empty"] += int(mt_data.get("empty", 0))
+            for reason, count in route_agg.get("route_failure_reasons", {}).items():
+                r = str(reason)
+                totals["move_route_agg"]["route_failure_reasons"][r] = totals["move_route_agg"]["route_failure_reasons"].get(r, 0) + int(count)
 
     def coverage(total: int, learned: int) -> float:
         if total <= 0:
@@ -128,6 +148,7 @@ def _merge_policy_stats(matches: Iterable[Dict[str, object]]) -> Dict[str, objec
         "artifact_dirs": sorted(totals["artifact_dirs"]),
         "manifest_paths": sorted(totals["manifest_paths"]),
         "fallback_reasons": sorted(totals["fallback_reasons"]),
+        "move_route_aggregate": totals["move_route_agg"],
     }
 
 
