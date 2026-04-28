@@ -1,0 +1,19 @@
+seed: 42
+output_root: experiments/shenji_agent
+league_dir: league
+paired_matches: 5
+max_steps: 400
+candidate_profile: challenger
+incumbent_profile: baseline
+promotion_gate:
+  overall_point_estimate_min: 0.55
+  overall_ci_lower_min: 0.5
+  complex_point_estimate_min: 0.55
+  complex_ci_lower_min: 0.5
+  min_learned_path_coverage: 0.3
+  min_move_path_coverage: 0.2
+  min_shoot_path_coverage: 0.2
+  elo_delta_lower_min: 15.0
+  max_bucket_regression: 0.05
+  max_exploiter_win_rate: 0.52
+  consecutive_windows: 1

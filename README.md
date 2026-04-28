@@ -271,6 +271,45 @@ unzip -l ai.zip | grep -E 'ai/$|agent.py'
 
 ---
 
+## Iteration 007 模型状态
+
+最新自治推进结论见：
+
+- `experiments/shenji_agent/iteration_007.md`
+- `experiments/shenji_agent/normalized_retrain_report.md`
+- `experiments/shenji_agent/situation_model_architecture_blocked_analysis.md`
+- `experiments/shenji_agent/final_autonomous_blocked_report.md`
+
+当前主线：
+
+```bash
+PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages \
+python3.10 train_models.py --config configs/supervised_score_quality.yaml
+
+PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages \
+python3.10 scripts/diagnose_model_quality.py \
+  --artifacts ai/weights \
+  --datasets datasets \
+  --output experiments/shenji_agent/model_quality_after_iter007_normalized_retrain.json
+
+PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages \
+python3.10 -m training.selfplay \
+  --config configs/selfplay_smoke_learned_engagement.yaml \
+  --candidate ai/weights \
+  --incumbent ai/weights_incumbent_rule
+```
+
+关键事实：
+
+- situation feature normalizer 现在在训练和推理两侧一致应用。
+- normalized retrain 后 situation per-node variance 从 `1.5056e-05` 提升到 `0.004074`。
+- tactical model 仍加载，验证准确率约 `96.2%`。
+- medium self-play 中 learned move/shoot coverage 均为 `1.0`，但所有 match leg 仍为 `0.0-0.0`。
+- 当前阻塞不是 route plumbing 或 learned engagement，而是缺少 node/city/score-delta 级监督信号。
+- Windows 同步仍被 Tailscale SSH host key verification 阻塞。
+
+---
+
 ## 参考资料
 
 - `docs/docs.md`: 详细的API文档

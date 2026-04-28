@@ -1,0 +1,40 @@
+{
+  "sampling_protocol": "unique_first_then_replacement",
+  "scenario_source": "land_wargame_sdk/Data/Data/scenarios/*.json",
+  "requested_pairs": 5,
+  "candidate_pool_size": 43,
+  "unique_item_count_before_replacement": 5,
+  "duplicates_used": false,
+  "items": [
+    {
+      "scenario": "2230531221.json",
+      "map_id": 53,
+      "bucket": "complex",
+      "order_index": 0
+    },
+    {
+      "scenario": "2010211129.json",
+      "map_id": 29,
+      "bucket": "complex",
+      "order_index": 1
+    },
+    {
+      "scenario": "1531.json",
+      "map_id": 53,
+      "bucket": "complex",
+      "order_index": 2
+    },
+    {
+      "scenario": "211033019601.json",
+      "map_id": 9601,
+      "bucket": "medium",
+      "order_index": 3
+    },
+    {
+      "scenario": "2030331196.json",
+      "map_id": 96,
+      "bucket": "medium",
+      "order_index": 4
+    }
+  ]
+}

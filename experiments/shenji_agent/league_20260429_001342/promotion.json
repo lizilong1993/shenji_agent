@@ -1,0 +1,13 @@
+{
+  "accepted": true,
+  "failures": [],
+  "elo_delta_lower_bound": -0.0,
+  "learned_path_coverage": 1.0,
+  "move_path_coverage": 1.0,
+  "shoot_path_coverage": 0.0,
+  "max_bucket_regression": 0.0,
+  "bucket_regressions": {
+    "complex": 0.0
+  },
+  "max_exploiter_win_rate": 0.0
+}

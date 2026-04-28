@@ -1,0 +1,19 @@
+{
+  "champion": "ai/weights",
+  "historical_mains": [
+    "ai/weights",
+    "ai/weights",
+    "ai/weights",
+    "ai/weights",
+    "ai/weights",
+    "ai/weights",
+    "ai/weights",
+    "ai/weights"
+  ],
+  "exploiters": [
+    "aggressive_exploiter",
+    "occupy_exploiter"
+  ],
+  "specialists": [],
+  "consecutive_windows": 0
+}

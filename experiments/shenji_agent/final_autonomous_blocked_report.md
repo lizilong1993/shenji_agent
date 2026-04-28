@@ -1,213 +1,127 @@
-# Shenji Agent Autonomous Engineering — Final Blocked Report (Iteration 006)
+# Shenji Agent Final Autonomous Blocked Report
 
-**Date:** 2026-04-28
-**Status:** B — Blocked with hard evidence (model quality insufficient — situation model can't differentiate nodes)
-**Working directory:** `/remote-home/lizilong/shenji_agent_fresh` (fresh clone)
+## Final Status
+B blocked-with-hard-evidence.
 
----
+The Iteration 007 P0 training/inference normalization mismatch is fixed and verified. Normalized retraining materially improved situation node differentiation, but smoke and medium self-play still fail score/Elo gates. The remaining blocker is objective/label insufficiency: the current graph-level situation labels and tactical/action labels do not train a policy to produce reward-changing city capture or combat outcomes.
 
-## 1. Current Git State
+## Current State
+- Date: 2026-04-29 Asia/Shanghai.
+- Working directory: `/remote-home/lizilong/shenji_agent_fresh`.
+- Original repo: `/remote-home/lizilong/shenji_agent`.
+- Linux fresh clone HEAD before final docs commit: `f4e0dcf2dcbb9af0fc80f26b742099188b704fd5`.
+- Reverts: none.
+- Windows target: `100.127.108.19`, `C:\Users\lizilong\Desktop\WHUAI\Projects\SituationAwareness\code\miaosuan20260119`.
+- Windows sync status: blocked. `tailscale ssh` still fails with `No ED25519 host key is known for desktop-t3ll42l.tailf6b2dc.ts.net... Host key verification failed.`
+- OpenSSH fallback status: `ssh -o StrictHostKeyChecking=accept-new 100.127.108.19 ...` timed out on port 22.
 
-**HEAD:** `374f2be` — chore: update manifest SHA to current HEAD after smoke validation
+## Commits This Iteration
+- `77849cd38e80fd3281e19e6f0ebfd074ad44fae5` — fixed situation normalizer consistency and tests.
+- `30d9f7b922721d010dc05f6fe961eaceba4f762f` — retrained normalized models and recorded diagnostics.
+- `ff4804fbda0cd598bcbd624398eddea5f5b19cc7` — added self-play action-type diagnostics.
+- `f4e0dcf2dcbb9af0fc80f26b742099188b704fd5` — pointed manifest at diagnostics-capable agent code.
 
-**Commit history (fresh clone, ahead of original by 13 commits):**
-```
-374f2be chore: update manifest SHA to current HEAD after smoke validation
-5c3931f fix: use correct full SHA from git rev-parse for manifest
-2d2d5fb chore: bump manifest to latest HEAD
-1e16101 fix: correct source_commit_sha in model manifest
-006bcfc chore: bump manifest source_commit_sha for selfplay diagnostics fix
-e1a5e3b fix: add tactical model loaded tracking to self-play diagnostics
-ca2157c chore: bump manifest source_commit_sha to point to latest code
-33c6b71 feat: add feature normalizer, tactical model, and training-compatible situation features
-57708f6 docs: add iteration 005 report and update final blocked report
-677f69d fix: rebalance city scoring, fix situation model feature normalization, add policy score tests
-9ba20f3 chore: bump manifest to final report commit
-10608cd docs: final blocked report with move routing fix evidence
-49039ca fix: correct manifest source_commit_sha to real HEAD
-44ac552 chore: bump manifest source_commit_sha to 1860b86
-1860b86 fix: passthrough move route diagnostics and update manifest commit
-c59846b docs: finalize iteration 003 report with root cause and fix summary
-9e36d05 fix: add move route diagnostics, fallback strategy, and context-aware occupy
-```
+## Changed Files
+- Source: `training/supervised.py`, `ai/policy.py`, `scripts/diagnose_model_quality.py`, `ai/agent.py`, `training/selfplay.py`.
+- Tests: `tests/test_feature_normalizer_consistency.py`, `tests/test_selfplay_action_diagnostics.py`.
+- Artifacts/reports: `experiments/shenji_agent/iteration_007.md`, `experiments/shenji_agent/normalized_retrain_report.md`, `experiments/shenji_agent/situation_model_architecture_blocked_analysis.md`, `experiments/shenji_agent/model_quality_before_iter007_normalized_retrain.json`, `experiments/shenji_agent/model_quality_after_iter007_normalized_retrain.json`, `experiments/shenji_agent/20260428_235555/*`.
+- Published metadata: `ai/weights/model_manifest.json`, `ai/weights/situation_feature_normalizer.json`.
+- Generated local weights used for evaluation but ignored by git: `ai/weights/intent_lstm.pt`, `ai/weights/situation_gcn.pt`, `ai/weights/tactical_model.pt`.
 
-**Original repo** (`/remote-home/lizilong/shenji_agent`): At 2a5ac08, behind fresh clone by 13 commits.
+## Normalizer Evidence
+- Before: normalizer loaded in inference, but not applied during training.
+- After: `normalizer_applied_in_training=true`, `normalizer_loaded_in_inference=true`.
+- Normalizer kind: `per_dimension_zscore`.
+- Fitted on: `situation_train_split`.
+- Feature dim: `108`.
+- Zero-std count: `50`, safely transformed with std `1.0`.
+- Manifest records: `situation_training_applied_normalizer=true`.
 
----
+## Training Evidence
+Command:
+`PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages TMPDIR=$PWD/.tmp_claude TEMP=$PWD/.tmp_claude TMP=$PWD/.tmp_claude python3.10 train_models.py --config configs/supervised_score_quality.yaml`
 
-## 2. What Was Fixed (Iterations 001-006)
+Run dir: `experiments/shenji_agent/20260428_235555`.
 
-### Iteration 001-002: Learned Policy Disengagement
-- Root cause: `use_ai_optimization` not set for `CurrentAI`, so learned path skipped
-- Fix: Auto-enable learned policy for `CurrentAI` in Agent.setup()
+Results:
+- Intent immediate validation accuracy: `0.6221`.
+- Tactical validation accuracy: `0.9622`.
+- Situation validation accuracy: `0.5455`.
+- Situation samples: `108`.
+- Tactical samples: `24080`.
 
-### Iteration 003-004: empty_route (85% move fallback)
-- Root cause: March cost layer (mode 1) had 78.4% empty adjacency cells
-- Fix: Multi-mode fallback route finding (try all 4 move types)
-- empty_route: 85% → 0%, route coverage: 15% → 100%
+## Model Quality Before/After
+Before: `experiments/shenji_agent/model_quality_before_iter007_normalized_retrain.json`.
 
-### Iteration 005: City Scoring Rebalance
-- City scoring rebalanced: distance 0.35→0.08, owner bonus ±25/-15, proximity +20
-- Shoot scoring: kill bonus 50→75, target value bonus added
-- Per-node scoring instead of global mean
+After: `experiments/shenji_agent/model_quality_after_iter007_normalized_retrain.json`.
 
-### Iteration 006: Feature Normalization and Tactical Model (NEW)
-- **Feature format fix**: Created `operator_to_graph_feature()` matching CSV training format (73 raw-value dimensions)
-- **Feature normalizer**: Compute and save per-dimension mean/std from training data
-- **Tactical model**: Enabled, trained (96.2% val accuracy), loaded in inference, integrated into scoring
-- **Model quality diagnostics**: New script `diagnose_model_quality.py` with JSON output and warnings
-- **Tests**: 55 tests pass including new model quality diagnostics tests
+| Metric | Before | After |
+|---|---:|---:|
+| normalizer_applied_in_training | `false` | `true` |
+| situation_pre_sigmoid_std | `0.005960` | `0.057212` |
+| situation_output_mean | `0.508567` | `0.414247` |
+| situation_per_node_variance_mean | `1.5056e-05` | `0.004074` |
+| tactical_available | `true` | `true` |
+| intent_move_bias_estimate | `-0.2365` | `-0.2010` |
+| warning_count | `3` | `1` |
 
----
+## Self-Play Evidence
+Smoke artifact: `experiments/shenji_agent/league_20260429_001342`.
 
-## 3. Current Hard Evidence
+Smoke result:
+- 2 paired matches, all legs `0.0-0.0`.
+- Learned/move coverage: `1.0 / 1.0`.
+- Shoot coverage: `0.0`.
+- Valid action diagnostics show no valid `Shoot` or `Occupy` in the 50-step smoke window.
+- Promotion accepted in smoke-only thresholds, but not A-complete evidence.
 
-### Latest Smoke Self-Play: league_20260428_230957
-- 2 matches, max_steps=50
-- Both matches: 0-0 stalemate
-- **tactical_model_loaded_match_count: 2** (NEW — tactical model loading confirmed)
-- **situation_model_loaded_match_count: 2** 
-- **intent_model_loaded_match_count: 2**
-- learned_path_coverage: 1.0
-- move_path_coverage: 1.0
-- shoot_path_coverage: 0.0 (no combat)
-- empty_route_count: 0 (74 move attempts, all successful)
-- situation_score mean (move): 0.508 (near sigmoid(0) ≈ 0.5, no per-node differentiation)
-- combined_score (move): 99.59
-- Promotion: FAILED (all score/Elo gates at minimum)
+Medium artifact: `experiments/shenji_agent/league_20260429_001512`.
 
-### Model Quality Diagnosis
-| Metric | Before (Iter 005) | After (Iter 006) |
-|---|---|---|
-| Tactical model | MISSING | **LOADED** (96.2% acc) |
-| Feature normalizer | MISSING | **LOADED** |
-| Situation pre-sigmoid mean | 0.43 | 0.508 |
-| Situation per-node variance | 8.5e-05 | 1.5e-05 |
-| Intent move bias | -0.212 | -0.155 |
-| Warnings | 6 | 2 |
+Medium result:
+- 5 paired matches, all legs `0.0-0.0`.
+- Overall point estimate: `0.5`.
+- Complex point estimate: `0.5`.
+- Learned/move/shoot coverage: `1.0 / 1.0 / 1.0`.
+- Valid `Shoot`: `28`.
+- Generated learned `Shoot`: `28`.
+- Promotion accepted: `false`.
+- Promotion failures: `overall_point_estimate`, `overall_ci_lower`, `complex_point_estimate`, `complex_ci_lower`, `elo_delta_lower`.
 
----
+Route and action status:
+- Empty route remains `0`.
+- Learned policy engagement remains `1.0`.
+- Tactical model loaded in all matches.
+- The candidate can generate learned move and shoot actions, but reward remains zero.
 
-## 4. Root Cause Analysis — Why Still 0-0
+## Architecture/Data Blocker
+Analysis file: `experiments/shenji_agent/situation_model_architecture_blocked_analysis.md`.
 
-### Code Plumbing: COMPLETE ✅
-All route/action/model plumbing works correctly:
-- Routes: 100% coverage, zero empty_route
-- Models: All three (intent, situation, tactical) load successfully
-- Normalizer: Saved and loaded correctly
-- Diagnostics: Comprehensive, with JSON output
+Key facts:
+- Situation dataset has `108` graph samples, each with `12` nodes.
+- Labels are graph-level binary labels only.
+- Label distribution: `72` negative / `36` positive.
+- There are no node-level, city-level, target-level, occupy-success, damage, or score-delta labels.
+- The original architecture symptom, near-zero node variance, improved about 270x after the normalizer fix.
+- Therefore, GNN architecture is no longer the immediate proven blocker; the hard blocker is missing objective-level supervision.
 
-### Situation Model: FUNDAMENTALLY LIMITED 🔴
-The situation model (`GraphSituationModel`) has two structural problems:
+## Verification
+- `tests/test_feature_normalizer_consistency.py`: `8 passed`.
+- `tests/test_model_quality_diagnostics.py`: `8 passed`.
+- `tests/test_policy_score_tuning.py`: `12 passed`.
+- `tests/test_mainline_contract.py`: `35 passed`.
+- `tests/test_selfplay_action_diagnostics.py`: `3 passed`.
+- `tests/test_mainline_contract.py tests/test_move_route_diagnostics.py`: `45 passed`.
 
-1. **Global mean pooling architecture**: `node_scores.mean(dim=0)` trains the model for graph-level classification, not per-node differentiation. With 3-layer GraphSage convolutions, node representations converge (over-smoothing), producing near-identical per-node scores (variance 1.5e-05).
+## Remaining Risks
+- Intent move bias remains negative.
+- Medium self-play proves learned shooting happens, but scoring remains 0-0.
+- Formal self-play was not run because smoke/medium did not show score improvement.
+- Windows sync remains blocked by host-key verification despite safe Linux-side remediation attempts.
+- Worktree still contains pre-existing generated/cache dirt such as `__pycache__`, `.tmp_claude/`, ignored weights, dataset symlinks, and incumbent artifacts.
 
-2. **Training data normalization mismatch**: The model was trained on raw CSV features (values 0-10000). During inference, the normalizer transforms features to ~N(0,1). The model was NOT trained on normalized features (normalizer isn't applied during training). This means the model receives input distribution it wasn't trained for.
-
-3. **Small training dataset**: Only 108 graph samples for situation model. Even with perfect architecture, 108 samples is insufficient for learning meaningful per-node patterns.
-
-### Tactical Model: WORKING ✅
-Tactical model at 96.2% accuracy can evaluate action quality. But without meaningful situation scores to guide WHICH city to go to, and without sufficient shoot opportunities, the tactical model can't break the stalemate alone.
-
-### Intent Model: PARTIALLY WORKING ⚠️
-Move bias improved from -0.212 to -0.155 but still negative. The model predicts "stay" (class 0) for most enemies, providing no movement guidance.
-
----
-
-## 5. What Has Been Eliminated
-
-| Suspected Cause | Status | Evidence |
-|----------------|--------|----------|
-| Code bugs preventing moves | ELIMINATED | 100% move_path_coverage, zero empty_route |
-| Learned policy not engaging | ELIMINATED | 100% learned_path_coverage |
-| Route generation broken | ELIMINATED | All 4 move types working, multi-mode fallback |
-| City scoring weights imbalanced | ELIMINATED | Owner bonus, proximity bonus, balanced distance |
-| Feature format mismatch (training vs inference) | FIXED | operator_to_graph_feature matches CSV format |
-| Missing normalizer | FIXED | situation_feature_normalizer.json saved and loaded |
-| Tactical model disabled | FIXED | Enabled, trained, loaded, integrated into scoring |
-| Tactical model tracking in self-play | FIXED | tactical_model_loaded_count properly reported |
-| Fake torch breaking tests | ELIMINATED | conftest.py + cleanup in tests |
-| Manifest SHA incorrect | FIXED | Correct full SHA verified via git rev-parse |
-
----
-
-## 6. Remaining: Model Quality (Not Code)
-
-The remaining 0-0 stalemate requires model quality improvements that go beyond code plumbing:
-
-1. **Situation model needs architectural change**: Replace global mean pooling with per-node scoring architecture (attention-based readout, node-level loss, or variance regularization)
-
-2. **Training needs normalization consistency**: Apply normalization during training, not just inference. The current normalizer is computed from training data but only applied during inference.
-
-3. **More training data needed**: 108 graph samples is insufficient. Need either more data, data augmentation, or transfer learning.
-
-4. **Intent model needs class balancing**: Negative move bias requires either class weights or data rebalancing to encourage movement toward objectives.
-
----
-
-## 7. Test Results
-```
-55 passed in 19.41s
-```
-7 test files, 55 tests total. All pass.
-
----
-
-## 8. Linux Git State
-- Fresh clone: `/remote-home/lizilong/shenji_agent_fresh`
-- HEAD: `374f2be`
-- 55/55 tests pass
-- All code changes committed
-- 13 commits ahead of original repo
-
----
-
-## 9. Windows Sync State
-- **BLOCKED**: tailscale SSH to 100.127.108.19
-  - First attempt: Connection timeout (SSH port unreachable)
-  - Second attempt: Host key verification failed (unknown ED25519 key)
-  - The Windows machine needs tailscale SSH host key configured
-- Sync file list ready (10 files from Iteration 006 changes)
-
----
-
-## 10. Files Changed in Iteration 006
-
-### New Files
-- `configs/supervised_score_quality.yaml` — Training config with tactical enabled
-- `scripts/diagnose_model_quality.py` — Model quality diagnostic script
-- `tests/test_model_quality_diagnostics.py` — 8 tests for model diagnostics
-- `ai/weights/situation_feature_normalizer.json` — 108-dim feature normalizer
-- `experiments/shenji_agent/iteration_006.md` — Iteration report
-- `experiments/shenji_agent/training_model_quality_diagnosis.md` — Detailed diagnosis
-
-### Modified Files
-- `ai/features.py` — Added `operator_to_graph_feature()` (73-dim CSV format)
-- `ai/policy.py` — Normalizer loading, tactical model loading, feature format fix, tactical score integration
-- `training/supervised.py` — Feature normalizer computation and saving
-- `training/selfplay.py` — Tactical model tracking in diagnostics
-- `tests/test_policy_score_tuning.py` — Updated situation model test
-- `ai/weights/model_manifest.json` — Updated with normalizer and tactical entries
-
----
-
-## 11. Next Steps (For Future Iterations)
-
-### Unblocked (can proceed):
-1. Apply normalization during situation model training (use computed normalizer to transform training features)
-2. Add class weights to intent model training for positive move bias
-3. Experiment with situation model architecture: reduce GraphSage layers (3→2), add attention readout
-4. Generate synthetic per-node labels for situation training
-
-### Blocked:
-1. Windows sync — tailscale SSH host key needs configuration on Windows side
-2. More training data — requires additional data collection or generation
-
----
-
-## 12. Iteration Reports
-- `iteration_002.md` — Learned policy re-engagement
-- `iteration_003.md` — empty_route root cause and fix
-- `iteration_004.md` — Move route diagnostics and validation
-- `iteration_005.md` — City scoring rebalance and model quality diagnosis
-- `iteration_006.md` — Feature normalization, tactical model, and retraining
+## Next Minimal Plan
+1. Generate rollout-derived labels for score delta, occupy success, damage/kill delta, and per-operator/per-city counterfactual value.
+2. Train a node/city-level situation head on those labels.
+3. Re-run model diagnostics, 50-step smoke, and 400-step medium self-play.
+4. Only run formal self-play after non-zero score behavior or candidate/baseline separation appears.
+5. Fix Windows Tailscale SSH trust/known-host handling from a surface that can accept the host key, then sync Linux commits and generated weights.

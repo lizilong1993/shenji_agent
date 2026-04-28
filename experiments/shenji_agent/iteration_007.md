@@ -18,17 +18,17 @@ Continue from Iteration 006 blocked state. P0 is fixing the situation-model trai
 - [x] Run model quality diagnostics before retrain.
 - [x] Run model quality diagnostics after retrain.
 - [x] Check situation per-node variance after normalized retrain.
-- [ ] If variance remains low, design and implement GraphSituationModel architecture variant.
+- [x] Decide GraphSituationModel architecture branch: not implemented because normalized retrain fixed near-zero variance; blocked analysis documents why labels/objective are now the hard blocker.
 - [ ] Train architecture variant.
 - [ ] Compare baseline vs normalized vs architecture variant.
 - [x] Run related tests.
 - [ ] Linux commit.
 - [ ] Windows sync + Windows commit.
-- [ ] Run smoke self-play.
-- [ ] Analyze whether smoke is still 0-0.
+- [x] Run smoke self-play.
+- [x] Analyze whether smoke is still 0-0.
 - [ ] If smoke improves, run formal self-play.
-- [ ] Update final report/docs.
-- [ ] Close as A completed or B blocked-with-hard-evidence.
+- [x] Update final report/docs.
+- [x] Close as A completed or B blocked-with-hard-evidence.
 
 ## Initial State
 - Workdir: `/remote-home/lizilong/shenji_agent_fresh`
@@ -150,9 +150,58 @@ Before/after conclusion:
 - Situation per-node variance improved from `1.5056e-05` to `0.004074`, roughly 270x.
 - Since variance materially improved, the next branch is smoke self-play before implementing a GNN architecture variant.
 
+## Smoke and Medium Self-Play
+Smoke command:
+`PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages TMPDIR=$PWD/.tmp_claude TEMP=$PWD/.tmp_claude TMP=$PWD/.tmp_claude python3.10 -m training.selfplay --config configs/selfplay_smoke_learned_engagement.yaml --candidate ai/weights --incumbent ai/weights_incumbent_rule`
+
+Latest diagnostic smoke artifact:
+`experiments/shenji_agent/league_20260429_001342`
+
+Smoke result:
+- paired matches: `2`
+- all legs: `0.0-0.0`
+- overall point estimate: `0.5`
+- learned/move coverage: `1.0`
+- shoot coverage: `0.0`
+- valid action evidence: no valid `Shoot` and no valid `Occupy` in the 50-step smoke window.
+- generated actions: `Move`, `JMPlan`, `WeaponLock`, no scoring actions.
+
+Medium command:
+`PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages TMPDIR=$PWD/.tmp_claude TEMP=$PWD/.tmp_claude TMP=$PWD/.tmp_claude python3.10 -m training.selfplay --config configs/selfplay_medium_learned.yaml --candidate ai/weights --incumbent ai/weights_incumbent_rule`
+
+Medium artifact:
+`experiments/shenji_agent/league_20260429_001512`
+
+Medium result:
+- paired matches: `5`
+- all legs: `0.0-0.0`
+- overall point estimate: `0.5`
+- complex point estimate: `0.5`
+- medium point estimate: `0.5`
+- learned/move/shoot coverage: `1.0 / 1.0 / 1.0`
+- valid action aggregate includes `Shoot: 28`
+- generated action aggregate includes `Shoot: 28`
+- promotion accepted: `false`
+- promotion failures: `overall_point_estimate`, `overall_ci_lower`, `complex_point_estimate`, `complex_ci_lower`, `elo_delta_lower`
+
+Conclusion:
+The 50-step smoke was too short to expose shoot opportunities, but the 400-step medium run did expose and generate learned shoot actions. Scores still remained 0-0. The remaining blocker is not route coverage, learned engagement, tactical loading, or the original normalizer mismatch. Current evidence points to reward/objective/label insufficiency.
+
+## Architecture Decision
+Analysis file:
+`experiments/shenji_agent/situation_model_architecture_blocked_analysis.md`
+
+Decision:
+No GNN v2 was implemented in this iteration because the explicit architecture symptom, near-zero node variance, materially improved after the training normalizer fix. A GNN v2 would not address the current hard blocker: graph-level binary labels provide no node/city/score-delta supervision, while medium self-play proves learned move and shoot actions still do not change reward.
+
+Data evidence:
+- situation graph samples: `108`
+- nodes per graph: `12`
+- label distribution: `72` negative / `36` positive
+- labels are graph-level only: no node-level, city-level, occupy-success, target-value, damage, or score-delta labels.
+
 ## Next
-1. Commit normalized retrain manifest/normalizer/reports.
-2. Retry Windows sync after commit.
-3. Run smoke self-play against `ai/weights_incumbent_rule`.
-4. If smoke is still 0-0, analyze whether to proceed to architecture variant or blocked evidence.
-5. If smoke improves, run formal self-play.
+1. Generate node/city/score-delta supervision from rollouts.
+2. Train a node/city-level situation head on objective labels.
+3. Re-run smoke/medium before formal.
+4. Fix Windows sync host-key trust outside Linux if possible; Linux-side safe remediation was attempted and failed.

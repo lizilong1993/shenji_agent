@@ -1,0 +1,22 @@
+{
+  "sampling_protocol": "unique_first_then_replacement",
+  "scenario_source": "land_wargame_sdk/Data/Data/scenarios/*.json",
+  "requested_pairs": 2,
+  "candidate_pool_size": 43,
+  "unique_item_count_before_replacement": 2,
+  "duplicates_used": false,
+  "items": [
+    {
+      "scenario": "2230531221.json",
+      "map_id": 53,
+      "bucket": "complex",
+      "order_index": 0
+    },
+    {
+      "scenario": "2010211129.json",
+      "map_id": 29,
+      "bucket": "complex",
+      "order_index": 1
+    }
+  ]
+}
