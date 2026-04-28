@@ -57,6 +57,13 @@ class ActionType:
     ) = range(1, 21)
 
 
+ACTION_TYPE_NAMES = {
+    value: name
+    for name, value in ActionType.__dict__.items()
+    if not name.startswith("_") and isinstance(value, int)
+}
+
+
 class MoveType:
     Maneuver, March, Walk, Fly = range(4)
 
@@ -499,6 +506,15 @@ class Agent:
         self.policy_profile = "baseline"
         self.policy_artifacts_dir = None
         self.policy = LearnedPolicy()
+        self.valid_action_type_counts: Dict[str, int] = {}
+        self.generated_action_type_counts: Dict[str, int] = {}
+
+    def _action_name(self, action_type: int) -> str:
+        return ACTION_TYPE_NAMES.get(int(action_type), str(action_type))
+
+    def _reset_action_diagnostics(self) -> None:
+        self.valid_action_type_counts = {}
+        self.generated_action_type_counts = {}
 
     def setup(self, setup_info: Dict[str, Any]) -> None:
         try:
@@ -540,6 +556,7 @@ class Agent:
                 ActionType.CancelJMPlan,
             ]
             self.observation = None
+            self._reset_action_diagnostics()
             self.map = Map(setup_info["basic_data"], setup_info["cost_data"], setup_info.get("see_data"))
             self.map_data = self.map.get_map_data()
             self.policy.configure(self.faction, self.policy_artifacts_dir, self.policy_profile)
@@ -574,6 +591,7 @@ class Agent:
             self.history = None
             self.pending_actions = []
             self.flag_act = {}
+            self._reset_action_diagnostics()
             self.policy.reset()
             self.logger.info("reset complete")
         except Exception:
@@ -625,11 +643,16 @@ class Agent:
             for obj_id, action_map in valid_actions.items():
                 if obj_id not in self.controllable_ops:
                     continue
+                for available_action_type in action_map:
+                    name = self._action_name(int(available_action_type))
+                    self.valid_action_type_counts[name] = self.valid_action_type_counts.get(name, 0) + 1
                 for action_type in self.priority or []:
                     if action_type not in action_map:
                         continue
                     action = self._generate_action(obj_id, action_type, action_map[action_type])
                     if action:
+                        generated_name = self._action_name(int(action.get("type", action_type)))
+                        self.generated_action_type_counts[generated_name] = self.generated_action_type_counts.get(generated_name, 0) + 1
                         total_actions.append(action)
                         break
             self.logger.info("step actions_count=%s", len(total_actions))
@@ -677,6 +700,8 @@ class Agent:
     def get_policy_stats(self) -> Dict[str, Any]:
         stats = self.policy.get_diagnostics()
         stats["use_ai_optimization"] = self.use_ai_optimization
+        stats["valid_action_type_counts"] = dict(sorted(self.valid_action_type_counts.items()))
+        stats["generated_action_type_counts"] = dict(sorted(self.generated_action_type_counts.items()))
         return stats
 
     def get_bop(self, obj_id: int) -> Optional[Dict[str, Any]]:

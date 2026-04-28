@@ -743,6 +743,8 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
     intent_model_loaded_count = 0
     situation_model_loaded_count = 0
     tactical_model_loaded_count = 0
+    valid_action_type_counts: Dict[str, int] = {}
+    generated_action_type_counts: Dict[str, int] = {}
     move_route_samples: List[Dict[str, object]] = []
     move_route_agg_merged = {
         "total_attempts": 0,
@@ -777,6 +779,10 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
             intent_model_loaded_count += int(bool(payload.get("intent_model_loaded")))
             situation_model_loaded_count += int(bool(payload.get("situation_model_loaded")))
             tactical_model_loaded_count += int(bool(payload.get("tactical_model_loaded")))
+            for key, count in payload.get("valid_action_type_counts", {}).items():
+                valid_action_type_counts[str(key)] = valid_action_type_counts.get(str(key), 0) + int(count)
+            for key, count in payload.get("generated_action_type_counts", {}).items():
+                generated_action_type_counts[str(key)] = generated_action_type_counts.get(str(key), 0) + int(count)
             route_agg = payload.get("move_route_aggregate", {})
             if isinstance(route_agg, dict):
                 move_route_agg_merged["total_attempts"] += int(route_agg.get("total_attempts", 0))
@@ -825,6 +831,8 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
         "intent_model_loaded_count": intent_model_loaded_count,
         "situation_model_loaded_count": situation_model_loaded_count,
         "tactical_model_loaded_count": tactical_model_loaded_count,
+        "valid_action_type_counts": dict(sorted(valid_action_type_counts.items())),
+        "generated_action_type_counts": dict(sorted(generated_action_type_counts.items())),
         "trace_samples": traces[:12],
         "move_route_aggregate": move_route_agg_merged,
         "move_route_samples": move_route_samples[:50],
