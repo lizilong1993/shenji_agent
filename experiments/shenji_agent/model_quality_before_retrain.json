@@ -1,0 +1,71 @@
+{
+  "git_head": "57708f65831ec53f3a82fca0468d71461ff8a661",
+  "manifest_path": "/remote-home/lizilong/shenji_agent_fresh/ai/weights/model_manifest.json",
+  "manifest_loaded": true,
+  "intent_model_path": "/remote-home/lizilong/shenji_agent_fresh/ai/weights/intent_lstm.pt",
+  "situation_model_path": "/remote-home/lizilong/shenji_agent_fresh/ai/weights/situation_gcn.pt",
+  "tactical_model_path": null,
+  "history_len": 8,
+  "horizons": 5,
+  "feature_dim": 108,
+  "situation_checkpoint_loaded": true,
+  "intent_checkpoint_loaded": true,
+  "tactical_checkpoint_loaded": false,
+  "normalizer_available": false,
+  "normalizer_loaded": false,
+  "warnings": [
+    "manifest_managed_file_missing: intent_model.pt",
+    "manifest_managed_file_missing: situation_model.pt",
+    "manifest_managed_file_missing: tactical_model.pt",
+    "intent_negative_move_bias",
+    "tactical_model_missing",
+    "normalizer_missing"
+  ],
+  "recommended_next_actions": [
+    "train_tactical_model",
+    "save_feature_normalizer",
+    "address_intent_move_bias",
+    "compute_and_save_feature_normalizer",
+    "enable_and_train_tactical_model"
+  ],
+  "manifest_generated_at": "20260427_025901",
+  "manifest_source_commit": "9ba20f3b21363e17eef5fb33553453c3b5814955",
+  "manifest_managed_files": [
+    "intent_lstm.pt",
+    "situation_gcn.pt",
+    "intent_model.pt",
+    "situation_model.pt",
+    "tactical_model.pt",
+    "model_manifest.json"
+  ],
+  "situation_pre_sigmoid_mean": 0.4314542199884142,
+  "situation_pre_sigmoid_std": 0.015779577420420774,
+  "situation_pre_sigmoid_min": 0.4008570909500122,
+  "situation_pre_sigmoid_max": 0.4578716456890106,
+  "situation_output_mean": 0.4248963197072347,
+  "situation_output_std": 0.012543596849720978,
+  "situation_per_node_variance_mean": 8.490656424934666e-05,
+  "intent_output_distribution": {
+    "class_0": 0.49878957867622375,
+    "class_1": 0.06734531372785568,
+    "class_2": 0.12898853421211243,
+    "class_3": 0.09294338524341583,
+    "class_4": 0.08846613019704819,
+    "class_5": 0.07607702910900116,
+    "class_6": 0.04738999903202057
+  },
+  "move_bias_estimate": -0.2123836747237614,
+  "tactical_available": false,
+  "datasets_available": true,
+  "datasets_state_graph_csv_count": 108,
+  "train_feature_stats_sample_shape": [
+    12,
+    108
+  ],
+  "train_feature_stats_available": true,
+  "train_feature_mean_abs_max": 5225.33349609375,
+  "train_feature_std_max": 4879.4013671875,
+  "train_feature_std_min": 0.0,
+  "datasets_intent_available": true,
+  "datasets_tactical_csv_size": 409055700
+}
