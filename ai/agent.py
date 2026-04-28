@@ -723,16 +723,101 @@ class Agent:
                 cities = self.observation.get("cities", [])
                 if not cities or not self.map:
                     return None
+                cur_hex = bop.get("cur_hex")
+                is_on_city = any(
+                    city.get("coord") is not None and int(city["coord"]) == cur_hex
+                    for city in cities
+                )
+                if is_on_city:
+                    city_on = next(
+                        (city for city in cities if city.get("coord") is not None and int(city["coord"]) == cur_hex),
+                        None,
+                    )
+                    city_flag = city_on.get("flag", -1) if city_on else -1
+                    if city_flag != self.faction:
+                        return None
                 move_type = self.get_move_type(bop)
-                reachable_city_routes: List[Tuple[Dict[str, Any], List[int]]] = []
-                for city in cities:
-                    city_hex = city.get("coord")
-                    if city_hex is None:
-                        continue
-                    route = self.map.gen_move_route(bop["cur_hex"], int(city_hex), move_type)
-                    if route:
-                        reachable_city_routes.append((city, route))
+                all_move_types = [move_type] + [m for m in [0, 1, 2, 3] if m != move_type]
+                best_route_by_city: Dict[int, Tuple[Dict[str, Any], List[int], int]] = {}
+                used_move_type = move_type
+                for try_move_type in all_move_types:
+                    for city in cities:
+                        city_hex = city.get("coord")
+                        if city_hex is None:
+                            continue
+                        city_id = int(city_hex)
+                        route = self.map.gen_move_route(bop["cur_hex"], city_id, try_move_type)
+                        if route:
+                            route_len = len(route)
+                            existing = best_route_by_city.get(city_id)
+                            if existing is None or route_len < existing[2]:
+                                best_route_by_city[city_id] = (city, route, route_len, try_move_type)
+                reachable_city_routes = [
+                    (rec[0], rec[1]) for rec in best_route_by_city.values()
+                ]
+                if reachable_city_routes:
+                    used_move_type = best_route_by_city[next(iter(best_route_by_city))][3]
+
                 if not reachable_city_routes:
+                    nearest_city = min(
+                        (city for city in cities if city.get("coord") is not None),
+                        key=lambda c: self.map.get_distance(bop["cur_hex"], int(c["coord"])),
+                        default=None,
+                    )
+                    fallback_hex = None
+                    if nearest_city is not None:
+                        target_city_hex = int(nearest_city["coord"])
+                        neighbors = self.map.get_neighbors(bop["cur_hex"])
+                        best_dist = self.map.get_distance(bop["cur_hex"], target_city_hex)
+                        for n_hex in neighbors:
+                            if n_hex < 0:
+                                continue
+                            dist = self.map.get_distance(n_hex, target_city_hex)
+                            if dist >= 0 and dist < best_dist:
+                                best_dist = dist
+                                fallback_hex = n_hex
+                    if fallback_hex is not None:
+                        simple_route = [fallback_hex]
+                        self.policy.record_move_route({
+                            "operator_id": obj_id,
+                            "operator_type": bop.get("type"),
+                            "current_hex": bop.get("cur_hex"),
+                            "move_type": move_type,
+                            "move_type_name": {0: "Maneuver", 1: "March", 2: "Walk", 3: "Fly"}.get(move_type, str(move_type)),
+                            "target_kind": "nearest_city_neighbor",
+                            "target_source": "fallback_neighbor",
+                            "target_city_id": int(nearest_city["coord"]),
+                            "target_hex": fallback_hex,
+                            "reachable_city_count": 0,
+                            "total_cities": len(cities),
+                            "route_len": 1,
+                            "route_empty": False,
+                            "route_failure_reason": "none",
+                            "selected_by_learned": False,
+                        })
+                        self.policy.note_action(
+                            "move",
+                            False,
+                            {"obj_id": obj_id, "target_hex": fallback_hex, "reason": "fallback_neighbor"},
+                        )
+                        return {"actor": self.seat, "obj_id": obj_id, "type": ActionType.Move, "move_path": simple_route}
+                    self.policy.record_move_route({
+                        "operator_id": obj_id,
+                        "operator_type": bop.get("type"),
+                        "current_hex": bop.get("cur_hex"),
+                        "move_type": move_type,
+                        "move_type_name": {0: "Maneuver", 1: "March", 2: "Walk", 3: "Fly"}.get(move_type, str(move_type)),
+                        "target_kind": "city",
+                        "target_source": "no_valid_move_candidate" if missing_move_candidate else "empty_route",
+                        "target_city_id": None,
+                        "target_hex": None,
+                        "reachable_city_count": 0,
+                        "total_cities": len(cities),
+                        "route_len": 0,
+                        "route_empty": True,
+                        "route_failure_reason": "no_valid_move_candidate" if missing_move_candidate else "empty_route",
+                        "selected_by_learned": False,
+                    })
                     self.policy.note_action(
                         "move",
                         False,
@@ -755,8 +840,43 @@ class Agent:
                     }
                     route = route_by_city.get(best_city, [])
                     if route:
+                        target_source = "learned" if used_move_type == move_type else f"learned_fallback_move_type_{used_move_type}"
+                        self.policy.record_move_route({
+                            "operator_id": obj_id,
+                            "operator_type": bop.get("type"),
+                            "current_hex": bop.get("cur_hex"),
+                            "move_type": used_move_type,
+                            "move_type_name": {0: "Maneuver", 1: "March", 2: "Walk", 3: "Fly"}.get(used_move_type, str(used_move_type)),
+                            "target_kind": "city",
+                            "target_source": target_source,
+                            "target_city_id": best_city,
+                            "target_hex": best_city,
+                            "reachable_city_count": len(reachable_city_routes),
+                            "total_cities": len(cities),
+                            "route_len": len(route),
+                            "route_empty": False,
+                            "route_failure_reason": "none",
+                            "selected_by_learned": True,
+                        })
                         self.policy.note_action("move", True, trace)
                         return {"actor": self.seat, "obj_id": obj_id, "type": ActionType.Move, "move_path": route}
+                    self.policy.record_move_route({
+                        "operator_id": obj_id,
+                        "operator_type": bop.get("type"),
+                        "current_hex": bop.get("cur_hex"),
+                        "move_type": move_type,
+                        "move_type_name": {0: "Maneuver", 1: "March", 2: "Walk", 3: "Fly"}.get(move_type, str(move_type)),
+                        "target_kind": "city",
+                        "target_source": "learned",
+                        "target_city_id": best_city,
+                        "target_hex": best_city,
+                        "reachable_city_count": len(reachable_city_routes),
+                        "total_cities": len(cities),
+                        "route_len": 0,
+                        "route_empty": True,
+                        "route_failure_reason": "empty_route",
+                        "selected_by_learned": False,
+                    })
                     self.policy.note_action(
                         "move",
                         False,
@@ -764,7 +884,11 @@ class Agent:
                     )
                 return None
 
-        # Original Rule-based Logic
+        # Original Rule-based Logic (only when AI optimization disabled
+        # or action type not handled by learned path)
+        if self.use_ai_optimization and action_type in (ActionType.Shoot, ActionType.Move):
+            return None
+
         if action_type == ActionType.Occupy:
             return {"actor": self.seat, "obj_id": obj_id, "type": ActionType.Occupy}
         if action_type == ActionType.Shoot:
@@ -836,12 +960,44 @@ class Agent:
                 return None
             if bop.get("sub_type") == 3:
                 return None
-            destination = self._rng.choice([city["coord"] for city in self.observation.get("cities", [])])
+            cities_list = self.observation.get("cities", [])
+            cur_hex = bop.get("cur_hex")
+            is_on_city = any(
+                city.get("coord") is not None and int(city["coord"]) == cur_hex
+                for city in cities_list
+            )
+            if is_on_city:
+                city_on = next(
+                    (city for city in cities_list if city.get("coord") is not None and int(city["coord"]) == cur_hex),
+                    None,
+                )
+                city_flag = city_on.get("flag", -1) if city_on else -1
+                if city_flag != self.faction:
+                    return None
+            destination = self._rng.choice([city["coord"] for city in cities_list])
             if self.my_direction:
                 destination = self.my_direction.get("info", {}).get("target_pos", destination)
             if self.map and bop.get("cur_hex") != destination:
                 move_type = self.get_move_type(bop)
                 route = self.map.gen_move_route(bop["cur_hex"], destination, move_type)
+                cities = self.observation.get("cities", [])
+                self.policy.record_move_route({
+                    "operator_id": obj_id,
+                    "operator_type": bop.get("type"),
+                    "current_hex": bop.get("cur_hex"),
+                    "move_type": move_type,
+                    "move_type_name": {0: "Maneuver", 1: "March", 2: "Walk", 3: "Fly"}.get(move_type, str(move_type)),
+                    "target_kind": "city",
+                    "target_source": "rule_fallback",
+                    "target_city_id": destination,
+                    "target_hex": destination,
+                    "reachable_city_count": 0,
+                    "total_cities": len(cities),
+                    "route_len": len(route),
+                    "route_empty": not route,
+                    "route_failure_reason": "empty_route" if not route else "none",
+                    "selected_by_learned": False,
+                })
                 self.policy.note_action(
                     "move",
                     False,

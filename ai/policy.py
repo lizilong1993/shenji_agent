@@ -83,6 +83,7 @@ class LearnedPolicy:
             "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
         }
         self.trace_samples: List[Dict[str, Any]] = []
+        self._reset_move_route_diagnostics()
 
     def _load_intent_model(self, payload: Dict[str, Any]) -> Any:
         hidden_dim = int(payload.get("hidden_dim") or payload["model_state"]["lstm.weight_ih_l0"].shape[0] // 4)
@@ -219,6 +220,33 @@ class LearnedPolicy:
                         sample[field] = trace[field]
                 self.trace_samples.append(sample)
 
+    def _reset_move_route_diagnostics(self) -> None:
+        self.move_route_aggregate = {
+            "total_attempts": 0,
+            "empty_route_count": 0,
+            "reachable_city_total": 0,
+            "by_move_type": {},
+            "route_failure_reasons": {},
+        }
+        self.move_route_samples: List[Dict[str, Any]] = []
+
+    def record_move_route(self, diagnostic: Dict[str, Any]) -> None:
+        agg = self.move_route_aggregate
+        agg["total_attempts"] += 1
+        if diagnostic.get("route_empty"):
+            agg["empty_route_count"] += 1
+        agg["reachable_city_total"] += int(diagnostic.get("reachable_city_count", 0))
+        move_type_name = str(diagnostic.get("move_type_name", "unknown"))
+        mt = agg["by_move_type"].setdefault(move_type_name, {"total": 0, "empty": 0})
+        mt["total"] += 1
+        if diagnostic.get("route_empty"):
+            mt["empty"] += 1
+        reason = str(diagnostic.get("route_failure_reason", "none"))
+        if reason != "none":
+            agg["route_failure_reasons"][reason] = agg["route_failure_reasons"].get(reason, 0) + 1
+        if len(self.move_route_samples) < 50:
+            self.move_route_samples.append(diagnostic)
+
     def get_diagnostics(self) -> Dict[str, Any]:
         move_total = int(self.action_counts["move"]["total"])
         move_learned = int(self.action_counts["move"]["learned"])
@@ -251,6 +279,8 @@ class LearnedPolicy:
             "shoot_path_coverage": _coverage(shoot_total, shoot_learned),
             "score_means": score_means,
             "trace_samples": list(self.trace_samples),
+            "move_route_aggregate": dict(self.move_route_aggregate),
+            "move_route_samples": list(self.move_route_samples),
         }
 
     def observe(self, observation: Dict[str, Any]) -> None:

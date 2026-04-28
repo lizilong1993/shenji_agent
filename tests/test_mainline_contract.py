@@ -1932,6 +1932,12 @@ class MainlineContractTest(unittest.TestCase):
                     return [12, 102]
                 return []
 
+            def get_distance(self, pos1: int, pos2: int) -> int:
+                return abs(pos1 - pos2) // 100
+
+            def get_neighbors(self, pos: int) -> list[int]:
+                return [pos - 100, pos + 100, pos - 1, pos + 1]
+
         class FakePolicy:
             def __init__(self) -> None:
                 self.choose_city_calls: list[list[int]] = []
@@ -1946,6 +1952,9 @@ class MainlineContractTest(unittest.TestCase):
 
             def note_action(self, action_type: str, used_learned: bool, trace=None) -> None:
                 self.note_calls.append((action_type, used_learned, trace))
+
+            def record_move_route(self, diagnostic: dict) -> None:
+                pass
 
         fake_map = FakeMap()
         fake_policy = FakePolicy()
@@ -1977,6 +1986,12 @@ class MainlineContractTest(unittest.TestCase):
             [
                 (11, 101, MoveType.Maneuver),
                 (11, 102, MoveType.Maneuver),
+                (11, 101, MoveType.March),
+                (11, 102, MoveType.March),
+                (11, 101, MoveType.Walk),
+                (11, 102, MoveType.Walk),
+                (11, 101, MoveType.Fly),
+                (11, 102, MoveType.Fly),
             ],
         )
         self.assertEqual(fake_policy.choose_city_calls, [[102]])
@@ -2000,6 +2015,12 @@ class MainlineContractTest(unittest.TestCase):
                 self.calls.append((begin, end, mode))
                 return []
 
+            def get_distance(self, pos1: int, pos2: int) -> int:
+                return abs(pos1 - pos2) // 100
+
+            def get_neighbors(self, pos: int) -> list[int]:
+                return [pos - 100, pos + 100, pos - 1, pos + 1]
+
         class FakePolicy:
             def __init__(self) -> None:
                 self.choose_city_calls: list[list[int]] = []
@@ -2012,6 +2033,9 @@ class MainlineContractTest(unittest.TestCase):
 
             def note_action(self, action_type: str, used_learned: bool, trace=None) -> None:
                 self.note_calls.append((action_type, used_learned, trace))
+
+            def record_move_route(self, diagnostic: dict) -> None:
+                pass
 
         fake_map = FakeMap()
         fake_policy = FakePolicy()
@@ -2044,6 +2068,12 @@ class MainlineContractTest(unittest.TestCase):
             [
                 (11, 101, MoveType.Maneuver),
                 (11, 102, MoveType.Maneuver),
+                (11, 101, MoveType.March),
+                (11, 102, MoveType.March),
+                (11, 101, MoveType.Walk),
+                (11, 102, MoveType.Walk),
+                (11, 101, MoveType.Fly),
+                (11, 102, MoveType.Fly),
             ],
         )
         self.assertEqual(fake_policy.choose_city_calls, [])
@@ -2064,6 +2094,12 @@ class MainlineContractTest(unittest.TestCase):
                 self.calls.append((begin, end, mode))
                 return []
 
+            def get_distance(self, pos1: int, pos2: int) -> int:
+                return abs(pos1 - pos2) // 100
+
+            def get_neighbors(self, pos: int) -> list[int]:
+                return [pos - 100, pos + 100, pos - 1, pos + 1]
+
         class FakePolicy:
             def __init__(self) -> None:
                 self.choose_city_calls: list[list[int]] = []
@@ -2076,6 +2112,9 @@ class MainlineContractTest(unittest.TestCase):
 
             def note_action(self, action_type: str, used_learned: bool, trace=None) -> None:
                 self.note_calls.append((action_type, used_learned, trace))
+
+            def record_move_route(self, diagnostic: dict) -> None:
+                pass
 
         fake_map = FakeMap()
         fake_policy = FakePolicy()
@@ -2108,6 +2147,12 @@ class MainlineContractTest(unittest.TestCase):
             [
                 (11, 101, MoveType.Maneuver),
                 (11, 102, MoveType.Maneuver),
+                (11, 101, MoveType.March),
+                (11, 102, MoveType.March),
+                (11, 101, MoveType.Walk),
+                (11, 102, MoveType.Walk),
+                (11, 101, MoveType.Fly),
+                (11, 102, MoveType.Fly),
             ],
         )
         self.assertEqual(fake_policy.choose_city_calls, [])
