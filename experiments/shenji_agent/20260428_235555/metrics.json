@@ -1,0 +1,332 @@
+{
+  "device": "cuda",
+  "map_catalog": [
+    {
+      "map_id": 123,
+      "name": "map_123",
+      "rows": 100,
+      "cols": 100,
+      "terrain_entropy": 1.021656599034443,
+      "elevation_std": 18.46763801574707,
+      "cover_density": 0.4391,
+      "road_sparsity": 0.905,
+      "river_density": 0.0344,
+      "connectivity_penalty": 0.0,
+      "complexity_score": 0.5296524167060852,
+      "bucket": "complex"
+    },
+    {
+      "map_id": 19,
+      "name": "map_19",
+      "rows": 70,
+      "cols": 66,
+      "terrain_entropy": 0.1595123292408352,
+      "elevation_std": 152.0809783935547,
+      "cover_density": 0.03441558441558441,
+      "road_sparsity": 0.9019480519480519,
+      "river_density": 0.011688311688311689,
+      "connectivity_penalty": 0.0,
+      "complexity_score": -0.1848008781671524,
+      "bucket": "simple"
+    },
+    {
+      "map_id": 21,
+      "name": "map_21",
+      "rows": 92,
+      "cols": 77,
+      "terrain_entropy": 0.38579263143461906,
+      "elevation_std": 52.97767639160156,
+      "cover_density": 0.07368718238283456,
+      "road_sparsity": 0.7843026538678712,
+      "river_density": 0.013269339356295878,
+      "connectivity_penalty": 0.0,
+      "complexity_score": -0.5305930376052856,
+      "bucket": "simple"
+    },
+    {
+      "map_id": 212,
+      "name": "map_212",
+      "rows": 50,
+      "cols": 50,
+      "terrain_entropy": -1.000088900581841e-12,
+      "elevation_std": 0.0,
+      "cover_density": 0.0,
+      "road_sparsity": 1.0,
+      "river_density": 0.0,
+      "connectivity_penalty": 1.0,
+      "complexity_score": 0.15776367485523224,
+      "bucket": "medium"
+    },
+    {
+      "map_id": 221,
+      "name": "map_221",
+      "rows": 70,
+      "cols": 60,
+      "terrain_entropy": 0.923118902231506,
+      "elevation_std": 17.275043487548828,
+      "cover_density": 0.3273809523809524,
+      "road_sparsity": 0.8902380952380953,
+      "river_density": 0.03380952380952381,
+      "connectivity_penalty": 0.0,
+      "complexity_score": 0.35729560256004333,
+      "bucket": "complex"
+    },
+    {
+      "map_id": 29,
+      "name": "map_29",
+      "rows": 92,
+      "cols": 77,
+      "terrain_entropy": 0.04121384154221029,
+      "elevation_std": 331.3549499511719,
+      "cover_density": 0.006352343308865048,
+      "road_sparsity": 0.9632975719932242,
+      "river_density": 0.019621682665160928,
+      "connectivity_penalty": 0.0,
+      "complexity_score": 0.38668498396873474,
+      "bucket": "complex"
+    },
+    {
+      "map_id": 43,
+      "name": "map_43",
+      "rows": 60,
+      "cols": 58,
+      "terrain_entropy": 1.313032205084201,
+      "elevation_std": 49.24408721923828,
+      "cover_density": 0.36954022988505747,
+      "road_sparsity": 0.8471264367816091,
+      "river_density": 0.007183908045977011,
+      "connectivity_penalty": 0.0,
+      "complexity_score": 0.08471781015396118,
+      "bucket": "medium"
+    },
+    {
+      "map_id": 53,
+      "name": "map_53",
+      "rows": 92,
+      "cols": 77,
+      "terrain_entropy": 1.4180240776960447,
+      "elevation_std": 144.6142120361328,
+      "cover_density": 0.354884246188594,
+      "road_sparsity": 0.8564370412196499,
+      "river_density": 0.026821005081874648,
+      "connectivity_penalty": 0.0,
+      "complexity_score": 0.6295850872993469,
+      "bucket": "complex"
+    },
+    {
+      "map_id": 82,
+      "name": "map_82",
+      "rows": 64,
+      "cols": 51,
+      "terrain_entropy": 0.8869381817267543,
+      "elevation_std": 61.06324005126953,
+      "cover_density": 0.3872549019607843,
+      "road_sparsity": 0.8017769607843137,
+      "river_density": 0.0,
+      "connectivity_penalty": 0.0,
+      "complexity_score": -0.24354922771453857,
+      "bucket": "simple"
+    },
+    {
+      "map_id": 83,
+      "name": "map_83",
+      "rows": 66,
+      "cols": 51,
+      "terrain_entropy": 0.3705085324226651,
+      "elevation_std": 11.083745002746582,
+      "cover_density": 0.12180629827688651,
+      "road_sparsity": 0.7964943553178847,
+      "river_density": 0.0,
+      "connectivity_penalty": 0.0,
+      "complexity_score": -0.7578520178794861,
+      "bucket": "simple"
+    },
+    {
+      "map_id": 84,
+      "name": "map_84",
+      "rows": 64,
+      "cols": 51,
+      "terrain_entropy": -1.000088900581841e-12,
+      "elevation_std": 18.186702728271484,
+      "cover_density": 0.0,
+      "road_sparsity": 1.0,
+      "river_density": 0.0,
+      "connectivity_penalty": 0.0,
+      "complexity_score": -0.49326303601264954,
+      "bucket": "simple"
+    },
+    {
+      "map_id": 86,
+      "name": "map_86",
+      "rows": 64,
+      "cols": 51,
+      "terrain_entropy": 1.2185354225793024,
+      "elevation_std": 43.943172454833984,
+      "cover_density": 0.4007352941176471,
+      "road_sparsity": 0.8125,
+      "river_density": 0.011948529411764705,
+      "connectivity_penalty": 0.0,
+      "complexity_score": 0.05748283490538597,
+      "bucket": "medium"
+    },
+    {
+      "map_id": 92,
+      "name": "map_92",
+      "rows": 92,
+      "cols": 77,
+      "terrain_entropy": 0.9445802143365236,
+      "elevation_std": 104.34397888183594,
+      "cover_density": 0.4203839638622247,
+      "road_sparsity": 0.817476002258611,
+      "river_density": 0.015245623941276116,
+      "connectivity_penalty": 0.0,
+      "complexity_score": 0.16400593519210815,
+      "bucket": "complex"
+    },
+    {
+      "map_id": 94,
+      "name": "map_94",
+      "rows": 92,
+      "cols": 77,
+      "terrain_entropy": 0.23580467408116973,
+      "elevation_std": 2.7608683109283447,
+      "cover_density": 0.038396386222473176,
+      "road_sparsity": 0.8585544889892716,
+      "river_density": 0.018351214003387916,
+      "connectivity_penalty": 0.0,
+      "complexity_score": -0.4626995027065277,
+      "bucket": "simple"
+    },
+    {
+      "map_id": 96,
+      "name": "map_96",
+      "rows": 92,
+      "cols": 77,
+      "terrain_entropy": 0.8842236461345051,
+      "elevation_std": 58.81330871582031,
+      "cover_density": 0.5700169395821569,
+      "road_sparsity": 0.7958780350084698,
+      "river_density": 0.017363071710897796,
+      "connectivity_penalty": 0.0,
+      "complexity_score": 0.15278299152851105,
+      "bucket": "medium"
+    },
+    {
+      "map_id": 9601,
+      "name": "map_9601",
+      "rows": 92,
+      "cols": 77,
+      "terrain_entropy": 0.8842236461345051,
+      "elevation_std": 58.81330871582031,
+      "cover_density": 0.5700169395821569,
+      "road_sparsity": 0.7958780350084698,
+      "river_density": 0.017363071710897796,
+      "connectivity_penalty": 0.0,
+      "complexity_score": 0.15278299152851105,
+      "bucket": "medium"
+    }
+  ],
+  "dataset_contract": {
+    "intent": {
+      "map_id_strategy": "suffix",
+      "filename_segment_index": 1
+    },
+    "situation": {
+      "map_id_strategy": "suffix",
+      "filename_segment_index": 1
+    },
+    "tactical": {
+      "label_col": "样本标签"
+    }
+  },
+  "intent": {
+    "train_loss": 0.995828834362328,
+    "val_immediate_accuracy": 0.6220703125,
+    "bucket_accuracy": {
+      "medium": 0.6220703125
+    },
+    "horizon_accuracy": {
+      "h1": 0.6220703125,
+      "h2": 0.7236328125,
+      "h3": 0.759765625,
+      "h4": 0.7685546875,
+      "h5": 0.7939453125
+    },
+    "samples": {
+      "train": 4096,
+      "val": 1024
+    },
+    "bucket_counts": {
+      "train": {
+        "medium": 4096
+      },
+      "val": {
+        "medium": 1024
+      }
+    },
+    "schema": {
+      "map_id_strategy": "suffix",
+      "filename_segment_index": 1,
+      "history_len": 8,
+      "horizons": 5
+    },
+    "artifact": "intent_lstm.pt"
+  },
+  "tactical": {
+    "train_loss": 15.902410783265767,
+    "val_accuracy": 0.9622093023255814,
+    "samples": 24080,
+    "schema": {
+      "label_column": "样本标签",
+      "feature_columns": [
+        "ID",
+        "算子类型",
+        "算子所属方",
+        "起始点",
+        "目标点",
+        "起始点机动范围",
+        "起始点观察范围",
+        "起始点暴露范围",
+        "起始点夺控能力",
+        "目标点机动范围",
+        "目标点观察范围",
+        "目标点暴露范围",
+        "目标点夺控能力",
+        "主要夺控点",
+        "次要夺控点",
+        "特殊地形",
+        "整体移动方向"
+      ]
+    },
+    "label_distribution": {
+      "1.0": 12060,
+      "0.0": 12020
+    },
+    "artifact": "tactical_model.pt"
+  },
+  "situation": {
+    "train_loss": 0.6140718419418865,
+    "val_accuracy": 0.5454545454545454,
+    "bucket_accuracy": {
+      "complex": 0.5454545454545454
+    },
+    "samples": 108,
+    "bucket_counts": {
+      "complex": 108
+    },
+    "schema": {
+      "map_id_strategy": "suffix",
+      "filename_segment_index": 1
+    },
+    "artifact": "situation_gcn.pt",
+    "normalizer": {
+      "path": "situation_feature_normalizer.json",
+      "kind": "per_dimension_zscore",
+      "fitted_on": "situation_train_split",
+      "feature_dim": 108,
+      "num_samples": 1032,
+      "zero_std_count": 50,
+      "training_applied_normalizer": true
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "git_head": "77849cd38e80fd3281e19e6f0ebfd074ad44fae5",
+  "manifest_path": "/remote-home/lizilong/shenji_agent_fresh/ai/weights/model_manifest.json",
+  "manifest_loaded": true,
+  "intent_model_path": "/remote-home/lizilong/shenji_agent_fresh/ai/weights/intent_lstm.pt",
+  "situation_model_path": "/remote-home/lizilong/shenji_agent_fresh/ai/weights/situation_gcn.pt",
+  "tactical_model_path": "/remote-home/lizilong/shenji_agent_fresh/ai/weights/tactical_model.pt",
+  "history_len": 8,
+  "horizons": 5,
+  "feature_dim": 108,
+  "situation_checkpoint_loaded": true,
+  "intent_checkpoint_loaded": true,
+  "tactical_checkpoint_loaded": true,
+  "normalizer_available": true,
+  "normalizer_loaded": true,
+  "warnings": [
+    "intent_negative_move_bias"
+  ],
+  "recommended_next_actions": [
+    "address_intent_move_bias"
+  ],
+  "manifest_generated_at": "20260428_235813",
+  "manifest_source_commit": "77849cd38e80fd3281e19e6f0ebfd074ad44fae5",
+  "manifest_managed_files": [
+    "intent_lstm.pt",
+    "situation_gcn.pt",
+    "situation_feature_normalizer.json",
+    "model_manifest.json",
+    "tactical_model.pt"
+  ],
+  "normalizer_applied_in_training": true,
+  "normalizer_manifest_feature_dim": 108,
+  "normalizer_manifest_kind": "per_dimension_zscore",
+  "situation_checkpoint_training_applied_normalizer": true,
+  "situation_pre_sigmoid_mean": 0.41145545669964384,
+  "situation_pre_sigmoid_std": 0.0572122676488795,
+  "situation_pre_sigmoid_min": 0.3307120203971863,
+  "situation_pre_sigmoid_max": 0.5815937519073486,
+  "situation_output_mean": 0.4142473042011261,
+  "situation_output_std": 0.008354299052368947,
+  "situation_per_node_variance_mean": 0.0040744750294834375,
+  "intent_output_distribution": {
+    "class_0": 0.49155110120773315,
+    "class_1": 0.06566080451011658,
+    "class_2": 0.14747092127799988,
+    "class_3": 0.0626838356256485,
+    "class_4": 0.0827883929014206,
+    "class_5": 0.08270879834890366,
+    "class_6": 0.06713618338108063
+  },
+  "move_bias_estimate": -0.20100883926664082,
+  "tactical_available": true,
+  "tactical_output_mean": 0.5337677001953125,
+  "tactical_output_std": 0.022869640961289406,
+  "normalizer_keys": [
+    "feature_mean",
+    "feature_std",
+    "feature_std_raw",
+    "feature_dim",
+    "num_samples",
+    "zero_std_count",
+    "zero_std_features",
+    "fitted_on",
+    "normalizer_kind"
+  ],
+  "normalizer_feature_count": 108,
+  "normalizer_zero_std_count": 50,
+  "normalizer_loaded_in_inference": true,
+  "datasets_available": true,
+  "datasets_state_graph_csv_count": 108,
+  "train_feature_stats_sample_shape": [
+    12,
+    108
+  ],
+  "train_feature_stats_available": true,
+  "train_feature_mean_abs_max": 5225.33349609375,
+  "train_feature_std_max": 4879.4013671875,
+  "train_feature_std_min": 0.0,
+  "datasets_intent_available": true,
+  "datasets_tactical_csv_size": 409055700
+}

@@ -1,0 +1,19 @@
+{
+  "intent_bucket_accuracy": {
+    "medium": 0.6220703125
+  },
+  "intent_bucket_counts": {
+    "train": {
+      "medium": 4096
+    },
+    "val": {
+      "medium": 1024
+    }
+  },
+  "situation_bucket_accuracy": {
+    "complex": 0.5454545454545454
+  },
+  "situation_bucket_counts": {
+    "complex": 108
+  }
+}

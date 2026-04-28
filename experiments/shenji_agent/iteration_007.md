@@ -14,10 +14,10 @@ Continue from Iteration 006 blocked state. P0 is fixing the situation-model trai
 - [x] Inspect normalizer training/inference paths.
 - [x] Fix training path that computed but did not apply the situation normalizer.
 - [x] Add normalizer training/inference consistency tests.
-- [ ] Retrain normalized situation/intent/tactical models.
+- [x] Retrain normalized situation/intent/tactical models.
 - [x] Run model quality diagnostics before retrain.
-- [ ] Run model quality diagnostics after retrain.
-- [ ] Check situation per-node variance after normalized retrain.
+- [x] Run model quality diagnostics after retrain.
+- [x] Check situation per-node variance after normalized retrain.
 - [ ] If variance remains low, design and implement GraphSituationModel architecture variant.
 - [ ] Train architecture variant.
 - [ ] Compare baseline vs normalized vs architecture variant.
@@ -102,15 +102,57 @@ Results:
 - `tests/test_policy_score_tuning.py -q`: `12 passed in 0.86s`
 - `tests/test_mainline_contract.py -q`: `35 passed in 1.13s`
 
-## Linux Commit
-Pending after report update and diff review.
+## Linux Commits
+- `77849cd38e80fd3281e19e6f0ebfd074ad44fae5` — P0 normalizer consistency code, diagnostics, tests, before-retrain diagnostics, and initial Iteration 007 report.
 
 ## Windows Sync
-Pending; currently blocked by Tailscale SSH host key verification / OpenSSH timeout evidence above.
+- Sync attempt after `77849cd38e80fd3281e19e6f0ebfd074ad44fae5` used `.tmp_claude/sync_files.txt`.
+- Sync file list:
+  - `ai/policy.py`
+  - `experiments/shenji_agent/iteration_007.md`
+  - `experiments/shenji_agent/model_quality_before_iter007_normalized_retrain.json`
+  - `scripts/diagnose_model_quality.py`
+  - `tests/test_feature_normalizer_consistency.py`
+  - `training/supervised.py`
+- Result: failed with `No ED25519 host key is known for desktop-t3ll42l.tailf6b2dc.ts.net. and you have requested strict checking. Host key verification failed.`
+- Windows commit sha: unavailable, sync blocked.
+
+## Normalized Retrain
+Command:
+`PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages TMPDIR=$PWD/.tmp_claude TEMP=$PWD/.tmp_claude TMP=$PWD/.tmp_claude python3.10 train_models.py --config configs/supervised_score_quality.yaml`
+
+Artifacts:
+- Run dir: `experiments/shenji_agent/20260428_235555`
+- Published dir: `ai/weights`
+- Report: `experiments/shenji_agent/normalized_retrain_report.md`
+
+Training results:
+- Intent immediate validation accuracy: `0.6221`
+- Tactical validation accuracy: `0.9622`
+- Situation validation accuracy: `0.5455`
+- Situation samples: `108`, all complex bucket.
+- Situation normalizer fitted on `situation_train_split`, feature dim `108`, zero-std count `50`, `training_applied_normalizer=true`.
+- Manifest source commit: `77849cd38e80fd3281e19e6f0ebfd074ad44fae5`.
+
+After-retrain diagnostics:
+- Output file: `experiments/shenji_agent/model_quality_after_iter007_normalized_retrain.json`
+- normalizer_applied_in_training: `true`
+- normalizer_loaded_in_inference: `true`
+- situation pre-sigmoid mean/std/min/max: `0.411455` / `0.057212` / `0.330712` / `0.581594`
+- situation output mean/std: `0.414247` / `0.008354`
+- situation per-node variance mean: `0.0040744750294834375`
+- tactical_available: `true`
+- intent move bias estimate: `-0.2010`
+- warnings: `intent_negative_move_bias`
+
+Before/after conclusion:
+- Explicit training/inference mismatch is fixed.
+- Situation per-node variance improved from `1.5056e-05` to `0.004074`, roughly 270x.
+- Since variance materially improved, the next branch is smoke self-play before implementing a GNN architecture variant.
 
 ## Next
-1. Commit P0 normalizer consistency fix and tests.
+1. Commit normalized retrain manifest/normalizer/reports.
 2. Retry Windows sync after commit.
-3. Retrain with `configs/supervised_score_quality.yaml`.
-4. Run after-retrain diagnostics and compare per-node variance.
-5. If variance remains low, implement the GraphSituationModel architecture variant.
+3. Run smoke self-play against `ai/weights_incumbent_rule`.
+4. If smoke is still 0-0, analyze whether to proceed to architecture variant or blocked evidence.
+5. If smoke improves, run formal self-play.

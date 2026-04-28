@@ -1,11 +1,16 @@
 {
-  "generated_at": "20260428_223958",
-  "source_commit_sha": "5c3931fd2b747d2dd7d07fee27abe66a223bd7c9",
+  "generated_at": "20260428_235813",
+  "source_commit_sha": "77849cd38e80fd3281e19e6f0ebfd074ad44fae5",
   "history_len": 8,
   "horizons": 5,
   "intent_lstm": "intent_lstm.pt",
   "situation_gcn": "situation_gcn.pt",
   "situation_feature_normalizer": "situation_feature_normalizer.json",
+  "situation_normalizer_kind": "per_dimension_zscore",
+  "situation_normalizer_fitted_on": "situation_train_split",
+  "situation_normalizer_feature_dim": 108,
+  "situation_normalizer_zero_std_count": 50,
+  "situation_training_applied_normalizer": true,
   "tactical_model": "tactical_model.pt",
   "managed_files": [
     "intent_lstm.pt",
