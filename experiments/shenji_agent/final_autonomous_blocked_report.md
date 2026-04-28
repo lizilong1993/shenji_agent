@@ -1,147 +1,171 @@
-# Shenji Agent Autonomous Engineering — Final Blocked Report (Iteration 003-004)
+# Shenji Agent Autonomous Engineering — Final Blocked Report (Iteration 005)
 
 **Date:** 2026-04-28
-**Status:** B — Blocked with hard evidence
+**Status:** B — Blocked with hard evidence (model quality insufficient)
 **Working directory:** `/remote-home/lizilong/shenji_agent_fresh` (fresh clone)
-**Root FS:** 97% (107G free; was 100% full at start)
 
 ---
 
 ## 1. Current Git State
 
-**HEAD:** `49039ca` — fix: correct manifest source_commit_sha to real HEAD
+**HEAD:** `677f69d` — fix: rebalance city scoring, fix situation model feature normalization, add policy score tests
 
-**Commit history (fresh clone, ahead of original by 5 commits):**
+**Commit history (fresh clone, ahead of original by 8 commits):**
 ```
+677f69d fix: rebalance city scoring, fix situation model feature normalization, add policy score tests
+9ba20f3 chore: bump manifest to final report commit
+10608cd docs: final blocked report with move routing fix evidence
 49039ca fix: correct manifest source_commit_sha to real HEAD
 44ac552 chore: bump manifest source_commit_sha to 1860b86
 1860b86 fix: passthrough move route diagnostics and update manifest commit
 c59846b docs: finalize iteration 003 report with root cause and fix summary
 9e36d05 fix: add move route diagnostics, fallback strategy, and context-aware occupy
-cee21ce docs: add iteration 002 report and final blocked report
-a33cdee fix: restore learned move and shoot engagement in selfplay
 ```
 
-**Original repo** (`/remote-home/lizilong/shenji_agent`): Root FS was 100% full during Iteration 002. Now has space but all work was done in fresh clone. Fresh clone is ahead by 5 commits.
+**Original repo** (`/remote-home/lizilong/shenji_agent`): At 2a5ac08, behind fresh clone by 8 commits.
 
 ---
 
-## 2. Root Cause: empty_route (85% move fallback rate)
+## 2. What Was Fixed (Iterations 001-005)
 
-### Finding
-The **March movement cost layer (cost[1])** in `cost.pickle` has **78.4% empty adjacency cells** (5,556/7,084 on map_21). When a Vehicle is in March state, `get_move_type()` returns 1 (March), and `gen_move_route()` indexes into `cost[1]` where most cells have `{}`. The A* frontier exhausts → empty route → move fails.
+### Iteration 001-002: Learned Policy Disengagement
+- Root cause: `use_ai_optimization` not set for `CurrentAI`, so learned path skipped
+- Fix: Auto-enable learned policy for `CurrentAI` in Agent.setup()
+- Fix: Always enable `use_ai_optimization` for non-baseline profiles
+- Disabled GPU policy inference (CUDA OOM on shared GPU)
+- Capped PyTorch CPU threads
 
-### Fix
-Multi-mode fallback: try all 4 move types (Maneuver, March, Walk, Fly), use shortest route per city. March failures fall back to Maneuver (100% coverage). Neighbor-step heuristic for dead-end positions.
+### Iteration 003-004: empty_route (85% move fallback)
+- Root cause: March cost layer (mode 1) had 78.4% empty adjacency cells in cost.pickle
+- Fix: Multi-mode fallback route finding (try all 4 move types, shortest route per city)
+- empty_route: 85% → 0%
+- move_path_coverage: 14.7% → 100%
+- learned_path_coverage: 15.5% → 100%
 
----
-
-## 3. Code Changes
-
-### ai/agent.py (+176 lines)
-- Multi-mode fallback route finding with dedup by shortest route
-- Neighbor-step heuristic when no city reachable via any move type
-- Context-aware Occupy: skip Move when operator stands on neutral/enemy city
-- Guard: prevent learned path fallthrough to rule-based for Shoot/Move
-- Per-move diagnostics: `record_move_route()` at all Move decision points
-
-### ai/policy.py (+30 lines)
-- `_reset_move_route_diagnostics()` — aggregate counters + sample buffer
-- `record_move_route()` — records per-move diagnostics and updates aggregates
-
-### training/selfplay.py (+40 lines)
-- `_merge_policy_stats()` — passthrough `move_route_aggregate` and `move_route_samples`
-
-### training/evaluate.py (+30 lines)
-- `_merge_policy_stats()` — aggregate `move_route_aggregate` across matches
-
-### tests/test_move_route_diagnostics.py (new, 10 tests)
-### tests/test_mainline_contract.py (+45 lines, 3 tests updated)
+### Iteration 005: City Scoring Rebalance and Model Quality Diagnosis
+- **City scoring**: Rebalanced distance penalty (0.35→0.08), added owner bonus (+25 neutral/enemy, -15 friendly), occupy proximity bonus (+20)
+- **Shoot scoring**: Kill bonus 50→75, target value bonus added
+- **Situation model normalization**: Feature standardization in `_score_counterfactual`
+- **Per-node scoring**: Individual operator node score instead of global mean
+- **Tests**: +12 policy score tests, +conftest.py (fake module protection), fixed test cleanup
+- **Situation model diagnosis**: Pre-sigmoid values -28.69→0 after normalization, but per-node scores all ~0.484 (no differentiation)
 
 ---
 
-## 4. Test Results
+## 3. Current Hard Evidence (0-0 Stalemate)
 
+### Medium Self-Play (5 matches, max_steps=400)
+- League: `league_20260428_204108`
+- All 5 matches: 0-0 stalemate (candidate=0.0, opponent=0.0 in all legs)
+- Route coverage: 1.0 (move/shoot/learned all 100%)
+- Fallback reasons: [] (zero fallbacks)
+- **situation_score mean**: 0.00054 (near-zero, model not differentiating)
+- **intent_bias mean**: -0.364 (negative, discourages movement)
+- **tactical_model_loaded**: 0/5 matches (model file missing from candidate dir)
+- **combined_score (move)**: 10.09 (entirely from heuristics, no learned signal)
+
+### Promotion Gate Failures
+| Gate | Current | Required | Status |
+|------|---------|----------|--------|
+| overall_point_estimate | 0.5000 | ≥ 0.60 | FAIL |
+| overall_ci95_lower | 0.5000 | ≥ 0.55 | FAIL |
+| complex_point_estimate | 0.5000 | ≥ 0.60 | FAIL |
+| complex_ci95_lower | 0.5000 | ≥ 0.55 | FAIL |
+| elo_delta_lower | -0.0 | ≥ 35 | FAIL |
+| learned_path_coverage | 1.0000 | ≥ 0.30 | PASS |
+| move_path_coverage | 1.0000 | ≥ 0.20 | PASS |
+| shoot_path_coverage | 1.0000 | ≥ 0.20 | PASS |
+| max_bucket_regression | 0.0 | ≤ 0.03 | PASS |
+| max_exploiter_win_rate | 0.0 | ≤ 0.45 | PASS |
+
+---
+
+## 4. Root Cause of Stalemate: Model Quality
+
+### Evidence Chain
+1. **Situation model produces near-identical per-node scores (~0.484)** for all operators regardless of position — provides zero positional differentiation
+2. **Intent model has negative move bias (-0.364)** — discourages the most common action type
+3. **Tactical model is disabled** — `tactical_model.pt` missing from candidate `ai/weights/` directory
+4. **Candidate and incumbent share the same route-finding logic** — the multi-mode fallback fix benefits both equally
+5. **All scoring differentiation comes from heuristic rules** — which are identical for both sides at equal positions
+6. **Result**: Both sides converge to same behavior → mutual attrition → 0-0
+
+### Model Files Present
+- Candidate (`ai/weights/`): intent_lstm.pt, situation_gcn.pt, intention_lstm.pth, situation_gcn.pth
+- Missing from candidate: intent_model.pt, situation_model.pt, tactical_model.pt
+- Incumbent (`ai/weights_incumbent_rule/`): has all files but profile="baseline" → learned policy disabled
+
+---
+
+## 5. What Has Been Eliminated
+
+| Suspected Cause | Status | Evidence |
+|----------------|--------|----------|
+| Code bugs preventing moves | ELIMINATED | 100% move_path_coverage, zero empty_route |
+| Learned policy not engaging | ELIMINATED | 100% learned_path_coverage, no fallback_reasons |
+| Route generation broken | ELIMINATED | All 4 move types working, multi-mode fallback |
+| City scoring weights imbalanced | FIXED | Owner bonus, proximity bonus, balanced distance |
+| Situation model output near-zero | FIXED | Feature normalization added, output ~0.48 per node |
+| Per-node vs global pooling | FIXED | Per-node scores used for city differentiation |
+| Fake torch breaking tests | FIXED | conftest.py + cleanup in test_mainline_contract.py |
+
+---
+
+## 6. Remaining: Model Training Required
+
+The code plumbing is complete. The remaining failure is a **model quality issue** requiring retraining:
+
+### Required Actions
+1. **Retrain situation model (GraphSituationModel)**: With standardized input features and per-node scoring targets
+2. **Retrain intent model (MultiHorizonIntentionModel)**: With positive move bias toward objectives
+3. **Train and enable tactical model (TacticalScorer)**: For real-time action evaluation
+4. **Add occupy/scoring labels to training data**: City capture events, scoring opportunities
+5. **Generate tactical_model.pt** in candidate weights directory
+6. **Retrain with proper feature normalization**: Match inference-time feature distribution
+
+### Minimum Verifiable Improvement
+After retraining:
+1. situation_score should vary meaningfully across different city positions (std > 0.01 across cities)
+2. intent_bias for move should be non-negative
+3. tactical_model_loaded should be True
+4. At least one match should have non-zero score
+5. candidate should show Elo advantage > 0
+
+---
+
+## 7. Test Results
 ```
-tests/test_mainline_contract.py — 35 passed
-tests/test_move_route_diagnostics.py — 10 passed
-Total: 45 tests, 0 failures
+79 passed in 1.31s
 ```
+7 test files, 79 tests total. All pass.
 
 ---
 
-## 5. Self-Play Results
-
-### Smoke (2 matches, 50 steps)
-
-| Metric | Pre-Fix (formal) | Post-Fix (smoke) |
-|--------|-------------------|-------------------|
-| move_path_coverage | 0.147 (14.7%) | **1.000 (100%)** |
-| learned_path_coverage | 0.155 (15.5%) | **1.000 (100%)** |
-| empty_route_count | ~4,066 (85%) | **0 (0%)** |
-| fallback_reasons | ["empty_route"] | **[] (none)** |
-| intent_bias (move) | -0.636 | 0.0 |
-| promotion_accepted | False | True |
-
-Per-move diagnostics confirm: 37 moves, 0 empty routes, March completely avoided.
-
-### Medium (5 matches, 400 steps)
-
-| Metric | Pre-Fix | Post-Fix |
-|--------|---------|----------|
-| move_path_coverage | 0.147 | **1.000** |
-| learned_path_coverage | 0.155 | **1.000** |
-| shoot_path_coverage | 1.000 | **1.000** |
-| empty_route_count | ~4,066 | **0** |
-| overall_point_estimate | 0.500 | 0.500 (still 0-0) |
-| promotion_accepted | False | False (score gates fail) |
-
-All coverage gates pass. Score gates fail (all matches 0-0).
+## 8. Linux Git State
+- Fresh clone: `/remote-home/lizilong/shenji_agent_fresh`
+- HEAD: `677f69d`
+- 79/79 tests pass
+- All changes committed
 
 ---
 
-## 6. Why Scores Remain 0-0
-
-The multi-mode fallback improved **both** candidate and incumbent movement:
-- Candidate: 43 moves, all learned, reaching cities
-- Opponent: 46 moves, rule-based, also reaching cities (was 85% empty before!)
-- Both sides: 12 shoot actions per match → mutual attrition → stalemate
-
-The learned policy's `choose_city` makes strategic decisions, but the rule-based opponent's random city selection is now equally effective since movement works for both. The policy's scoring function (`situation_score * 100 + city_value * 0.2 - distance * 0.35`) doesn't create enough strategic advantage.
+## 9. Windows Sync State
+- **BLOCKED**: tailscale SSH to 100.127.108.19 timed out (connection timeout on 2026-04-28)
+- Sync file list ready (5 files from HEAD commit)
+- Will sync when host becomes reachable
 
 ---
 
-## 7. Promotion Gate Status (Medium Run)
-
-| Gate | Threshold | Actual | Status |
-|------|-----------|--------|--------|
-| overall_point_estimate | ≥ 0.55 | 0.50 | ❌ |
-| overall_ci_lower | ≥ 0.50 | 0.50 | ❌ |
-| complex_point_estimate | ≥ 0.55 | 0.50 | ❌ |
-| complex_ci_lower | ≥ 0.50 | 0.50 | ❌ |
-| learned_path_coverage | ≥ 0.30 | **1.00** | ✅ |
-| move_path_coverage | ≥ 0.20 | **1.00** | ✅ |
-| shoot_path_coverage | ≥ 0.20 | **1.00** | ✅ |
-| elo_delta_lower | ≥ 15.0 | -0.0 | ❌ |
-| max_bucket_regression | ≤ 0.05 | 0.00 | ✅ |
-
-**Coverage gates**: All pass (were failing before)
-**Score gates**: All fail (0-0 stalemate)
+## 10. Uncommitted Files
+- `.pyc` cache files (excluded from commit)
+- `ai/weights/weights/` (duplicate directory)
+- `datasets/`, `land_wargame_sdk/` (large assets)
+- `scripts/` (verification scripts, already present)
 
 ---
 
-## 8. Remaining Blockers
-
-### Code/plumbing: NONE — all verified fixed
-### Model quality: Needs training data improvement or score function tuning
-
----
-
-## 9. How to Sync Back to Original Repo
-
-```bash
-cd /remote-home/lizilong/shenji_agent
-git remote add fresh /remote-home/lizilong/shenji_agent_fresh 2>/dev/null || true
-git fetch fresh
-git merge fresh/main
-```
+## 11. Iteration Reports
+- `iteration_002.md` — Learned policy re-engagement
+- `iteration_003.md` — empty_route root cause and fix
+- `iteration_004.md` — Move route diagnostics and validation
+- `iteration_005.md` — City scoring rebalance and model quality diagnosis
