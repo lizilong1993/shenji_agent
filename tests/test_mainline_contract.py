@@ -683,10 +683,21 @@ class MainlineContractTest(unittest.TestCase):
         from training.common import git_head_sha
         from training.selfplay import _load_agent_class_from_commit
 
+        _saved_torch = {}
         for module_name in list(sys.modules):
             if module_name == "torch" or module_name.startswith("torch."):
-                sys.modules.pop(module_name, None)
+                _saved_torch[module_name] = sys.modules.pop(module_name, None)
         _install_fake_torch()
+
+        def _restore_real_torch() -> None:
+            for module_name in list(sys.modules):
+                if module_name == "torch" or module_name.startswith("torch."):
+                    sys.modules.pop(module_name, None)
+            for name, mod in _saved_torch.items():
+                if mod is not None:
+                    sys.modules[name] = mod
+
+        self.addCleanup(_restore_real_torch)
         commit_sha = git_head_sha(REPO_ROOT)
         agent_class = _load_agent_class_from_commit(commit_sha)
         self.assertEqual(agent_class.__name__, "Agent")

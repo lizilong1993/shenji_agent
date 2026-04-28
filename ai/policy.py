@@ -366,6 +366,7 @@ class LearnedPolicy:
         if not index_lookup:
             return 0.0
         features = np.array(cache["features"], copy=True)
+        override_row = None
         for obj_id, operator in overrides.items():
             row_idx = index_lookup.get(int(obj_id))
             if row_idx is None:
@@ -375,11 +376,20 @@ class LearnedPolicy:
                 frame=observation,
                 fallback_pos=operator.get("cur_hex"),
             )
+            override_row = row_idx
         adjacency = build_feature_similarity_graph(features)
+        num_nodes = features.shape[0]
+        if num_nodes > 1:
+            feat_std = np.std(features, axis=0, keepdims=True)
+            feat_std = np.where(feat_std < 1e-8, 1.0, feat_std)
+            features = (features - np.mean(features, axis=0, keepdims=True)) / feat_std
         with _torch_inference_mode():
             x = self._move_to_device(torch.tensor(features, dtype=torch.float32))
             adj = self._move_to_device(torch.tensor(adjacency, dtype=torch.float32))
-            return float(self.situation_model(x, adj).view(-1).item())
+            node_scores = self.situation_model.backbone(x, adj)
+            if override_row is not None and 0 <= override_row < node_scores.shape[0]:
+                return float(node_scores[override_row].item())
+            return float(node_scores.mean().item())
 
     def choose_shoot_candidate(
         self,
@@ -420,9 +430,22 @@ class LearnedPolicy:
             target_hp = float(target.get("blood", 100.0))
             attack_level = float(candidate.get("attack_level", 0.0))
             hit_prob = float(candidate.get("hit_prob", 0.0))
-            kill_bonus = 50.0 if adjusted_target["blood"] <= 0 else 0.0
+            kill_bonus = 75.0 if adjusted_target["blood"] <= 0 else 0.0
             profile_bonus = 12.0 if self.policy_profile == "aggressive_exploiter" else 0.0
-            combined_score = situation_score * 100.0 + attack_level * 8.0 + hit_prob * 30.0 + intent_bias + kill_bonus + profile_bonus - target_hp * 0.05
+            target_value = float(target.get("value", 0.0))
+            situation_contribution = 0.0
+            if situation_score > 1e-6:
+                situation_contribution = situation_score * 100.0
+            combined_score = (
+                situation_contribution
+                + attack_level * 8.0
+                + hit_prob * 30.0
+                + intent_bias
+                + kill_bonus
+                + profile_bonus
+                + target_value * 0.3
+                - target_hp * 0.05
+            )
             trace = {
                 "obj_id": int(operator.get("obj_id", -1)),
                 "candidate_id": int(target_id),
@@ -462,10 +485,12 @@ class LearnedPolicy:
             situation_score = self._score_counterfactual(observation, {int(operator_id): adjusted_operator})
 
             distance_penalty = 0.0
+            raw_distance = -1
             if tactical_map is not None and operator.get("cur_hex"):
                 distance = tactical_map.get_distance(int(operator["cur_hex"]), city_hex)
                 if distance >= 0:
-                    distance_penalty = float(distance)
+                    raw_distance = float(distance)
+                    distance_penalty = raw_distance
 
             threat_penalty = 0.0
             for enemy in visible_enemies:
@@ -479,7 +504,31 @@ class LearnedPolicy:
             intent_bias = -threat_penalty
             occupy_bias = 8.0 if self.policy_profile == "occupy_exploiter" else 0.0
             city_value = float(city.get("value", 0.0))
-            combined_score = situation_score * 100.0 + city_value * 0.2 + occupy_bias + intent_bias - distance_penalty * 0.35
+            city_owner = int(city.get("flag", -1))
+            owner_bonus = 0.0
+            if self.faction is not None and city_owner >= 0:
+                if city_owner != self.faction:
+                    owner_bonus = 25.0
+                else:
+                    owner_bonus = -15.0
+
+            occupy_proximity_bonus = 0.0
+            if raw_distance >= 0 and raw_distance <= 1:
+                occupy_proximity_bonus = 20.0
+
+            situation_contribution = 0.0
+            if situation_score > 1e-6:
+                situation_contribution = situation_score * 100.0
+
+            combined_score = (
+                situation_contribution
+                + city_value * 0.5
+                + owner_bonus
+                + occupy_proximity_bonus
+                + occupy_bias
+                + intent_bias
+                - distance_penalty * 0.08
+            )
             trace = {
                 "obj_id": int(operator_id),
                 "candidate_id": city_hex,
