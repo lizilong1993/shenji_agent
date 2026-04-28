@@ -518,8 +518,9 @@ class Agent:
             self.user_name = setup_info.get("user_name")
             self.user_id = setup_info.get("user_id")
             self.priority = [
-                ActionType.Occupy,
                 ActionType.Shoot,
+                ActionType.Move,
+                ActionType.Occupy,
                 ActionType.GuideShoot,
                 ActionType.JMPlan,
                 ActionType.LayMine,
@@ -531,7 +532,6 @@ class Agent:
                 ActionType.Union,
                 ActionType.EnterFort,
                 ActionType.ExitFort,
-                ActionType.Move,
                 ActionType.RemoveKeep,
                 ActionType.ChangeState,
                 ActionType.StopMove,
@@ -550,7 +550,7 @@ class Agent:
                 self.use_ai_optimization = False
             self.logger.info("setup complete seat=%s faction=%s role=%s", self.seat, self.faction, self.role)
         except Exception:
-            self.logger.exception("setup failed")
+            self.logger.critical("setup failed", exc_info=True)
             raise
 
     def reset(self) -> None:
@@ -577,7 +577,7 @@ class Agent:
             self.policy.reset()
             self.logger.info("reset complete")
         except Exception:
-            self.logger.exception("reset failed")
+            self.logger.critical("reset failed", exc_info=True)
             raise
 
     def step(self, observation: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -635,7 +635,7 @@ class Agent:
             self.logger.info("step actions_count=%s", len(total_actions))
             return total_actions
         except Exception:
-            self.logger.exception("step failed")
+            self.logger.critical("step failed", exc_info=True)
             return []
 
     def save(self, path: str) -> None:
@@ -653,7 +653,7 @@ class Agent:
                 json.dump(payload, f, ensure_ascii=False)
             self.logger.info("saved to %s", path)
         except Exception:
-            self.logger.exception("save failed")
+            self.logger.critical("save failed", exc_info=True)
             raise
 
     def load(self, path: str) -> None:
@@ -671,7 +671,7 @@ class Agent:
             self.user_id = payload.get("user_id")
             self.logger.info("loaded from %s", path)
         except Exception:
-            self.logger.exception("load failed")
+            self.logger.critical("load failed", exc_info=True)
             raise
 
     def get_policy_stats(self) -> Dict[str, Any]:
@@ -719,14 +719,41 @@ class Agent:
                 bop = self.get_bop(obj_id)
                 if not bop or bop.get("sub_type") == 3:
                     return None
+                missing_move_candidate = not candidate
                 cities = self.observation.get("cities", [])
-                if not cities:
+                if not cities or not self.map:
                     return None
-                selected_city, trace = self.policy.choose_city(bop, cities, self.observation, self.map)
-                if selected_city is not None and self.map:
-                    best_city = selected_city["coord"]
-                    move_type = self.get_move_type(bop)
-                    route = self.map.gen_move_route(bop["cur_hex"], best_city, move_type)
+                move_type = self.get_move_type(bop)
+                reachable_city_routes: List[Tuple[Dict[str, Any], List[int]]] = []
+                for city in cities:
+                    city_hex = city.get("coord")
+                    if city_hex is None:
+                        continue
+                    route = self.map.gen_move_route(bop["cur_hex"], int(city_hex), move_type)
+                    if route:
+                        reachable_city_routes.append((city, route))
+                if not reachable_city_routes:
+                    self.policy.note_action(
+                        "move",
+                        False,
+                        {
+                            "obj_id": obj_id,
+                            "reason": "no_valid_move_candidate" if missing_move_candidate else "empty_route",
+                        },
+                    )
+                    return None
+                selected_city, trace = self.policy.choose_city(
+                    bop,
+                    [city for city, _ in reachable_city_routes],
+                    self.observation,
+                    self.map,
+                )
+                if selected_city is not None:
+                    best_city = int(selected_city["coord"])
+                    route_by_city = {
+                        int(city["coord"]): route for city, route in reachable_city_routes if city.get("coord") is not None
+                    }
+                    route = route_by_city.get(best_city, [])
                     if route:
                         self.policy.note_action("move", True, trace)
                         return {"actor": self.seat, "obj_id": obj_id, "type": ActionType.Move, "move_path": route}

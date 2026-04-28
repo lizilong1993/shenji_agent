@@ -6,7 +6,7 @@ import json
 import math
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
@@ -37,6 +37,15 @@ def _merge_policy_stats(matches: Iterable[Dict[str, object]]) -> Dict[str, objec
         "move_learned": 0,
         "shoot_total": 0,
         "shoot_learned": 0,
+        "manifest_loaded_match_count": 0,
+        "intent_model_loaded_match_count": 0,
+        "situation_model_loaded_match_count": 0,
+        "tactical_model_loaded_match_count": 0,
+        "learned_policy_enabled_match_count": 0,
+        "fallback_reasons": set(),
+        "profiles": set(),
+        "artifact_dirs": set(),
+        "manifest_paths": set(),
         "score_sums": {
             "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
             "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
@@ -58,6 +67,27 @@ def _merge_policy_stats(matches: Iterable[Dict[str, object]]) -> Dict[str, objec
             totals["score_sums"][action_key]["samples"] += samples
             for metric in ("intent_bias", "situation_score", "combined_score"):
                 totals["score_sums"][action_key][metric] += float(action_scores.get(metric, 0.0)) * samples
+        diagnostics = match.get("candidate_policy_diagnostics", {})
+        if isinstance(diagnostics, dict):
+            totals["manifest_loaded_match_count"] += int(bool(diagnostics.get("manifest_loaded")))
+            totals["intent_model_loaded_match_count"] += int(bool(diagnostics.get("intent_model_loaded")))
+            totals["situation_model_loaded_match_count"] += int(bool(diagnostics.get("situation_model_loaded")))
+            totals["tactical_model_loaded_match_count"] += int(bool(diagnostics.get("tactical_model_loaded")))
+            totals["learned_policy_enabled_match_count"] += int(bool(diagnostics.get("learned_policy_enabled")))
+            profile = diagnostics.get("profile")
+            if profile:
+                totals["profiles"].add(str(profile))
+            artifact_dir = diagnostics.get("artifact_dir")
+            if artifact_dir:
+                totals["artifact_dirs"].add(str(artifact_dir))
+            manifest_path = diagnostics.get("manifest_path")
+            if manifest_path:
+                totals["manifest_paths"].add(str(manifest_path))
+            fallback_reason = diagnostics.get("fallback_reason")
+            if isinstance(fallback_reason, list):
+                totals["fallback_reasons"].update(str(reason) for reason in fallback_reason if reason)
+            elif fallback_reason:
+                totals["fallback_reasons"].add(str(fallback_reason))
 
     def coverage(total: int, learned: int) -> float:
         if total <= 0:
@@ -89,6 +119,15 @@ def _merge_policy_stats(matches: Iterable[Dict[str, object]]) -> Dict[str, objec
             "shoot": {"total": shoot_total, "learned": shoot_learned},
         },
         "score_means": score_means,
+        "manifest_loaded_match_count": int(totals["manifest_loaded_match_count"]),
+        "intent_model_loaded_match_count": int(totals["intent_model_loaded_match_count"]),
+        "situation_model_loaded_match_count": int(totals["situation_model_loaded_match_count"]),
+        "tactical_model_loaded_match_count": int(totals["tactical_model_loaded_match_count"]),
+        "learned_policy_enabled_match_count": int(totals["learned_policy_enabled_match_count"]),
+        "profiles": sorted(totals["profiles"]),
+        "artifact_dirs": sorted(totals["artifact_dirs"]),
+        "manifest_paths": sorted(totals["manifest_paths"]),
+        "fallback_reasons": sorted(totals["fallback_reasons"]),
     }
 
 
@@ -123,7 +162,11 @@ def summarize_matches(matches: Iterable[Dict[str, object]]) -> Dict[str, object]
     }
 
 
-def promotion_decision(summary: Dict[str, object], config: Dict[str, object]) -> Dict[str, object]:
+def promotion_decision(
+    summary: Dict[str, object],
+    config: Dict[str, object],
+    exploiter_results: Optional[Dict[str, Dict[str, object]]] = None,
+) -> Dict[str, object]:
     overall = summary["overall"]
     buckets = summary["buckets"]
     policy = summary.get("policy", {})
@@ -140,11 +183,47 @@ def promotion_decision(summary: Dict[str, object], config: Dict[str, object]) ->
     min_learned_coverage = float(config.get("min_learned_path_coverage", 0.0))
     if min_learned_coverage > 0.0 and float(policy.get("learned_path_coverage", 0.0)) < min_learned_coverage:
         failures.append("learned_path_coverage")
+    min_move_coverage = float(config.get("min_move_path_coverage", 0.0))
+    if min_move_coverage > 0.0 and float(policy.get("move_path_coverage", 0.0)) < min_move_coverage:
+        failures.append("move_path_coverage")
+    min_shoot_coverage = float(config.get("min_shoot_path_coverage", 0.0))
+    if min_shoot_coverage > 0.0 and float(policy.get("shoot_path_coverage", 0.0)) < min_shoot_coverage:
+        failures.append("shoot_path_coverage")
+
+    overall_ci_lower = float(overall["ci95"][0])
+    elo_delta_lower_bound = simple_elo(overall_ci_lower) if int(overall.get("count", 0)) > 0 else 0.0
+    elo_delta_lower_min = float(config.get("elo_delta_lower_min", 0.0))
+    if elo_delta_lower_min > 0.0 and elo_delta_lower_bound < elo_delta_lower_min:
+        failures.append("elo_delta_lower")
+
+    bucket_regressions = {
+        bucket: max(0.0, 0.5 - float(values.get("point_estimate", 0.0)))
+        for bucket, values in buckets.items()
+    }
+    max_bucket_regression = max(bucket_regressions.values(), default=0.0)
+    allowed_bucket_regression = float(config.get("max_bucket_regression", 1.0))
+    if allowed_bucket_regression < 1.0 and max_bucket_regression > allowed_bucket_regression:
+        failures.append("bucket_regression")
+
+    max_exploiter_win_rate = 0.0
+    if exploiter_results:
+        max_exploiter_win_rate = max(
+            float(result.get("win_rate_vs_candidate", 0.0))
+            for result in exploiter_results.values()
+        )
+    allowed_exploiter_win_rate = float(config.get("max_exploiter_win_rate", 1.0))
+    if exploiter_results and allowed_exploiter_win_rate < 1.0 and max_exploiter_win_rate > allowed_exploiter_win_rate:
+        failures.append("exploiter_win_rate")
     return {
         "accepted": not failures,
         "failures": failures,
-        "elo_delta_lower_bound": overall["elo"],
+        "elo_delta_lower_bound": elo_delta_lower_bound,
         "learned_path_coverage": float(policy.get("learned_path_coverage", 0.0)),
+        "move_path_coverage": float(policy.get("move_path_coverage", 0.0)),
+        "shoot_path_coverage": float(policy.get("shoot_path_coverage", 0.0)),
+        "max_bucket_regression": max_bucket_regression,
+        "bucket_regressions": bucket_regressions,
+        "max_exploiter_win_rate": max_exploiter_win_rate,
     }
 
 

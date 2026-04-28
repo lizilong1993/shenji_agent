@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import random
@@ -10,11 +11,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
-
-try:
-    import torch
-except ImportError:  # pragma: no cover
-    torch = None  # type: ignore[assignment]
 
 try:
     import yaml
@@ -36,9 +32,17 @@ def ensure_dir(path: Path | str) -> Path:
     return p
 
 
+def _optional_torch() -> Any | None:
+    try:
+        return importlib.import_module("torch")
+    except ImportError:  # pragma: no cover
+        return None
+
+
 def set_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
+    torch = _optional_torch()
     if torch is None:
         return
     torch.manual_seed(seed)
@@ -80,6 +84,7 @@ def discover_dir(parent: Path | str, *, contains: Optional[str] = None, required
 
 
 def safe_device():
+    torch = _optional_torch()
     if torch is None:
         return "cpu"
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")

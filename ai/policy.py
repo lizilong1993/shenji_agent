@@ -23,6 +23,12 @@ except ImportError:  # pragma: no cover
     MultiHorizonIntentionModel = None  # type: ignore[assignment]
 
 
+def _torch_inference_mode():
+    if torch is None:  # pragma: no cover
+        raise RuntimeError("torch is unavailable")
+    return getattr(torch, "inference_mode", torch.no_grad)()
+
+
 _DIRECTION_STEPS = [
     (0, 0),
     (1, 0),
@@ -296,7 +302,7 @@ class LearnedPolicy:
         while len(history) < self.history_len:
             history.insert(0, np.zeros_like(history[0]))
         tensor = self._move_to_device(torch.tensor(np.stack(history), dtype=torch.float32).unsqueeze(0))
-        with torch.inference_mode():
+        with _torch_inference_mode():
             logits = self.intent_model(tensor)[0, 0]
         return torch.softmax(logits, dim=-1).detach().cpu().tolist()
 
@@ -340,7 +346,7 @@ class LearnedPolicy:
                 fallback_pos=operator.get("cur_hex"),
             )
         adjacency = build_feature_similarity_graph(features)
-        with torch.inference_mode():
+        with _torch_inference_mode():
             x = self._move_to_device(torch.tensor(features, dtype=torch.float32))
             adj = self._move_to_device(torch.tensor(adjacency, dtype=torch.float32))
             return float(self.situation_model(x, adj).view(-1).item())

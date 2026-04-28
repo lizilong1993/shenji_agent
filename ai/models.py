@@ -1,3 +1,5 @@
+import inspect
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -62,6 +64,10 @@ class MultiHorizonIntentionModel(nn.Module):
         super().__init__()
         self.horizons = horizons
         self.num_classes = num_classes
+        attention_kwargs = {"embed_dim": hidden_dim * 2, "num_heads": 4}
+        self._attention_batch_first = "batch_first" in inspect.signature(nn.MultiheadAttention).parameters
+        if self._attention_batch_first:
+            attention_kwargs["batch_first"] = True
         self.lstm = nn.LSTM(
             input_dim,
             hidden_dim,
@@ -70,7 +76,7 @@ class MultiHorizonIntentionModel(nn.Module):
             bidirectional=True,
             dropout=0.1,
         )
-        self.attention = nn.MultiheadAttention(embed_dim=hidden_dim * 2, num_heads=4, batch_first=True)
+        self.attention = nn.MultiheadAttention(**attention_kwargs)
         self.head = nn.Sequential(
             nn.LayerNorm(hidden_dim * 2),
             nn.Linear(hidden_dim * 2, hidden_dim * 2),
@@ -80,7 +86,12 @@ class MultiHorizonIntentionModel(nn.Module):
 
     def forward(self, x):
         out, _ = self.lstm(x)
-        attn_out, _ = self.attention(out, out, out)
+        if self._attention_batch_first:
+            attn_out, _ = self.attention(out, out, out)
+        else:
+            out_t = out.transpose(0, 1)
+            attn_out, _ = self.attention(out_t, out_t, out_t)
+            attn_out = attn_out.transpose(0, 1)
         pooled = attn_out[:, -1, :]
         logits = self.head(pooled)
         return logits.view(-1, self.horizons, self.num_classes)
