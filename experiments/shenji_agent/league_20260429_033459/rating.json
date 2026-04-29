@@ -1,0 +1,12 @@
+{
+  "env_backend": "train_env.TrainEnv",
+  "phase": "formal_compare_interrupted",
+  "status": "interrupted",
+  "completed_pairs": 3,
+  "total_pairs": 5,
+  "error": {
+    "type": "KeyboardInterrupt",
+    "message": "compare interrupted",
+    "raised_at": "2026-04-29T05:27:29.998011Z"
+  }
+}

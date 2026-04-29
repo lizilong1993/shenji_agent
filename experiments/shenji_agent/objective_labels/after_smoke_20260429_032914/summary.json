@@ -1,0 +1,24 @@
+{
+  "label_count": 13440,
+  "confidence_counts": {
+    "high": 13440
+  },
+  "label_kind_counts": {
+    "score_delta": 13440
+  },
+  "action_type_counts": {
+    "303": 9520,
+    "333": 1920,
+    "GetOn": 80,
+    "None": 1920
+  },
+  "positive_reward_count": 0,
+  "negative_reward_count": 0,
+  "zero_reward_count": 13440,
+  "reward_proxy_mean": 0.0,
+  "outputs": {
+    "objective_labels_jsonl": "experiments/shenji_agent/objective_labels/after_smoke_20260429_032914/objective_labels.jsonl",
+    "summary_json": "experiments/shenji_agent/objective_labels/after_smoke_20260429_032914/summary.json",
+    "readme": "experiments/shenji_agent/objective_labels/after_smoke_20260429_032914/README.md"
+  }
+}

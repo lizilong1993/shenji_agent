@@ -1,0 +1,21 @@
+{
+  "env_backend": "train_env.TrainEnv",
+  "phase": "formal_compare_interrupted",
+  "completed_pairs": 3,
+  "total_pairs": 5,
+  "candidate_source_commit_sha": "ecd962ef57e48a58940090bab14056bbd639d835",
+  "incumbent_source_commit_sha": "1d7cdf3b71e28d538eb16fda178e1b6c7ba3d393",
+  "heartbeat_ts": "2026-04-29T05:27:29.998048Z",
+  "current_order_index": 3,
+  "current_map_id": 9601,
+  "current_scenario": "211033019601.json",
+  "current_bucket": "medium",
+  "current_leg_index": 1,
+  "leg_steps": 217,
+  "status": "interrupted",
+  "error": {
+    "type": "KeyboardInterrupt",
+    "message": "compare interrupted",
+    "raised_at": "2026-04-29T05:27:29.998011Z"
+  }
+}

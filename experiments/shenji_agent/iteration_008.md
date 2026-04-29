@@ -1,7 +1,7 @@
 # Iteration 008: Objective-Aware Labels and Score-Producing Policy
 
 ## Status
-In progress.
+B blocked-with-hard-evidence.
 
 ## Goal
 Continue from Iteration 007 blocked evidence and attempt to break the graph-level-label blocker by auditing available objective signals, constructing objective-aware labels, training or integrating an objective-aware scorer/policy signal, and validating with tests plus self-play. Stop only at A completed or deeper B blocked-with-hard-evidence.
@@ -9,22 +9,22 @@ Continue from Iteration 007 blocked evidence and attempt to break the graph-leve
 ## TODO
 - [x] Confirm repo status and HEAD.
 - [x] Read Iteration 007 reports.
-- [ ] Read latest smoke/formal artifacts.
-- [ ] Analyze current 0-0 stalemate objective-level cause.
-- [ ] Inventory data sources for node/city/score-delta/occupy/damage labels.
-- [ ] Construct objective-aware labels from self-play/match artifacts or SDK state.
-- [ ] Add label extraction script.
-- [ ] Add training data quality report.
-- [ ] Add objective-aware model or policy scorer.
-- [ ] Train objective-aware scorer.
-- [ ] Update manifest and diagnostics.
-- [ ] Run tests.
-- [ ] Linux commit.
-- [ ] Run smoke self-play.
-- [ ] If smoke improves, run formal self-play.
-- [ ] Update final report.
-- [ ] Output manual sync file list.
-- [ ] If still blocked, provide deeper hard evidence.
+- [x] Read latest smoke/formal artifacts.
+- [x] Analyze current 0-0 stalemate objective-level cause.
+- [x] Inventory data sources for node/city/score-delta/occupy/damage labels.
+- [x] Construct objective-aware labels from self-play/match artifacts or SDK state.
+- [x] Add label extraction script.
+- [x] Add training data quality report.
+- [x] Add objective-aware model or policy scorer.
+- [x] Train objective-aware scorer: not trained as a neural model because available labels had no high-confidence non-zero score/capture/damage target; implemented objective-aware heuristic policy scorer instead.
+- [x] Update manifest and diagnostics.
+- [x] Run tests.
+- [x] Linux commit.
+- [x] Run smoke self-play.
+- [x] If smoke improves, run formal self-play: not run because smoke remained all `0.0-0.0` and did not expose normal Move/Shoot/Occupy action maps.
+- [x] Update final report.
+- [x] Output manual sync file list.
+- [x] If still blocked, provide deeper hard evidence.
 
 ## Initial State
 - Timestamp UTC: `2026-04-29T03:10:56Z`.
@@ -44,13 +44,142 @@ Continue from Iteration 007 blocked evidence and attempt to break the graph-leve
 - Current known blocker: graph-level binary situation labels do not provide node/city/score-delta/occupy/damage supervision and have not produced promotion-quality score-changing policy behavior.
 
 ## Latest Artifact Index
-Latest artifact candidates discovered include `experiments/shenji_agent/league_20260429_001342` and `experiments/shenji_agent/league_20260429_001512`, with summary/rating/promotion/participants/match_results files. Detailed read is pending below.
+Latest artifact candidates discovered include `experiments/shenji_agent/league_20260429_001342` and `experiments/shenji_agent/league_20260429_001512`, with summary/rating/promotion/participants/match_results files.
 
 ## Current Coverage and Score Facts
-Pending detailed artifact read. Iteration 007 reported latest medium coverage as learned/move/shoot `1.0 / 1.0 / 1.0`, score distribution all `0.0-0.0`, and promotion failures on score/Elo gates.
+Iteration 007 latest medium run `league_20260429_001512` had learned/move/shoot coverage `1.0 / 1.0 / 1.0`, generated learned `Move: 137` and `Shoot: 28`, score distribution all `0.0-0.0`, and promotion failures on score/Elo gates.
 
 ## Current Blocker Hypothesis
 The current failure is objective-level, not route plumbing: the agent can generate learned movement and learned shooting, but the available supervised signals do not teach score-producing city capture, objective progress, or damage-to-score conversion.
 
 ## This Round Target
 Audit objective label sources, build any immediately constructible labels, integrate objective-aware policy scoring or train a lightweight objective scorer if labels are sufficient, then validate with tests and self-play evidence.
+
+## Objective Label Source Audit
+- Report: `experiments/shenji_agent/objective_label_source_audit.md`.
+- Existing self-play artifacts have final scores and policy route/action summaries, but no historical per-turn state, city ownership timeline, damage events, or action outcomes.
+- Scenario JSON provides initial city value/owner and operator value/type/position.
+- WG-StateGraph has `score.csv` final human-game score components and `new-Human-Human-judge.csv` damage events, but they are not aligned to self-play action choices.
+- Immediately constructible labels from old artifacts: distance-to-objective progress, final outcome credit, city value/owner metadata.
+- Not constructible from old artifacts: score_delta per action, occupy_success, city capture delta, damage/kill delta.
+
+## Label Builder
+- Added `scripts/build_objective_labels.py`.
+- Added tests in `tests/test_objective_label_builder.py`.
+- Existing artifact label output: `experiments/shenji_agent/objective_labels/latest`.
+- Existing artifact labels: `1480`.
+- Confidence distribution: `1453 medium`, `27 low`, `0 high`.
+- Label kinds: `1453 distance_to_objective_delta`, `27 final_outcome_credit`.
+- Action types: `1453 Move`, `27 Shoot`.
+- Reward distribution: `1453 positive`, `27 zero`, `0 negative`.
+- Conclusion: useful as audit/proxy data, not sufficient for neural objective scorer training because no high-confidence score/capture/damage target exists.
+
+## Objective Policy Integration
+- Added heuristic objective score to policy city and shoot ranking.
+- Diagnostics now expose `objective_model_loaded`, `objective_score_used`, `objective_score_by_action_type`, `objective_weight`, `objective_top_action`, and `selected_action_objective_score`.
+- Manifest updated with `objective_enabled=true`, `objective_mode=heuristic_policy_score`, objective label counts, and reason no neural objective model was trained.
+- Added tests in `tests/test_objective_policy_integration.py`.
+
+## Objective Progress Diagnostics
+- Added per-step objective/action/city diagnostics in `training/selfplay.py`.
+- Added `objective_progress_diagnostics.json`, `action_outcome_diagnostics.json`, and `city_control_timeline.json` sidecars.
+- Added tests in `tests/test_objective_progress_diagnostics.py`.
+- Initial implementation embedded per-step records in match stats and caused a 46MB interrupted medium artifact; fixed in commit `e23a98f` so future completed runs keep detailed records out of `match_results.json`.
+
+## Model Diagnostics
+Command:
+`PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages:. TMPDIR=$PWD/.tmp_claude TEMP=$PWD/.tmp_claude TMP=$PWD/.tmp_claude python3.10 scripts/diagnose_model_quality.py --artifacts ai/weights --datasets datasets --output experiments/shenji_agent/model_quality_after_iter008_objective_policy.json`
+
+Result:
+- HEAD: `e23a98f302ad27dd66b9514ec0116909b06d435e`.
+- Situation/intent/tactical/normalizer loaded.
+- Situation per-node variance mean: `0.0025503166689304635`.
+- Warning: `intent_negative_move_bias`.
+
+## Tests
+- New/related subset after implementation: `28 passed in 3.16s`.
+- Mainline/objective/policy/model subset: `71 passed in 5.45s`.
+- Storage fix subset: `40 passed in 2.20s`.
+- Final full suite: `111 passed in 51.02s`.
+
+## Smoke Self-Play
+Command:
+`PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages:. TMPDIR=$PWD/.tmp_claude TEMP=$PWD/.tmp_claude TMP=$PWD/.tmp_claude python3.10 -m training.selfplay --config configs/selfplay_smoke_objective_quality.yaml --candidate ai/weights --incumbent ai/weights_incumbent_rule`
+
+Artifact: `experiments/shenji_agent/league_20260429_032914`.
+
+Result:
+- Scores: two paired matches, all legs `0.0-0.0`.
+- Smoke-only `promotion_accepted=true`, not A-complete evidence.
+- Candidate learned/move/shoot coverage: `0.0 / 0.0 / 0.0`.
+- Candidate valid/generated action counts: empty.
+- Action outcome diagnostics: `11520` action records; action types were `303`, `333`, `GetOn`.
+- Occupy opportunities/successes: `0 / 0`.
+- Score delta actions: `0`.
+- Damage actions: `0`.
+- City value changes: `0`.
+- SDK emitted repeated `did not pass authentication`.
+
+## Smoke-Derived Labels
+- Output: `experiments/shenji_agent/objective_labels/after_smoke_20260429_032914`.
+- Labels: `13440`.
+- Confidence: `13440 high` because actual score_before/after was observed.
+- Reward distribution: all `0.0`.
+- Action types: `303`, `333`, `GetOn`, `None`; no Move/Shoot/Occupy labels.
+- Conclusion: the new logging works, but current smoke did not enter normal score-producing action flow.
+
+## Medium Attempt
+Command:
+`PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages:. TMPDIR=$PWD/.tmp_claude TEMP=$PWD/.tmp_claude TMP=$PWD/.tmp_claude python3.10 -m training.selfplay --config configs/selfplay_medium_learned.yaml --candidate ai/weights --incumbent ai/weights_incumbent_rule`
+
+Artifact: `experiments/shenji_agent/league_20260429_033459`.
+
+Result:
+- Status: interrupted with `KeyboardInterrupt` after `3/5` paired matches because diagnostics serialization became too expensive.
+- Completed paired matches: all completed legs `0.0-0.0`.
+- Promotion: `accepted=false`, failure `compare_interrupted`.
+- Candidate valid/generated action counts in completed pairs: empty.
+- Same repeated SDK authentication messages appeared.
+- Follow-up fix: `e23a98f` keeps objective records out of match stats to avoid future 46MB heartbeat payloads.
+
+## Linux Commits
+- `ecd962ef57e48a58940090bab14056bbd639d835` — objective labels, diagnostics, heuristic objective policy scoring, tests, smoke config, audit, initial labels.
+- `d3680ae2b04d7ecb7f73bb5ccfeace402c812537` — publish objective policy manifest with wrong SHA.
+- `1d7cdf3b71e28d538eb16fda178e1b6c7ba3d393` — correct objective policy manifest SHA.
+- `e23a98f302ad27dd66b9514ec0116909b06d435e` — keep detailed objective diagnostics out of match stats.
+
+## Blocked Conclusion
+B blocked-with-hard-evidence. Iteration 008 proved old artifacts cannot yield high-confidence score/capture/damage labels; new diagnostics can collect actual score/city/damage fields, but current smoke/partial medium runs stayed in setup/deployment flow, emitted repeated SDK authentication messages, exposed no normal Move/Shoot/Occupy valid action maps, and produced no non-zero score/capture/damage labels. Formal self-play was not run because smoke did not improve and medium objective evidence did not complete or show non-zero score behavior.
+
+## Manual Sync List
+Source: `/remote-home/lizilong/shenji_agent_fresh`.
+
+Target: `C:\Users\lizilong\Desktop\WHUAI\Projects\SituationAwareness\code\miaosuan20260119`.
+
+Important files:
+- `ai/policy.py`
+- `training/selfplay.py`
+- `scripts/build_objective_labels.py`
+- `configs/selfplay_smoke_objective_quality.yaml`
+- `tests/test_objective_label_builder.py`
+- `tests/test_objective_policy_integration.py`
+- `tests/test_objective_progress_diagnostics.py`
+- `ai/weights/model_manifest.json`
+- `experiments/shenji_agent/iteration_008.md`
+- `experiments/shenji_agent/objective_label_source_audit.md`
+- `experiments/shenji_agent/objective_label_blocked_analysis.md`
+- `experiments/shenji_agent/stalemate_action_diagnosis.md`
+- `experiments/shenji_agent/final_autonomous_blocked_report.md`
+- `experiments/shenji_agent/objective_labels/latest/summary.json`
+- `experiments/shenji_agent/objective_labels/latest/objective_labels.jsonl`
+- `experiments/shenji_agent/objective_labels/after_smoke_20260429_032914/summary.json`
+- `experiments/shenji_agent/model_quality_after_iter008_objective_policy.json`
+- `experiments/shenji_agent/league_20260429_032914/summary.md`
+- `experiments/shenji_agent/league_20260429_032914/rating.json`
+- `experiments/shenji_agent/league_20260429_032914/promotion.json`
+- `experiments/shenji_agent/league_20260429_032914/participants.json`
+- `experiments/shenji_agent/league_20260429_032914/objective_progress_diagnostics.json`
+- `experiments/shenji_agent/league_20260429_032914/action_outcome_diagnostics.json`
+- `experiments/shenji_agent/league_20260429_032914/city_control_timeline.json`
+
+Do not sync `.git`, `.tmp_claude`, `__pycache__`, `.pytest_cache`, full `datasets`, full `land_wargame_sdk`, or large unrelated historical experiment directories.

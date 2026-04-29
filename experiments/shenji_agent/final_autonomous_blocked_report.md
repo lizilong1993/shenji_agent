@@ -1,134 +1,124 @@
 # Shenji Agent Final Autonomous Blocked Report
 
 ## Final Status
-B blocked-with-hard-evidence.
+B blocked-with-hard-evidence after Iteration 008.
 
-The Iteration 007 P0 training/inference normalization mismatch is fixed and verified. Normalized retraining materially improved situation node differentiation, but smoke and medium self-play still fail score/Elo gates. The remaining blocker is objective/label insufficiency: the current graph-level situation labels and tactical/action labels do not train a policy to produce reward-changing city capture or combat outcomes.
+The Iteration 007 route/normalizer/tactical plumbing fixes remained intact, but Iteration 008 could not produce promotion-quality score behavior. This round proved that historical artifacts can only produce heuristic distance-progress labels, and new objective logging under the current SDK run state collected only zero score-delta setup/deployment actions. The remaining blocker is objective-supervision collection: no current artifact contains non-zero score/capture/damage labels aligned to normal Move/Shoot/Occupy decisions.
 
 ## Current State
-- Date: 2026-04-29 Asia/Shanghai.
 - Working directory: `/remote-home/lizilong/shenji_agent_fresh`.
-- Original repo: `/remote-home/lizilong/shenji_agent`.
-- Linux fresh clone HEAD before this report refresh: `2055da3ff8714b6149107e7c1762b1970fbc4554`.
+- Original repo: `/remote-home/lizilong/shenji_agent`; not synchronized this round.
+- Linux HEAD: `e23a98f302ad27dd66b9514ec0116909b06d435e`.
 - Reverts: none.
-- Windows target: `100.127.108.19`, `C:\Users\lizilong\Desktop\WHUAI\Projects\SituationAwareness\code\miaosuan20260119`.
-- Windows sync status: blocked. `tailscale ssh` still fails with `No ED25519 host key is known for desktop-t3ll42l.tailf6b2dc.ts.net... Host key verification failed.`
-- OpenSSH fallback status: `ssh -o StrictHostKeyChecking=accept-new 100.127.108.19 ...` timed out on port 22.
-- Final retry on 2026-04-29: `tailscale ssh` still failed with the same host-key verification error; OpenSSH fallback again timed out on port 22.
+- Windows sync: intentionally not attempted per Iteration 008 instruction.
+- Windows target for later manual sync: `C:\Users\lizilong\Desktop\WHUAI\Projects\SituationAwareness\code\miaosuan20260119`.
 
-## Commits This Iteration
-- `77849cd38e80fd3281e19e6f0ebfd074ad44fae5` — fixed situation normalizer consistency and tests.
-- `30d9f7b922721d010dc05f6fe961eaceba4f762f` — retrained normalized models and recorded diagnostics.
-- `ff4804fbda0cd598bcbd624398eddea5f5b19cc7` — added self-play action-type diagnostics.
-- `f4e0dcf2dcbb9af0fc80f26b742099188b704fd5` — pointed manifest at diagnostics-capable agent code.
-- `2055da3ff8714b6149107e7c1762b1970fbc4554` — documented Iteration 007 blocked evidence, medium self-play artifacts, and README/final report updates.
+## Fresh Clone Ahead Commits
+- `ecd962e feat: add objective labels and diagnostics`
+- `d3680ae chore: publish objective policy manifest`
+- `1d7cdf3 fix: correct objective policy manifest sha`
+- `e23a98f fix: keep objective diagnostics out of match stats`
 
 ## Changed Files
-- Source: `training/supervised.py`, `ai/policy.py`, `scripts/diagnose_model_quality.py`, `ai/agent.py`, `training/selfplay.py`.
-- Tests: `tests/test_feature_normalizer_consistency.py`, `tests/test_selfplay_action_diagnostics.py`.
-- Artifacts/reports: `experiments/shenji_agent/iteration_007.md`, `experiments/shenji_agent/normalized_retrain_report.md`, `experiments/shenji_agent/situation_model_architecture_blocked_analysis.md`, `experiments/shenji_agent/model_quality_before_iter007_normalized_retrain.json`, `experiments/shenji_agent/model_quality_after_iter007_normalized_retrain.json`, `experiments/shenji_agent/20260428_235555/*`.
-- Published metadata: `ai/weights/model_manifest.json`, `ai/weights/situation_feature_normalizer.json`.
-- Generated local weights used for evaluation but ignored by git: `ai/weights/intent_lstm.pt`, `ai/weights/situation_gcn.pt`, `ai/weights/tactical_model.pt`.
+- Source: `ai/policy.py`, `training/selfplay.py`.
+- Script: `scripts/build_objective_labels.py`.
+- Config: `configs/selfplay_smoke_objective_quality.yaml`.
+- Tests: `tests/test_objective_label_builder.py`, `tests/test_objective_policy_integration.py`, `tests/test_objective_progress_diagnostics.py`.
+- Manifest: `ai/weights/model_manifest.json`.
+- Reports: `iteration_008.md`, `objective_label_source_audit.md`, `objective_label_blocked_analysis.md`, `stalemate_action_diagnosis.md`, this report.
+- Artifacts: objective labels, model diagnostics, objective smoke sidecars, interrupted medium evidence.
 
-## Normalizer Evidence
-- Before: normalizer loaded in inference, but not applied during training.
-- After: `normalizer_applied_in_training=true`, `normalizer_loaded_in_inference=true`.
-- Normalizer kind: `per_dimension_zscore`.
-- Fitted on: `situation_train_split`.
-- Feature dim: `108`.
-- Zero-std count: `50`, safely transformed with std `1.0`.
-- Manifest records: `situation_training_applied_normalizer=true`.
+## Objective Label Audit
+- Existing artifacts label output: `experiments/shenji_agent/objective_labels/latest`.
+- Labels from old artifacts: `1480`.
+- Confidence: `1453 medium`, `27 low`, `0 high`.
+- Label kinds: `1453 distance_to_objective_delta`, `27 final_outcome_credit`.
+- Action types: `1453 Move`, `27 Shoot`.
+- Missing from old artifacts: per-action score delta, occupy success, city capture delta, damage/kill delta, and unit position timeline.
 
-## Training Evidence
-Command:
-`PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages TMPDIR=$PWD/.tmp_claude TEMP=$PWD/.tmp_claude TMP=$PWD/.tmp_claude python3.10 train_models.py --config configs/supervised_score_quality.yaml`
+## Objective Policy and Diagnostics
+- Added heuristic objective score into Move/Shoot ranking because labels were not sufficient for a neural ObjectiveScorer.
+- Manifest records `objective_enabled=true`, `objective_mode=heuristic_policy_score`, label counts, and no neural objective model trained.
+- Added sidecars: `objective_progress_diagnostics.json`, `action_outcome_diagnostics.json`, `city_control_timeline.json`.
+- Fixed diagnostics storage after an interrupted medium run showed match stats became too large.
 
-Run dir: `experiments/shenji_agent/20260428_235555`.
+## Model Diagnostics
+Artifact: `experiments/shenji_agent/model_quality_after_iter008_objective_policy.json`.
 
-Results:
-- Intent immediate validation accuracy: `0.6221`.
-- Tactical validation accuracy: `0.9622`.
-- Situation validation accuracy: `0.5455`.
-- Situation samples: `108`.
-- Tactical samples: `24080`.
-
-## Model Quality Before/After
-Before: `experiments/shenji_agent/model_quality_before_iter007_normalized_retrain.json`.
-
-After: `experiments/shenji_agent/model_quality_after_iter007_normalized_retrain.json`.
-
-| Metric | Before | After |
-|---|---:|---:|
-| normalizer_applied_in_training | `false` | `true` |
-| situation_pre_sigmoid_std | `0.005960` | `0.057212` |
-| situation_output_mean | `0.508567` | `0.414247` |
-| situation_per_node_variance_mean | `1.5056e-05` | `0.004074` |
-| tactical_available | `true` | `true` |
-| intent_move_bias_estimate | `-0.2365` | `-0.2010` |
-| warning_count | `3` | `1` |
+- Situation/intent/tactical/normalizer loaded.
+- Situation per-node variance mean: `0.0025503166689304635`.
+- Remaining warning: `intent_negative_move_bias`.
 
 ## Self-Play Evidence
-Smoke artifact: `experiments/shenji_agent/league_20260429_001342`.
+Objective smoke artifact: `experiments/shenji_agent/league_20260429_032914`.
 
-Smoke result:
-- 2 paired matches, all legs `0.0-0.0`.
-- Learned/move coverage: `1.0 / 1.0`.
-- Shoot coverage: `0.0`.
-- Valid action diagnostics show no valid `Shoot` or `Occupy` in the 50-step smoke window.
-- Promotion accepted in smoke-only thresholds, but not A-complete evidence.
+- Scores: all legs `0.0-0.0`.
+- Learned/move/shoot coverage: `0.0 / 0.0 / 0.0`.
+- Action outcome records: `11520`.
+- Action types: `303`, `333`, `GetOn`; no normal Move/Shoot/Occupy.
+- Occupy opportunities/successes: `0 / 0`.
+- Score delta actions: `0`.
+- Damage actions: `0`.
+- City value changes: `0`.
+- SDK emitted repeated `did not pass authentication`.
 
-Medium artifact: `experiments/shenji_agent/league_20260429_001512`.
+Objective medium attempt: `experiments/shenji_agent/league_20260429_033459`.
 
-Medium result:
-- 5 paired matches, all legs `0.0-0.0`.
-- Overall point estimate: `0.5`.
-- Complex point estimate: `0.5`.
-- Learned/move/shoot coverage: `1.0 / 1.0 / 1.0`.
-- Valid `Shoot`: `28`.
-- Generated learned `Shoot`: `28`.
-- Promotion accepted: `false`.
-- Promotion failures: `overall_point_estimate`, `overall_ci_lower`, `complex_point_estimate`, `complex_ci_lower`, `elo_delta_lower`.
+- Status: interrupted after `3/5` paired matches due diagnostics serialization overhead.
+- Completed paired scores: all `0.0-0.0`.
+- Promotion: `accepted=false`, failure `compare_interrupted`.
+- Same SDK authentication messages and no candidate valid/generated normal action counts in completed pairs.
 
-Route and action status:
-- Empty route remains `0`.
-- Learned policy engagement remains `1.0`.
-- Tactical model loaded in all matches.
-- The candidate can generate learned move and shoot actions, but reward remains zero.
+Formal self-play was not run because smoke did not improve and the medium objective attempt did not complete or show non-zero score behavior.
 
-## Architecture/Data Blocker
-Analysis file: `experiments/shenji_agent/situation_model_architecture_blocked_analysis.md`.
-
-Key facts:
-- Situation dataset has `108` graph samples, each with `12` nodes.
-- Labels are graph-level binary labels only.
-- Label distribution: `72` negative / `36` positive.
-- There are no node-level, city-level, target-level, occupy-success, damage, or score-delta labels.
-- The original architecture symptom, near-zero node variance, improved about 270x after the normalizer fix.
-- Therefore, GNN architecture is no longer the immediate proven blocker; the hard blocker is missing objective-level supervision.
+## Promotion Gate
+- A-complete not satisfied.
+- No formal `promotion_accepted=true`.
+- Current objective smoke promotion was smoke-only and invalid as final promotion evidence.
+- Score/Elo/candidate superiority gates remain unproven.
 
 ## Verification
-- `tests/test_feature_normalizer_consistency.py`: `8 passed`.
-- `tests/test_model_quality_diagnostics.py`: `8 passed`.
-- `tests/test_policy_score_tuning.py`: `12 passed`.
-- `tests/test_mainline_contract.py`: `35 passed`.
-- `tests/test_selfplay_action_diagnostics.py`: `3 passed`.
-- `tests/test_mainline_contract.py tests/test_move_route_diagnostics.py`: `45 passed`.
-- Final related-suite refresh: `tests/test_feature_normalizer_consistency.py tests/test_model_quality_diagnostics.py tests/test_policy_score_tuning.py tests/test_mainline_contract.py tests/test_selfplay_action_diagnostics.py`: `66 passed in 36.14s`.
+- `pytest tests -q`: `111 passed in 51.02s`.
 
-## Remaining Risks
-- Intent move bias remains negative.
-- Medium self-play proves learned shooting happens, but scoring remains 0-0.
-- Formal self-play was not run because smoke/medium did not show score improvement.
-- Windows sync remains blocked by host-key verification despite safe Linux-side remediation attempts.
-- Worktree still contains pre-existing generated/cache dirt such as `__pycache__`, `.tmp_claude/`, ignored weights, dataset symlinks, and incumbent artifacts.
+## Remaining Blocker
+The project is blocked on collecting score-producing objective supervision. Historical artifacts are insufficient, and current SDK self-play did not expose normal Move/Shoot/Occupy action maps under repeated authentication messages. The next minimal step is to restore normal SDK battle-phase execution, then rerun a short objective smoke with Iteration 008 sidecars enabled and rebuild labels from non-zero score/capture/damage events.
 
-## Final Git Status
-- Linux status still contains generated/cache or pre-existing local assets: `__pycache__/*.pyc`, `ai/__pycache__/*.pyc`, `.tmp_claude/`, `ai/weights/weights/`, `ai/weights_incumbent_rule/`, `datasets`, `land_wargame_sdk/land_wargame_sdk`, `scripts/launch_detached_compare.py`, and `scripts/verify_learned_policy_engagement.py`.
-- Windows status is unavailable because sync is blocked before remote command execution.
+## Git Status
+Remaining uncommitted entries are pre-existing/generated or local assets: `__pycache__`, `.tmp_claude/`, `ai/weights/weights/`, `ai/weights_incumbent_rule/`, `datasets`, `land_wargame_sdk/land_wargame_sdk`, and two untracked helper scripts.
 
-## Next Minimal Plan
-1. Generate rollout-derived labels for score delta, occupy success, damage/kill delta, and per-operator/per-city counterfactual value.
-2. Train a node/city-level situation head on those labels.
-3. Re-run model diagnostics, 50-step smoke, and 400-step medium self-play.
-4. Only run formal self-play after non-zero score behavior or candidate/baseline separation appears.
-5. Fix Windows Tailscale SSH trust/known-host handling from a surface that can accept the host key, then sync Linux commits and generated weights.
+## Manual Sync Instructions
+Suggested source directory:
+`/remote-home/lizilong/shenji_agent_fresh`
+
+Suggested target directory:
+`C:\Users\lizilong\Desktop\WHUAI\Projects\SituationAwareness\code\miaosuan20260119`
+
+Sync important files:
+- `ai/**/*.py`
+- `training/**/*.py`
+- `scripts/build_objective_labels.py`
+- `configs/selfplay_smoke_objective_quality.yaml`
+- `tests/**/*.py`
+- `ai/weights/model_manifest.json`
+- `experiments/shenji_agent/**/*.md`
+- `experiments/shenji_agent/objective_labels/latest/summary.json`
+- `experiments/shenji_agent/objective_labels/latest/objective_labels.jsonl`
+- `experiments/shenji_agent/objective_labels/after_smoke_20260429_032914/summary.json`
+- `experiments/shenji_agent/model_quality_after_iter008_objective_policy.json`
+- `experiments/shenji_agent/league_20260429_032914/summary.md`
+- `experiments/shenji_agent/league_20260429_032914/rating.json`
+- `experiments/shenji_agent/league_20260429_032914/promotion.json`
+- `experiments/shenji_agent/league_20260429_032914/participants.json`
+- `experiments/shenji_agent/league_20260429_032914/objective_progress_diagnostics.json`
+- `experiments/shenji_agent/league_20260429_032914/action_outcome_diagnostics.json`
+- `experiments/shenji_agent/league_20260429_032914/city_control_timeline.json`
+
+Do not sync:
+- `.git`
+- `.tmp_claude`
+- `__pycache__`
+- `.pytest_cache`
+- full `datasets`, unless explicitly needed
+- full `land_wargame_sdk`, unless explicitly modified
+- full large historical `experiments` tree
+- unrelated caches or local SDK/weight directories
