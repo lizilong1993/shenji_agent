@@ -8,6 +8,7 @@ import pickle
 import random
 import sys
 import types
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
@@ -153,6 +154,177 @@ def _load_case_data(scenario_path: Path, map_id: int) -> Dict[str, object]:
     }
 
 
+def _side_snapshot(observation: Dict[str, Any], faction: int) -> Dict[str, object]:
+    cities = observation.get("cities", [])
+    operators = observation.get("operators", [])
+    controlled_value = 0.0
+    controlled_count = 0
+    neutral_count = 0
+    enemy_count = 0
+    for city in cities:
+        if not isinstance(city, dict):
+            continue
+        flag = city.get("flag")
+        if flag == faction:
+            controlled_count += 1
+            controlled_value += float(city.get("value", 0.0) or 0.0)
+        elif flag in (0, 1):
+            enemy_count += 1
+        else:
+            neutral_count += 1
+    friendly_blood = 0.0
+    enemy_blood = 0.0
+    friendly_alive = 0
+    enemy_alive = 0
+    for operator in operators:
+        if not isinstance(operator, dict):
+            continue
+        blood = float(operator.get("blood", 0.0) or 0.0)
+        alive = blood > 0.0
+        if operator.get("color") == faction:
+            friendly_blood += blood
+            friendly_alive += int(alive)
+        else:
+            enemy_blood += blood
+            enemy_alive += int(alive)
+    return {
+        "score": float(observation.get("reward", 0.0) or 0.0),
+        "city_control_count": int(controlled_count),
+        "city_value_controlled": float(controlled_value),
+        "neutral_city_count": int(neutral_count),
+        "enemy_city_count": int(enemy_count),
+        "friendly_blood": float(friendly_blood),
+        "enemy_blood": float(enemy_blood),
+        "friendly_alive": int(friendly_alive),
+        "enemy_alive": int(enemy_alive),
+    }
+
+
+def _snapshot_delta(before: Dict[str, object], after: Dict[str, object]) -> Dict[str, object]:
+    return {
+        "score_before": float(before.get("score", 0.0)),
+        "score_after": float(after.get("score", 0.0)),
+        "score_delta": float(after.get("score", 0.0)) - float(before.get("score", 0.0)),
+        "city_value_controlled_before": float(before.get("city_value_controlled", 0.0)),
+        "city_value_controlled_after": float(after.get("city_value_controlled", 0.0)),
+        "city_value_delta": float(after.get("city_value_controlled", 0.0))
+        - float(before.get("city_value_controlled", 0.0)),
+        "damage_dealt": max(0.0, float(before.get("enemy_blood", 0.0)) - float(after.get("enemy_blood", 0.0))),
+        "damage_taken": max(0.0, float(before.get("friendly_blood", 0.0)) - float(after.get("friendly_blood", 0.0))),
+        "kill_dealt": max(0, int(before.get("enemy_alive", 0)) - int(after.get("enemy_alive", 0))),
+        "kill_taken": max(0, int(before.get("friendly_alive", 0)) - int(after.get("friendly_alive", 0))),
+    }
+
+
+def _action_side(action: Dict[str, Any]) -> int | None:
+    actor = action.get("actor")
+    if actor == 1:
+        return RED
+    if actor == 11:
+        return BLUE
+    return None
+
+
+def _action_type_name(action: Dict[str, Any]) -> str:
+    action_type = action.get("type")
+    try:
+        from ai.agent import ACTION_TYPE_NAMES
+
+        return str(ACTION_TYPE_NAMES.get(int(action_type), action_type))
+    except Exception:
+        return str(action_type)
+
+
+def _city_owner_by_coord(observation: Dict[str, Any]) -> Dict[int, int]:
+    owners: Dict[int, int] = {}
+    for city in observation.get("cities", []):
+        if not isinstance(city, dict) or city.get("coord") is None:
+            continue
+        owners[int(city["coord"])] = int(city.get("flag", -99))
+    return owners
+
+
+def _operator_by_id(observation: Dict[str, Any]) -> Dict[int, Dict[str, Any]]:
+    return {
+        int(operator["obj_id"]): operator
+        for operator in observation.get("operators", [])
+        if isinstance(operator, dict) and operator.get("obj_id") is not None
+    }
+
+
+def _build_step_objective_records(
+    *,
+    match_id: str,
+    turn: int,
+    before_state: List[Dict[str, Any]],
+    after_state: List[Dict[str, Any]],
+    actions: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, object]], List[Dict[str, object]], Dict[str, object]]:
+    before_red = _side_snapshot(before_state[RED], RED)
+    before_blue = _side_snapshot(before_state[BLUE], BLUE)
+    after_red = _side_snapshot(after_state[RED], RED)
+    after_blue = _side_snapshot(after_state[BLUE], BLUE)
+    red_delta = _snapshot_delta(before_red, after_red)
+    blue_delta = _snapshot_delta(before_blue, after_blue)
+    progress_record = {
+        "match_id": match_id,
+        "turn": int(turn),
+        "red": {"side": RED, **red_delta, **after_red},
+        "blue": {"side": BLUE, **blue_delta, **after_blue},
+    }
+    before_owners = _city_owner_by_coord(before_state[RED])
+    after_owners = _city_owner_by_coord(after_state[RED])
+    before_ops = _operator_by_id(before_state[RED])
+    outcome_records: List[Dict[str, object]] = []
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+        side = _action_side(action)
+        side_delta = red_delta if side == RED else blue_delta if side == BLUE else {}
+        obj_id = action.get("obj_id")
+        operator = before_ops.get(int(obj_id)) if obj_id is not None else None
+        current_hex = int(operator.get("cur_hex")) if operator and operator.get("cur_hex") is not None else None
+        target_hex = None
+        if action.get("move_path"):
+            target_hex = int(action["move_path"][-1])
+        elif action.get("jm_pos") is not None:
+            target_hex = int(action["jm_pos"])
+        elif current_hex is not None:
+            target_hex = current_hex
+        owner_before = before_owners.get(target_hex) if target_hex is not None else None
+        owner_after = after_owners.get(target_hex) if target_hex is not None else None
+        action_name = _action_type_name(action)
+        outcome_records.append(
+            {
+                "match_id": match_id,
+                "turn": int(turn),
+                "side": side,
+                "operator_id": obj_id,
+                "operator_type": operator.get("type") if operator else None,
+                "current_hex": current_hex,
+                "action_type": action_name,
+                "target_hex": target_hex,
+                "target_city_id": target_hex if target_hex in before_owners else None,
+                "target_owner_before": owner_before,
+                "target_owner_after": owner_after,
+                "occupy_available": action_name == "Occupy",
+                "occupy_selected": action_name == "Occupy",
+                "occupy_success": action_name == "Occupy" and owner_before != owner_after and owner_after == side,
+                **side_delta,
+            }
+        )
+    city_timeline = {
+        "match_id": match_id,
+        "turn": int(turn),
+        "red_city_control_count": after_red["city_control_count"],
+        "blue_city_control_count": after_blue["city_control_count"],
+        "red_city_value_controlled": after_red["city_value_controlled"],
+        "blue_city_value_controlled": after_blue["city_value_controlled"],
+        "neutral_city_count": after_red["neutral_city_count"],
+    }
+    return [progress_record], outcome_records, city_timeline
+
+
 def _run_single(
     scenario_path: Path,
     map_id: int,
@@ -160,6 +332,7 @@ def _run_single(
     blue_profile: Dict[str, Any],
     max_steps: int,
     heartbeat: Callable[[int], None] | None = None,
+    match_id: str | None = None,
 ) -> Tuple[float, float, Dict[str, object], Dict[str, object]]:
     env_class, _ = _train_env_runtime()
     env = env_class()
@@ -176,15 +349,37 @@ def _run_single(
     blue.setup({**shared, "seat": 11, "faction": 1, "role": 1, "user_name": blue_profile["user_name"], "policy_profile": blue_profile["profile"], "policy_artifacts_dir": blue_profile["artifacts"], "state": state})
     done = False
     steps = 0
+    objective_progress_turns: List[Dict[str, object]] = []
+    action_outcomes: List[Dict[str, object]] = []
+    city_control_timeline: List[Dict[str, object]] = []
+    diagnostic_match_id = match_id or scenario_path.name
     while not done and steps < max_steps:
+        before_state = deepcopy(state)
         actions = red.step(state[RED]) + blue.step(state[BLUE])
         state, done = env.step(actions)
+        progress, outcomes, city_timeline = _build_step_objective_records(
+            match_id=diagnostic_match_id,
+            turn=steps,
+            before_state=before_state,
+            after_state=state,
+            actions=actions,
+        )
+        objective_progress_turns.extend(progress)
+        action_outcomes.extend(outcomes)
+        city_control_timeline.append(city_timeline)
         steps += 1
         if heartbeat is not None:
             heartbeat(steps)
     red_score = float(state[RED].get("reward", 0.0))
     blue_score = float(state[BLUE].get("reward", 0.0))
-    return red_score, blue_score, red.get_policy_stats(), blue.get_policy_stats()
+    red_stats = red.get_policy_stats()
+    blue_stats = blue.get_policy_stats()
+    for stats in (red_stats, blue_stats):
+        if stats:
+            stats["objective_progress_turns"] = objective_progress_turns
+            stats["action_outcomes"] = action_outcomes
+            stats["city_control_timeline"] = city_control_timeline
+    return red_score, blue_score, red_stats, blue_stats
 
 
 def _paired_score(candidate_a: float, opponent_a: float, candidate_b: float, opponent_b: float) -> float:
@@ -733,8 +928,8 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
         "shoot": {"total": 0, "learned": 0},
     }
     score_sums = {
-        "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "combined_score": 0.0},
-        "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "combined_score": 0.0},
+        "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "objective_score": 0.0, "combined_score": 0.0},
+        "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "objective_score": 0.0, "combined_score": 0.0},
     }
     traces: List[Dict[str, object]] = []
     policy_profiles = set()
@@ -746,6 +941,9 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
     valid_action_type_counts: Dict[str, int] = {}
     generated_action_type_counts: Dict[str, int] = {}
     move_route_samples: List[Dict[str, object]] = []
+    objective_progress_turns: List[Dict[str, object]] = []
+    action_outcomes: List[Dict[str, object]] = []
+    city_control_timeline: List[Dict[str, object]] = []
     move_route_agg_merged = {
         "total_attempts": 0,
         "empty_route_count": 0,
@@ -763,7 +961,7 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
             action_scores = score_means.get(action_key, {}) if isinstance(score_means, dict) else {}
             samples = int(action_scores.get("samples", 0))
             score_sums[action_key]["samples"] += samples
-            for metric in ("intent_bias", "situation_score", "tactical_score", "combined_score"):
+            for metric in ("intent_bias", "situation_score", "tactical_score", "objective_score", "combined_score"):
                 score_sums[action_key][metric] += float(action_scores.get(metric, 0.0)) * samples
         if isinstance(payload, dict):
             traces.extend(payload.get("trace_samples", [])[:6])
@@ -799,6 +997,15 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
             route_samples = payload.get("move_route_samples", [])
             if isinstance(route_samples, list):
                 move_route_samples.extend(route_samples)
+            progress_turns = payload.get("objective_progress_turns", [])
+            if isinstance(progress_turns, list):
+                objective_progress_turns.extend(progress_turns)
+            outcomes = payload.get("action_outcomes", [])
+            if isinstance(outcomes, list):
+                action_outcomes.extend(outcomes)
+            timeline = payload.get("city_control_timeline", [])
+            if isinstance(timeline, list):
+                city_control_timeline.extend(timeline)
 
     def coverage(total: int, learned: int) -> float:
         if total <= 0:
@@ -815,9 +1022,11 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
         score_means[action_key] = {
             "samples": samples,
             "intent_bias": float(values["intent_bias"] / samples) if samples else 0.0,
-            "situation_score": float(values["situation_score"] / samples) if samples else 0.0,
-            "combined_score": float(values["combined_score"] / samples) if samples else 0.0,
-        }
+                "situation_score": float(values["situation_score"] / samples) if samples else 0.0,
+                "tactical_score": float(values["tactical_score"] / samples) if samples else 0.0,
+                "objective_score": float(values["objective_score"] / samples) if samples else 0.0,
+                "combined_score": float(values["combined_score"] / samples) if samples else 0.0,
+            }
 
     return {
         "counts": merged,
@@ -836,6 +1045,69 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
         "trace_samples": traces[:12],
         "move_route_aggregate": move_route_agg_merged,
         "move_route_samples": move_route_samples[:50],
+        "objective_progress_turns": objective_progress_turns,
+        "action_outcomes": action_outcomes,
+        "city_control_timeline": city_control_timeline,
+    }
+
+
+def _collect_objective_sidecars(matches: List[Dict[str, object]]) -> Dict[str, object]:
+    progress_turns: List[Dict[str, object]] = []
+    action_outcomes: List[Dict[str, object]] = []
+    city_timeline: List[Dict[str, object]] = []
+    for match in matches:
+        if not isinstance(match, dict):
+            continue
+        for stats_key in ("candidate_policy_stats", "opponent_policy_stats"):
+            stats = match.get(stats_key, {})
+            if not isinstance(stats, dict):
+                continue
+            progress_turns.extend(stats.get("objective_progress_turns", []))
+            action_outcomes.extend(stats.get("action_outcomes", []))
+            city_timeline.extend(stats.get("city_control_timeline", []))
+    occupy_opportunities = sum(1 for item in action_outcomes if item.get("occupy_available"))
+    occupy_successes = sum(1 for item in action_outcomes if item.get("occupy_success"))
+    return {
+        "objective_progress": {
+            "turns": progress_turns,
+            "summary": {
+                "turn_records": len(progress_turns),
+                "score_delta_records": sum(
+                    1
+                    for item in progress_turns
+                    for side_key in ("red", "blue")
+                    if float(item.get(side_key, {}).get("score_delta", 0.0)) != 0.0
+                ),
+                "damage_records": sum(
+                    1
+                    for item in progress_turns
+                    for side_key in ("red", "blue")
+                    if float(item.get(side_key, {}).get("damage_dealt", 0.0)) > 0.0
+                ),
+            },
+        },
+        "action_outcomes": {
+            "actions": action_outcomes,
+            "summary": {
+                "action_records": len(action_outcomes),
+                "occupy_opportunities": int(occupy_opportunities),
+                "occupy_successes": int(occupy_successes),
+                "score_delta_actions": sum(1 for item in action_outcomes if float(item.get("score_delta", 0.0)) != 0.0),
+                "damage_actions": sum(1 for item in action_outcomes if float(item.get("damage_dealt", 0.0)) > 0.0),
+            },
+        },
+        "city_control": {
+            "turns": city_timeline,
+            "summary": {
+                "turn_records": len(city_timeline),
+                "city_value_change_records": sum(
+                    1
+                    for prev, cur in zip(city_timeline, city_timeline[1:])
+                    if prev.get("red_city_value_controlled") != cur.get("red_city_value_controlled")
+                    or prev.get("blue_city_value_controlled") != cur.get("blue_city_value_controlled")
+                ),
+            },
+        },
     }
 
 
@@ -1078,7 +1350,11 @@ def main() -> None:
         league_state["champion"] = candidate_arg
         league_state["consecutive_windows"] = 0
 
+    objective_sidecars = _collect_objective_sidecars(matches)
     save_json({"env_backend": env_backend, "matches": matches}, run_dir / "match_results.json")
+    save_json(objective_sidecars["objective_progress"], run_dir / "objective_progress_diagnostics.json")
+    save_json(objective_sidecars["action_outcomes"], run_dir / "action_outcome_diagnostics.json")
+    save_json(objective_sidecars["city_control"], run_dir / "city_control_timeline.json")
     save_json(summary, run_dir / "rating.json")
     save_json(decision, run_dir / "promotion.json")
     save_json(exploiter_results, run_dir / "exploitability.json")

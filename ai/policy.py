@@ -69,6 +69,8 @@ class LearnedPolicy:
         self.intent_model = None
         self.situation_model = None
         self.tactical_model = None
+        self.objective_model = None
+        self.objective_weight = 1.0
         self._feature_normalizer: Dict[str, Any] = {}
         self.enemy_histories: Dict[int, Deque[np.ndarray]] = defaultdict(lambda: deque(maxlen=self.history_len))
         self.loaded_from: Optional[Path] = None
@@ -82,8 +84,8 @@ class LearnedPolicy:
             "shoot": {"total": 0, "learned": 0},
         }
         self.score_totals = {
-            "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "combined_score": 0.0},
-            "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "combined_score": 0.0},
+            "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "objective_score": 0.0, "combined_score": 0.0},
+            "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "objective_score": 0.0, "combined_score": 0.0},
         }
         self.normalizer_diagnostics = {
             "normalizer_loaded": False,
@@ -98,6 +100,14 @@ class LearnedPolicy:
             "normalizer_mismatch_reason": None,
         }
         self.trace_samples: List[Dict[str, Any]] = []
+        self.objective_diagnostics = {
+            "objective_model_loaded": False,
+            "objective_score_used": False,
+            "objective_weight": self.objective_weight,
+            "objective_fallback_reason": "objective_model_missing_using_heuristic",
+            "objective_top_action": None,
+            "selected_action_objective_score": None,
+        }
         self._reset_move_route_diagnostics()
 
     def _load_intent_model(self, payload: Dict[str, Any]) -> Any:
@@ -190,6 +200,7 @@ class LearnedPolicy:
         self.intent_model = None
         self.situation_model = None
         self.tactical_model = None
+        self.objective_model = None
         self._feature_normalizer = {}
         self.loaded_from = None
         self.manifest = {}
@@ -261,7 +272,7 @@ class LearnedPolicy:
             self.action_counts[key]["learned"] += 1
         if trace:
             totals = self.score_totals[key]
-            numeric_fields = ("intent_bias", "situation_score", "tactical_score", "combined_score")
+            numeric_fields = ("intent_bias", "situation_score", "tactical_score", "objective_score", "combined_score")
             if any(field in trace for field in numeric_fields):
                 totals["samples"] += 1
                 for field in numeric_fields:
@@ -269,10 +280,12 @@ class LearnedPolicy:
                         totals[field] = totals.get(field, 0.0) + float(trace.get(field, 0.0))
             if len(self.trace_samples) < 12:
                 sample = {"action": key, "used_learned": used_learned}
-                for field in ("obj_id", "candidate_id", "intent_bias", "situation_score", "tactical_score", "combined_score", "reason"):
+                for field in ("obj_id", "candidate_id", "intent_bias", "situation_score", "tactical_score", "objective_score", "combined_score", "reason"):
                     if field in trace:
                         sample[field] = trace[field]
                 self.trace_samples.append(sample)
+            if "objective_score" in trace:
+                self.objective_diagnostics["selected_action_objective_score"] = float(trace.get("objective_score", 0.0))
 
     def _reset_move_route_diagnostics(self) -> None:
         self.move_route_aggregate = {
@@ -315,9 +328,20 @@ class LearnedPolicy:
                 "intent_bias": float(totals["intent_bias"] / samples) if samples else 0.0,
                 "situation_score": float(totals["situation_score"] / samples) if samples else 0.0,
                 "tactical_score": float(totals["tactical_score"] / samples) if samples else 0.0,
+                "objective_score": float(totals["objective_score"] / samples) if samples else 0.0,
                 "combined_score": float(totals["combined_score"] / samples) if samples else 0.0,
                 "samples": samples,
             }
+        objective_score_values = {
+            key: value.get("objective_score", 0.0)
+            for key, value in score_means.items()
+            if value.get("samples", 0)
+        }
+        if objective_score_values:
+            self.objective_diagnostics["objective_top_action"] = max(
+                objective_score_values,
+                key=objective_score_values.__getitem__,
+            )
         return {
             "policy_profile": self.policy_profile,
             "device": self.device,
@@ -327,6 +351,11 @@ class LearnedPolicy:
             "situation_model_loaded": self.situation_model is not None,
             "tactical_model_loaded": self.tactical_model is not None,
             "normalizer_loaded": self.has_normalizer(),
+            **self.objective_diagnostics,
+            "objective_score_by_action_type": {
+                key: {"samples": value["samples"], "mean": value["objective_score"]}
+                for key, value in score_means.items()
+            },
             "normalizer_diagnostics": dict(self.normalizer_diagnostics),
             "counts": {
                 "move": dict(self.action_counts["move"]),
@@ -340,6 +369,34 @@ class LearnedPolicy:
             "move_route_aggregate": dict(self.move_route_aggregate),
             "move_route_samples": list(self.move_route_samples),
         }
+
+    def _objective_city_score(self, operator: Dict[str, Any], city: Dict[str, Any], tactical_map: Any) -> float:
+        city_hex = int(city.get("coord", 0))
+        city_value = float(city.get("value", 0.0) or 0.0)
+        city_owner = int(city.get("flag", -1))
+        score = city_value * 0.8
+        if self.faction is not None:
+            if city_owner == self.faction:
+                score -= 35.0
+            else:
+                score += 65.0
+        if tactical_map is not None and operator.get("cur_hex") is not None:
+            distance = tactical_map.get_distance(int(operator["cur_hex"]), city_hex)
+            if distance >= 0:
+                score += max(0.0, 8.0 - float(distance)) * 7.5
+                if distance <= 1 and city_owner != self.faction:
+                    score += 80.0
+        self.objective_diagnostics["objective_score_used"] = True
+        return float(score)
+
+    def _objective_shoot_score(self, target: Dict[str, Any], candidate: Dict[str, Any]) -> float:
+        expected_damage = float(candidate.get("damage", 0.0) or 0.0) * float(candidate.get("hit_prob", 0.0) or 0.0)
+        target_hp = max(0.0, float(target.get("blood", 0.0) or 0.0))
+        target_value = float(target.get("value", 0.0) or 0.0)
+        kill = expected_damage >= target_hp and target_hp > 0.0
+        score = expected_damage * 10.0 + target_value * 0.5 + (90.0 if kill else 0.0)
+        self.objective_diagnostics["objective_score_used"] = True
+        return float(score)
 
     def observe(self, observation: Dict[str, Any]) -> None:
         if self.faction is None:
@@ -549,6 +606,7 @@ class LearnedPolicy:
                 situation_contribution = situation_score * 100.0
             tactical_score = self._tactical_score(operator, candidate, target_operator=target)
             tactical_contribution = float(torch.sigmoid(torch.tensor(tactical_score)).item()) * 20.0
+            objective_score = self._objective_shoot_score(target, candidate)
             combined_score = (
                 situation_contribution
                 + attack_level * 8.0
@@ -559,6 +617,7 @@ class LearnedPolicy:
                 + target_value * 0.3
                 - target_hp * 0.05
                 + tactical_contribution
+                + objective_score * self.objective_weight
             )
             trace = {
                 "obj_id": int(operator.get("obj_id", -1)),
@@ -566,6 +625,7 @@ class LearnedPolicy:
                 "intent_bias": float(intent_bias),
                 "situation_score": float(situation_score),
                 "tactical_score": float(tactical_score),
+                "objective_score": float(objective_score),
                 "combined_score": float(combined_score),
             }
             if best is None or combined_score > best[0]:
@@ -641,6 +701,7 @@ class LearnedPolicy:
             }
             tactical_score = self._tactical_score(operator, move_candidate, city=city)
             tactical_contribution = float(torch.sigmoid(torch.tensor(tactical_score)).item()) * 20.0
+            objective_score = self._objective_city_score(operator, city, tactical_map)
 
             combined_score = (
                 situation_contribution
@@ -651,6 +712,7 @@ class LearnedPolicy:
                 + intent_bias
                 - distance_penalty * 0.08
                 + tactical_contribution
+                + objective_score * self.objective_weight
             )
             trace = {
                 "obj_id": int(operator_id),
@@ -658,6 +720,7 @@ class LearnedPolicy:
                 "intent_bias": float(intent_bias),
                 "situation_score": float(situation_score),
                 "tactical_score": float(tactical_score),
+                "objective_score": float(objective_score),
                 "combined_score": float(combined_score),
             }
             if best is None or combined_score > best[0]:
