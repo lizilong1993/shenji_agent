@@ -1,0 +1,7 @@
+version: "3.8"
+
+services:
+  dev:
+    # The installed SDK authentication config is bound to this MAC.
+    # Use only with an authorized .engine_config for this environment.
+    mac_address: "02:42:ac:11:00:45"

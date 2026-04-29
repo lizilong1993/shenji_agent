@@ -1,0 +1,220 @@
+{
+  "env_backend": "train_env.TrainEnv",
+  "matches": [
+    {
+      "scenario": "2230531221.json",
+      "bucket": "complex",
+      "map_id": 53,
+      "order_index": 0,
+      "paired_score": 0.5,
+      "first_leg": {
+        "candidate": 0.0,
+        "opponent": 0.0
+      },
+      "second_leg": {
+        "candidate": 0.0,
+        "opponent": 0.0
+      },
+      "candidate_artifacts": "/remote-home/lizilong/shenji_agent/ai/weights",
+      "opponent_artifacts": "/remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule",
+      "candidate_source_commit_sha": "3d3e69a5aa688cf4eeff948db60d507d90bee86c",
+      "opponent_source_commit_sha": "0a9c7ff3736b5dd095ad8b1abc9fab164a477c3d",
+      "candidate_code_origin": "git:3d3e69a5aa688cf4eeff948db60d507d90bee86c",
+      "opponent_code_origin": "git:0a9c7ff3736b5dd095ad8b1abc9fab164a477c3d",
+      "candidate_user_name": "CurrentAI",
+      "opponent_user_name": "IncumbentAI",
+      "candidate_profile": "challenger",
+      "opponent_profile": "baseline",
+      "candidate_policy_stats": {
+        "counts": {
+          "move": {
+            "total": 0,
+            "learned": 0
+          },
+          "shoot": {
+            "total": 0,
+            "learned": 0
+          }
+        },
+        "learned_path_coverage": 0.0,
+        "move_path_coverage": 0.0,
+        "shoot_path_coverage": 0.0,
+        "score_means": {
+          "move": {
+            "samples": 0,
+            "intent_bias": 0.0,
+            "situation_score": 0.0,
+            "tactical_score": 0.0,
+            "objective_score": 0.0,
+            "combined_score": 0.0
+          },
+          "shoot": {
+            "samples": 0,
+            "intent_bias": 0.0,
+            "situation_score": 0.0,
+            "tactical_score": 0.0,
+            "objective_score": 0.0,
+            "combined_score": 0.0
+          }
+        },
+        "policy_profiles": [
+          "challenger"
+        ],
+        "inference_devices": [
+          "cpu"
+        ],
+        "loaded_from_dirs": [
+          "ai/weights"
+        ],
+        "intent_model_loaded_count": 2,
+        "situation_model_loaded_count": 2,
+        "tactical_model_loaded_count": 0,
+        "valid_action_type_counts": {
+          "ChangeState": 4160,
+          "GetOff": 320,
+          "GetOn": 1280,
+          "JMPlan": 960,
+          "Move": 3840,
+          "WeaponLock": 3200
+        },
+        "generated_action_type_counts": {
+          "303": 1280,
+          "333": 160
+        },
+        "trace_samples": [],
+        "move_route_aggregate": {
+          "total_attempts": 0,
+          "empty_route_count": 0,
+          "reachable_city_total": 0,
+          "by_move_type": {},
+          "route_failure_reasons": {}
+        },
+        "move_route_samples": []
+      },
+      "candidate_policy_diagnostics": {
+        "user_name": "CurrentAI",
+        "artifact_dir": "/remote-home/lizilong/shenji_agent/ai/weights",
+        "profile": "challenger",
+        "manifest_path": "/remote-home/lizilong/shenji_agent/ai/weights/model_manifest.json",
+        "manifest_loaded": true,
+        "manifest_generated_at": "20260428_235813",
+        "manifest_source_commit_sha": "3d3e69a5aa688cf4eeff948db60d507d90bee86c",
+        "snapshot_role": null,
+        "managed_files": [
+          "intent_lstm.pt",
+          "situation_gcn.pt",
+          "situation_feature_normalizer.json",
+          "model_manifest.json",
+          "tactical_model.pt"
+        ],
+        "intent_model_loaded": true,
+        "situation_model_loaded": true,
+        "tactical_model_present": true,
+        "tactical_model_loaded": false,
+        "learned_policy_requested": true,
+        "learned_policy_enabled": true,
+        "fallback_reason": [],
+        "learned_path_coverage": 0.0,
+        "move_path_coverage": 0.0,
+        "shoot_path_coverage": 0.0,
+        "inference_devices": [
+          "cpu"
+        ],
+        "loaded_from_dirs": [
+          "ai/weights"
+        ]
+      },
+      "opponent_policy_stats": {
+        "counts": {
+          "move": {
+            "total": 0,
+            "learned": 0
+          },
+          "shoot": {
+            "total": 0,
+            "learned": 0
+          }
+        },
+        "learned_path_coverage": 0.0,
+        "move_path_coverage": 0.0,
+        "shoot_path_coverage": 0.0,
+        "score_means": {
+          "move": {
+            "samples": 0,
+            "intent_bias": 0.0,
+            "situation_score": 0.0,
+            "tactical_score": 0.0,
+            "objective_score": 0.0,
+            "combined_score": 0.0
+          },
+          "shoot": {
+            "samples": 0,
+            "intent_bias": 0.0,
+            "situation_score": 0.0,
+            "tactical_score": 0.0,
+            "objective_score": 0.0,
+            "combined_score": 0.0
+          }
+        },
+        "policy_profiles": [
+          "baseline"
+        ],
+        "inference_devices": [
+          "cpu"
+        ],
+        "loaded_from_dirs": [],
+        "intent_model_loaded_count": 0,
+        "situation_model_loaded_count": 0,
+        "tactical_model_loaded_count": 0,
+        "valid_action_type_counts": {
+          "ChangeState": 4160,
+          "GetOff": 320,
+          "GetOn": 1280,
+          "JMPlan": 960,
+          "Move": 3840,
+          "WeaponLock": 3200
+        },
+        "generated_action_type_counts": {
+          "303": 1280,
+          "333": 160
+        },
+        "trace_samples": [],
+        "move_route_aggregate": {
+          "total_attempts": 0,
+          "empty_route_count": 0,
+          "reachable_city_total": 0,
+          "by_move_type": {},
+          "route_failure_reasons": {}
+        },
+        "move_route_samples": []
+      },
+      "opponent_policy_diagnostics": {
+        "user_name": "IncumbentAI",
+        "artifact_dir": "/remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule",
+        "profile": "baseline",
+        "manifest_path": "/remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule/model_manifest.json",
+        "manifest_loaded": true,
+        "manifest_generated_at": "20260327_141602",
+        "manifest_source_commit_sha": "",
+        "snapshot_role": "bootstrap_rule_baseline",
+        "managed_files": [],
+        "intent_model_loaded": false,
+        "situation_model_loaded": false,
+        "tactical_model_present": true,
+        "tactical_model_loaded": false,
+        "learned_policy_requested": false,
+        "learned_policy_enabled": false,
+        "fallback_reason": [
+          "baseline_profile"
+        ],
+        "learned_path_coverage": 0.0,
+        "move_path_coverage": 0.0,
+        "shoot_path_coverage": 0.0,
+        "inference_devices": [
+          "cpu"
+        ],
+        "loaded_from_dirs": []
+      }
+    }
+  ]
+}
