@@ -8,6 +8,7 @@ Reproduce the SDK authentication blocker in the formal repository after merging 
 
 - Formal repository HEAD: `0a9c7ff3736b5dd095ad8b1abc9fab164a477c3d`
 - Fresh source HEAD: `0a9c7ff3736b5dd095ad8b1abc9fab164a477c3d`
+- Closeout commit: `5d29772 docs: finalize sdk auth blocked evidence`
 - Merge strategy: fast-forward from `fresh/main`
 - Merge result: successful; formal repository now contains the validated Iteration 009 code, tests, configs, diagnostics, and reports.
 

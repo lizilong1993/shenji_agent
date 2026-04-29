@@ -11,6 +11,7 @@ Validated fresh-clone work has been merged back into the formal repository, and 
 - Formal repository path: `/remote-home/lizilong/shenji_agent`
 - Fresh source HEAD merged: `0a9c7ff3736b5dd095ad8b1abc9fab164a477c3d`
 - Formal HEAD after merge-back: `0a9c7ff3736b5dd095ad8b1abc9fab164a477c3d`
+- Closeout evidence commit: `5d29772 docs: finalize sdk auth blocked evidence`
 - Merge strategy: fast-forward from `fresh/main`
 - Merge-back report: `experiments/shenji_agent/iteration_010_merge_back.md`
 - Formal pre-merge tracked/index changes were preserved in Git stash entries:
@@ -26,6 +27,18 @@ Validated fresh-clone work has been merged back into the formal repository, and 
 - `experiments/shenji_agent/iteration_010_merge_back.md`
 - `experiments/shenji_agent/iteration_010.md`
 - `experiments/shenji_agent/league_20260429_102023/*`
+
+## New Commits In Formal Repository
+
+- `a33cdee fix: restore learned move and shoot engagement in selfplay`
+- `9e36d05 fix: add move route diagnostics, fallback strategy, and context-aware occupy`
+- `1860b86 fix: passthrough move route diagnostics and update manifest commit`
+- `33c6b71 feat: add feature normalizer, tactical model, and training-compatible situation features`
+- `ff4804f Expose self-play action type diagnostics`
+- `ecd962e feat: add objective labels and diagnostics`
+- `3d3e69a feat: add battle phase valid action diagnostics`
+- `0a9c7ff docs: refresh iteration 009 final head`
+- `5d29772 docs: finalize sdk auth blocked evidence`
 
 ## Tests
 
