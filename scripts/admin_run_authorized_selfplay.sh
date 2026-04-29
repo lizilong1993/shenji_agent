@@ -77,3 +77,5 @@ PY"
 
 echo "Authorized smoke completed. To continue promotion work, run inside the container:"
 echo "  cd /app && bash scripts/continue_after_auth_fixed.sh"
+echo "For full formal promotion, run:"
+echo "  cd /app && bash scripts/run_full_promotion_after_auth.sh"

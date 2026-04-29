@@ -76,6 +76,7 @@ def test_json_schema_contains_stable_handoff_fields(tmp_path: Path) -> None:
     ]:
         assert key in payload
     assert any("continue_after_auth_fixed.sh" in item for item in payload["run_after_fix_commands"])
+    assert any("run_full_promotion_after_auth.sh" in item for item in payload["run_after_fix_commands"])
     assert payload["safety"] == {
         "mutates_system": False,
         "patches_sdk": False,

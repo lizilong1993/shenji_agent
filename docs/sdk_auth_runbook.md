@@ -77,6 +77,19 @@ The continuation script performs:
 6. Test suite.
 7. Formal self-play continuation.
 
+For the stricter one-command path that runs the full promotion sequence against
+`configs/selfplay_sota_stop.yaml`, use:
+
+```bash
+bash scripts/run_full_promotion_after_auth.sh
+```
+
+That runner performs SDK auth preflight, battle smoke, objective smoke,
+high-confidence objective label validation, objective-aware policy scoring
+validation, tests, formal self-play, consecutive-window promotion validation,
+and final completion report generation. It fails closed at the first invalid
+artifact and prints the artifact path plus the next action.
+
 Any run is useful promotion evidence only if:
 
 - `auth_status` is no longer `failed_mac_mismatch`.

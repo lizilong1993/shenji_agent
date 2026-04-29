@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTINUE_SCRIPT = ROOT / "scripts" / "continue_after_auth_fixed.sh"
 ADMIN_SCRIPT = ROOT / "scripts" / "admin_run_authorized_selfplay.sh"
 RUN_AUTHORIZED_SCRIPT = ROOT / "scripts" / "run_selfplay_authorized_mac.sh"
+FULL_PROMOTION_SCRIPT = ROOT / "scripts" / "run_full_promotion_after_auth.sh"
 
 
 def _read(path: Path) -> str:
@@ -36,6 +37,7 @@ def test_admin_script_validates_docker_mac_auth_battle_and_valid_actions() -> No
     assert "phase_action_diagnostics.json" in text
     assert "battle_phase_entered" in text
     assert "selected_move_shoot_occupy_actions" in text
+    assert "run_full_promotion_after_auth.sh" in text
 
 
 def test_handoff_scripts_do_not_require_sudo_or_patch_sdk() -> None:

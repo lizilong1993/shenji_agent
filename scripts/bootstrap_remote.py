@@ -27,7 +27,8 @@ def main() -> None:
 
     remote_setup = (
         f"set -e; "
-        f"if [ -d {args.repo_path} ]; then git -C {args.repo_path} fetch origin && git -C {args.repo_path} reset --hard origin/main; "
+        f"if [ -d {args.repo_path}/.git ]; then git -C {args.repo_path} fetch origin && git -C {args.repo_path} pull --ff-only; "
+        f"elif [ -e {args.repo_path} ]; then echo 'repo path exists but is not a git checkout: {args.repo_path}' >&2; exit 2; "
         f"else git clone {args.repo_url} {args.repo_path}; fi; "
         f"if ! python3 -m venv {args.venv_path}; then "
         f"python3 -m pip install --user virtualenv && python3 -m virtualenv {args.venv_path}; "

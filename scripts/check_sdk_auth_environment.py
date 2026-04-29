@@ -179,6 +179,7 @@ def build_report(engine_config: Path, experiments_root: Path) -> dict[str, Any]:
         "python3.10 scripts/check_sdk_auth_environment.py --output experiments/shenji_agent/sdk_auth_environment_check.json",
         "python3.10 -m training.selfplay --config configs/selfplay_smoke_battle_phase.yaml --candidate ai/weights --incumbent ai/weights_incumbent_rule",
         "bash scripts/continue_after_auth_fixed.sh",
+        "bash scripts/run_full_promotion_after_auth.sh",
     ]
     if bound_mac:
         commands.insert(1, "bash scripts/admin_run_authorized_selfplay.sh")
