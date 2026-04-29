@@ -1,0 +1,33 @@
+{
+  "env_backend": "train_env.TrainEnv",
+  "candidate": {
+    "artifacts": "/remote-home/lizilong/shenji_agent_fresh/ai/weights",
+    "profile": "challenger",
+    "source_commit_sha": "ecd962ef57e48a58940090bab14056bbd639d835",
+    "code_origin": "git:ecd962ef57e48a58940090bab14056bbd639d835",
+    "manifest_path": "/remote-home/lizilong/shenji_agent_fresh/ai/weights/model_manifest.json",
+    "manifest_loaded": true,
+    "user_name": "CurrentAI",
+    "snapshot_role": null,
+    "manifest_generated_at": "20260428_235813",
+    "managed_files": [
+      "intent_lstm.pt",
+      "situation_gcn.pt",
+      "situation_feature_normalizer.json",
+      "model_manifest.json",
+      "tactical_model.pt"
+    ]
+  },
+  "incumbent": {
+    "artifacts": "/remote-home/lizilong/shenji_agent_fresh/ai/weights_incumbent_rule",
+    "profile": "baseline",
+    "source_commit_sha": "145933933824dc2ee49c0f9e10ad90b3efca7b8d",
+    "code_origin": "git:145933933824dc2ee49c0f9e10ad90b3efca7b8d",
+    "manifest_path": "/remote-home/lizilong/shenji_agent_fresh/ai/weights_incumbent_rule/model_manifest.json",
+    "manifest_loaded": true,
+    "user_name": "IncumbentAI",
+    "snapshot_role": "bootstrap_rule_baseline",
+    "manifest_generated_at": "20260327_141602",
+    "managed_files": []
+  }
+}

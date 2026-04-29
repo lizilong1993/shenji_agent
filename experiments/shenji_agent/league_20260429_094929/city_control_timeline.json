@@ -1,0 +1,2888 @@
+{
+  "turns": [
+    {
+      "match_id": "2230531221.json",
+      "turn": 0,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 1,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 2,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 3,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 4,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 5,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 6,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 7,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 8,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 9,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 10,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 11,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 12,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 13,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 14,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 15,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 16,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 17,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 18,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 19,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 20,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 21,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 22,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 23,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 24,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 25,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 26,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 27,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 28,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 29,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 30,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 31,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 32,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 33,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 34,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 35,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 36,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 37,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 38,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 39,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 40,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 41,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 42,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 43,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 44,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 45,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 46,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 47,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 48,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 49,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 50,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 51,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 52,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 53,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 54,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 55,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 56,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 57,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 58,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 59,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 60,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 61,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 62,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 63,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 64,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 65,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 66,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 67,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 68,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 69,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 70,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 71,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 72,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 73,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 74,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 75,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 76,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 77,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 78,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 79,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 0,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 1,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 2,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 3,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 4,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 5,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 6,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 7,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 8,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 9,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 10,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 11,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 12,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 13,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 14,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 15,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 16,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 17,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 18,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 19,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 20,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 21,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 22,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 23,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 24,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 25,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 26,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 27,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 28,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 29,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 30,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 31,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 32,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 33,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 34,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 35,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 36,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 37,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 38,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 39,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 40,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 41,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 42,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 43,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 44,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 45,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 46,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 47,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 48,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 49,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 50,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 51,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 52,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 53,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 54,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 55,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 56,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 57,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 58,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 59,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 60,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 61,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 62,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 63,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 64,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 65,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 66,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 67,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 68,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 69,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 70,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 71,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 72,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 73,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 74,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 75,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 76,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 77,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 78,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 79,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 0,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 1,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 2,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 3,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 4,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 5,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 6,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 7,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 8,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 9,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 10,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 11,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 12,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 13,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 14,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 15,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 16,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 17,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 18,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 19,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 20,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 21,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 22,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 23,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 24,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 25,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 26,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 27,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 28,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 29,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 30,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 31,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 32,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 33,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 34,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 35,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 36,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 37,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 38,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 39,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 40,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 41,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 42,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 43,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 44,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 45,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 46,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 47,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 48,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 49,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 50,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 51,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 52,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 53,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 54,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 55,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 56,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 57,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 58,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 59,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 60,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 61,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 62,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 63,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 64,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 65,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 66,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 67,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 68,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 69,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 70,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 71,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 72,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 73,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 74,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 75,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 76,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 77,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 78,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 79,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 0,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 1,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 2,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 3,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 4,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 5,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 6,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 7,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 8,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 9,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 10,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 11,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 12,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 13,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 14,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 15,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 16,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 17,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 18,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 19,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 20,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 21,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 22,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 23,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 24,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 25,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 26,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 27,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 28,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 29,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 30,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 31,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 32,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 33,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 34,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 35,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 36,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 37,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 38,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 39,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 40,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 41,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 42,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 43,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 44,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 45,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 46,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 47,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 48,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 49,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 50,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 51,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 52,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 53,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 54,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 55,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 56,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 57,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 58,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 59,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 60,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 61,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 62,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 63,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 64,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 65,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 66,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 67,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 68,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 69,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 70,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 71,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 72,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 73,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 74,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 75,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 76,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 77,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 78,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    },
+    {
+      "match_id": "2230531221.json",
+      "turn": 79,
+      "red_city_control_count": 0,
+      "blue_city_control_count": 0,
+      "red_city_value_controlled": 0.0,
+      "blue_city_value_controlled": 0.0,
+      "neutral_city_count": 7
+    }
+  ],
+  "summary": {
+    "turn_records": 320,
+    "city_value_change_records": 0
+  }
+}

@@ -516,6 +516,14 @@ class Agent:
         self.valid_action_type_counts = {}
         self.generated_action_type_counts = {}
 
+    def _record_valid_action_types(self, valid_actions: Dict[Any, Any]) -> None:
+        for action_map in valid_actions.values():
+            if not isinstance(action_map, dict):
+                continue
+            for available_action_type in action_map:
+                name = self._action_name(int(available_action_type))
+                self.valid_action_type_counts[name] = self.valid_action_type_counts.get(name, 0) + 1
+
     def setup(self, setup_info: Dict[str, Any]) -> None:
         try:
             requested_policy = setup_info.get("policy_profile")
@@ -614,6 +622,8 @@ class Agent:
                 self.controllable_ops = self.team_info[self.seat].get("operators", [])
             else:
                 self.controllable_ops = [op["obj_id"] for op in observation.get("operators", [])]
+            valid_actions = observation.get("valid_actions", {})
+            self._record_valid_action_types(valid_actions)
             communications = observation.get("communication", [])
             for command in communications:
                 if command.get("type") in [200, 201] and command.get("info", {}).get("company_id") == self.seat:
@@ -635,17 +645,15 @@ class Agent:
                                     "target_obj_id": operator.get("launcher"),
                                 }
                             )
+                            self.generated_action_type_counts["303"] = self.generated_action_type_counts.get("303", 0) + 1
                 actions.append({"actor": self.seat, "type": 333})
+                self.generated_action_type_counts["333"] = self.generated_action_type_counts.get("333", 0) + 1
                 self.logger.info("step actions_count=%s", len(actions))
                 return actions
             total_actions: List[Dict[str, Any]] = []
-            valid_actions = observation.get("valid_actions", {})
             for obj_id, action_map in valid_actions.items():
                 if obj_id not in self.controllable_ops:
                     continue
-                for available_action_type in action_map:
-                    name = self._action_name(int(available_action_type))
-                    self.valid_action_type_counts[name] = self.valid_action_type_counts.get(name, 0) + 1
                 for action_type in self.priority or []:
                     if action_type not in action_map:
                         continue

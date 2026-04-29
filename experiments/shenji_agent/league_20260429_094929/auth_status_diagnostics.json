@@ -1,0 +1,56 @@
+{
+  "auth_statuses": [
+    {
+      "status": "failed_mac_mismatch",
+      "env_backend": "train_env.TrainEnv",
+      "engine_config": {
+        "path": "/usr/local/lib/python3.10/dist-packages/train_env/env/authenticate/.engine_config",
+        "exists": true,
+        "bound_mac": "02:42:ac:11:00:45",
+        "timestamp": "1777298501090988694"
+      },
+      "current_macs": [
+        "02:42:ac:11:00:02"
+      ]
+    },
+    {
+      "status": "failed_mac_mismatch",
+      "env_backend": "train_env.TrainEnv",
+      "engine_config": {
+        "path": "/usr/local/lib/python3.10/dist-packages/train_env/env/authenticate/.engine_config",
+        "exists": true,
+        "bound_mac": "02:42:ac:11:00:45",
+        "timestamp": "1777298501090988694"
+      },
+      "current_macs": [
+        "02:42:ac:11:00:02"
+      ]
+    },
+    {
+      "status": "failed_mac_mismatch",
+      "env_backend": "train_env.TrainEnv",
+      "engine_config": {
+        "path": "/usr/local/lib/python3.10/dist-packages/train_env/env/authenticate/.engine_config",
+        "exists": true,
+        "bound_mac": "02:42:ac:11:00:45",
+        "timestamp": "1777298501090988694"
+      },
+      "current_macs": [
+        "02:42:ac:11:00:02"
+      ]
+    },
+    {
+      "status": "failed_mac_mismatch",
+      "env_backend": "train_env.TrainEnv",
+      "engine_config": {
+        "path": "/usr/local/lib/python3.10/dist-packages/train_env/env/authenticate/.engine_config",
+        "exists": true,
+        "bound_mac": "02:42:ac:11:00:45",
+        "timestamp": "1777298501090988694"
+      },
+      "current_macs": [
+        "02:42:ac:11:00:02"
+      ]
+    }
+  ]
+}

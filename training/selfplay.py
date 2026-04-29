@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+from collections import Counter
 import importlib
 import json
 import logging
@@ -26,6 +28,8 @@ from .maps import (
 )
 
 RED, BLUE = 0, 1
+NORMAL_BATTLE_ACTIONS = {"Move", "Shoot", "Occupy"}
+DEPLOYMENT_ACTION_TYPES = {"303", "304", "314", "315", "316", "333"}
 _SNAPSHOT_ROLE_TO_PROFILE = {
     "bootstrap_rule_baseline": "baseline",
     "accepted_learned_mainline": "incumbent",
@@ -252,6 +256,196 @@ def _operator_by_id(observation: Dict[str, Any]) -> Dict[int, Dict[str, Any]]:
     }
 
 
+def _current_mac_addresses() -> List[str]:
+    addresses: List[str] = []
+    for path in sorted(Path("/sys/class/net").glob("*/address")):
+        try:
+            address = path.read_text(encoding="utf-8").strip().lower()
+        except OSError:
+            continue
+        if address and address != "00:00:00:00:00:00":
+            addresses.append(address)
+    return addresses
+
+
+def _decode_engine_config(config_path: Path | None = None) -> Dict[str, object]:
+    path = config_path or Path("/usr/local/lib/python3.10/dist-packages/train_env/env/authenticate/.engine_config")
+    if not path.exists():
+        return {"path": str(path), "exists": False, "bound_mac": None, "timestamp": None}
+    raw = path.read_text(encoding="utf-8", errors="replace").strip()
+    decoded = ""
+    try:
+        decoded = base64.b64decode(raw).decode("utf-8", errors="replace")
+    except Exception:
+        return {"path": str(path), "exists": True, "bound_mac": None, "timestamp": None, "decode_error": True}
+    parts = decoded.split(",", 1)
+    return {
+        "path": str(path),
+        "exists": True,
+        "bound_mac": parts[0].lower() if parts and parts[0] else None,
+        "timestamp": parts[1] if len(parts) > 1 else None,
+    }
+
+
+def _sdk_auth_status(env_backend: str) -> Dict[str, object]:
+    if "train_env" not in env_backend:
+        return {"status": "not_applicable", "env_backend": env_backend}
+    config = _decode_engine_config()
+    current_macs = _current_mac_addresses()
+    bound_mac = config.get("bound_mac")
+    if bound_mac and bound_mac not in current_macs:
+        status = "failed_mac_mismatch"
+    elif bound_mac and bound_mac in current_macs:
+        status = "mac_match_unverified"
+    elif not config.get("exists"):
+        status = "engine_config_missing"
+    else:
+        status = "unknown"
+    return {
+        "status": status,
+        "env_backend": env_backend,
+        "engine_config": config,
+        "current_macs": current_macs,
+    }
+
+
+def _valid_action_type_counts(observation: Dict[str, Any]) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for action_map in (observation.get("valid_actions") or {}).values():
+        if not isinstance(action_map, dict):
+            continue
+        for action_type in action_map:
+            action_name = _action_type_name({"type": action_type})
+            counts[action_name] = counts.get(action_name, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _phase_name(observation: Dict[str, Any]) -> str:
+    stage = observation.get("time", {}).get("stage")
+    if stage == 0:
+        return "env_config"
+    if stage == 1:
+        return "deployment"
+    if stage == 2:
+        return "battle"
+    return "unknown"
+
+
+def _score_from_observation(observation: Dict[str, Any], side: int) -> float:
+    reward = observation.get("reward")
+    if reward is not None:
+        return float(reward or 0.0)
+    scores = observation.get("scores", {})
+    if isinstance(scores, dict):
+        key = "red_total" if side == RED else "blue_total"
+        if key in scores:
+            return float(scores.get(key, 0.0) or 0.0)
+    return 0.0
+
+
+def _selected_action_counts(actions: List[Dict[str, Any]], seat: int) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for action in actions:
+        if not isinstance(action, dict) or action.get("actor") != seat:
+            continue
+        name = _action_type_name(action)
+        counts[name] = counts.get(name, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _selected_action_source(selected_counts: Dict[str, int], phase: str) -> str:
+    if not selected_counts:
+        return "none"
+    if phase == "deployment" and set(selected_counts).issubset(DEPLOYMENT_ACTION_TYPES):
+        return "deployment_stage_branch"
+    return "agent_valid_action_policy"
+
+
+def _no_battle_action_reason(
+    *,
+    phase: str,
+    valid_counts: Dict[str, int],
+    selected_counts: Dict[str, int],
+    auth_status: str,
+) -> str | None:
+    battle_valid = sum(int(valid_counts.get(name, 0)) for name in NORMAL_BATTLE_ACTIONS)
+    battle_selected = sum(int(selected_counts.get(name, 0)) for name in NORMAL_BATTLE_ACTIONS)
+    if phase != "battle" and auth_status.startswith("failed"):
+        return "auth_failed_or_unverified_stage_stuck"
+    if phase != "battle":
+        return "deployment_or_setup_phase"
+    if battle_valid <= 0:
+        return "no_move_shoot_occupy_valid_actions"
+    if battle_selected <= 0:
+        return "no_move_shoot_occupy_selected_actions"
+    return None
+
+
+def _build_phase_action_records(
+    *,
+    match_id: str,
+    turn: int,
+    before_state: List[Dict[str, Any]],
+    after_state: List[Dict[str, Any]],
+    actions: List[Dict[str, Any]],
+    done: bool,
+    env_backend: str,
+    auth_status: Dict[str, object],
+) -> List[Dict[str, object]]:
+    records: List[Dict[str, object]] = []
+    auth_state = str(auth_status.get("status", "unknown"))
+    for side, seat in ((RED, 1), (BLUE, 11)):
+        before_obs = before_state[side]
+        after_obs = after_state[side]
+        valid_counts = _valid_action_type_counts(before_obs)
+        selected_counts = _selected_action_counts(actions, seat)
+        phase = _phase_name(before_obs)
+        stage = before_obs.get("time", {}).get("stage")
+        after_stage = after_obs.get("time", {}).get("stage")
+        setup_count = sum(int(selected_counts.get(name, 0)) for name in DEPLOYMENT_ACTION_TYPES)
+        selected_type = ",".join(f"{name}:{count}" for name, count in selected_counts.items()) or None
+        records.append(
+            {
+                "match_id": match_id,
+                "turn": int(turn),
+                "side": int(side),
+                "env_backend": env_backend,
+                "auth_status": auth_state,
+                "phase": phase,
+                "stage": stage,
+                "step_type": "battle" if phase == "battle" else "setup_or_deployment",
+                "observation_keys": sorted(str(key) for key in before_obs.keys()),
+                "valid_action_count": int(sum(valid_counts.values())),
+                "valid_action_types": sorted(valid_counts),
+                "valid_action_type_counts": valid_counts,
+                "setup_action_count": int(setup_count),
+                "deployment_action_count": int(setup_count),
+                "move_action_count": int(valid_counts.get("Move", 0)),
+                "shoot_action_count": int(valid_counts.get("Shoot", 0)),
+                "occupy_action_count": int(valid_counts.get("Occupy", 0)),
+                "other_action_count": int(
+                    sum(count for name, count in valid_counts.items() if name not in NORMAL_BATTLE_ACTIONS)
+                ),
+                "selected_action_type": selected_type,
+                "selected_action_type_counts": selected_counts,
+                "selected_action_source": _selected_action_source(selected_counts, phase),
+                "action_payload_valid": bool(selected_counts),
+                "env_step_returned_done": bool(done),
+                "env_step_returned_score": _score_from_observation(after_obs, side),
+                "score_before": _score_from_observation(before_obs, side),
+                "score_after": _score_from_observation(after_obs, side),
+                "phase_transition": f"{stage}->{after_stage}",
+                "no_battle_action_reason": _no_battle_action_reason(
+                    phase=phase,
+                    valid_counts=valid_counts,
+                    selected_counts=selected_counts,
+                    auth_status=auth_state,
+                ),
+            }
+        )
+    return records
+
+
 def _build_step_objective_records(
     *,
     match_id: str,
@@ -334,8 +528,9 @@ def _run_single(
     heartbeat: Callable[[int], None] | None = None,
     match_id: str | None = None,
 ) -> Tuple[float, float, Dict[str, object], Dict[str, object]]:
-    env_class, _ = _train_env_runtime()
+    env_class, env_backend = _train_env_runtime()
     env = env_class()
+    auth_status = _sdk_auth_status(env_backend)
     shared = _load_case_data(scenario_path, map_id)
     player_info = [
         {"seat": 1, "faction": 0, "role": 1, "user_name": red_profile["user_name"], "user_id": 1},
@@ -352,11 +547,24 @@ def _run_single(
     objective_progress_turns: List[Dict[str, object]] = []
     action_outcomes: List[Dict[str, object]] = []
     city_control_timeline: List[Dict[str, object]] = []
+    phase_action_records: List[Dict[str, object]] = []
     diagnostic_match_id = match_id or scenario_path.name
     while not done and steps < max_steps:
         before_state = deepcopy(state)
         actions = red.step(state[RED]) + blue.step(state[BLUE])
         state, done = env.step(actions)
+        phase_action_records.extend(
+            _build_phase_action_records(
+                match_id=diagnostic_match_id,
+                turn=steps,
+                before_state=before_state,
+                after_state=state,
+                actions=actions,
+                done=done,
+                env_backend=env_backend,
+                auth_status=auth_status,
+            )
+        )
         progress, outcomes, city_timeline = _build_step_objective_records(
             match_id=diagnostic_match_id,
             turn=steps,
@@ -379,6 +587,8 @@ def _run_single(
             stats["objective_progress_turns"] = objective_progress_turns
             stats["action_outcomes"] = action_outcomes
             stats["city_control_timeline"] = city_control_timeline
+            stats["phase_action_records"] = phase_action_records
+            stats["auth_status"] = auth_status
     return red_score, blue_score, red_stats, blue_stats
 
 
@@ -944,6 +1154,8 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
     objective_progress_turns: List[Dict[str, object]] = []
     action_outcomes: List[Dict[str, object]] = []
     city_control_timeline: List[Dict[str, object]] = []
+    phase_action_records: List[Dict[str, object]] = []
+    auth_statuses: List[Dict[str, object]] = []
     move_route_agg_merged = {
         "total_attempts": 0,
         "empty_route_count": 0,
@@ -1006,6 +1218,12 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
             timeline = payload.get("city_control_timeline", [])
             if isinstance(timeline, list):
                 city_control_timeline.extend(timeline)
+            phase_records = payload.get("phase_action_records", [])
+            if isinstance(phase_records, list):
+                phase_action_records.extend(phase_records)
+            auth_status = payload.get("auth_status")
+            if isinstance(auth_status, dict):
+                auth_statuses.append(auth_status)
 
     def coverage(total: int, learned: int) -> float:
         if total <= 0:
@@ -1048,6 +1266,8 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
         "objective_progress_turns": objective_progress_turns,
         "action_outcomes": action_outcomes,
         "city_control_timeline": city_control_timeline,
+        "phase_action_records": phase_action_records,
+        "auth_statuses": auth_statuses,
     }
 
 
@@ -1116,6 +1336,8 @@ def _strip_objective_records(stats: Dict[str, object]) -> Dict[str, List[Dict[st
         "objective_progress_turns": list(stats.pop("objective_progress_turns", [])),
         "action_outcomes": list(stats.pop("action_outcomes", [])),
         "city_control_timeline": list(stats.pop("city_control_timeline", [])),
+        "phase_action_records": list(stats.pop("phase_action_records", [])),
+        "auth_statuses": list(stats.pop("auth_statuses", [])),
     }
 
 
@@ -1135,6 +1357,93 @@ def _build_objective_sidecars_from_records(
             }
         ]
     )
+
+
+def _summarize_phase_action_records(records: List[Dict[str, object]]) -> Dict[str, object]:
+    reason_counts = Counter(
+        str(record.get("no_battle_action_reason"))
+        for record in records
+        if record.get("no_battle_action_reason")
+    )
+    auth_failure_count = sum(1 for record in records if str(record.get("auth_status", "")).startswith("failed"))
+    first_battle_turn = None
+    for record in records:
+        if record.get("phase") == "battle":
+            first_battle_turn = int(record.get("turn", 0))
+            break
+    selected_move = sum(
+        int(record.get("selected_action_type_counts", {}).get("Move", 0))
+        for record in records
+        if isinstance(record.get("selected_action_type_counts"), dict)
+    )
+    selected_shoot = sum(
+        int(record.get("selected_action_type_counts", {}).get("Shoot", 0))
+        for record in records
+        if isinstance(record.get("selected_action_type_counts"), dict)
+    )
+    selected_occupy = sum(
+        int(record.get("selected_action_type_counts", {}).get("Occupy", 0))
+        for record in records
+        if isinstance(record.get("selected_action_type_counts"), dict)
+    )
+    return {
+        "total_turn_records": len(records),
+        "total_turns": len({(record.get("match_id"), record.get("turn")) for record in records}),
+        "turns_with_setup_deployment_only": sum(1 for record in records if record.get("phase") != "battle"),
+        "turns_with_move": sum(1 for record in records if int(record.get("move_action_count", 0)) > 0),
+        "turns_with_shoot": sum(1 for record in records if int(record.get("shoot_action_count", 0)) > 0),
+        "turns_with_occupy": sum(1 for record in records if int(record.get("occupy_action_count", 0)) > 0),
+        "selected_move_actions": int(selected_move),
+        "selected_shoot_actions": int(selected_shoot),
+        "selected_occupy_actions": int(selected_occupy),
+        "battle_phase_entered": first_battle_turn is not None,
+        "first_battle_turn": first_battle_turn,
+        "auth_failure_count": int(auth_failure_count),
+        "no_battle_action_reason_distribution": dict(sorted(reason_counts.items())),
+    }
+
+
+def _build_phase_action_sidecars(records: List[Dict[str, object]]) -> Dict[str, object]:
+    summary = _summarize_phase_action_records(records)
+    timeline = [
+        {
+            "match_id": record.get("match_id"),
+            "turn": record.get("turn"),
+            "side": record.get("side"),
+            "phase": record.get("phase"),
+            "stage": record.get("stage"),
+            "phase_transition": record.get("phase_transition"),
+            "valid_action_type_counts": record.get("valid_action_type_counts", {}),
+            "selected_action_type_counts": record.get("selected_action_type_counts", {}),
+            "no_battle_action_reason": record.get("no_battle_action_reason"),
+        }
+        for record in records
+    ]
+    return {
+        "phase_action": {"turns": records, "summary": summary},
+        "valid_action_timeline": {"turns": timeline, "summary": summary},
+    }
+
+
+def _apply_battle_phase_gate(decision: Dict[str, object], phase_summary: Dict[str, object]) -> Dict[str, object]:
+    gated = dict(decision)
+    failures = list(gated.get("failures", []))
+    if not bool(phase_summary.get("battle_phase_entered")):
+        failures.append("battle_phase_not_entered")
+    selected_total = (
+        int(phase_summary.get("selected_move_actions", 0))
+        + int(phase_summary.get("selected_shoot_actions", 0))
+        + int(phase_summary.get("selected_occupy_actions", 0))
+    )
+    if selected_total <= 0:
+        failures.append("no_move_shoot_occupy_selected_actions")
+    if failures:
+        deduped = list(dict.fromkeys(str(failure) for failure in failures))
+        gated["failures"] = deduped
+        gated["accepted"] = False
+    gated["battle_phase_entered"] = bool(phase_summary.get("battle_phase_entered"))
+    gated["selected_move_shoot_occupy_actions"] = int(selected_total)
+    return gated
 
 
 def main() -> None:
@@ -1196,6 +1505,8 @@ def main() -> None:
     objective_progress_records: List[Dict[str, object]] = []
     action_outcome_records: List[Dict[str, object]] = []
     city_control_records: List[Dict[str, object]] = []
+    phase_action_records: List[Dict[str, object]] = []
+    auth_status_records: List[Dict[str, object]] = []
     total_pairs = len(paired_map_list["items"])
     current_match_state: Dict[str, object] | None = None
     _save_progress_snapshot(
@@ -1271,6 +1582,8 @@ def main() -> None:
                 objective_progress_records.extend(objective_records["objective_progress_turns"])
                 action_outcome_records.extend(objective_records["action_outcomes"])
                 city_control_records.extend(objective_records["city_control_timeline"])
+                phase_action_records.extend(objective_records["phase_action_records"])
+                auth_status_records.extend(objective_records["auth_statuses"])
             candidate_diagnostics = _build_match_policy_diagnostics(
                 artifacts=candidate_arg,
                 participant=candidate_participant,
@@ -1373,7 +1686,12 @@ def main() -> None:
             "candidate_learned_path_coverage": float(np.mean(profile_coverages)) if profile_coverages else 0.0,
         }
 
-    decision = promotion_decision(summary, config["promotion_gate"], exploiter_results)
+    phase_action_sidecars = _build_phase_action_sidecars(phase_action_records)
+    phase_summary = phase_action_sidecars["phase_action"]["summary"]
+    decision = _apply_battle_phase_gate(
+        promotion_decision(summary, config["promotion_gate"], exploiter_results),
+        phase_summary,
+    )
 
     if decision["accepted"]:
         league_state["consecutive_windows"] = int(league_state.get("consecutive_windows", 0)) + 1
@@ -1393,6 +1711,9 @@ def main() -> None:
     save_json(objective_sidecars["objective_progress"], run_dir / "objective_progress_diagnostics.json")
     save_json(objective_sidecars["action_outcomes"], run_dir / "action_outcome_diagnostics.json")
     save_json(objective_sidecars["city_control"], run_dir / "city_control_timeline.json")
+    save_json(phase_action_sidecars["phase_action"], run_dir / "phase_action_diagnostics.json")
+    save_json(phase_action_sidecars["valid_action_timeline"], run_dir / "valid_action_timeline.json")
+    save_json({"auth_statuses": auth_status_records}, run_dir / "auth_status_diagnostics.json")
     save_json(summary, run_dir / "rating.json")
     save_json(decision, run_dir / "promotion.json")
     save_json(exploiter_results, run_dir / "exploitability.json")
@@ -1442,6 +1763,14 @@ def main() -> None:
                 f"- max_exploiter_win_rate: `{decision.get('max_exploiter_win_rate', 0.0):.4f}`",
                 f"- promotion_accepted: `{decision['accepted']}`",
                 f"- promotion_failures: `{decision.get('failures', [])}`",
+                f"- battle_phase_entered: `{phase_summary.get('battle_phase_entered')}`",
+                f"- first_battle_turn: `{phase_summary.get('first_battle_turn')}`",
+                f"- turns_with_setup_deployment_only: `{phase_summary.get('turns_with_setup_deployment_only')}`",
+                f"- turns_with_move: `{phase_summary.get('turns_with_move')}`",
+                f"- turns_with_shoot: `{phase_summary.get('turns_with_shoot')}`",
+                f"- turns_with_occupy: `{phase_summary.get('turns_with_occupy')}`",
+                f"- auth_failure_count: `{phase_summary.get('auth_failure_count')}`",
+                f"- no_battle_action_reason_distribution: `{phase_summary.get('no_battle_action_reason_distribution')}`",
             ]
         ),
         encoding="utf-8",

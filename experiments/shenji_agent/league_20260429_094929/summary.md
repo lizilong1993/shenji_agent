@@ -1,0 +1,38 @@
+# Shenji Self-Play Summary
+
+- env_backend: `train_env.TrainEnv`
+- paired_map_items: `1`
+- map_list_duplicates_used: `False`
+- candidate_source_commit_sha: `ecd962ef57e48a58940090bab14056bbd639d835`
+- incumbent_source_commit_sha: `145933933824dc2ee49c0f9e10ad90b3efca7b8d`
+- candidate_user_name: `CurrentAI`
+- candidate_profile: `challenger`
+- candidate_artifacts: `/remote-home/lizilong/shenji_agent_fresh/ai/weights`
+- candidate_manifest_path: `/remote-home/lizilong/shenji_agent_fresh/ai/weights/model_manifest.json`
+- candidate_manifest_loaded: `True`
+- incumbent_user_name: `IncumbentAI`
+- incumbent_profile: `baseline`
+- incumbent_artifacts: `/remote-home/lizilong/shenji_agent_fresh/ai/weights_incumbent_rule`
+- incumbent_manifest_path: `/remote-home/lizilong/shenji_agent_fresh/ai/weights_incumbent_rule/model_manifest.json`
+- incumbent_manifest_loaded: `True`
+- overall_point_estimate: `0.5000`
+- overall_ci95_lower: `0.5000`
+- complex_point_estimate: `0.5000`
+- complex_ci95_lower: `0.5000`
+- learned_path_coverage: `0.0000`
+- move_path_coverage: `0.0000`
+- shoot_path_coverage: `0.0000`
+- candidate_learned_policy_enabled_matches: `1`
+- candidate_fallback_reasons: `[]`
+- elo_delta_lower_bound: `-0.0000`
+- max_exploiter_win_rate: `0.0000`
+- promotion_accepted: `False`
+- promotion_failures: `['battle_phase_not_entered', 'no_move_shoot_occupy_selected_actions']`
+- battle_phase_entered: `False`
+- first_battle_turn: `None`
+- turns_with_setup_deployment_only: `640`
+- turns_with_move: `640`
+- turns_with_shoot: `0`
+- turns_with_occupy: `0`
+- auth_failure_count: `640`
+- no_battle_action_reason_distribution: `{'auth_failed_or_unverified_stage_stuck': 640}`
