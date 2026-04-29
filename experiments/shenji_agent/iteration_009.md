@@ -21,13 +21,13 @@ Continue from Iteration 008 blocked evidence and determine why SDK/self-play doe
 - [x] Add tests for setup-only and battle-phase valid-action detection.
 - [x] Fix any repairable runner/config/phase transition issue.
 - [x] Run tests.
-- [ ] Linux commit.
+- [x] Linux commit.
 - [x] Run smoke self-play.
 - [x] Analyze whether smoke shows Move/Shoot/Occupy.
 - [x] If battle actions appear, rebuild objective labels: not run because battle phase did not appear.
 - [x] If objective progress improves, run formal self-play: not run because battle phase/objective progress did not appear.
-- [ ] Update final report.
-- [ ] Output manual sync file list.
+- [x] Update final report.
+- [x] Output manual sync file list.
 
 ## Initial State
 Command:
@@ -163,6 +163,14 @@ Result:
 ## Blocked Conclusion
 B blocked-with-hard-evidence. The authentication failure is localized to the SDK wheel and the installed engine config is visibly bound to a different MAC than the current container. Under this failed authentication state, `TrainEnv` remains in deployment stage and self-play cannot produce promotion-valid battle-phase evidence. Repository-side fixes now prevent misleading setup-only `0.0-0.0` runs from being accepted and write hard diagnostic sidecars for future validation.
 
+## Linux Commits
+- `3d3e69a5aa688cf4eeff948db60d507d90bee86c` — `feat: add battle phase valid action diagnostics`.
+- `e7cc4f31583690a45ffeca078cbcee55ef26adae` — `chore: point weights at battle phase diagnostics code`.
+
+## Final HEAD
+- HEAD after manifest refresh: `e7cc4f31583690a45ffeca078cbcee55ef26adae`.
+- A final docs HEAD refresh commit may follow this entry.
+
 ## Manual Sync List
 Source: `/remote-home/lizilong/shenji_agent_fresh`.
 
@@ -170,6 +178,7 @@ Target: `C:\Users\lizilong\Desktop\WHUAI\Projects\SituationAwareness\code\miaosu
 
 Important files:
 - `ai/agent.py`
+- `ai/weights/model_manifest.json`
 - `training/selfplay.py`
 - `configs/selfplay_smoke_battle_phase.yaml`
 - `tests/test_phase_action_diagnostics.py`

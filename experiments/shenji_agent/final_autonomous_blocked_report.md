@@ -8,7 +8,7 @@ Iteration 009 localized the runtime blocker to SDK authentication and added phas
 ## Current State
 - Working directory: `/remote-home/lizilong/shenji_agent_fresh`.
 - Original repo: `/remote-home/lizilong/shenji_agent`; not synchronized.
-- Linux HEAD before Iteration 009 commit: `145933933824dc2ee49c0f9e10ad90b3efca7b8d`.
+- Linux HEAD after Iteration 009 manifest refresh: `e7cc4f31583690a45ffeca078cbcee55ef26adae`.
 - Windows sync: intentionally not attempted.
 - Windows target for later manual sync: `C:\Users\lizilong\Desktop\WHUAI\Projects\SituationAwareness\code\miaosuan20260119`.
 
@@ -51,6 +51,11 @@ Smoke artifact: `experiments/shenji_agent/league_20260429_094929`.
 - `configs/selfplay_smoke_battle_phase.yaml`: small smoke config for validating battle phase.
 - `tests/test_phase_action_diagnostics.py`: validates setup-only/battle diagnostics and serialization.
 - `tests/test_selfplay_battle_phase_contract.py`: validates promotion rejection when battle evidence is absent.
+- `ai/weights/model_manifest.json`: points candidate source code to `3d3e69a5aa688cf4eeff948db60d507d90bee86c`, the commit containing battle-phase diagnostics code.
+
+## Iteration 009 Commits
+- `3d3e69a feat: add battle phase valid action diagnostics`
+- `e7cc4f3 chore: point weights at battle phase diagnostics code`
 
 ## Reports Added
 - `experiments/shenji_agent/authentication_failure_analysis.md`.
@@ -80,7 +85,7 @@ The SDK/platform owner must provide valid authorization for the current Linux ru
 5. If score/city/damage progress appears, continue objective scorer/policy and formal self-play.
 
 ## Git Status
-Before final commit, remaining uncommitted entries include intentional Iteration 009 source/config/test/report edits plus pre-existing/generated local entries: `__pycache__`, `.tmp_claude/`, `ai/weights/weights/`, `ai/weights_incumbent_rule/`, `datasets`, `land_wargame_sdk/land_wargame_sdk`, and two untracked helper scripts. The generated/cache/local asset entries are not part of the intended commit.
+After Iteration 009 commits, remaining uncommitted entries are pre-existing/generated local entries: `__pycache__`, `.tmp_claude/`, `ai/weights/weights/`, `ai/weights_incumbent_rule/`, `datasets`, `land_wargame_sdk/land_wargame_sdk`, and two untracked helper scripts. The generated/cache/local asset entries are not part of the intended commit.
 
 ## Manual Sync Instructions
 Suggested source directory:
