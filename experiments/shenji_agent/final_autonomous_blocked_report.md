@@ -9,17 +9,19 @@ The Iteration 007 P0 training/inference normalization mismatch is fixed and veri
 - Date: 2026-04-29 Asia/Shanghai.
 - Working directory: `/remote-home/lizilong/shenji_agent_fresh`.
 - Original repo: `/remote-home/lizilong/shenji_agent`.
-- Linux fresh clone HEAD before final docs commit: `f4e0dcf2dcbb9af0fc80f26b742099188b704fd5`.
+- Linux fresh clone HEAD before this report refresh: `2055da3ff8714b6149107e7c1762b1970fbc4554`.
 - Reverts: none.
 - Windows target: `100.127.108.19`, `C:\Users\lizilong\Desktop\WHUAI\Projects\SituationAwareness\code\miaosuan20260119`.
 - Windows sync status: blocked. `tailscale ssh` still fails with `No ED25519 host key is known for desktop-t3ll42l.tailf6b2dc.ts.net... Host key verification failed.`
 - OpenSSH fallback status: `ssh -o StrictHostKeyChecking=accept-new 100.127.108.19 ...` timed out on port 22.
+- Final retry on 2026-04-29: `tailscale ssh` still failed with the same host-key verification error; OpenSSH fallback again timed out on port 22.
 
 ## Commits This Iteration
 - `77849cd38e80fd3281e19e6f0ebfd074ad44fae5` — fixed situation normalizer consistency and tests.
 - `30d9f7b922721d010dc05f6fe961eaceba4f762f` — retrained normalized models and recorded diagnostics.
 - `ff4804fbda0cd598bcbd624398eddea5f5b19cc7` — added self-play action-type diagnostics.
 - `f4e0dcf2dcbb9af0fc80f26b742099188b704fd5` — pointed manifest at diagnostics-capable agent code.
+- `2055da3ff8714b6149107e7c1762b1970fbc4554` — documented Iteration 007 blocked evidence, medium self-play artifacts, and README/final report updates.
 
 ## Changed Files
 - Source: `training/supervised.py`, `ai/policy.py`, `scripts/diagnose_model_quality.py`, `ai/agent.py`, `training/selfplay.py`.
@@ -111,6 +113,7 @@ Key facts:
 - `tests/test_mainline_contract.py`: `35 passed`.
 - `tests/test_selfplay_action_diagnostics.py`: `3 passed`.
 - `tests/test_mainline_contract.py tests/test_move_route_diagnostics.py`: `45 passed`.
+- Final related-suite refresh: `tests/test_feature_normalizer_consistency.py tests/test_model_quality_diagnostics.py tests/test_policy_score_tuning.py tests/test_mainline_contract.py tests/test_selfplay_action_diagnostics.py`: `66 passed in 36.14s`.
 
 ## Remaining Risks
 - Intent move bias remains negative.
@@ -118,6 +121,10 @@ Key facts:
 - Formal self-play was not run because smoke/medium did not show score improvement.
 - Windows sync remains blocked by host-key verification despite safe Linux-side remediation attempts.
 - Worktree still contains pre-existing generated/cache dirt such as `__pycache__`, `.tmp_claude/`, ignored weights, dataset symlinks, and incumbent artifacts.
+
+## Final Git Status
+- Linux status still contains generated/cache or pre-existing local assets: `__pycache__/*.pyc`, `ai/__pycache__/*.pyc`, `.tmp_claude/`, `ai/weights/weights/`, `ai/weights_incumbent_rule/`, `datasets`, `land_wargame_sdk/land_wargame_sdk`, `scripts/launch_detached_compare.py`, and `scripts/verify_learned_policy_engagement.py`.
+- Windows status is unavailable because sync is blocked before remote command execution.
 
 ## Next Minimal Plan
 1. Generate rollout-derived labels for score delta, occupy success, damage/kill delta, and per-operator/per-city counterfactual value.

@@ -1,7 +1,7 @@
 # Iteration 007: Training/Inference Normalizer Consistency and Situation Node Differentiation
 
 ## Status
-In progress.
+B blocked-with-hard-evidence.
 
 ## Goal
 Continue from Iteration 006 blocked state. P0 is fixing the situation-model training/inference normalization mismatch. P0/P1 is improving or proving the limits of situation per-node differentiation. Final validation remains smoke/formal self-play, not supervised metrics alone.
@@ -19,14 +19,14 @@ Continue from Iteration 006 blocked state. P0 is fixing the situation-model trai
 - [x] Run model quality diagnostics after retrain.
 - [x] Check situation per-node variance after normalized retrain.
 - [x] Decide GraphSituationModel architecture branch: not implemented because normalized retrain fixed near-zero variance; blocked analysis documents why labels/objective are now the hard blocker.
-- [ ] Train architecture variant.
-- [ ] Compare baseline vs normalized vs architecture variant.
+- [x] Train architecture variant: intentionally not run after normalized retrain fixed the proven near-zero variance symptom; see architecture/data blocker evidence.
+- [x] Compare baseline vs normalized vs architecture variant: baseline vs normalized compared; architecture variant deferred with hard evidence because missing objective labels, not near-zero variance, is now the blocker.
 - [x] Run related tests.
-- [ ] Linux commit.
-- [ ] Windows sync + Windows commit.
+- [x] Linux commit.
+- [x] Windows sync + Windows commit: attempted after Linux commits; blocked by host key verification / port 22 timeout, no Windows commit available.
 - [x] Run smoke self-play.
 - [x] Analyze whether smoke is still 0-0.
-- [ ] If smoke improves, run formal self-play.
+- [x] If smoke improves, run formal self-play: not run because smoke/medium stayed 0-0 and promotion failed score/Elo gates.
 - [x] Update final report/docs.
 - [x] Close as A completed or B blocked-with-hard-evidence.
 
@@ -104,6 +104,10 @@ Results:
 
 ## Linux Commits
 - `77849cd38e80fd3281e19e6f0ebfd074ad44fae5` — P0 normalizer consistency code, diagnostics, tests, before-retrain diagnostics, and initial Iteration 007 report.
+- `30d9f7b922721d010dc05f6fe961eaceba4f762f` — normalized retrain artifacts, published manifest/normalizer, after-retrain diagnostics, and retrain report.
+- `ff4804fbda0cd598bcbd624398eddea5f5b19cc7` — self-play action-type diagnostics.
+- `f4e0dcf2dcbb9af0fc80f26b742099188b704fd5` — manifest update to diagnostics-capable agent code.
+- `2055da3ff8714b6149107e7c1762b1970fbc4554` — final Iteration 007 blocked evidence, medium self-play artifacts, README/final report updates.
 
 ## Windows Sync
 - Sync attempt after `77849cd38e80fd3281e19e6f0ebfd074ad44fae5` used `.tmp_claude/sync_files.txt`.
@@ -116,6 +120,10 @@ Results:
   - `training/supervised.py`
 - Result: failed with `No ED25519 host key is known for desktop-t3ll42l.tailf6b2dc.ts.net. and you have requested strict checking. Host key verification failed.`
 - Windows commit sha: unavailable, sync blocked.
+- Final retry on 2026-04-29:
+  - `tailscale ssh 100.127.108.19 ...` still failed with `No ED25519 host key is known for desktop-t3ll42l.tailf6b2dc.ts.net. and you have requested strict checking. Host key verification failed.`
+  - `ssh -o StrictHostKeyChecking=accept-new 100.127.108.19 ...` failed with `ssh: connect to host 100.127.108.19 port 22: Connection timed out`.
+  - Windows sync and Windows commit remain blocked.
 
 ## Normalized Retrain
 Command:
@@ -205,3 +213,10 @@ Data evidence:
 2. Train a node/city-level situation head on objective labels.
 3. Re-run smoke/medium before formal.
 4. Fix Windows sync host-key trust outside Linux if possible; Linux-side safe remediation was attempted and failed.
+
+## Final Verification Refresh
+- Current HEAD after Iteration 007 closeout: `2055da3ff8714b6149107e7c1762b1970fbc4554`.
+- Related test command rerun:
+  `PYTHONPATH=/remote-home/lizilong/.local/lib/python3.10/site-packages python3.10 -m pytest tests/test_feature_normalizer_consistency.py tests/test_model_quality_diagnostics.py tests/test_policy_score_tuning.py tests/test_mainline_contract.py tests/test_selfplay_action_diagnostics.py -q`
+- Result: `66 passed in 36.14s`.
+- Current uncommitted worktree entries are generated/cache or pre-existing local assets: `__pycache__/*.pyc`, `ai/__pycache__/*.pyc`, `.tmp_claude/`, `ai/weights/weights/`, `ai/weights_incumbent_rule/`, `datasets`, `land_wargame_sdk/land_wargame_sdk`, `scripts/launch_detached_compare.py`, and `scripts/verify_learned_policy_engagement.py`.
