@@ -1,0 +1,127 @@
+README.md:7:项目官网：[http://wargame.ia.ac.cn](http://wargame.ia.ac.cn)
+README.md:21:├── land_wargame_sdk/             # SDK主目录
+README.md:25:│   ├── run_offline_games.py     # 推演启动入口程序
+README.md:26:│   └── land_wargame_train_env-*.whl  # 环境安装包
+README.md:45:- **应用入口层**：`land_wargame_sdk/run_offline_games.py` 负责推演流程组织、数据加载、AI实例化与复盘输出。
+README.md:47:- **环境仿真层**：`train_env` 来自 SDK 安装包 `land_wargame_train_env-*.whl`，封装了推演引擎与裁决规则。
+README.md:49:- **数据资源层**：`land_wargame_sdk/Data/` 中存放地图与想定数据（场景配置）。
+README.md:53:`run_offline_games.py` 是本仓库的主入口，单 Agent 与多 Agent 模式都在这里编排：
+README.md:59:TrainEnv.setup(env_step_info)
+README.md:67:  TrainEnv.step(actions)   →  生成下一帧 state
+README.md:70:TrainEnv.reset / Agent.reset
+README.md:88:在 `run_offline_games.py` 中，会向 `setup()` 注入包含想定、地图、席位等信息的 `setup_info`，而 `step()` 则以观测态势 `observation` 为输入并返回动作列表。
+README.md:95:│  TrainEnv   │     │   setup()   │     │   step()    │
+README.md:104:`TrainEnv` 维护的是完整状态 `state`，而 AI 看到的是 `observation`（通常是 `state` 的子集）。在 `run_offline_games.py` 中，示例代码直接将红蓝双方态势 `state[RED]`、`state[BLUE]` 传给对应 Agent。
+README.md:133:地图与想定数据由 `run_offline_games.py` 加载并传入 `TrainEnv.setup`，常用文件类型如下：
+README.md:140:本仓库数据位于 `land_wargame_sdk/Data/Data/` 目录；推演代码通过相对路径 `data/` 读取，Docker 环境会将 `land_wargame_sdk/Data` 挂载到容器内 `/workspace/data`，从而匹配读取路径。
+README.md:162:python run_offline_games.py
+README.md:228:| `./land_wargame_sdk/Data` | `/workspace/data` | 地图/想定数据 |
+README.md:317:- 官网文档: https://wargame.ia.ac.cn/docs/
+docs/sdk_auth_runbook.md:1:# SDK Authentication Runbook
+docs/sdk_auth_runbook.md:5:- SDK backend: `train_env.TrainEnv`
+docs/sdk_auth_runbook.md:6:- SDK wheel authentication extension: `/usr/local/lib/python3.10/dist-packages/train_env/env/authenticate/authenticator.cpython-310-x86_64-linux-gnu.so`
+docs/sdk_auth_runbook.md:7:- SDK engine config: `/usr/local/lib/python3.10/dist-packages/train_env/env/authenticate/.engine_config`
+docs/sdk_auth_runbook.md:9:- Engine config bound MAC: `02:42:ac:11:00:45`
+docs/sdk_auth_runbook.md:10:- Current container MAC: `02:42:ac:11:00:02`
+docs/sdk_auth_runbook.md:12:- Auth status: `failed_mac_mismatch`
+docs/sdk_auth_runbook.md:18:Do not patch or replace the SDK authentication extension, do not edit `.engine_config`, and do not fake battle-phase evidence.
+docs/sdk_auth_runbook.md:20:The project has a Compose service named `dev` using bridge networking. A dedicated override is provided at `docker-compose.auth-mac.yml`:
+docs/sdk_auth_runbook.md:23:docker compose -f docker-compose.yml -f docker-compose.auth-mac.yml up -d --build dev
+docs/sdk_auth_runbook.md:24:docker compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec dev bash -lc \
+docs/sdk_auth_runbook.md:30:If Compose is unavailable or the platform disallows service-level `mac_address`, run in a container or host that is officially authorized for the `.engine_config` MAC, or request a regenerated `.engine_config` for the actual runtime MAC.
+docs/sdk_auth_runbook.md:34:After the MAC matches, run:
+docs/sdk_auth_runbook.md:42:- `auth_status` is no longer `failed_mac_mismatch`.
+docs/docs.md:12:下载地址为: [http://wargame.ia.ac.cn/aidevelopment](http://wargame.ia.ac.cn/aidevelopment)。选择社区开发板下载。
+docs/docs.md:17:-   **land\_wargame\_train\_env-\*.whl**：SDK提供的环境安装包，用于安装核心模块
+docs/docs.md:20:-   **run\_offline\_games.py**：推演启动入口程序，提供了环境和AI的使用示例。开发者通过修改本文件代码，可以import自己开发的agent，自由设置对抗的次数，逻辑等。
+docs/docs.md:31:<span></span><code>pip install land_wargame_train_env-*.whl</code>
+docs/docs.md:41:<span></span><code>python run_offline_games.py</code>
+docs/docs.md:50:本地单机通过运行根目录下run_offline_games.py脚本启动引擎和本地Demo agent对抗。 agent生成动作后，env调用step接收双方的动作，并生成下一步的state以及done。state[RED]为红方态势，state[BLUE]是蓝方态势，state[GREEN]是包含了蓝方和红方的全局态势数据，在全局态势中，双方所有的算子信息全部可见。
+docs/docs.md:56:在run_offline_game.py文件中运行以下代码：
+docs/docs.md:59:from train_env import TrainEnv
+docs/docs.md:70:    env1 = TrainEnv()
+docs/docs.md:183:在/run_offline_game.py文件中运行以下代码：
+docs/docs.md:186:from train_env import TrainEnv
+docs/docs.md:199:在/run_offline_game.py文件中运行以下代码：
+docs/docs.md:202:from train_env import TrainEnv
+docs/docs.md:219:    env1 = TrainEnv()
+docs/docs.md:410:-   [setup](https://wargame.ia.ac.cn/docs/reference/apis/#baseagentsetup)
+docs/docs.md:411:-   [step](https://wargame.ia.ac.cn/docs/reference/apis/#baseagentstep)
+docs/docs.md:412:-   [reset](https://wargame.ia.ac.cn/docs/reference/apis/#baseagentreset)
+docs/docs.md:418:`BaseAgent`类包含3个抽象方法，[setup](https://wargame.ia.ac.cn/docs/reference/apis/#baseagentsetup)、[step](https://wargame.ia.ac.cn/docs/reference/apis/#baseagentstep)，[reset](https://wargame.ia.ac.cn/docs/reference/apis/#baseagentreset)。这些方法为AI必须编写的方法，未实现这些方法的agent将无法使用本SDK进行开发和线上接入。
+docs/docs.md:489:|observation|	dict|	[态势数据(https://wargame.ia.ac.cn/docs/reference/observations/)]|
+docs/docs.md:493:|List[dict]|	agent返回生成的符合格式要求的动作列表。详见[动作数据(https://wargame.ia.ac.cn/docs/reference/actions/)]|
+docs/docs.md:495:**示例：（来自DemoAI）** 在`BaseAgent.step`中开发者需要体现AI的策略。`BaseAgent.step`函数传入的参数是态势信息,输出的则是agent的动作列表。因为agent所作出的一切动作都必须要通过step函数来返回，所以开发者需要在`BaseAgent.step`函数中完成接受态势以及生成动作的功能。态势数据和动作数据见[态势数据](https://wargame.ia.ac.cn/docs/reference/observations/)以及[动作数据](https://wargame.ia.ac.cn/docs/reference/actions/)。
+docs/docs.md:582:### **TrainEnv类接口**
+docs/docs.md:584:#### **`TrainEnv.__init__`**
+docs/docs.md:592:#### **`TrainEnv.setup`**
+docs/docs.md:611:**返回值：** 返回游戏完整第一帧完整红蓝绿态势字典，详见[态势数据](https://wargame.ia.ac.cn/docs/reference/observations/)
+docs/docs.md:613:#### **`TrainEnv.step`**
+docs/docs.md:615:**功能：**接受各类动作，包括机动，打击，部署上车，兵力部署等，处理所有动作后返回新的一帧完整态势，以及是否达到游戏结束条件的flag。详见[动作数据](https://wargame.ia.ac.cn/docs/reference/actions/)和[态势数据](https://wargame.ia.ac.cn/docs/reference/observations/)。
+docs/docs.md:620:| action_msgs | list[dict] | 动作列表, 详见[动作数据](https://wargame.ia.ac.cn/docs/reference/actions/) |
+docs/docs.md:624:state	list[dict]	态势列表，其中state[0]代表红方态势，state[1]代表蓝方态势， state[-1]代表绿方态势，详见[态势数据](https://wargame.ia.ac.cn/docs/reference/observations/)
+docs/docs.md:626:#### **`TrainEnv.reset`**
+docs/docs.md:642:`TrainEnv`的`step`函数返回的`state`，表示当前环境的所有状态合集。状态合集有红方蓝方绿方态势组成：`state[0]`代表的是红方态势，`state[1]`代表的是蓝方态势,`state[-1]`代表的是绿方态势。 agent代码的`step`函数接受的参数是态势`observation`，它封装了当前时间，此agent能观测到的所有盘面信息，包括算子信息、裁决信息等。以下是态势最外层的数据结构以及他们代表的含义。
+docs/docs.md:1289:agent的`step`函数必须返回一个动作列表。 列表中的每个元素`action`表示的是该agent当前帧要进行的动作的确切信息，需要遵守正确的数据结构。 而后此动作列表将作为`TrainEnv.step`的参数传入环境。
+docs/docs.md:2327:-   间瞄炮火区：为间瞄炮兵算子下达间瞄火力且炮火到达的区域。地面算子进出炮火区将受到间瞄火力裁决，详见[间瞄射击规则](https://wargame.ia.ac.cn/docs/rules/rules/#jianmiaoguize)和[间瞄射击裁决表](https://wargame.ia.ac.cn/docs/rules/tables/#jianmiaobiao)
+docs/docs.md:2328:-   雷场：没有扫雷开辟通路功能的算子，也没有半速沿已开通路机动的算子，进入雷场后会受到雷场裁决，详见[雷场裁决表](https://wargame.ia.ac.cn/docs/rules/tables/#leichangbiao)
+scripts/bootstrap_remote.py:39:        f"python -m pip install {args.repo_path}/land_wargame_sdk/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl; "
+scripts/run_selfplay_authorized_mac.sh:4:AUTHORIZED_MAC="${AUTHORIZED_MAC:-02:42:ac:11:00:45}"
+scripts/run_selfplay_authorized_mac.sh:11:echo "authorized_mac=${AUTHORIZED_MAC}"
+scripts/run_selfplay_authorized_mac.sh:14:if printf '%s\n' "${current_macs}" | grep -qi "^${AUTHORIZED_MAC}$"; then
+scripts/run_selfplay_authorized_mac.sh:23:Current container MAC does not match the SDK .engine_config binding.
+scripts/run_selfplay_authorized_mac.sh:25:Run from the project root in an authorized Docker environment:
+scripts/run_selfplay_authorized_mac.sh:27:  docker compose -f docker-compose.yml -f docker-compose.auth-mac.yml up -d --build dev
+scripts/run_selfplay_authorized_mac.sh:28:  docker compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec dev bash -lc \\
+scripts/run_selfplay_authorized_mac.sh:31:If authentication still fails after the container has MAC ${AUTHORIZED_MAC},
+scripts/run_selfplay_authorized_mac.sh:32:request a regenerated .engine_config from the SDK provider for the actual runtime MAC.
+scripts/verify_learned_policy_engagement.py:132:    scenario_path = root / "land_wargame_sdk" / "Data" / "Data" / "scenarios" / args.scenario
+scripts/build_objective_labels.py:352:    parser.add_argument("--scenario-root", default="land_wargame_sdk/Data/Data/scenarios")
+training/selfplay.py:65:        ("land_wargame_train_env", "TrainEnv"),
+training/selfplay.py:66:        ("train_env", "TrainEnv"),
+training/selfplay.py:77:    return mock_module.MockTrainEnv, "mock_train_env.MockTrainEnv"
+training/selfplay.py:142:    data_root = repo_root() / "land_wargame_sdk" / "Data" / "Data"
+training/selfplay.py:259:def _current_mac_addresses() -> List[str]:
+training/selfplay.py:271:def _decode_engine_config(config_path: Path | None = None) -> Dict[str, object]:
+training/selfplay.py:272:    path = config_path or Path("/usr/local/lib/python3.10/dist-packages/train_env/env/authenticate/.engine_config")
+training/selfplay.py:290:def _sdk_auth_status(env_backend: str) -> Dict[str, object]:
+training/selfplay.py:293:    config = _decode_engine_config()
+training/selfplay.py:294:    current_macs = _current_mac_addresses()
+training/selfplay.py:301:        status = "engine_config_missing"
+training/selfplay.py:307:        "engine_config": config,
+training/selfplay.py:369:    auth_status: str,
+training/selfplay.py:373:    if phase != "battle" and auth_status.startswith("failed"):
+training/selfplay.py:374:        return "auth_failed_or_unverified_stage_stuck"
+training/selfplay.py:393:    auth_status: Dict[str, object],
+training/selfplay.py:396:    auth_state = str(auth_status.get("status", "unknown"))
+training/selfplay.py:413:                "auth_status": auth_state,
+training/selfplay.py:442:                    auth_status=auth_state,
+training/selfplay.py:533:    auth_status = _sdk_auth_status(env_backend)
+training/selfplay.py:565:                auth_status=auth_status,
+training/selfplay.py:591:            stats["auth_status"] = auth_status
+training/selfplay.py:637:        raise SystemExit("No valid scenarios found under land_wargame_sdk/Data/Data/scenarios for self-play evaluation.")
+training/selfplay.py:647:        "scenario_source": "land_wargame_sdk/Data/Data/scenarios/*.json",
+training/selfplay.py:1158:    auth_statuses: List[Dict[str, object]] = []
+training/selfplay.py:1224:            auth_status = payload.get("auth_status")
+training/selfplay.py:1225:            if isinstance(auth_status, dict):
+training/selfplay.py:1226:                auth_statuses.append(auth_status)
+training/selfplay.py:1270:        "auth_statuses": auth_statuses,
+training/selfplay.py:1340:        "auth_statuses": list(stats.pop("auth_statuses", [])),
+training/selfplay.py:1368:    auth_failure_count = sum(1 for record in records if str(record.get("auth_status", "")).startswith("failed"))
+training/selfplay.py:1401:        "auth_failure_count": int(auth_failure_count),
+training/selfplay.py:1487:    if env_backend == "mock_train_env.MockTrainEnv":
+training/selfplay.py:1489:            "Formal self-play evaluation requires a real TrainEnv backend; resolved mock_train_env.MockTrainEnv instead."
+training/selfplay.py:1492:    maps_root = repo_root() / "land_wargame_sdk" / "Data" / "Data" / "maps"
+training/selfplay.py:1493:    scenario_root = repo_root() / "land_wargame_sdk" / "Data" / "Data" / "scenarios"
+training/selfplay.py:1509:    auth_status_records: List[Dict[str, object]] = []
+training/selfplay.py:1586:                auth_status_records.extend(objective_records["auth_statuses"])
+training/selfplay.py:1716:    save_json({"auth_statuses": auth_status_records}, run_dir / "auth_status_diagnostics.json")
+training/selfplay.py:1772:                f"- auth_failure_count: `{phase_summary.get('auth_failure_count')}`",
+training/supervised.py:396:    maps_root = repo_root() / "land_wargame_sdk" / "Data" / "Data" / "maps"
+land_wargame_sdk/run_offline_games.py:23:from train_env import TrainEnv
+land_wargame_sdk/run_offline_games.py:41:    env1 = TrainEnv()
+land_wargame_sdk/run_offline_games.py:159:    env1 = TrainEnv()
+Dockerfile:43:COPY land_wargame_sdk/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl /tmp/
+Dockerfile:44:RUN pip install --no-cache-dir /tmp/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl \
+Dockerfile:45:    && rm /tmp/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+.devcontainer/devcontainer.json:2:	"name": "Miaosuan Dev Container",

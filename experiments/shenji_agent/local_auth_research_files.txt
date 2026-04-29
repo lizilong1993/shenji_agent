@@ -1,0 +1,16 @@
+./.codex/skills/.system/imagegen/LICENSE.txt
+./.codex/skills/.system/openai-docs/LICENSE.txt
+./.codex/skills/.system/skill-creator/license.txt
+./.codex/skills/.system/skill-installer/LICENSE.txt
+./docker-compose.auth-mac.yml
+./docs/sdk_auth_runbook.md
+./experiments/shenji_agent/authentication_failure_analysis.md
+./experiments/shenji_agent/iteration_011_auto_research_auth_completion.md
+./experiments/shenji_agent/league_20260429_094929/auth_status_diagnostics.json
+./experiments/shenji_agent/league_20260429_102023/auth_status_diagnostics.json
+./experiments/shenji_agent/local_auth_research_files.txt
+./experiments/shenji_agent/local_auth_research_grep.txt
+./experiments/shenji_agent/sdk_auth_blocked_analysis.md
+./experiments/shenji_agent/sdk_auth_resolution_plan.md
+./land_wargame_sdk/run_offline_games.py
+./scripts/run_selfplay_authorized_mac.sh

@@ -1,0 +1,18 @@
+{
+  "accepted": false,
+  "failures": [
+    "battle_phase_not_entered",
+    "no_move_shoot_occupy_selected_actions"
+  ],
+  "elo_delta_lower_bound": -0.0,
+  "learned_path_coverage": 0.0,
+  "move_path_coverage": 0.0,
+  "shoot_path_coverage": 0.0,
+  "max_bucket_regression": 0.0,
+  "bucket_regressions": {
+    "complex": 0.0
+  },
+  "max_exploiter_win_rate": 0.0,
+  "battle_phase_entered": false,
+  "selected_move_shoot_occupy_actions": 0
+}

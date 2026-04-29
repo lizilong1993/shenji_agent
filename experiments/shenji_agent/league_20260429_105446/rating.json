@@ -1,0 +1,72 @@
+{
+  "overall": {
+    "point_estimate": 0.5,
+    "ci95": [
+      0.5,
+      0.5
+    ],
+    "elo": -0.0,
+    "count": 1
+  },
+  "buckets": {
+    "complex": {
+      "point_estimate": 0.5,
+      "ci95": [
+        0.5,
+        0.5
+      ],
+      "count": 1
+    }
+  },
+  "policy": {
+    "learned_path_coverage": 0.0,
+    "move_path_coverage": 0.0,
+    "shoot_path_coverage": 0.0,
+    "counts": {
+      "move": {
+        "total": 0,
+        "learned": 0
+      },
+      "shoot": {
+        "total": 0,
+        "learned": 0
+      }
+    },
+    "score_means": {
+      "move": {
+        "samples": 0,
+        "intent_bias": 0.0,
+        "situation_score": 0.0,
+        "combined_score": 0.0
+      },
+      "shoot": {
+        "samples": 0,
+        "intent_bias": 0.0,
+        "situation_score": 0.0,
+        "combined_score": 0.0
+      }
+    },
+    "manifest_loaded_match_count": 1,
+    "intent_model_loaded_match_count": 1,
+    "situation_model_loaded_match_count": 1,
+    "tactical_model_loaded_match_count": 0,
+    "learned_policy_enabled_match_count": 1,
+    "profiles": [
+      "challenger"
+    ],
+    "artifact_dirs": [
+      "/remote-home/lizilong/shenji_agent/ai/weights"
+    ],
+    "manifest_paths": [
+      "/remote-home/lizilong/shenji_agent/ai/weights/model_manifest.json"
+    ],
+    "fallback_reasons": [],
+    "move_route_aggregate": {
+      "total_attempts": 0,
+      "empty_route_count": 0,
+      "reachable_city_total": 0,
+      "by_move_type": {},
+      "route_failure_reasons": {}
+    }
+  }
+}
