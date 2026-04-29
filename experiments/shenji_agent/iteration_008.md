@@ -147,6 +147,7 @@ Result:
 - `d3680ae2b04d7ecb7f73bb5ccfeace402c812537` — publish objective policy manifest with wrong SHA.
 - `1d7cdf3b71e28d538eb16fda178e1b6c7ba3d393` — correct objective policy manifest SHA.
 - `e23a98f302ad27dd66b9514ec0116909b06d435e` — keep detailed objective diagnostics out of match stats.
+- `789ce7fe43d83016e1bc2d873492822a02ca9421` — finalize Iteration 008 blocked evidence and reports.
 
 ## Blocked Conclusion
 B blocked-with-hard-evidence. Iteration 008 proved old artifacts cannot yield high-confidence score/capture/damage labels; new diagnostics can collect actual score/city/damage fields, but current smoke/partial medium runs stayed in setup/deployment flow, emitted repeated SDK authentication messages, exposed no normal Move/Shoot/Occupy valid action maps, and produced no non-zero score/capture/damage labels. Formal self-play was not run because smoke did not improve and medium objective evidence did not complete or show non-zero score behavior.

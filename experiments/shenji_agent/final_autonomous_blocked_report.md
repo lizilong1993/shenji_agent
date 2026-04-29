@@ -8,7 +8,7 @@ The Iteration 007 route/normalizer/tactical plumbing fixes remained intact, but 
 ## Current State
 - Working directory: `/remote-home/lizilong/shenji_agent_fresh`.
 - Original repo: `/remote-home/lizilong/shenji_agent`; not synchronized this round.
-- Linux HEAD: `e23a98f302ad27dd66b9514ec0116909b06d435e`.
+- Linux HEAD: `789ce7fe43d83016e1bc2d873492822a02ca9421`.
 - Reverts: none.
 - Windows sync: intentionally not attempted per Iteration 008 instruction.
 - Windows target for later manual sync: `C:\Users\lizilong\Desktop\WHUAI\Projects\SituationAwareness\code\miaosuan20260119`.
@@ -18,6 +18,7 @@ The Iteration 007 route/normalizer/tactical plumbing fixes remained intact, but 
 - `d3680ae chore: publish objective policy manifest`
 - `1d7cdf3 fix: correct objective policy manifest sha`
 - `e23a98f fix: keep objective diagnostics out of match stats`
+- `789ce7f docs: finalize iteration 008 blocked evidence`
 
 ## Changed Files
 - Source: `ai/policy.py`, `training/selfplay.py`.
