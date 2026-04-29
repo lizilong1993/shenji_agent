@@ -1111,6 +1111,32 @@ def _collect_objective_sidecars(matches: List[Dict[str, object]]) -> Dict[str, o
     }
 
 
+def _strip_objective_records(stats: Dict[str, object]) -> Dict[str, List[Dict[str, object]]]:
+    return {
+        "objective_progress_turns": list(stats.pop("objective_progress_turns", [])),
+        "action_outcomes": list(stats.pop("action_outcomes", [])),
+        "city_control_timeline": list(stats.pop("city_control_timeline", [])),
+    }
+
+
+def _build_objective_sidecars_from_records(
+    progress_turns: List[Dict[str, object]],
+    action_outcomes: List[Dict[str, object]],
+    city_timeline: List[Dict[str, object]],
+) -> Dict[str, object]:
+    return _collect_objective_sidecars(
+        [
+            {
+                "candidate_policy_stats": {
+                    "objective_progress_turns": progress_turns,
+                    "action_outcomes": action_outcomes,
+                    "city_control_timeline": city_timeline,
+                }
+            }
+        ]
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Shenji self-play league evaluation.")
     parser.add_argument("--config", default="configs/selfplay_baseline.yaml")
@@ -1167,6 +1193,9 @@ def main() -> None:
         scenarios_by_bucket[str(item["bucket"])].append((scenario_path, int(item["map_id"])))
 
     matches: List[Dict[str, object]] = []
+    objective_progress_records: List[Dict[str, object]] = []
+    action_outcome_records: List[Dict[str, object]] = []
+    city_control_records: List[Dict[str, object]] = []
     total_pairs = len(paired_map_list["items"])
     current_match_state: Dict[str, object] | None = None
     _save_progress_snapshot(
@@ -1237,6 +1266,11 @@ def main() -> None:
             )
             candidate_stats = _merge_policy_stats(red_stats, blue_leg_blue_stats)
             opponent_stats = _merge_policy_stats(blue_stats, blue_leg_red_stats)
+            for stats in (candidate_stats, opponent_stats):
+                objective_records = _strip_objective_records(stats)
+                objective_progress_records.extend(objective_records["objective_progress_turns"])
+                action_outcome_records.extend(objective_records["action_outcomes"])
+                city_control_records.extend(objective_records["city_control_timeline"])
             candidate_diagnostics = _build_match_policy_diagnostics(
                 artifacts=candidate_arg,
                 participant=candidate_participant,
@@ -1350,7 +1384,11 @@ def main() -> None:
         league_state["champion"] = candidate_arg
         league_state["consecutive_windows"] = 0
 
-    objective_sidecars = _collect_objective_sidecars(matches)
+    objective_sidecars = _build_objective_sidecars_from_records(
+        objective_progress_records,
+        action_outcome_records,
+        city_control_records,
+    )
     save_json({"env_backend": env_backend, "matches": matches}, run_dir / "match_results.json")
     save_json(objective_sidecars["objective_progress"], run_dir / "objective_progress_diagnostics.json")
     save_json(objective_sidecars["action_outcomes"], run_dir / "action_outcome_diagnostics.json")
