@@ -166,9 +166,10 @@ B blocked-with-hard-evidence. The authentication failure is localized to the SDK
 ## Linux Commits
 - `3d3e69a5aa688cf4eeff948db60d507d90bee86c` — `feat: add battle phase valid action diagnostics`.
 - `e7cc4f31583690a45ffeca078cbcee55ef26adae` — `chore: point weights at battle phase diagnostics code`.
+- `0c62b372480b804808ca002470e957d33f87c1dd` — `docs: record iteration 009 sdk auth blocker`.
 
 ## Final HEAD
-- HEAD after manifest refresh: `e7cc4f31583690a45ffeca078cbcee55ef26adae`.
+- HEAD after blocker report refresh: `0c62b372480b804808ca002470e957d33f87c1dd`.
 - A final docs HEAD refresh commit may follow this entry.
 
 ## Manual Sync List

@@ -8,7 +8,7 @@ Iteration 009 localized the runtime blocker to SDK authentication and added phas
 ## Current State
 - Working directory: `/remote-home/lizilong/shenji_agent_fresh`.
 - Original repo: `/remote-home/lizilong/shenji_agent`; not synchronized.
-- Linux HEAD after Iteration 009 manifest refresh: `e7cc4f31583690a45ffeca078cbcee55ef26adae`.
+- Linux HEAD after Iteration 009 blocker report refresh: `0c62b372480b804808ca002470e957d33f87c1dd`.
 - Windows sync: intentionally not attempted.
 - Windows target for later manual sync: `C:\Users\lizilong\Desktop\WHUAI\Projects\SituationAwareness\code\miaosuan20260119`.
 
@@ -56,6 +56,7 @@ Smoke artifact: `experiments/shenji_agent/league_20260429_094929`.
 ## Iteration 009 Commits
 - `3d3e69a feat: add battle phase valid action diagnostics`
 - `e7cc4f3 chore: point weights at battle phase diagnostics code`
+- `0c62b37 docs: record iteration 009 sdk auth blocker`
 
 ## Reports Added
 - `experiments/shenji_agent/authentication_failure_analysis.md`.
