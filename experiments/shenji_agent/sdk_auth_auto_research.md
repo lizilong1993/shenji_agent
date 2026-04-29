@@ -2,6 +2,8 @@
 
 Date: 2026-04-29
 
+Iteration 012 update: current-environment paths were rechecked after adding the full promotion continuation runner. The latest smoke artifact is now `experiments/shenji_agent/league_20260429_112500`, and auth remains blocked by the same MAC mismatch.
+
 ## Local Search Scope
 
 Generated evidence files:
@@ -19,7 +21,7 @@ Searched repository paths: `README.md`, `docs`, `scripts`, `configs`, `training`
    - `training/selfplay.py` imports real `train_env.TrainEnv` on Linux and rejects mock `MockTrainEnv` for formal self-play.
    - `docker-compose.auth-mac.yml` sets the service MAC to the `.engine_config` bound value.
    - `scripts/run_selfplay_authorized_mac.sh` refuses to run unless the current MAC already matches or instructs the authorized Compose path.
-   - Newly added handoff tools are `scripts/check_sdk_auth_environment.py`, `scripts/admin_run_authorized_selfplay.sh`, and `scripts/continue_after_auth_fixed.sh`.
+   - Handoff tools are `scripts/check_sdk_auth_environment.py`, `scripts/admin_run_authorized_selfplay.sh`, `scripts/continue_after_auth_fixed.sh`, and `scripts/run_full_promotion_after_auth.sh`.
 
 2. Official offline mode:
    - The local SDK docs use "offline" to mean local single-machine inference/development with `TrainEnv`.
@@ -47,6 +49,14 @@ Searched repository paths: `README.md`, `docs`, `scripts`, `configs`, `training`
    - Read-only preflight, diagnostics, test execution, current-environment smoke reproduction, and handoff script generation are executable.
    - Applying the authorized MAC to the already-running container is not executable from repository code without host/container creation control.
 
+8. Iteration 012 environment checks:
+   - Docker, Docker Compose, Docker socket, Podman, Buildah, Nerdctl, Singularity, Apptainer, Slurm, qsub, srun, and kubectl were unavailable.
+   - The current container lacks `CAP_NET_ADMIN` and `CAP_SYS_ADMIN`.
+   - User namespace creation fails with `Operation not permitted`.
+   - `/proc/*/ns/net` shows one visible network namespace only.
+   - No current interface or namespace exposes MAC `02:42:ac:11:00:45`.
+   - The default remote runner `lizilong@146.56.220.99:21427` exists in project scripts but SSH access from this environment failed with `Permission denied (publickey,password)`.
+
 ## SDK Package Inspection
 
 - Installed package origin: `/usr/local/lib/python3.10/dist-packages/train_env/__init__.cpython-310-x86_64-linux-gnu.so`
@@ -71,7 +81,7 @@ Command:
 python3.10 -m training.selfplay --config configs/selfplay_smoke_battle_phase.yaml --candidate ai/weights --incumbent ai/weights_incumbent_rule
 ```
 
-Artifact: `experiments/shenji_agent/league_20260429_105446`
+Artifact: `experiments/shenji_agent/league_20260429_112500`
 
 Observed:
 
@@ -93,6 +103,7 @@ The only discovered legal experiment that can change the result is to create/run
 ```bash
 bash scripts/admin_run_authorized_selfplay.sh
 bash scripts/continue_after_auth_fixed.sh
+bash scripts/run_full_promotion_after_auth.sh
 ```
 
 If that still fails with the authorized MAC present, request a regenerated `.engine_config` or official SDK/platform authorization instructions.

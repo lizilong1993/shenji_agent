@@ -16,7 +16,7 @@ Date: 2026-04-29
 - site:wargame.ia.ac.cn .engine_config
 - site:wargame.ia.ac.cn land_wargame_train_env TrainEnv
 
-## Public Sources Found
+## Iteration 012 Public Sources Checked
 
 1. Official platform docs: `https://wargame.ia.ac.cn/docs/`
    - The docs identify 庙算·陆战指挥官 as an AI development/evaluation platform.
@@ -33,6 +33,20 @@ Date: 2026-04-29
    - Docker documents `mac_address` as a Compose service attribute.
    - Docker also documents network-level `networks.mac_address` and notes some runtimes can reject service-level `mac_address`.
    - This supports the existing legal handoff path, but it requires host/container creation privileges.
+
+4. Docker container run reference: `https://docs.docker.com/reference/cli/docker/container/run/`
+   - Docker documents `--mac-address` as a container MAC address option.
+   - It also documents `mac-address` in extended per-network syntax.
+   - This confirms that creating an authorized runtime with a specific MAC is a standard container configuration path, not an SDK mutation.
+
+## Search Result
+
+No official public source found any of the following:
+
+- `.engine_config` regeneration CLI.
+- `TrainEnv` environment variable for alternate license/config selection.
+- Official offline mode that bypasses authentication.
+- Legal way to alter SDK-visible MAC from inside an already-running container without network/container privileges.
 
 ## Summary
 

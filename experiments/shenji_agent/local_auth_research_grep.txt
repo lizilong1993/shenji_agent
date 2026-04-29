@@ -24,13 +24,27 @@ docs/sdk_auth_runbook.md:7:- SDK engine config: `/usr/local/lib/python3.10/dist-
 docs/sdk_auth_runbook.md:9:- Engine config bound MAC: `02:42:ac:11:00:45`
 docs/sdk_auth_runbook.md:10:- Current container MAC: `02:42:ac:11:00:02`
 docs/sdk_auth_runbook.md:12:- Auth status: `failed_mac_mismatch`
-docs/sdk_auth_runbook.md:18:Do not patch or replace the SDK authentication extension, do not edit `.engine_config`, and do not fake battle-phase evidence.
-docs/sdk_auth_runbook.md:20:The project has a Compose service named `dev` using bridge networking. A dedicated override is provided at `docker-compose.auth-mac.yml`:
-docs/sdk_auth_runbook.md:23:docker compose -f docker-compose.yml -f docker-compose.auth-mac.yml up -d --build dev
-docs/sdk_auth_runbook.md:24:docker compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec dev bash -lc \
-docs/sdk_auth_runbook.md:30:If Compose is unavailable or the platform disallows service-level `mac_address`, run in a container or host that is officially authorized for the `.engine_config` MAC, or request a regenerated `.engine_config` for the actual runtime MAC.
-docs/sdk_auth_runbook.md:34:After the MAC matches, run:
-docs/sdk_auth_runbook.md:42:- `auth_status` is no longer `failed_mac_mismatch`.
+docs/sdk_auth_runbook.md:22:python3.10 scripts/check_sdk_auth_environment.py --output experiments/shenji_agent/sdk_auth_environment_check.json
+docs/sdk_auth_runbook.md:29:- `auth_environment_ready=false`
+docs/sdk_auth_runbook.md:31:- `auth_status=failed_mac_mismatch`
+docs/sdk_auth_runbook.md:35:This proves the remaining blocker is SDK authorization, not repository policy/diagnostic code.
+docs/sdk_auth_runbook.md:39:Do not patch or replace the SDK authentication extension, do not edit `.engine_config`, and do not fake battle-phase evidence.
+docs/sdk_auth_runbook.md:41:The project has a Compose service named `dev` using bridge networking. A dedicated override is provided at `docker-compose.auth-mac.yml`:
+docs/sdk_auth_runbook.md:44:docker compose -f docker-compose.yml -f docker-compose.auth-mac.yml up -d --build dev
+docs/sdk_auth_runbook.md:45:docker compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec dev bash -lc \
+docs/sdk_auth_runbook.md:51:If Compose is unavailable or the platform disallows service-level `mac_address`, run in a container or host that is officially authorized for the `.engine_config` MAC, or request a regenerated `.engine_config` for the actual runtime MAC.
+docs/sdk_auth_runbook.md:57:bash scripts/admin_run_authorized_selfplay.sh
+docs/sdk_auth_runbook.md:60:The script checks Docker access, starts the Compose service with the authorized MAC override, verifies the container MAC, runs SDK auth preflight, runs battle smoke, and fails if auth still fails, battle phase is not entered, or selected `Move` / `Shoot` / `Occupy` actions remain zero.
+docs/sdk_auth_runbook.md:64:After the MAC matches, run:
+docs/sdk_auth_runbook.md:67:bash scripts/continue_after_auth_fixed.sh
+docs/sdk_auth_runbook.md:72:1. SDK auth preflight.
+docs/sdk_auth_runbook.md:84:bash scripts/run_full_promotion_after_auth.sh
+docs/sdk_auth_runbook.md:87:That runner performs SDK auth preflight, battle smoke, objective smoke,
+docs/sdk_auth_runbook.md:95:- `auth_status` is no longer `failed_mac_mismatch`.
+docs/sdk_auth_runbook.md:100:## If Authorized MAC Still Fails
+docs/sdk_auth_runbook.md:102:If the container reports `02:42:ac:11:00:45` and the SDK still prints `did not pass authentication`, do not patch the SDK. Use one of the official/legal paths:
+docs/sdk_auth_runbook.md:104:- Request a regenerated `.engine_config` for the actual runtime MAC.
+docs/sdk_auth_runbook.md:106:- Run on an officially authorized host/container image supplied by the SDK/platform owner.
 docs/docs.md:12:下载地址为: [http://wargame.ia.ac.cn/aidevelopment](http://wargame.ia.ac.cn/aidevelopment)。选择社区开发板下载。
 docs/docs.md:17:-   **land\_wargame\_train\_env-\*.whl**：SDK提供的环境安装包，用于安装核心模块
 docs/docs.md:20:-   **run\_offline\_games.py**：推演启动入口程序，提供了环境和AI的使用示例。开发者通过修改本文件代码，可以import自己开发的agent，自由设置对抗的次数，逻辑等。
@@ -65,7 +79,40 @@ docs/docs.md:642:`TrainEnv`的`step`函数返回的`state`，表示当前环境�
 docs/docs.md:1289:agent的`step`函数必须返回一个动作列表。 列表中的每个元素`action`表示的是该agent当前帧要进行的动作的确切信息，需要遵守正确的数据结构。 而后此动作列表将作为`TrainEnv.step`的参数传入环境。
 docs/docs.md:2327:-   间瞄炮火区：为间瞄炮兵算子下达间瞄火力且炮火到达的区域。地面算子进出炮火区将受到间瞄火力裁决，详见[间瞄射击规则](https://wargame.ia.ac.cn/docs/rules/rules/#jianmiaoguize)和[间瞄射击裁决表](https://wargame.ia.ac.cn/docs/rules/tables/#jianmiaobiao)
 docs/docs.md:2328:-   雷场：没有扫雷开辟通路功能的算子，也没有半速沿已开通路机动的算子，进入雷场后会受到雷场裁决，详见[雷场裁决表](https://wargame.ia.ac.cn/docs/rules/tables/#leichangbiao)
-scripts/bootstrap_remote.py:39:        f"python -m pip install {args.repo_path}/land_wargame_sdk/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl; "
+scripts/bootstrap_remote.py:40:        f"python -m pip install {args.repo_path}/land_wargame_sdk/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl; "
+scripts/check_sdk_auth_environment.py:15:DEFAULT_ENGINE_CONFIG = Path("/usr/local/lib/python3.10/dist-packages/train_env/env/authenticate/.engine_config")
+scripts/check_sdk_auth_environment.py:41:def _decode_engine_config(path: Path) -> dict[str, Any]:
+scripts/check_sdk_auth_environment.py:73:            (path / "auth_status_diagnostics.json").exists()
+scripts/check_sdk_auth_environment.py:83:def _auth_status_summary(path: Path | None) -> dict[str, Any]:
+scripts/check_sdk_auth_environment.py:86:    file_path = path / "auth_status_diagnostics.json"
+scripts/check_sdk_auth_environment.py:88:    records = payload.get("auth_statuses", [])
+scripts/check_sdk_auth_environment.py:142:def build_report(engine_config: Path, experiments_root: Path) -> dict[str, Any]:
+scripts/check_sdk_auth_environment.py:145:    config = _decode_engine_config(engine_config)
+scripts/check_sdk_auth_environment.py:149:    auth = _auth_status_summary(latest_run)
+scripts/check_sdk_auth_environment.py:153:    latest_auth = auth.get("latest_status")
+scripts/check_sdk_auth_environment.py:156:        blocker = "engine_config_missing"
+scripts/check_sdk_auth_environment.py:157:        next_action = "Install or obtain the official SDK .engine_config for this runtime, then rerun preflight."
+scripts/check_sdk_auth_environment.py:159:        blocker = "engine_config_unreadable"
+scripts/check_sdk_auth_environment.py:160:        next_action = "Verify the official SDK package/config; do not edit .engine_config manually."
+scripts/check_sdk_auth_environment.py:164:            f"Run in an authorized environment whose non-loopback MAC is {bound_mac}, "
+scripts/check_sdk_auth_environment.py:165:            "or request a regenerated .engine_config from the SDK provider for the actual runtime MAC."
+scripts/check_sdk_auth_environment.py:167:    elif str(latest_auth or "").startswith("failed"):
+scripts/check_sdk_auth_environment.py:168:        blocker = str(latest_auth)
+scripts/check_sdk_auth_environment.py:169:        next_action = "Rerun self-play after fixing SDK auth; if failure persists, contact the SDK/platform owner."
+scripts/check_sdk_auth_environment.py:172:        next_action = "Auth appears locally plausible; rerun battle smoke and inspect phase_action_diagnostics.json."
+scripts/check_sdk_auth_environment.py:175:        next_action = "Run scripts/continue_after_auth_fixed.sh to continue objective diagnostics and promotion."
+scripts/check_sdk_auth_environment.py:177:    ready = blocker is None or (mac_match and latest_auth not in {"failed_mac_mismatch", "engine_config_missing"})
+scripts/check_sdk_auth_environment.py:179:        "python3.10 scripts/check_sdk_auth_environment.py --output experiments/shenji_agent/sdk_auth_environment_check.json",
+scripts/check_sdk_auth_environment.py:181:        "bash scripts/continue_after_auth_fixed.sh",
+scripts/check_sdk_auth_environment.py:182:        "bash scripts/run_full_promotion_after_auth.sh",
+scripts/check_sdk_auth_environment.py:185:        commands.insert(1, "bash scripts/admin_run_authorized_selfplay.sh")
+scripts/check_sdk_auth_environment.py:201:        "engine_config": config,
+scripts/check_sdk_auth_environment.py:204:        "latest_auth_status_diagnostics": auth,
+scripts/check_sdk_auth_environment.py:207:        "auth_environment_ready": bool(ready),
+scripts/check_sdk_auth_environment.py:214:            "fakes_auth_or_battle_evidence": False,
+scripts/check_sdk_auth_environment.py:220:    parser = argparse.ArgumentParser(description="Check SDK auth/MAC readiness without host privileges.")
+scripts/check_sdk_auth_environment.py:221:    parser.add_argument("--engine-config", default=os.environ.get("SDK_ENGINE_CONFIG", str(DEFAULT_ENGINE_CONFIG)))
+scripts/check_sdk_auth_environment.py:226:    report = build_report(Path(args.engine_config), Path(args.experiments_root))
 scripts/run_selfplay_authorized_mac.sh:4:AUTHORIZED_MAC="${AUTHORIZED_MAC:-02:42:ac:11:00:45}"
 scripts/run_selfplay_authorized_mac.sh:11:echo "authorized_mac=${AUTHORIZED_MAC}"
 scripts/run_selfplay_authorized_mac.sh:14:if printf '%s\n' "${current_macs}" | grep -qi "^${AUTHORIZED_MAC}$"; then
@@ -75,8 +122,55 @@ scripts/run_selfplay_authorized_mac.sh:27:  docker compose -f docker-compose.yml
 scripts/run_selfplay_authorized_mac.sh:28:  docker compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec dev bash -lc \\
 scripts/run_selfplay_authorized_mac.sh:31:If authentication still fails after the container has MAC ${AUTHORIZED_MAC},
 scripts/run_selfplay_authorized_mac.sh:32:request a regenerated .engine_config from the SDK provider for the actual runtime MAC.
+scripts/run_full_promotion_after_auth.sh:5:PREFLIGHT_JSON="${PREFLIGHT_JSON:-${OUTPUT_ROOT}/sdk_auth_environment_check.json}"
+scripts/run_full_promotion_after_auth.sh:11:LABEL_DIR="${OBJECTIVE_LABEL_DIR:-${OUTPUT_ROOT}/objective_labels/latest_after_auth}"
+scripts/run_full_promotion_after_auth.sh:12:RUN_REPORT="${FULL_PROMOTION_RUN_REPORT:-${OUTPUT_ROOT}/full_promotion_after_auth_report.md}"
+scripts/run_full_promotion_after_auth.sh:76:    "# Full Promotion After Auth Report",
+scripts/run_full_promotion_after_auth.sh:91:    f"- auth_environment_ready: `{preflight_payload.get('auth_environment_ready')}`",
+scripts/run_full_promotion_after_auth.sh:148:        "preflight rejected: current MACs do not match engine_config bound MAC; "
+scripts/run_full_promotion_after_auth.sh:165:auth_path = run_dir / "auth_status_diagnostics.json"
+scripts/run_full_promotion_after_auth.sh:169:auth = json.loads(auth_path.read_text(encoding="utf-8")) if auth_path.exists() else {}
+scripts/run_full_promotion_after_auth.sh:171:statuses = [str(item.get("status")) for item in auth.get("auth_statuses", []) if isinstance(item, dict)]
+scripts/run_full_promotion_after_auth.sh:180:    failures.append("auth_status=" + ",".join(sorted(set(failed_statuses))))
+scripts/run_full_promotion_after_auth.sh:304:echo "Preflight auth check..."
+scripts/run_full_promotion_after_auth.sh:305:python3.10 scripts/check_sdk_auth_environment.py --output "${PREFLIGHT_JSON}" \
+scripts/run_full_promotion_after_auth.sh:306:  || fail "preflight command failed" "Run in an authorized environment and inspect ${PREFLIGHT_JSON}."
+scripts/run_full_promotion_after_auth.sh:308:  || fail "preflight rejected current environment" "Run from a runtime whose non-loopback MAC matches the official engine_config binding."
+scripts/run_full_promotion_after_auth.sh:320:  || fail "battle smoke did not produce authorized battle actions" "Fix SDK auth or battle-phase policy evidence before continuing."
+scripts/run_full_promotion_after_auth.sh:332:  || fail "objective smoke did not remain in battle phase" "Fix auth/battle evidence before building objective labels."
+scripts/run_full_promotion_after_auth.sh:369:    || fail "formal self-play did not keep authorized battle actions" "Fix auth/battle evidence before promotion."
 scripts/verify_learned_policy_engagement.py:132:    scenario_path = root / "land_wargame_sdk" / "Data" / "Data" / "scenarios" / args.scenario
+scripts/continue_after_auth_fixed.sh:9:PREFLIGHT_JSON="${PREFLIGHT_JSON:-${OUTPUT_ROOT}/sdk_auth_environment_check.json}"
+scripts/continue_after_auth_fixed.sh:33:auth_path = run_dir / "auth_status_diagnostics.json"
+scripts/continue_after_auth_fixed.sh:34:auth = json.loads(auth_path.read_text(encoding="utf-8")) if auth_path.exists() else {}
+scripts/continue_after_auth_fixed.sh:35:statuses = [str(item.get("status")) for item in auth.get("auth_statuses", []) if isinstance(item, dict)]
+scripts/continue_after_auth_fixed.sh:43:    failures.append("auth_status=failed_mac_mismatch")
+scripts/continue_after_auth_fixed.sh:57:python3.10 scripts/check_sdk_auth_environment.py --output "${PREFLIGHT_JSON}"
+scripts/continue_after_auth_fixed.sh:69:  echo "SDK auth environment is not ready; refusing to run promotion continuation."
+scripts/continue_after_auth_fixed.sh:99:LABEL_DIR="${OBJECTIVE_LABEL_DIR:-experiments/shenji_agent/objective_labels/latest_auth_fixed}"
 scripts/build_objective_labels.py:352:    parser.add_argument("--scenario-root", default="land_wargame_sdk/Data/Data/scenarios")
+scripts/admin_run_authorized_selfplay.sh:4:AUTHORIZED_MAC="${AUTHORIZED_MAC:-02:42:ac:11:00:45}"
+scripts/admin_run_authorized_selfplay.sh:5:SERVICE="${SDK_AUTH_COMPOSE_SERVICE:-dev}"
+scripts/admin_run_authorized_selfplay.sh:31:echo "Starting ${SERVICE} with authorized MAC ${AUTHORIZED_MAC}..."
+scripts/admin_run_authorized_selfplay.sh:32:compose -f docker-compose.yml -f docker-compose.auth-mac.yml up -d --build "${SERVICE}"
+scripts/admin_run_authorized_selfplay.sh:34:echo "Verifying container MAC..."
+scripts/admin_run_authorized_selfplay.sh:35:compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec -T "${SERVICE}" bash -lc \
+scripts/admin_run_authorized_selfplay.sh:36:  "cat /sys/class/net/*/address | grep -qi '^${AUTHORIZED_MAC}$'"
+scripts/admin_run_authorized_selfplay.sh:38:echo "Running SDK auth preflight inside authorized container..."
+scripts/admin_run_authorized_selfplay.sh:39:compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec -T "${SERVICE}" bash -lc \
+scripts/admin_run_authorized_selfplay.sh:40:  "cd /app && python3.10 scripts/check_sdk_auth_environment.py --output experiments/shenji_agent/sdk_auth_environment_check.json"
+scripts/admin_run_authorized_selfplay.sh:42:echo "Running battle smoke inside authorized container..."
+scripts/admin_run_authorized_selfplay.sh:43:compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec -T "${SERVICE}" bash -lc \
+scripts/admin_run_authorized_selfplay.sh:46:echo "Validating auth, battle phase, and selected Move/Shoot/Occupy evidence..."
+scripts/admin_run_authorized_selfplay.sh:47:compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec -T "${SERVICE}" bash -lc \
+scripts/admin_run_authorized_selfplay.sh:57:auth = json.loads((run / 'auth_status_diagnostics.json').read_text(encoding='utf-8'))
+scripts/admin_run_authorized_selfplay.sh:60:statuses = [str(item.get('status')) for item in auth.get('auth_statuses', []) if isinstance(item, dict)]
+scripts/admin_run_authorized_selfplay.sh:68:    failures.append('auth_status=' + ','.join(sorted(set(statuses))))
+scripts/admin_run_authorized_selfplay.sh:74:    raise SystemExit('Authorized self-play validation failed: ' + '; '.join(failures) + f'; run={run}')
+scripts/admin_run_authorized_selfplay.sh:75:print(f'authorized_selfplay_ready=true run={run} selected_move_shoot_occupy_actions={selected}')
+scripts/admin_run_authorized_selfplay.sh:78:echo "Authorized smoke completed. To continue promotion work, run inside the container:"
+scripts/admin_run_authorized_selfplay.sh:79:echo "  cd /app && bash scripts/continue_after_auth_fixed.sh"
+scripts/admin_run_authorized_selfplay.sh:81:echo "  cd /app && bash scripts/run_full_promotion_after_auth.sh"
 training/selfplay.py:65:        ("land_wargame_train_env", "TrainEnv"),
 training/selfplay.py:66:        ("train_env", "TrainEnv"),
 training/selfplay.py:77:    return mock_module.MockTrainEnv, "mock_train_env.MockTrainEnv"
@@ -124,4 +218,7 @@ land_wargame_sdk/run_offline_games.py:159:    env1 = TrainEnv()
 Dockerfile:43:COPY land_wargame_sdk/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl /tmp/
 Dockerfile:44:RUN pip install --no-cache-dir /tmp/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl \
 Dockerfile:45:    && rm /tmp/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+docker-compose.auth-mac.yml:5:    # The installed SDK authentication config is bound to this MAC.
+docker-compose.auth-mac.yml:6:    # Use only with an authorized .engine_config for this environment.
+docker-compose.auth-mac.yml:7:    mac_address: "02:42:ac:11:00:45"
 .devcontainer/devcontainer.json:2:	"name": "Miaosuan Dev Container",

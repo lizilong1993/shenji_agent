@@ -1,0 +1,26 @@
+# Full Promotion After Auth Report
+
+- generated_at: `2026-04-29T11:33:58.531904+00:00`
+- status: `failed`
+- head: `17eb19b8573e8fd14ea54063e4b32886d9a0e072`
+- preflight_json: `experiments/shenji_agent/sdk_auth_environment_check.json`
+- battle_config: `configs/selfplay_smoke_battle_phase.yaml`
+- objective_config: `configs/selfplay_smoke_objective_quality.yaml`
+- formal_config: `configs/selfplay_sota_stop.yaml`
+- candidate: `ai/weights`
+- incumbent: `ai/weights_incumbent_rule`
+- battle_run: ``
+- objective_run: ``
+- label_dir: `experiments/shenji_agent/objective_labels/latest_after_auth`
+- formal_run: ``
+- auth_environment_ready: `False`
+- blocker_reason: `mac_mismatch`
+- label_count: `None`
+- label_kind_counts: `None`
+- promotion_accepted: `None`
+- promotion_failures: `None`
+- overall_point_estimate: `None`
+- overall_ci95_lower: `None`
+- learned_path_coverage: `None`
+- failure: `preflight rejected current environment`
+- next_action: `Run from a runtime whose non-loopback MAC matches the official engine_config binding.`
