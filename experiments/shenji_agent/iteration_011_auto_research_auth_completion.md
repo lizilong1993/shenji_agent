@@ -31,7 +31,7 @@ The current container cannot complete SDK-authenticated battle promotion because
 - [x] If a legal path is found, execute it where current permissions allow.
 - [ ] If auth passes, continue objective labels, self-play, formal promotion.
 - [x] If all legal paths fail, write stronger blocked report.
-- [ ] Commit.
+- [x] Commit.
 - [x] Continue next loop until completed or hard-blocked.
 
 Auth did not pass in the current environment, so the auth-passed continuation item remains intentionally unchecked.
@@ -40,6 +40,7 @@ Auth did not pass in the current environment, so the auth-passed continuation it
 
 - `pwd`: `/remote-home/lizilong/shenji_agent`
 - Starting HEAD: `483a3cf205dc2aca5693a80c5dec913c70286c1e`
+- Iteration 011 tooling/evidence commit: `b25ab657ee43c09e479556ecc0bf77600efbb11c`
 - Tracked diff at start: empty.
 - Stash:
   - `stash@{0}: On main: post-test pycache generated backup`

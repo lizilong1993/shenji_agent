@@ -10,6 +10,7 @@ All legal engineering work that can be executed inside `/remote-home/lizilong/sh
 
 - Formal repository path: `/remote-home/lizilong/shenji_agent`
 - Starting HEAD for Iteration 011: `483a3cf205dc2aca5693a80c5dec913c70286c1e`
+- Iteration 011 tooling/evidence commit: `b25ab657ee43c09e479556ecc0bf77600efbb11c`
 - Latest current-environment smoke artifact: `experiments/shenji_agent/league_20260429_105446`
 - Latest preflight JSON: `experiments/shenji_agent/sdk_auth_environment_check.json`
 - Stash entries preserved:
