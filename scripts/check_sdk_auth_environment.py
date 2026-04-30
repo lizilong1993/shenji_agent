@@ -5,6 +5,7 @@ import argparse
 import base64
 import json
 import os
+import pwd
 import socket
 import subprocess
 from datetime import datetime, timezone
@@ -12,8 +13,36 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_ENGINE_CONFIG = Path("/usr/local/lib/python3.10/dist-packages/train_env/env/authenticate/.engine_config")
+ENGINE_CONFIG_RELATIVE_PATH = Path(
+    ".local/lib/python3.10/site-packages/train_env/env/authenticate/.engine_config"
+)
 DEFAULT_EXPERIMENTS_ROOT = Path("experiments/shenji_agent")
+
+
+def _repo_owner_home() -> Path | None:
+    try:
+        owner = pwd.getpwuid(Path.cwd().stat().st_uid)
+    except (KeyError, OSError):
+        return None
+    return Path(owner.pw_dir)
+
+
+def _default_engine_config() -> Path:
+    env_path = os.environ.get("SDK_ENGINE_CONFIG")
+    if env_path:
+        return Path(env_path).expanduser()
+
+    home_path = Path.home() / ENGINE_CONFIG_RELATIVE_PATH
+    if home_path.exists():
+        return home_path
+
+    owner_home = _repo_owner_home()
+    if owner_home and owner_home != Path.home():
+        owner_path = owner_home / ENGINE_CONFIG_RELATIVE_PATH
+        if owner_path.exists():
+            return owner_path
+
+    return home_path
 
 
 def _json_load(path: Path) -> dict[str, Any]:
@@ -218,7 +247,7 @@ def build_report(engine_config: Path, experiments_root: Path) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Check SDK auth/MAC readiness without host privileges.")
-    parser.add_argument("--engine-config", default=os.environ.get("SDK_ENGINE_CONFIG", str(DEFAULT_ENGINE_CONFIG)))
+    parser.add_argument("--engine-config", default=str(_default_engine_config()))
     parser.add_argument("--experiments-root", default=str(DEFAULT_EXPERIMENTS_ROOT))
     parser.add_argument("--output", help="Optional JSON output path.")
     args = parser.parse_args()

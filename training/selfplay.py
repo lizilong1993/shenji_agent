@@ -6,7 +6,9 @@ from collections import Counter
 import importlib
 import json
 import logging
+import os
 import pickle
+import pwd
 import random
 import sys
 import types
@@ -30,6 +32,9 @@ from .maps import (
 RED, BLUE = 0, 1
 NORMAL_BATTLE_ACTIONS = {"Move", "Shoot", "Occupy"}
 DEPLOYMENT_ACTION_TYPES = {"303", "304", "314", "315", "316", "333"}
+ENGINE_CONFIG_RELATIVE_PATH = Path(
+    ".local/lib/python3.10/site-packages/train_env/env/authenticate/.engine_config"
+)
 _SNAPSHOT_ROLE_TO_PROFILE = {
     "bootstrap_rule_baseline": "baseline",
     "accepted_learned_mainline": "incumbent",
@@ -268,8 +273,34 @@ def _current_mac_addresses() -> List[str]:
     return addresses
 
 
+def _repo_owner_home() -> Path | None:
+    try:
+        owner = pwd.getpwuid(repo_root().stat().st_uid)
+    except (KeyError, OSError):
+        return None
+    return Path(owner.pw_dir)
+
+
+def _default_engine_config_path() -> Path:
+    env_path = os.environ.get("SDK_ENGINE_CONFIG")
+    if env_path:
+        return Path(env_path).expanduser()
+
+    home_path = Path.home() / ENGINE_CONFIG_RELATIVE_PATH
+    if home_path.exists():
+        return home_path
+
+    owner_home = _repo_owner_home()
+    if owner_home and owner_home != Path.home():
+        owner_path = owner_home / ENGINE_CONFIG_RELATIVE_PATH
+        if owner_path.exists():
+            return owner_path
+
+    return home_path
+
+
 def _decode_engine_config(config_path: Path | None = None) -> Dict[str, object]:
-    path = config_path or Path("/usr/local/lib/python3.10/dist-packages/train_env/env/authenticate/.engine_config")
+    path = config_path or _default_engine_config_path()
     if not path.exists():
         return {"path": str(path), "exists": False, "bound_mac": None, "timestamp": None}
     raw = path.read_text(encoding="utf-8", errors="replace").strip()

@@ -1,0 +1,89 @@
+{
+  "auth_environment_ready": true,
+  "blocker_reason": null,
+  "current_macs": [
+    {
+      "interface": "eth0",
+      "mac": "02:42:ac:11:00:02"
+    }
+  ],
+  "cwd": "/remote-home/lizilong/shenji_agent",
+  "engine_config": {
+    "bound_mac": "02:42:ac:11:00:02",
+    "decode_error": null,
+    "exists": true,
+    "path": "/remote-home/lizilong/.local/lib/python3.10/site-packages/train_env/env/authenticate/.engine_config",
+    "timestamp": "1777517431836071613"
+  },
+  "generated_at": "2026-04-30T03:29:22.560329+00:00",
+  "git": {
+    "head": "b7271b5f998cfba59a8687d8e5d3b81b684b142a",
+    "status_short": "M ai/__pycache__/__init__.cpython-310.pyc\n M ai/__pycache__/agent.cpython-310.pyc\n M ai/__pycache__/models.cpython-310.pyc\n M scripts/check_sdk_auth_environment.py\n M training/selfplay.py\n?? .AGENTS.md.bkup\n?? .agent/round10_fresh_compare.log\n?? .agent/round10_fresh_compare.pid\n?? .agent/round10_fresh_monitor.log\n?? .agent/round10_fresh_monitor.pid\n?? .agent/round11_dummy.metadata.json\n?? .agent/round11_dummy.pid\n?? .agent/round11_dummy.status.json\n?? .agent/round11_dummy.stderr.log\n?? .agent/round11_dummy.stderr.log.launcher.log\n?? .agent/round11_dummy.stdout.log\n?? .agent/round11_fresh_compare.metadata.json\n?? .agent/round11_fresh_compare.pid\n?? .agent/round11_fresh_compare.status.json\n?? .agent/round11_fresh_compare.stderr.log\n?? .agent/round11_fresh_compare.stderr.log.launcher.log\n?? .agent/round11_fresh_compare.stdout.log\n?? .agent/round13_explorer_schema.txt\n?? .agent/round13_explorer_tests.txt\n?? .agent/round13_final_fresh_compare.metadata.json\n?? .agent/round13_final_fresh_compare.pid\n?? .agent/round13_final_fresh_compare.status.json\n?? .agent/round13_final_fresh_compare.stderr.log\n?? .agent/round13_final_fresh_compare.stderr.log.launcher.log\n?? .agent/round13_final_fresh_compare.stdout.log\n?? .agent/round13_fresh_compare.metadata.json\n?? .agent/round13_fresh_compare.pid\n?? .agent/round13_fresh_compare.stderr.log\n?? .agent/round13_fresh_compare.stderr.log.launcher.log\n?? .agent/round13_fresh_compare.stdout.log\n?? .agent/round13_worker_apply_patch.txt\n?? .agent/round13_worker_normalize.txt\n?? .agent/round13_worker_normalize_fast.txt\n?? .agent/round14_explorer_move.txt\n?? .agent/round14_worker_move_fix.txt\n?? .agent/round14_worker_move_probe.txt\n?? .agent/round15_worker_emptyroute_code.txt\n?? .agent/round15_worker_emptyroute_trace.txt\n?? .agent/round15_worker_emptyroute_trace_fast.txt\n?? .agent/round15_worker_emptyroute_trace_v2.txt\n?? .agent/round17_full_compare.metadata.json\n?? .agent/round17_full_compare.pid\n?? .agent/round17_full_compare.status.json\n?? .agent/round17_full_compare.stderr.log\n?? .agent/round17_full_compare.stderr.log.launcher.log\n?? .agent/round17_full_compare.stdout.log\n?? .agent/round18_analyze_relaunch_zero_coverage_20260427_022329/\n?? .agent/round18_capture_212051_observation_20260425_173433/\n?? .agent/round18_compare_20260425_040546.cmp.txt\n?? .agent/round18_compare_20260425_040546.command.txt\n?? .agent/round18_compare_20260425_040546.launch.json\n?? .agent/round18_compare_20260425_040546.memo.md\n?? .agent/round18_compare_20260425_040546.metadata.json\n?? .agent/round18_compare_20260425_040546.observe.txt\n?? .agent/round18_compare_20260425_040546.pid\n?? .agent/round18_compare_20260425_040546.sha256.txt\n?? .agent/round18_compare_20260425_040546.status.json\n?? .agent/round18_compare_20260425_040546.stderr.log\n?? .agent/round18_compare_20260425_040546.stderr.log.launcher.log\n?? .agent/round18_compare_20260425_040546.stdout.log\n?? .agent/round18_compare_post223fix_20260425_175823.metadata.json\n?? .agent/round18_compare_post223fix_20260425_175823.pid\n?? .agent/round18_compare_post223fix_20260425_175823.status.json\n?? .agent/round18_compare_post223fix_20260425_175823.stderr.log\n?? .agent/round18_compare_post223fix_20260425_175823.stderr.log.launcher.log\n?? .agent/round18_compare_post223fix_20260425_175823.stdout.log\n?? .agent/round18_compare_post223fix_20260425_175823.summarize.py\n?? .agent/round18_compare_post223fix_20260425_175823.summary.stderr.log\n?? .agent/round18_compare_post223fix_20260425_175823.summary.stdout.log\n?? .agent/round18_compare_post_212051fix_20260426_082101.command.txt\n?? .agent/round18_compare_post_212051fix_20260426_082101.launch.json\n?? .agent/round18_compare_post_212051fix_20260426_082101.metadata.json\n?? .agent/round18_compare_post_212051fix_20260426_082101.pid\n?? .agent/round18_compare_post_212051fix_20260426_082101.stderr.log\n?? .agent/round18_compare_post_212051fix_20260426_082101.stderr.log.launcher.log",
+    "status_short_count": 144,
+    "status_short_truncated": true
+  },
+  "hostname": "3e4726ec0ce0",
+  "latest_auth_status_diagnostics": {
+    "count": 4,
+    "exists": true,
+    "latest": {
+      "current_macs": [
+        "02:42:ac:11:00:02"
+      ],
+      "engine_config": {
+        "bound_mac": "02:42:ac:11:00:02",
+        "exists": true,
+        "path": "/remote-home/lizilong/.local/lib/python3.10/site-packages/train_env/env/authenticate/.engine_config",
+        "timestamp": "1777517431836071613"
+      },
+      "env_backend": "train_env.TrainEnv",
+      "status": "mac_match_unverified"
+    },
+    "latest_status": "mac_match_unverified",
+    "path": "experiments/shenji_agent/league_20260430_030051/auth_status_diagnostics.json"
+  },
+  "latest_phase_action_diagnostics": {
+    "exists": true,
+    "path": "experiments/shenji_agent/league_20260430_030051/phase_action_diagnostics.json",
+    "summary": {
+      "auth_failure_count": 0,
+      "battle_phase_entered": true,
+      "first_battle_turn": 1,
+      "no_battle_action_reason_distribution": {
+        "deployment_or_setup_phase": 8,
+        "no_move_shoot_occupy_valid_actions": 624
+      },
+      "selected_move_actions": 128,
+      "selected_occupy_actions": 0,
+      "selected_shoot_actions": 0,
+      "total_turn_records": 640,
+      "total_turns": 80,
+      "turns_with_move": 16,
+      "turns_with_occupy": 0,
+      "turns_with_setup_deployment_only": 8,
+      "turns_with_shoot": 0
+    }
+  },
+  "latest_promotion": {
+    "accepted": true,
+    "exists": true,
+    "failures": [],
+    "path": "experiments/shenji_agent/league_20260430_030051/promotion.json"
+  },
+  "latest_run_dir": "experiments/shenji_agent/league_20260430_030051",
+  "mac_match": true,
+  "next_action": "Run scripts/continue_after_auth_fixed.sh to continue objective diagnostics and promotion.",
+  "run_after_fix_commands": [
+    "python3.10 scripts/check_sdk_auth_environment.py --output experiments/shenji_agent/sdk_auth_environment_check.json",
+    "bash scripts/admin_run_authorized_selfplay.sh",
+    "python3.10 -m training.selfplay --config configs/selfplay_smoke_battle_phase.yaml --candidate ai/weights --incumbent ai/weights_incumbent_rule",
+    "bash scripts/continue_after_auth_fixed.sh",
+    "bash scripts/run_full_promotion_after_auth.sh"
+  ],
+  "safety": {
+    "fakes_auth_or_battle_evidence": false,
+    "mutates_system": false,
+    "patches_sdk": false
+  },
+  "schema_version": 1
+}
