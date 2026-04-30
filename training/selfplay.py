@@ -1801,14 +1801,19 @@ def main() -> None:
         profile_scores = []
         profile_coverages = []
         for scenario_path, map_id in scenarios_by_bucket.get("complex", [])[:4]:
-            score_a, score_b, candidate_stats, _ = _run_single(
+            score_a, score_b, candidate_stats, exploiter_stats = _run_single(
                 scenario_path,
                 map_id,
                 candidate_participant,
                 exploiter_participant,
                 int(config["max_steps"]),
             )
-            profile_scores.append(1.0 if score_b > score_a else 0.0)
+            candidate_objective = _policy_objective_total(candidate_stats)
+            exploiter_objective = _policy_objective_total(exploiter_stats)
+            if exploiter_objective != candidate_objective:
+                profile_scores.append(1.0 if exploiter_objective > candidate_objective else 0.0)
+            else:
+                profile_scores.append(1.0 if score_b > score_a else 0.0)
             profile_coverages.append(float(candidate_stats.get("learned_path_coverage", 0.0)))
         exploiter_results[profile] = {
             "win_rate_vs_candidate": float(np.mean(profile_scores)) if profile_scores else 0.0,
