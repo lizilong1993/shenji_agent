@@ -1785,8 +1785,22 @@ class MainlineContractTest(unittest.TestCase):
                         "shoot": {"total": 2, "learned": 2},
                     },
                     "score_means": {
-                        "move": {"samples": 1, "intent_bias": 1.0, "situation_score": 0.5, "combined_score": 3.0},
-                        "shoot": {"samples": 1, "intent_bias": 2.0, "situation_score": 0.7, "combined_score": 5.0},
+                        "move": {
+                            "samples": 1,
+                            "intent_bias": 1.0,
+                            "situation_score": 0.5,
+                            "tactical_score": 0.2,
+                            "objective_score": 4.0,
+                            "combined_score": 3.0,
+                        },
+                        "shoot": {
+                            "samples": 1,
+                            "intent_bias": 2.0,
+                            "situation_score": 0.7,
+                            "tactical_score": 0.3,
+                            "objective_score": 6.0,
+                            "combined_score": 5.0,
+                        },
                     },
                 },
                 "candidate_policy_diagnostics": {
@@ -1814,6 +1828,8 @@ class MainlineContractTest(unittest.TestCase):
         self.assertEqual(summary["policy"]["profiles"], ["challenger"])
         self.assertEqual(summary["policy"]["artifact_dirs"], ["/tmp/candidate"])
         self.assertEqual(summary["policy"]["manifest_paths"], ["/tmp/candidate/model_manifest.json"])
+        self.assertAlmostEqual(summary["policy"]["score_means"]["move"]["objective_score"], 4.0)
+        self.assertAlmostEqual(summary["policy"]["score_means"]["shoot"]["objective_score"], 6.0)
 
     def test_promotion_decision_enforces_sota_stop_guards(self) -> None:
         _install_fake_torch()

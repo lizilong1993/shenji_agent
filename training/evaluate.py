@@ -47,8 +47,22 @@ def _merge_policy_stats(matches: Iterable[Dict[str, object]]) -> Dict[str, objec
         "artifact_dirs": set(),
         "manifest_paths": set(),
         "score_sums": {
-            "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
-            "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
+            "move": {
+                "samples": 0,
+                "intent_bias": 0.0,
+                "situation_score": 0.0,
+                "tactical_score": 0.0,
+                "objective_score": 0.0,
+                "combined_score": 0.0,
+            },
+            "shoot": {
+                "samples": 0,
+                "intent_bias": 0.0,
+                "situation_score": 0.0,
+                "tactical_score": 0.0,
+                "objective_score": 0.0,
+                "combined_score": 0.0,
+            },
         },
         "move_route_agg": {
             "total_attempts": 0,
@@ -72,7 +86,7 @@ def _merge_policy_stats(matches: Iterable[Dict[str, object]]) -> Dict[str, objec
             action_scores = score_means.get(action_key, {}) if isinstance(score_means, dict) else {}
             samples = int(action_scores.get("samples", 0))
             totals["score_sums"][action_key]["samples"] += samples
-            for metric in ("intent_bias", "situation_score", "combined_score"):
+            for metric in ("intent_bias", "situation_score", "tactical_score", "objective_score", "combined_score"):
                 totals["score_sums"][action_key][metric] += float(action_scores.get(metric, 0.0)) * samples
         diagnostics = match.get("candidate_policy_diagnostics", {})
         if isinstance(diagnostics, dict):
@@ -121,6 +135,8 @@ def _merge_policy_stats(matches: Iterable[Dict[str, object]]) -> Dict[str, objec
             "samples": samples,
             "intent_bias": float(values["intent_bias"] / samples) if samples else 0.0,
             "situation_score": float(values["situation_score"] / samples) if samples else 0.0,
+            "tactical_score": float(values["tactical_score"] / samples) if samples else 0.0,
+            "objective_score": float(values["objective_score"] / samples) if samples else 0.0,
             "combined_score": float(values["combined_score"] / samples) if samples else 0.0,
         }
 

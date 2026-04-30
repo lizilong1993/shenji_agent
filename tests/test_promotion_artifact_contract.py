@@ -211,8 +211,22 @@ class PromotionArtifactContractTests(unittest.TestCase):
                         "shoot": {"total": 2, "learned": 2},
                     },
                     "score_means": {
-                        "move": {"samples": 3, "intent_bias": 1.0, "situation_score": 0.5, "combined_score": 3.0},
-                        "shoot": {"samples": 1, "intent_bias": 2.0, "situation_score": 0.7, "combined_score": 5.0},
+                        "move": {
+                            "samples": 3,
+                            "intent_bias": 1.0,
+                            "situation_score": 0.5,
+                            "tactical_score": 0.2,
+                            "objective_score": 4.0,
+                            "combined_score": 3.0,
+                        },
+                        "shoot": {
+                            "samples": 1,
+                            "intent_bias": 2.0,
+                            "situation_score": 0.7,
+                            "tactical_score": 0.3,
+                            "objective_score": 6.0,
+                            "combined_score": 5.0,
+                        },
                     },
                 },
                 "candidate_policy_diagnostics": {
@@ -245,6 +259,8 @@ class PromotionArtifactContractTests(unittest.TestCase):
         self.assertIn("learned_policy_enabled_match_count", policy)
         self.assertIn("profiles", policy)
         self.assertIn("artifact_dirs", policy)
+        self.assertAlmostEqual(policy["score_means"]["move"]["objective_score"], 4.0)
+        self.assertAlmostEqual(policy["score_means"]["shoot"]["objective_score"], 6.0)
 
     def test_build_match_policy_diagnostics_reports_fallback_when_models_missing(self) -> None:
         _install_test_stubs()
