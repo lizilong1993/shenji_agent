@@ -35,6 +35,7 @@ DEPLOYMENT_ACTION_TYPES = {"303", "304", "314", "315", "316", "333"}
 ENGINE_CONFIG_RELATIVE_PATH = Path(
     ".local/lib/python3.10/site-packages/train_env/env/authenticate/.engine_config"
 )
+SDK_SITE_PACKAGES_RELATIVE_PATH = Path(".local/lib/python3.10/site-packages")
 _SNAPSHOT_ROLE_TO_PROFILE = {
     "bootstrap_rule_baseline": "baseline",
     "accepted_learned_mainline": "incumbent",
@@ -66,6 +67,7 @@ def _configure_torch_cpu_inference_threads(
 def _resolve_train_env_class(
     import_module: Callable[[str], Any] = importlib.import_module,
 ) -> Tuple[type[Any], str]:
+    _ensure_sdk_site_packages_on_path()
     for module_name, class_name in (
         ("land_wargame_train_env", "TrainEnv"),
         ("train_env", "TrainEnv"),
@@ -279,6 +281,47 @@ def _repo_owner_home() -> Path | None:
     except (KeyError, OSError):
         return None
     return Path(owner.pw_dir)
+
+
+def _default_sdk_site_packages_candidates() -> List[Path]:
+    candidates: List[Path] = []
+    env_path = os.environ.get("SDK_SITE_PACKAGES")
+    if env_path:
+        candidates.append(Path(env_path).expanduser())
+
+    engine_config_path = os.environ.get("SDK_ENGINE_CONFIG")
+    if engine_config_path:
+        config_path = Path(engine_config_path).expanduser()
+        try:
+            candidates.append(config_path.parents[3])
+        except IndexError:
+            pass
+
+    candidates.append(Path.home() / SDK_SITE_PACKAGES_RELATIVE_PATH)
+    owner_home = _repo_owner_home()
+    if owner_home and owner_home != Path.home():
+        candidates.append(owner_home / SDK_SITE_PACKAGES_RELATIVE_PATH)
+
+    unique: List[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key not in seen:
+            seen.add(key)
+            unique.append(candidate)
+    return unique
+
+
+def _ensure_sdk_site_packages_on_path() -> str | None:
+    for site_packages in _default_sdk_site_packages_candidates():
+        if not (site_packages / "train_env").exists():
+            continue
+        site_path = str(site_packages)
+        if site_path in sys.path:
+            sys.path.remove(site_path)
+        sys.path.insert(0, site_path)
+        return site_path
+    return None
 
 
 def _default_engine_config_path() -> Path:
