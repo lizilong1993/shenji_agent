@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from training.selfplay import _build_step_objective_records, _collect_objective_sidecars
+from training.selfplay import (
+    _build_step_objective_records,
+    _collect_objective_sidecars,
+    _paired_score,
+    _terminal_objective_score,
+)
 
 
 def _obs(red_reward: float = 0.0, blue_reward: float = 0.0):
@@ -60,3 +65,45 @@ def test_collect_objective_sidecars_summarizes_records() -> None:
     assert sidecars["action_outcomes"]["summary"]["occupy_opportunities"] == 1
     assert sidecars["action_outcomes"]["summary"]["occupy_successes"] == 1
     assert sidecars["city_control"]["summary"]["city_value_change_records"] == 1
+
+
+def test_terminal_objective_score_uses_reward_when_available() -> None:
+    observation = _obs(red_reward=7.0)[0]
+
+    assert _terminal_objective_score(observation, 0) == 7.0
+
+
+def test_terminal_objective_score_falls_back_to_real_objective_state() -> None:
+    observation = _obs(red_reward=0.0)[0]
+    observation["cities"][0]["flag"] = 0
+    observation["operators"][0]["blood"] = 5
+    observation["operators"][1]["blood"] = 1
+
+    assert _terminal_objective_score(observation, 0) > _terminal_objective_score(observation, 1)
+
+
+def test_paired_score_uses_objective_tiebreak_for_reward_ties() -> None:
+    candidate_stats = {
+        "score_means": {
+            "move": {"samples": 2, "objective_score": 10.0},
+            "shoot": {"samples": 1, "objective_score": 5.0},
+        }
+    }
+    opponent_stats = {
+        "score_means": {
+            "move": {"samples": 2, "objective_score": 2.0},
+            "shoot": {"samples": 0, "objective_score": 0.0},
+        }
+    }
+
+    assert (
+        _paired_score(
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            candidate_stats=candidate_stats,
+            opponent_stats=opponent_stats,
+        )
+        == 1.0
+    )

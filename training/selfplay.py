@@ -227,6 +227,22 @@ def _snapshot_delta(before: Dict[str, object], after: Dict[str, object]) -> Dict
     }
 
 
+def _terminal_objective_score(observation: Dict[str, Any], side: int) -> float:
+    snapshot = _side_snapshot(observation, side)
+    reward = float(snapshot.get("score", 0.0))
+    if abs(reward) > 1e-9:
+        return reward
+    return float(
+        float(snapshot.get("city_value_controlled", 0.0)) * 2.0
+        + float(snapshot.get("city_control_count", 0.0)) * 25.0
+        - float(snapshot.get("enemy_city_count", 0.0)) * 10.0
+        + float(snapshot.get("friendly_blood", 0.0)) * 0.25
+        - float(snapshot.get("enemy_blood", 0.0)) * 0.25
+        + float(snapshot.get("friendly_alive", 0.0)) * 5.0
+        - float(snapshot.get("enemy_alive", 0.0)) * 5.0
+    )
+
+
 def _action_side(action: Dict[str, Any]) -> int | None:
     actor = action.get("actor")
     if actor == 1:
@@ -652,8 +668,8 @@ def _run_single(
         steps += 1
         if heartbeat is not None:
             heartbeat(steps)
-    red_score = float(state[RED].get("reward", 0.0))
-    blue_score = float(state[BLUE].get("reward", 0.0))
+    red_score = _terminal_objective_score(state[RED], RED)
+    blue_score = _terminal_objective_score(state[BLUE], BLUE)
     red_stats = red.get_policy_stats()
     blue_stats = blue.get_policy_stats()
     for stats in (red_stats, blue_stats):
@@ -666,7 +682,31 @@ def _run_single(
     return red_score, blue_score, red_stats, blue_stats
 
 
-def _paired_score(candidate_a: float, opponent_a: float, candidate_b: float, opponent_b: float) -> float:
+def _policy_objective_total(stats: Dict[str, object] | None) -> float:
+    if not isinstance(stats, dict):
+        return 0.0
+    score_means = stats.get("score_means", {})
+    if not isinstance(score_means, dict):
+        return 0.0
+    total = 0.0
+    for action_key in ("move", "shoot"):
+        action_scores = score_means.get(action_key, {})
+        if not isinstance(action_scores, dict):
+            continue
+        samples = int(action_scores.get("samples", 0) or 0)
+        total += float(action_scores.get("objective_score", 0.0) or 0.0) * samples
+    return float(total)
+
+
+def _paired_score(
+    candidate_a: float,
+    opponent_a: float,
+    candidate_b: float,
+    opponent_b: float,
+    *,
+    candidate_stats: Dict[str, object] | None = None,
+    opponent_stats: Dict[str, object] | None = None,
+) -> float:
     def outcome(left: float, right: float) -> float:
         if left > right:
             return 1.0
@@ -674,7 +714,16 @@ def _paired_score(candidate_a: float, opponent_a: float, candidate_b: float, opp
             return 0.0
         return 0.5
 
-    return (outcome(candidate_a, opponent_a) + outcome(candidate_b, opponent_b)) / 2.0
+    paired = (outcome(candidate_a, opponent_a) + outcome(candidate_b, opponent_b)) / 2.0
+    if paired != 0.5:
+        return paired
+    candidate_objective = _policy_objective_total(candidate_stats)
+    opponent_objective = _policy_objective_total(opponent_stats)
+    if candidate_objective > opponent_objective:
+        return 1.0
+    if candidate_objective < opponent_objective:
+        return 0.0
+    return paired
 
 
 def _collect_scenario_candidates(
@@ -1676,7 +1725,14 @@ def main() -> None:
                     "bucket": bucket,
                     "map_id": map_id,
                     "order_index": order_index,
-                    "paired_score": _paired_score(red_score, blue_score, blue_blue_score, blue_red_score),
+                    "paired_score": _paired_score(
+                        red_score,
+                        blue_score,
+                        blue_blue_score,
+                        blue_red_score,
+                        candidate_stats=candidate_stats,
+                        opponent_stats=opponent_stats,
+                    ),
                     "first_leg": first_leg_result,
                     "second_leg": {"candidate": blue_blue_score, "opponent": blue_red_score},
                     "candidate_artifacts": candidate_artifacts,
