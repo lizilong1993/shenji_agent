@@ -726,6 +726,30 @@ def _paired_score(
     return paired
 
 
+def _paired_exploiter_result(
+    *,
+    candidate_red_score: float,
+    exploiter_blue_score: float,
+    exploiter_red_score: float,
+    candidate_blue_score: float,
+    candidate_red_stats: Dict[str, object],
+    exploiter_blue_stats: Dict[str, object],
+    exploiter_red_stats: Dict[str, object],
+    candidate_blue_stats: Dict[str, object],
+) -> Tuple[float, Dict[str, object]]:
+    candidate_stats = _merge_policy_stats(candidate_red_stats, candidate_blue_stats)
+    exploiter_stats = _merge_policy_stats(exploiter_blue_stats, exploiter_red_stats)
+    candidate_paired_score = _paired_score(
+        candidate_red_score,
+        exploiter_blue_score,
+        candidate_blue_score,
+        exploiter_red_score,
+        candidate_stats=candidate_stats,
+        opponent_stats=exploiter_stats,
+    )
+    return float(1.0 - candidate_paired_score), candidate_stats
+
+
 def _collect_scenario_candidates(
     scenario_root: Path,
     bucket_lookup: Dict[int, str],
@@ -1801,20 +1825,32 @@ def main() -> None:
         profile_scores = []
         profile_coverages = []
         for scenario_path, map_id in scenarios_by_bucket.get("complex", [])[:4]:
-            score_a, score_b, candidate_stats, exploiter_stats = _run_single(
+            candidate_red_score, exploiter_blue_score, candidate_red_stats, exploiter_blue_stats = _run_single(
                 scenario_path,
                 map_id,
                 candidate_participant,
                 exploiter_participant,
                 int(config["max_steps"]),
             )
-            candidate_objective = _policy_objective_total(candidate_stats)
-            exploiter_objective = _policy_objective_total(exploiter_stats)
-            if exploiter_objective != candidate_objective:
-                profile_scores.append(1.0 if exploiter_objective > candidate_objective else 0.0)
-            else:
-                profile_scores.append(1.0 if score_b > score_a else 0.0)
-            profile_coverages.append(float(candidate_stats.get("learned_path_coverage", 0.0)))
+            exploiter_red_score, candidate_blue_score, exploiter_red_stats, candidate_blue_stats = _run_single(
+                scenario_path,
+                map_id,
+                exploiter_participant,
+                candidate_participant,
+                int(config["max_steps"]),
+            )
+            exploiter_win_score, paired_candidate_stats = _paired_exploiter_result(
+                candidate_red_score=candidate_red_score,
+                exploiter_blue_score=exploiter_blue_score,
+                exploiter_red_score=exploiter_red_score,
+                candidate_blue_score=candidate_blue_score,
+                candidate_red_stats=candidate_red_stats,
+                exploiter_blue_stats=exploiter_blue_stats,
+                exploiter_red_stats=exploiter_red_stats,
+                candidate_blue_stats=candidate_blue_stats,
+            )
+            profile_scores.append(exploiter_win_score)
+            profile_coverages.append(float(paired_candidate_stats.get("learned_path_coverage", 0.0)))
         exploiter_results[profile] = {
             "win_rate_vs_candidate": float(np.mean(profile_scores)) if profile_scores else 0.0,
             "matches": len(profile_scores),

@@ -3,6 +3,7 @@ from __future__ import annotations
 from training.selfplay import (
     _build_step_objective_records,
     _collect_objective_sidecars,
+    _paired_exploiter_result,
     _paired_score,
     _terminal_objective_score,
 )
@@ -107,3 +108,34 @@ def test_paired_score_uses_objective_tiebreak_for_reward_ties() -> None:
         )
         == 1.0
     )
+
+
+def test_paired_exploiter_result_is_side_symmetric_for_reward_ties() -> None:
+    candidate_stats = {
+        "counts": {"move": {"total": 1, "learned": 1}, "shoot": {"total": 0, "learned": 0}},
+        "score_means": {
+            "move": {"samples": 1, "objective_score": 25.0},
+            "shoot": {"samples": 0, "objective_score": 0.0},
+        },
+    }
+    exploiter_stats = {
+        "counts": {"move": {"total": 1, "learned": 0}, "shoot": {"total": 0, "learned": 0}},
+        "score_means": {
+            "move": {"samples": 1, "objective_score": 5.0},
+            "shoot": {"samples": 0, "objective_score": 0.0},
+        },
+    }
+
+    exploiter_win_rate, paired_candidate_stats = _paired_exploiter_result(
+        candidate_red_score=93.0,
+        exploiter_blue_score=137.0,
+        exploiter_red_score=93.0,
+        candidate_blue_score=137.0,
+        candidate_red_stats=candidate_stats,
+        exploiter_blue_stats=exploiter_stats,
+        exploiter_red_stats=exploiter_stats,
+        candidate_blue_stats=candidate_stats,
+    )
+
+    assert exploiter_win_rate == 0.0
+    assert paired_candidate_stats["learned_path_coverage"] == 1.0
