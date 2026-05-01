@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import errno
 import importlib
 import json
 import os
 import random
 import shutil
 import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -67,7 +69,30 @@ def dump_yaml(data: Dict[str, Any], path: Path | str) -> None:
 
 
 def save_json(data: Dict[str, Any], path: Path | str) -> None:
-    Path(path).write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    out_path = Path(path)
+    payload = json.dumps(data, indent=2, ensure_ascii=False)
+    retry_errnos = {errno.ESTALE, errno.EINTR}
+    last_error: OSError | None = None
+    for attempt in range(6):
+        tmp_path = out_path.with_name(f".{out_path.name}.{os.getpid()}.{attempt}.tmp")
+        try:
+            with tmp_path.open("w", encoding="utf-8") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_path, out_path)
+            return
+        except OSError as exc:
+            last_error = exc
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+            if exc.errno not in retry_errnos:
+                raise
+            time.sleep(min(0.05 * (2**attempt), 0.5))
+    if last_error is not None:
+        raise last_error
 
 
 def discover_dir(parent: Path | str, *, contains: Optional[str] = None, required_file: Optional[str] = None) -> Path:

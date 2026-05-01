@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import errno
 import json
+import os
 import pickle
 import random
 import subprocess
@@ -473,6 +475,31 @@ _install_fake_pandas()
 
 
 class MainlineContractTest(unittest.TestCase):
+    def test_save_json_retries_stale_file_handle_with_atomic_replace(self) -> None:
+        from training.common import save_json
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "payload.json"
+            real_replace = os.replace
+            calls = 0
+
+            def flaky_replace(src: str | bytes | os.PathLike[str], dst: str | bytes | os.PathLike[str]) -> None:
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    raise OSError(errno.ESTALE, "Stale file handle")
+                real_replace(src, dst)
+
+            with mock.patch("training.common.os.replace", side_effect=flaky_replace):
+                save_json({"ok": True}, output_path)
+
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            leftovers = list(Path(tmp).glob(".*.tmp"))
+
+        self.assertEqual(payload, {"ok": True})
+        self.assertEqual(calls, 2)
+        self.assertEqual(leftovers, [])
+
     def test_training_modules_do_not_eager_import_torch(self) -> None:
         import builtins
         import importlib
