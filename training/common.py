@@ -79,7 +79,6 @@ def save_json(data: Dict[str, Any], path: Path | str) -> None:
             with tmp_path.open("w", encoding="utf-8") as handle:
                 handle.write(payload)
                 handle.flush()
-                os.fsync(handle.fileno())
             os.replace(tmp_path, out_path)
             return
         except OSError as exc:
