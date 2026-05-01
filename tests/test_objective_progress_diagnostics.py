@@ -139,3 +139,26 @@ def test_paired_exploiter_result_is_side_symmetric_for_reward_ties() -> None:
 
     assert exploiter_win_rate == 0.0
     assert paired_candidate_stats["learned_path_coverage"] == 1.0
+
+
+def test_paired_exploiter_result_counts_draw_as_not_exploiter_win() -> None:
+    stats = {
+        "counts": {"move": {"total": 1, "learned": 1}, "shoot": {"total": 0, "learned": 0}},
+        "score_means": {
+            "move": {"samples": 1, "objective_score": 10.0},
+            "shoot": {"samples": 0, "objective_score": 0.0},
+        },
+    }
+
+    exploiter_win_rate, _ = _paired_exploiter_result(
+        candidate_red_score=10.0,
+        exploiter_blue_score=20.0,
+        exploiter_red_score=10.0,
+        candidate_blue_score=20.0,
+        candidate_red_stats=stats,
+        exploiter_blue_stats=stats,
+        exploiter_red_stats=stats,
+        candidate_blue_stats=stats,
+    )
+
+    assert exploiter_win_rate == 0.0
