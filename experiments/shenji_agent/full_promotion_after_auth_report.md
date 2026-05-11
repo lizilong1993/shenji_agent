@@ -1,26 +1,25 @@
 # Full Promotion After Auth Report
 
-- generated_at: `2026-04-29T11:33:58.531904+00:00`
-- status: `failed`
-- head: `17eb19b8573e8fd14ea54063e4b32886d9a0e072`
+- generated_at: `2026-05-02T01:11:29.025189+00:00`
+- status: `completed`
+- head: `095bb38fac1eabe6c3e36114288ad45751167daf`
 - preflight_json: `experiments/shenji_agent/sdk_auth_environment_check.json`
 - battle_config: `configs/selfplay_smoke_battle_phase.yaml`
 - objective_config: `configs/selfplay_smoke_objective_quality.yaml`
 - formal_config: `configs/selfplay_sota_stop.yaml`
 - candidate: `ai/weights`
 - incumbent: `ai/weights_incumbent_rule`
-- battle_run: ``
-- objective_run: ``
+- battle_run: `experiments/shenji_agent/league_20260501_085618`
+- objective_run: `experiments/shenji_agent/league_20260501_085731`
 - label_dir: `experiments/shenji_agent/objective_labels/latest_after_auth`
-- formal_run: ``
-- auth_environment_ready: `False`
-- blocker_reason: `mac_mismatch`
-- label_count: `None`
-- label_kind_counts: `None`
-- promotion_accepted: `None`
-- promotion_failures: `None`
-- overall_point_estimate: `None`
-- overall_ci95_lower: `None`
-- learned_path_coverage: `None`
-- failure: `preflight rejected current environment`
-- next_action: `Run from a runtime whose non-loopback MAC matches the official engine_config binding.`
+- formal_run: `experiments/shenji_agent/league_20260501_170204`
+- auth_environment_ready: `True`
+- blocker_reason: `None`
+- label_count: `2344`
+- label_kind_counts: `{'distance_to_objective_delta': 78, 'score_delta': 2266}`
+- promotion_accepted: `True`
+- promotion_failures: `[]`
+- overall_point_estimate: `0.87`
+- overall_ci95_lower: `0.800000011920929`
+- learned_path_coverage: `0.37277940409832777`
+

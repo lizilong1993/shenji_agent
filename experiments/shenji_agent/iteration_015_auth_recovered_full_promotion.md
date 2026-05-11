@@ -74,3 +74,51 @@ c59846b docs: finalize iteration 003 report with root cause and fix summary
 - latest_battle_phase_entered: `true`
 
 The root executor initially resolved `~` to `/root`, but the SDK auth config present for this project is the user-home SDK path under `/remote-home/lizilong/.local/...`. The diagnostics were adjusted to prefer explicit `SDK_ENGINE_CONFIG`, then the current HOME SDK path, then the repository owner HOME SDK path when root is operating on the user-owned repository. No `.engine_config` contents were changed.
+
+## Auth Path Fix Commits
+
+- `dab4a84 fix: align auth diagnostics with sdk engine config path`
+- `0d448d3 fix: prefer user-local sdk package for selfplay`
+
+The auth path fix was committed without adding `.engine_config`, SDK binaries, signing keys, datasets, `.tmp_codex`, `.agent`, or Python bytecode.
+
+## Full Promotion Pipeline
+
+- command: `bash scripts/run_full_promotion_after_auth.sh`
+- exit_code: `0`
+- report: `experiments/shenji_agent/full_promotion_after_auth_report.md`
+- preflight_status: `auth_environment_ready=True`, `blocker_reason=None`, `mac_match=True`
+- battle_smoke_path: `experiments/shenji_agent/league_20260501_085618`
+- objective_smoke_path: `experiments/shenji_agent/league_20260501_085731`
+- objective_label_path: `experiments/shenji_agent/objective_labels/latest_after_auth/summary.json`
+- formal_run_path: `experiments/shenji_agent/league_20260501_170204`
+- tests_result: `139 passed in 12.02s`
+- promotion_result: `promotion_accepted=True`, `failure_reasons=[]`
+
+## Final Formal Gate Evidence
+
+- promotion_json: `experiments/shenji_agent/league_20260501_170204/promotion.json`
+- rating_json: `experiments/shenji_agent/league_20260501_170204/rating.json`
+- summary_md: `experiments/shenji_agent/league_20260501_170204/summary.md`
+- promotion_accepted: `true`
+- failure_reasons: `[]`
+- overall_point_estimate: `0.87`
+- overall_ci95_lower: `0.800000011920929`
+- complex_point_estimate: `0.8181818181818182`
+- complex_ci95_lower: `0.6363636255264282`
+- learned_path_coverage: `0.37277940409832777`
+- move_path_coverage: `0.3366836301950806`
+- shoot_path_coverage: `1.0`
+- elo_delta_lower: `240.82400947416946`
+- max_bucket_regression: `0.0`
+- max_exploiter_win_rate: `0.25`
+- consecutive_windows: `2/2`
+- mock_backend: `false` (`env_backend=train_env.TrainEnv`)
+- auth_status: `mac_match_unverified`
+- auth_failure_count: `0`
+- battle_phase_entered: `true`
+- selected_move_shoot_occupy_actions: `94682`
+
+## Final Status
+
+A completed. The full real SDK promotion loop passed preflight, battle smoke, objective smoke, objective labels, objective-aware scoring, tests, and two consecutive formal promotion windows without using mock auth, mock battle evidence, SDK binary patching, or threshold reductions.

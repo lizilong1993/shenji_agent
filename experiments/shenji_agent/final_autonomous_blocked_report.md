@@ -1,8 +1,10 @@
 # Shenji Agent Final Autonomous Blocked Report
 
+> **Superseded by `final_autonomous_completion_report.md` after auth path fix and formal promotion success.** This document is preserved for historical reference.
+
 ## Final Status
 
-B blocked-with-hard-evidence after Iteration 012.
+B blocked-with-hard-evidence after Iteration 012 (HISTORICAL — superseded by A completed).
 
 The repository has been advanced as far as legally executable in the current container. All current-permission auth paths were researched and attempted. The remaining blocker is SDK MAC authentication outside the repository's present permissions, not missing policy/test/report work.
 
@@ -192,3 +194,4 @@ Result: current environment reproduces SDK MAC auth blocker in `experiments/shen
 Do not delete preserved user/local artifacts. The worktree contains pre-existing untracked files under `.agent`, `.codex`, local package files, local weights, and helper scripts. Test execution leaves tracked `ai/__pycache__/*.pyc` modifications in this environment; these are generated artifacts and are not part of the committed handoff.
 
 The report/evidence files under `experiments/shenji_agent` are intentionally force-added where needed because the repository ignores `experiments/` by default.
+

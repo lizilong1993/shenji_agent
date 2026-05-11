@@ -1,0 +1,8 @@
+{
+  "generated_at": "20260327_141602",
+  "history_len": 8,
+  "horizons": 5,
+  "intent_lstm": "intent_lstm.pt",
+  "situation_gcn": "situation_gcn.pt",
+  "snapshot_role": "bootstrap_rule_baseline"
+}

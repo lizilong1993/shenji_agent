@@ -1,0 +1,463 @@
+Shenji Agent Project Handoff Summary
+Generated on: 2026-04-27 (UTC)
+Repository root: /remote-home/lizilong/shenji_agent
+
+1. Project identity
+
+This repository is a Python land-wargame AI project built around the Miaosuan / Land Wargame SDK. It is no longer just an SDK demo repository. The current codebase has two parallel responsibilities:
+
+- Runtime agent logic that plays inside TrainEnv.
+- A model-production pipeline for supervised training, self-play evaluation, league gating, and artifact publishing.
+
+The active mainline appears to be a hybrid policy:
+
+- Rule-based action generation still exists in ai/agent.py.
+- Learned intent and situation models are loaded through ai/policy.py from ai/weights/model_manifest.json.
+- Formal promotion decisions are based on league/self-play artifacts, not only training loss or a single ad hoc evaluation run.
+
+2. High-level repository layout
+
+Top-level directories and their roles:
+
+- ai/
+  Active runtime AI package.
+  Contains:
+  - agent.py: main Agent class used at runtime.
+  - policy.py: learned-policy wrapper and diagnostics.
+  - features.py: feature extraction for operators and graphs.
+  - models.py: PyTorch model definitions.
+  - weights/: currently published learned artifacts.
+
+- training/
+  Training and evaluation pipeline.
+  Contains:
+  - supervised.py: supervised training entrypoint and artifact generation.
+  - selfplay.py: paired-match league evaluation and promotion workflow.
+  - evaluate.py: rating / CI / Elo / promotion gate logic.
+  - data.py: dataset discovery and dataset classes.
+  - maps.py: map cataloging and complexity bucket generation.
+  - common.py: shared utilities.
+
+- datasets/
+  Local datasets for three tasks:
+  - intention recognition
+  - situation graph learning
+  - tactical position scoring
+
+- land_wargame_sdk/
+  Bundled SDK assets.
+  Important note: the engine implementation is mainly a wheel file, not source code.
+  This means internal TrainEnv behavior is partly opaque from repo source inspection.
+
+- experiments/shenji_agent/
+  Checked-in experiment outputs from supervised training and league/self-play runs.
+
+- tests/
+  Main contract-level test suite.
+
+- scripts/
+  Remote/bootstrap/sync/report/detached-run helper scripts.
+
+- docs/
+  SDK/platform documentation and images.
+
+- configs/
+  Training and evaluation configs.
+
+3. Main entrypoints
+
+Primary code entrypoints:
+
+- train_models.py
+  Delegates to training.supervised.main().
+
+- train_real.py
+  Also delegates to training.supervised.main().
+
+- python -m training.selfplay --config ...
+  This is the formal arena / league comparison path.
+
+- run_evaluation.py
+  Simpler ad hoc evaluation loop. Useful for quick checks, but not the formal source of truth for promotion.
+
+- land_wargame_sdk/run_offline_games.py
+  SDK-style local game runner.
+
+4. Runtime architecture
+
+Runtime AI flow:
+
+- ai/agent.py constructs an Agent.
+- Agent.setup(...) receives scenario/map/state/setup info.
+- Agent creates a Map helper from basic_data / cost_data / see_data.
+- Agent configures LearnedPolicy with:
+  - faction
+  - artifact directory
+  - policy profile
+- During step(...):
+  - observation is cached
+  - learned policy observes enemy state history
+  - controllable operators are resolved
+  - rule-based priority order scans valid actions
+  - action generation may use learned scoring via LearnedPolicy
+
+Important runtime behaviors:
+
+- The default policy profile is baseline.
+- If user_name is CurrentAI and no profile is explicitly given, Agent.setup will prefer challenger.
+- If learned artifacts are requested but not loadable, the agent falls back to rules and disables AI optimization.
+
+5. Model architecture and features
+
+Current learned policy components:
+
+- Intent model:
+  MultiHorizonIntentionModel
+  Purpose: predict future movement / intention horizons from enemy history.
+
+- Situation model:
+  GraphSituationModel
+  Purpose: score tactical or situation quality from graph-like state features.
+
+- Tactical model:
+  TacticalScorer
+  Present in the supervised training pipeline, but disabled in the baseline supervised config currently inspected.
+
+Feature facts:
+
+- FEATURE_DIM is 108.
+- The policy keeps rolling enemy histories with history_len defaulting to 8.
+- The policy records learned-path diagnostics such as:
+  - learned_path_coverage
+  - move_path_coverage
+  - shoot_path_coverage
+  - trace_samples
+
+6. Training pipeline
+
+Supervised training behavior:
+
+- train_models.py and train_real.py both run training.supervised.main().
+- training/supervised.py trains up to three submodels:
+  - intent
+  - tactical
+  - situation
+- Outputs include:
+  - metrics.json
+  - slice_report.json
+  - config.yaml
+  - summary.md
+- If publish_to_ai_weights is true, artifacts are copied into ai/weights/ and a manifest is written.
+
+Current baseline supervised config (configs/supervised_baseline.yaml):
+
+- seed: 42
+- output_root: experiments/shenji_agent
+- publish_to_ai_weights: true
+- intent enabled: true
+- tactical enabled: false
+- situation enabled: true
+
+Dataset-contract behavior is explicit and important:
+
+- intent map_id resolution strategy: suffix
+- situation map_id resolution strategy: suffix
+- tactical label column: 样本标签
+
+7. Evaluation and promotion pipeline
+
+The formal evaluation path is training/selfplay.py plus training/evaluate.py.
+
+Key behavior:
+
+- Builds paired scenario lists from land_wargame_sdk/Data/Data/scenarios/*.json
+- Resolves map ids and map buckets
+- Runs paired matches candidate vs incumbent
+- Summarizes:
+  - overall point estimate
+  - bucketed results
+  - CI95
+  - Elo-equivalent metric
+  - learned policy coverage
+- Writes artifacts such as:
+  - match_results.json
+  - rating.json
+  - promotion.json
+  - exploitability.json
+  - participants.json
+  - summary.md
+  - map_list.json
+
+Promotion-gate thresholds in configs/selfplay_sota_stop.yaml:
+
+- overall_point_estimate_min: 0.60
+- overall_ci_lower_min: 0.55
+- complex_point_estimate_min: 0.60
+- complex_ci_lower_min: 0.55
+- min_learned_path_coverage: 0.30
+- min_move_path_coverage: 0.20
+- min_shoot_path_coverage: 0.20
+- elo_delta_lower_min: 35.0
+- max_bucket_regression: 0.03
+- max_exploiter_win_rate: 0.45
+- consecutive_windows: 2
+
+Very important project rule:
+
+- program.md states that stop/ready decisions must come from the self-play/league evidence path, not from supervised metrics alone.
+
+8. Datasets
+
+The code expects three dataset families under datasets/ and they are present locally.
+
+Observed dataset surfaces:
+
+- datasets/意图识别研究数据集WargameData_mini01/
+  Contains train.json and test.json.
+  Used for intent recognition / trajectory prediction supervision.
+
+- datasets/[重庆大学] 分队级陆战兵棋态势表征图数据集 WG-StateGraph/
+  Contains label.csv and many graph-related CSVs.
+  Used for state/situation graph learning.
+
+- datasets/陆战兵棋态势特征数据集/
+  Contains Wargame_Feature_Dataset.csv and a docx description.
+  Used for tactical position scoring.
+
+There are also normalized/preprocessed-looking directories:
+
+- datasets/WargameData_mini01/
+  Contains traj_data_*.pkl
+
+- datasets/WG-StateGraph/
+  Contains graph_data_*.pkl
+
+9. Environment and deployment
+
+Containerization:
+
+- Dockerfile uses python:3.10-slim.
+- requirements.txt installs numpy, torch==2.0.1, scipy, pandas, matplotlib, tensorrt (linux only), jupyter, tqdm, scikit-learn, PyYAML.
+- Dockerfile also installs the bundled SDK wheel.
+
+docker-compose:
+
+- Defines a dev service that builds the image and mounts the repo into /app.
+- PYTHONPATH is set to /app.
+
+Devcontainer:
+
+- .devcontainer/devcontainer.json points VS Code to the compose-based dev service.
+
+Fallback behavior:
+
+- When TrainEnv import fails, some scripts can fall back to mock_train_env.py for logic verification.
+
+10. Current artifacts and model manifests
+
+Observed published candidate weights:
+
+- ai/weights/intent_lstm.pt
+- ai/weights/situation_gcn.pt
+- ai/weights/model_manifest.json
+
+ai/weights/model_manifest.json currently says:
+
+- generated_at: 20260427_025901
+- source_commit_sha: 561af02b18ab60e7d0475e31eff50e8092eba8c0
+- history_len: 8
+- horizons: 5
+
+Observed incumbent snapshot:
+
+- ai/weights_incumbent_rule/model_manifest.json
+
+That manifest indicates:
+
+- generated_at: 20260327_141602
+- snapshot_role: bootstrap_rule_baseline
+
+Interpretation:
+
+- The incumbent directory looks like a rule-baseline snapshot, not a clearly promoted learned mainline.
+
+11. Current experiment status snapshot
+
+Important: there is a difference between older complete runs, newer complete runs, and the latest incomplete run.
+
+Latest incomplete league directory observed:
+
+- experiments/shenji_agent/league_20260427_030310/
+
+It currently contains:
+
+- map_list.json
+- partial_match_results.json
+- progress.json
+
+This suggests a run was in progress or interrupted and is not a final verdict surface.
+
+Latest complete league run I inspected:
+
+- experiments/shenji_agent/league_20260426_160721/
+
+Its summary shows:
+
+- overall_point_estimate: 0.5000
+- overall_ci95_lower: 0.5000
+- complex_point_estimate: 0.5000
+- complex_ci95_lower: 0.5000
+- learned_path_coverage: 0.0000
+- move_path_coverage: 0.0000
+- shoot_path_coverage: 0.0000
+- promotion_accepted: False
+
+Its promotion.json failures include:
+
+- overall_point_estimate
+- overall_ci_lower
+- complex_point_estimate
+- complex_ci_lower
+- learned_path_coverage
+- move_path_coverage
+- shoot_path_coverage
+- elo_delta_lower
+
+This is the most important current-state signal: the latest complete formal league result inspected is failing the gate badly and shows zero learned-path engagement.
+
+Earlier complete run also observed:
+
+- experiments/shenji_agent/league_20260423_024928/
+
+Its rating/promotion files show a perfect-looking 1.0 result with learned_path_coverage 1.0 but move_path_coverage 0.0 and shoot_path_coverage 1.0.
+
+Interpretation:
+
+- The experiment history is not monotonic.
+- There may have been regressions, environment differences, candidate/incumbent mismatch, or evaluation-pipeline changes across runs.
+- This repo likely needs careful triage of why a past apparently perfect run is not reflected in the latest complete run.
+
+Latest supervised run I inspected:
+
+- experiments/shenji_agent/20260425_034746/
+
+Its summary shows:
+
+- intent_immediate_accuracy: 0.6182
+- tactical_accuracy: skipped (disabled_by_config)
+- situation_accuracy: 0.5909
+- complex_bucket_intent_accuracy: 0.0000
+- medium_bucket_intent_accuracy: 0.6182
+- simple_bucket_intent_accuracy: 0.0000
+- intent_bucket_counts_train: {'medium': 4096}
+- intent_bucket_counts_val: {'medium': 1024}
+- situation_bucket_counts: {'complex': 108}
+
+Interpretation:
+
+- The supervised training data distribution looks narrow/skewed in this run.
+- Intent train/val counts appear medium-only.
+- Situation counts appear complex-only.
+- This may explain poor generalization or misleading training metrics.
+
+12. Tests
+
+The main test surface is:
+
+- tests/test_mainline_contract.py
+
+Characteristics:
+
+- It is a large contract-style suite.
+- It installs fake numpy / torch / pandas in places to avoid heavy runtime dependencies.
+- It checks:
+  - training imports
+  - self-play map sampling
+  - env fallback behavior
+  - schema normalization
+  - progress sidecars
+  - policy device routing
+  - tactical dataset label handling
+  - summarization
+  - promotion gates
+  - same-candidate rejection
+
+Interpretation:
+
+- Tests are strong on control-plane/contracts.
+- They are weaker as proof of actual model quality or real TrainEnv behavior.
+
+13. Documentation surfaces
+
+Important documents:
+
+- README.md
+  General repository introduction, but parts of it still look closer to the original SDK/demo framing than the current training-heavy reality.
+
+- docs/docs.md
+  SDK/platform usage docs.
+
+- program.md
+  The best source of truth for what "mainline success" means right now.
+
+- ALGORITHM_OPTIMIZATION_PLAN.md
+  Design/roadmap memo. Some references still point to legacy AIs/ paths.
+
+14. Current git/worktree snapshot
+
+Current branch:
+
+- main
+
+Current HEAD at inspection time:
+
+- 2a5ac08ef5dc7a6cc9694aa7cbbd5e1ceb5f0bb7
+
+Worktree state:
+
+- Dirty.
+- There are many modified and untracked files, including source files, configs, tests, docs, ai/weights_incumbent_rule, scripts, and many .agent artifacts.
+
+Important implication:
+
+- This repository is actively in-progress.
+- Some generated artifacts and checked-in experiment outputs may not align cleanly with current HEAD.
+- The published ai/weights manifest source_commit_sha (561af02...) does not match current HEAD (2a5ac08...), so the currently published candidate artifacts were not produced from the exact current checkout.
+
+15. Likely active mainline hypothesis
+
+Best evidence-based interpretation:
+
+- The project is trying to turn a rule-based wargame controller into a hybrid learned controller.
+- The current formal gate is closed-loop self-play league evaluation.
+- The current bottleneck is probably not "how to add models" but "why learned-policy engagement / evaluation validity / generalization are unstable across runs."
+
+16. Key uncertainties / risks
+
+- The SDK engine is packaged as a wheel, so some behavior is opaque.
+- README and some older docs may be partially stale relative to current code.
+- The latest directory by timestamp is not necessarily the latest complete verdict.
+- The checked-in experiment history includes contradictory-looking outcomes.
+- Current supervised metrics do not prove formal self-play improvement.
+- Current worktree is dirty, so exact reproducibility may be difficult without first identifying the intended baseline.
+
+17. Good next-task directions for ChatGPT
+
+If you want ChatGPT to propose useful next steps, ask it to focus on one or more of these:
+
+- Why does the latest complete league run show zero learned-path coverage?
+- Why do supervised data buckets look skewed (medium-only / complex-only) in the latest inspected metrics?
+- Why does an older league run appear perfect while a newer complete run fails badly?
+- Which files define the candidate/incumbent wiring and could cause evaluation mismatch?
+- What is the smallest reproducible verification plan to confirm whether the learned policy is actually being used in formal self-play?
+- How should the repo be cleaned so README/docs/runtime/artifacts reflect the real mainline?
+
+18. Suggested prompt to give ChatGPT
+
+You can upload this file and ask something like:
+
+"This is a handoff summary of my repo. Please read it and tell me the top 5 most important technical follow-up tasks, prioritized by impact and certainty. Focus on concrete debugging/verification steps for the training/self-play pipeline, especially learned-path coverage, experiment inconsistency, and dataset skew. Do not give generic advice; anchor each suggestion to the project facts in the handoff file."
+
+19. Bottom line
+
+This is an actively evolving Python research/engineering repository for a Miaosuan land-wargame AI. The real project center is now the hybrid runtime policy plus the supervised/self-play evaluation pipeline, not the original SDK demo shell. The most important current fact is that the latest complete formal league run inspected is failing the gate with zero learned-policy engagement, while older runs and published artifacts suggest inconsistent or changing behavior across the project history.
