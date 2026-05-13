@@ -1,0 +1,25 @@
+{
+  "blockers": [],
+  "by_move_type": {
+    "Fly": {
+      "empty": 7182,
+      "total": 8716
+    },
+    "Maneuver": {
+      "empty": 7595,
+      "total": 10093
+    },
+    "Walk": {
+      "empty": 864,
+      "total": 4771
+    }
+  },
+  "empty_route_count": 15641,
+  "empty_route_rate": 0.6633163698049194,
+  "league_dir": "/remote-home/lizilong/shenji_agent/experiments/shenji_agent/league_20260501_170204",
+  "rating_exists": true,
+  "route_failure_reasons": {
+    "no_valid_move_candidate": 15641
+  },
+  "total_move_attempts": 23580
+}

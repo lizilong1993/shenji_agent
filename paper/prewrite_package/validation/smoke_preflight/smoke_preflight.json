@@ -1,0 +1,25 @@
+{
+  "blockers": [
+    {
+      "component": "candidate_artifact_dir",
+      "missing": [
+        "/remote-home/lizilong/shenji_agent/ai/weights/intent_lstm.pt",
+        "/remote-home/lizilong/shenji_agent/ai/weights/situation_gcn.pt",
+        "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt"
+      ]
+    },
+    {
+      "component": "incumbent_artifact_dir",
+      "missing": [
+        "/remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule/intent_lstm.pt",
+        "/remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule/situation_gcn.pt"
+      ]
+    }
+  ],
+  "candidate_artifact_dir": "/remote-home/lizilong/shenji_agent/ai/weights",
+  "incumbent_artifact_dir": "/remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule",
+  "map_basic_count": 16,
+  "scenario_count": 50,
+  "status": "blocked",
+  "would_run": "python -m training.selfplay --config configs/selfplay_minimal.yaml --candidate /remote-home/lizilong/shenji_agent/ai/weights --incumbent /remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule"
+}

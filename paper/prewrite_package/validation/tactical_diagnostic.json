@@ -1,0 +1,11 @@
+{
+  "artifact_dir": "/remote-home/lizilong/shenji_agent/ai/weights",
+  "blockers": [
+    "missing tactical model file: /remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt"
+  ],
+  "manifest_exists": true,
+  "tactical_model_exists": false,
+  "tactical_model_loaded": false,
+  "tactical_model_path": "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt",
+  "tactical_nonzero_count": 0
+}

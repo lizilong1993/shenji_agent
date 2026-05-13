@@ -1,0 +1,296 @@
+{
+  "asset_summary": {
+    "ai_weights": {
+      "file_count": 4,
+      "ignored_by_git": false,
+      "needed_for": "candidate checkpoints and manifests",
+      "path": "ai/weights",
+      "previously_deleted_by_sync_commit_8c7067c": true,
+      "representative_filenames": [
+        "ai/weights/intention_lstm.pth",
+        "ai/weights/model_manifest.json",
+        "ai/weights/situation_feature_normalizer.json",
+        "ai/weights/situation_gcn.pth"
+      ],
+      "safe_backup_instructions_needed": true,
+      "status": "exists",
+      "total_size_bytes": 13665458,
+      "tracked_by_git": true
+    },
+    "experiments": {
+      "file_count": 111,
+      "ignored_by_git": false,
+      "needed_for": "formal and diagnostic evidence",
+      "path": "experiments/shenji_agent",
+      "previously_deleted_by_sync_commit_8c7067c": false,
+      "representative_filenames": [
+        "experiments/shenji_agent/20260428_235555/config.yaml",
+        "experiments/shenji_agent/20260428_235555/metrics.json",
+        "experiments/shenji_agent/20260428_235555/situation_feature_normalizer.json",
+        "experiments/shenji_agent/20260428_235555/slice_report.json",
+        "experiments/shenji_agent/20260428_235555/summary.md",
+        "experiments/shenji_agent/authentication_failure_analysis.md",
+        "experiments/shenji_agent/authorized_environment_search.md",
+        "experiments/shenji_agent/current_interfaces.txt"
+      ],
+      "safe_backup_instructions_needed": true,
+      "status": "exists",
+      "total_size_bytes": 20101859,
+      "tracked_by_git": true
+    },
+    "incumbent_rule": {
+      "file_count": 1,
+      "ignored_by_git": false,
+      "needed_for": "rule incumbent manifest",
+      "path": "ai/weights_incumbent_rule",
+      "previously_deleted_by_sync_commit_8c7067c": true,
+      "representative_filenames": [
+        "ai/weights_incumbent_rule/model_manifest.json"
+      ],
+      "safe_backup_instructions_needed": true,
+      "status": "exists",
+      "total_size_bytes": 197,
+      "tracked_by_git": true
+    },
+    "sdk_maps": {
+      "file_count": 48,
+      "ignored_by_git": false,
+      "needed_for": "map, cost, visibility data",
+      "path": "land_wargame_sdk/Data/Data/maps",
+      "previously_deleted_by_sync_commit_8c7067c": true,
+      "representative_filenames": [
+        "land_wargame_sdk/Data/Data/maps/map_123/123see.npz",
+        "land_wargame_sdk/Data/Data/maps/map_123/basic.json",
+        "land_wargame_sdk/Data/Data/maps/map_123/cost.pickle",
+        "land_wargame_sdk/Data/Data/maps/map_19/19see.npz",
+        "land_wargame_sdk/Data/Data/maps/map_19/basic.json",
+        "land_wargame_sdk/Data/Data/maps/map_19/cost.pickle",
+        "land_wargame_sdk/Data/Data/maps/map_21/21see.npz",
+        "land_wargame_sdk/Data/Data/maps/map_21/basic.json"
+      ],
+      "safe_backup_instructions_needed": true,
+      "status": "exists",
+      "total_size_bytes": 179220393,
+      "tracked_by_git": true
+    },
+    "sdk_scenarios": {
+      "file_count": 50,
+      "ignored_by_git": false,
+      "needed_for": "scenario data",
+      "path": "land_wargame_sdk/Data/Data/scenarios",
+      "previously_deleted_by_sync_commit_8c7067c": true,
+      "representative_filenames": [
+        "land_wargame_sdk/Data/Data/scenarios/1231.json",
+        "land_wargame_sdk/Data/Data/scenarios/1531.json",
+        "land_wargame_sdk/Data/Data/scenarios/1631.json",
+        "land_wargame_sdk/Data/Data/scenarios/1910631192.json",
+        "land_wargame_sdk/Data/Data/scenarios/1930331196.json",
+        "land_wargame_sdk/Data/Data/scenarios/1930631192.json",
+        "land_wargame_sdk/Data/Data/scenarios/2010131194.json",
+        "land_wargame_sdk/Data/Data/scenarios/2010141294.json"
+      ],
+      "safe_backup_instructions_needed": true,
+      "status": "exists",
+      "total_size_bytes": 3408840,
+      "tracked_by_git": true
+    },
+    "sdk_wheel": {
+      "file_count": 1,
+      "ignored_by_git": false,
+      "needed_for": "SDK environment install",
+      "path": "land_wargame_sdk/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "previously_deleted_by_sync_commit_8c7067c": true,
+      "representative_filenames": [
+        "land_wargame_sdk/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+      ],
+      "safe_backup_instructions_needed": true,
+      "status": "exists",
+      "total_size_bytes": 24705556,
+      "tracked_by_git": true
+    }
+  },
+  "best_league": {
+    "candidate": "challenger",
+    "elo": -0.0,
+    "incumbent": "baseline",
+    "learned_path_coverage": 0.0,
+    "map_or_scenario_count": "not_available",
+    "match_count": 2,
+    "missing_required_sidecars": [
+      "league_state.json",
+      "exploitability.json"
+    ],
+    "path": "experiments/shenji_agent/league_20260429_032914",
+    "present_sidecars": {
+      "exploitability.json": false,
+      "league_state.json": false,
+      "participants.json": true,
+      "promotion.json": true,
+      "rating.json": true,
+      "summary.md": true
+    },
+    "promotion_accepted": true,
+    "promotion_failures": [],
+    "route_empty_count": 0,
+    "route_total_attempts": 0,
+    "suitable_for_manuscript_evidence": true,
+    "tactical_model_loaded_match_count": 2,
+    "win_rate": 0.5
+  },
+  "claims": [
+    {
+      "Allowed wording": "implemented and exercised in local SDK evaluation",
+      "Candidate manuscript claim": "Closed-loop land-wargame SDK evaluation was implemented.",
+      "Claim ID": "C1",
+      "Evidence path": "training/selfplay.py; experiments/shenji_agent/league_* sidecars",
+      "Evidence type": "code and JSON sidecars",
+      "Exact metric or observation": "league directories contain rating/promotion/participants sidecars",
+      "Forbidden wording": "public benchmark dominance",
+      "Known caveat": "single proprietary/local SDK",
+      "Status": "supported"
+    },
+    {
+      "Allowed wording": "loads learned intent/situation components",
+      "Candidate manuscript claim": "Candidate agent uses learned intent/situation components.",
+      "Claim ID": "C2",
+      "Evidence path": "ai/models.py; ai/weights/model_manifest.json; ai/weights/*.pth",
+      "Evidence type": "code, manifests, checkpoints",
+      "Exact metric or observation": "intent and situation checkpoints exist",
+      "Forbidden wording": "learned components drove all decisions",
+      "Known caveat": "sidecars may show zero learned action-path coverage",
+      "Status": "supported"
+    },
+    {
+      "Allowed wording": "rule incumbent baseline",
+      "Candidate manuscript claim": "Candidate was evaluated against a rule incumbent.",
+      "Claim ID": "C3",
+      "Evidence path": "ai/weights_incumbent_rule/model_manifest.json; participants.json",
+      "Evidence type": "manifest and participants sidecars",
+      "Exact metric or observation": "incumbent profile baseline/rule manifests present",
+      "Forbidden wording": "strong external baseline",
+      "Known caveat": "incumbent has no checkpoint payload",
+      "Status": "supported"
+    },
+    {
+      "Allowed wording": "promotion-gated local league evaluation",
+      "Candidate manuscript claim": "Promotion gate or league-style evaluation exists.",
+      "Claim ID": "C4",
+      "Evidence path": "experiments/shenji_agent/league_*/promotion.json",
+      "Evidence type": "JSON sidecars",
+      "Exact metric or observation": "promotion.json files present",
+      "Forbidden wording": "fully validated benchmark suite",
+      "Known caveat": "some runs incomplete or failed",
+      "Status": "supported"
+    },
+    {
+      "Allowed wording": "one accepted promotion sidecar exists",
+      "Candidate manuscript claim": "One verified promotion window exists.",
+      "Claim ID": "C5",
+      "Evidence path": "experiments/shenji_agent/league_20260429_032914/promotion.json",
+      "Evidence type": "promotion sidecar",
+      "Exact metric or observation": "accepted=True",
+      "Forbidden wording": "repeatable multi-window success",
+      "Known caveat": "accepted sidecar can have zero learned-path coverage",
+      "Status": "supported"
+    },
+    {
+      "Allowed wording": "two-window success not proven",
+      "Candidate manuscript claim": "Two-window hard-stop success exists.",
+      "Claim ID": "C6",
+      "Evidence path": "formal_artifacts_index.json",
+      "Evidence type": "absence/insufficient sidecars",
+      "Exact metric or observation": "no consecutive two-window proof extracted",
+      "Forbidden wording": "two-window promotion success",
+      "Known caveat": "requires formal consecutive-window sidecars",
+      "Status": "forbidden"
+    },
+    {
+      "Allowed wording": "tactical path remains unproven",
+      "Candidate manuscript claim": "Tactical module contributes.",
+      "Claim ID": "C7",
+      "Evidence path": "ai/weights/model_manifest.json; validation/tactical_diagnostic.json",
+      "Evidence type": "manifest/diagnostic",
+      "Exact metric or observation": "tactical checkpoint exists=False; learned coverage=0.0",
+      "Forbidden wording": "tactical module improves performance",
+      "Known caveat": "nonzero tactical contribution not demonstrated",
+      "Status": "forbidden"
+    },
+    {
+      "Allowed wording": "route diagnostics are tracked",
+      "Candidate manuscript claim": "Route planner is reliable.",
+      "Claim ID": "C8",
+      "Evidence path": "experiments/shenji_agent/league_20260429_032914/rating.json",
+      "Evidence type": "route diagnostics",
+      "Exact metric or observation": "route attempts=0",
+      "Forbidden wording": "route planner is reliable",
+      "Known caveat": "zero or unavailable route attempts cannot prove reliability",
+      "Status": "unsupported"
+    },
+    {
+      "Allowed wording": "route evidence is insufficient and remains a limitation",
+      "Candidate manuscript claim": "Route empty-rate limitation exists.",
+      "Claim ID": "C9",
+      "Evidence path": "rating.json policy.move_route_aggregate; validation/route_diagnostic.json",
+      "Evidence type": "diagnostic sidecars",
+      "Exact metric or observation": "route attempt evidence is absent/zero in key sidecars",
+      "Forbidden wording": "route issue resolved",
+      "Known caveat": "empty-rate cannot always be computed",
+      "Status": "supported"
+    },
+    {
+      "Allowed wording": "preliminary baseline/ablation scaffolding",
+      "Candidate manuscript claim": "Baselines/ablations exist.",
+      "Claim ID": "C10",
+      "Evidence path": "configs/*ablation*.yaml; tests; experiments",
+      "Evidence type": "configs and partial artifacts",
+      "Exact metric or observation": "tactical ablation config exists; no complete protocol-matched ablation table extracted",
+      "Forbidden wording": "comprehensive ablation study",
+      "Known caveat": "insufficient for strong comparative claims",
+      "Status": "partially supported"
+    },
+    {
+      "Allowed wording": "evidence-gated workflow contribution",
+      "Candidate manuscript claim": "Method is novel.",
+      "Claim ID": "C11",
+      "Evidence path": "08_novelty_and_positioning.md",
+      "Evidence type": "positioning note",
+      "Exact metric or observation": "novelty framed around evidence-gated workflow, not LSTM/GraphSAGE",
+      "Forbidden wording": "new LSTM or GraphSAGE algorithm",
+      "Known caveat": "standard model components",
+      "Status": "partially supported"
+    },
+    {
+      "Allowed wording": "repo-local reproducibility package",
+      "Candidate manuscript claim": "Evaluation is reproducible.",
+      "Claim ID": "C12",
+      "Evidence path": "00_repository_state.md; 01_asset_provenance.md; 11_validation_log.md",
+      "Evidence type": "inventory and validation",
+      "Exact metric or observation": "assets and commands documented; auth/local SDK may constrain reruns",
+      "Forbidden wording": "fully independently reproducible",
+      "Known caveat": "SDK/auth and missing tactical checkpoint risks",
+      "Status": "partially supported"
+    },
+    {
+      "Allowed wording": "no public SOTA claim",
+      "Candidate manuscript claim": "Public SOTA is achieved.",
+      "Claim ID": "C13",
+      "Evidence path": "none",
+      "Evidence type": "no public leaderboard evidence",
+      "Exact metric or observation": "not_available",
+      "Forbidden wording": "SOTA",
+      "Known caveat": "no protocol-matched public benchmark",
+      "Status": "forbidden"
+    },
+    {
+      "Allowed wording": "ready for conservative manuscript drafting with blockers",
+      "Candidate manuscript claim": "Manuscript is ready for top-tier submission.",
+      "Claim ID": "C14",
+      "Evidence path": "09_reviewer_risk_register.md",
+      "Evidence type": "risk register",
+      "Exact metric or observation": "major evidence gaps remain",
+      "Forbidden wording": "top-tier-ready submission package",
+      "Known caveat": "conservative manuscript/report can be written",
+      "Status": "forbidden"
+    }
+  ]
+}

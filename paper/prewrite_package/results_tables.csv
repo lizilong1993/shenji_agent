@@ -1,0 +1,27 @@
+table,item,metric,value,evidence_path,caveat
+system_components,Intent model,evidence_status,learned intent model exists,ai/models.py; ai/weights/intention_lstm.pth,standard LSTM/attention
+system_components,Situation model,evidence_status,learned situation model exists,ai/models.py; ai/weights/situation_gcn.pth,standard GraphSAGE-style model
+system_components,Tactical scorer,evidence_status,scorer class exists,ai/models.py; ai/weights/model_manifest.json,checkpoint/contribution not proven
+system_components,Rule fallback,evidence_status,fallback logic exists,ai/policy.py; ai/agent.py,may dominate decisions
+system_components,Route planner,evidence_status,route planner implementation exists,ai/agent.py,reliability unsupported
+system_components,Promotion gate,evidence_status,promotion sidecars exist,experiments/shenji_agent/league_*/promotion.json,not all accepted
+system_components,League evaluator,evidence_status,league evaluation entrypoint exists,training/selfplay.py,SDK/auth constrained
+system_components,Artifact validator,evidence_status,artifact contract tests exist,tests/test_promotion_artifact_contract.py,does not prove paper claims alone
+formal_league,experiments/shenji_agent/league_20260429_001342,promotion_accepted,True,experiments/shenji_agent/league_20260429_001342,learned_coverage=1.0
+formal_league,experiments/shenji_agent/league_20260429_001512,promotion_accepted,False,experiments/shenji_agent/league_20260429_001512,learned_coverage=1.0
+formal_league,experiments/shenji_agent/league_20260429_032914,promotion_accepted,True,experiments/shenji_agent/league_20260429_032914,learned_coverage=0.0
+formal_league,experiments/shenji_agent/league_20260429_094929,promotion_accepted,False,experiments/shenji_agent/league_20260429_094929,learned_coverage=0.0
+formal_league,experiments/shenji_agent/league_20260429_102023,promotion_accepted,False,experiments/shenji_agent/league_20260429_102023,learned_coverage=0.0
+formal_league,experiments/shenji_agent/league_20260429_105446,promotion_accepted,False,experiments/shenji_agent/league_20260429_105446,learned_coverage=0.0
+limitations,tactical contribution not proven,status,open,04_claim_to_evidence_matrix.md,limits manuscript wording
+limitations,route empty-rate issue,status,open,04_claim_to_evidence_matrix.md,limits manuscript wording
+limitations,two-window hard-stop not proven,status,open,04_claim_to_evidence_matrix.md,limits manuscript wording
+limitations,baseline/ablation insufficiency,status,open,04_claim_to_evidence_matrix.md,limits manuscript wording
+limitations,single SDK limitation,status,open,04_claim_to_evidence_matrix.md,limits manuscript wording
+limitations,limited scenario/map coverage,status,open,04_claim_to_evidence_matrix.md,limits manuscript wording
+reproducibility_assets,ai_weights,exists,exists,ai/weights,protect restored assets
+reproducibility_assets,incumbent_rule,exists,exists,ai/weights_incumbent_rule,protect restored assets
+reproducibility_assets,sdk_wheel,exists,exists,land_wargame_sdk/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl,protect restored assets
+reproducibility_assets,sdk_scenarios,exists,exists,land_wargame_sdk/Data/Data/scenarios,protect restored assets
+reproducibility_assets,sdk_maps,exists,exists,land_wargame_sdk/Data/Data/maps,protect restored assets
+reproducibility_assets,experiments,exists,exists,experiments/shenji_agent,protect restored assets

@@ -1,0 +1,201 @@
+[
+  {
+    "candidate": "challenger",
+    "elo": -0.0,
+    "incumbent": "baseline",
+    "learned_path_coverage": 1.0,
+    "map_or_scenario_count": "not_available",
+    "match_count": 2,
+    "missing_required_sidecars": [],
+    "path": "experiments/shenji_agent/league_20260429_001342",
+    "present_sidecars": {
+      "exploitability.json": true,
+      "league_state.json": true,
+      "participants.json": true,
+      "promotion.json": true,
+      "rating.json": true,
+      "summary.md": true
+    },
+    "promotion_accepted": true,
+    "promotion_failures": [],
+    "route_empty_count": 0,
+    "route_total_attempts": 37,
+    "suitable_for_manuscript_evidence": true,
+    "tactical_model_loaded_match_count": 2,
+    "win_rate": 0.5
+  },
+  {
+    "candidate": "challenger",
+    "elo": -0.0,
+    "incumbent": "baseline",
+    "learned_path_coverage": 1.0,
+    "map_or_scenario_count": "not_available",
+    "match_count": 5,
+    "missing_required_sidecars": [],
+    "path": "experiments/shenji_agent/league_20260429_001512",
+    "present_sidecars": {
+      "exploitability.json": true,
+      "league_state.json": true,
+      "participants.json": true,
+      "promotion.json": true,
+      "rating.json": true,
+      "summary.md": true
+    },
+    "promotion_accepted": false,
+    "promotion_failures": [
+      "overall_point_estimate",
+      "overall_ci_lower",
+      "complex_point_estimate",
+      "complex_ci_lower",
+      "elo_delta_lower"
+    ],
+    "route_empty_count": 0,
+    "route_total_attempts": 137,
+    "suitable_for_manuscript_evidence": true,
+    "tactical_model_loaded_match_count": 5,
+    "win_rate": 0.5
+  },
+  {
+    "candidate": "challenger",
+    "elo": -0.0,
+    "incumbent": "baseline",
+    "learned_path_coverage": 0.0,
+    "map_or_scenario_count": "not_available",
+    "match_count": 2,
+    "missing_required_sidecars": [
+      "league_state.json",
+      "exploitability.json"
+    ],
+    "path": "experiments/shenji_agent/league_20260429_032914",
+    "present_sidecars": {
+      "exploitability.json": false,
+      "league_state.json": false,
+      "participants.json": true,
+      "promotion.json": true,
+      "rating.json": true,
+      "summary.md": true
+    },
+    "promotion_accepted": true,
+    "promotion_failures": [],
+    "route_empty_count": 0,
+    "route_total_attempts": 0,
+    "suitable_for_manuscript_evidence": true,
+    "tactical_model_loaded_match_count": 2,
+    "win_rate": 0.5
+  },
+  {
+    "candidate": "not_available",
+    "elo": "not_available",
+    "incumbent": "not_available",
+    "learned_path_coverage": "not_available",
+    "map_or_scenario_count": "not_available",
+    "match_count": "not_available",
+    "missing_required_sidecars": [
+      "league_state.json",
+      "participants.json",
+      "exploitability.json"
+    ],
+    "path": "experiments/shenji_agent/league_20260429_033459",
+    "present_sidecars": {
+      "exploitability.json": false,
+      "league_state.json": false,
+      "participants.json": false,
+      "promotion.json": true,
+      "rating.json": true,
+      "summary.md": true
+    },
+    "promotion_accepted": false,
+    "promotion_failures": [
+      "compare_interrupted"
+    ],
+    "route_empty_count": "not_available",
+    "route_total_attempts": "not_available",
+    "suitable_for_manuscript_evidence": false,
+    "tactical_model_loaded_match_count": "not_available",
+    "win_rate": "not_available"
+  },
+  {
+    "candidate": "challenger",
+    "elo": -0.0,
+    "incumbent": "baseline",
+    "learned_path_coverage": 0.0,
+    "map_or_scenario_count": "not_available",
+    "match_count": 1,
+    "missing_required_sidecars": [],
+    "path": "experiments/shenji_agent/league_20260429_094929",
+    "present_sidecars": {
+      "exploitability.json": true,
+      "league_state.json": true,
+      "participants.json": true,
+      "promotion.json": true,
+      "rating.json": true,
+      "summary.md": true
+    },
+    "promotion_accepted": false,
+    "promotion_failures": [
+      "battle_phase_not_entered",
+      "no_move_shoot_occupy_selected_actions"
+    ],
+    "route_empty_count": 0,
+    "route_total_attempts": 0,
+    "suitable_for_manuscript_evidence": true,
+    "tactical_model_loaded_match_count": 1,
+    "win_rate": 0.5
+  },
+  {
+    "candidate": "challenger",
+    "elo": -0.0,
+    "incumbent": "baseline",
+    "learned_path_coverage": 0.0,
+    "map_or_scenario_count": "not_available",
+    "match_count": 1,
+    "missing_required_sidecars": [],
+    "path": "experiments/shenji_agent/league_20260429_102023",
+    "present_sidecars": {
+      "exploitability.json": true,
+      "league_state.json": true,
+      "participants.json": true,
+      "promotion.json": true,
+      "rating.json": true,
+      "summary.md": true
+    },
+    "promotion_accepted": false,
+    "promotion_failures": [
+      "battle_phase_not_entered",
+      "no_move_shoot_occupy_selected_actions"
+    ],
+    "route_empty_count": 0,
+    "route_total_attempts": 0,
+    "suitable_for_manuscript_evidence": true,
+    "tactical_model_loaded_match_count": 0,
+    "win_rate": 0.5
+  },
+  {
+    "candidate": "challenger",
+    "elo": -0.0,
+    "incumbent": "baseline",
+    "learned_path_coverage": 0.0,
+    "map_or_scenario_count": "not_available",
+    "match_count": 1,
+    "missing_required_sidecars": [],
+    "path": "experiments/shenji_agent/league_20260429_105446",
+    "present_sidecars": {
+      "exploitability.json": true,
+      "league_state.json": true,
+      "participants.json": true,
+      "promotion.json": true,
+      "rating.json": true,
+      "summary.md": true
+    },
+    "promotion_accepted": false,
+    "promotion_failures": [
+      "battle_phase_not_entered",
+      "no_move_shoot_occupy_selected_actions"
+    ],
+    "route_empty_count": 0,
+    "route_total_attempts": 0,
+    "suitable_for_manuscript_evidence": true,
+    "tactical_model_loaded_match_count": 0,
+    "win_rate": 0.5
+  }
+]

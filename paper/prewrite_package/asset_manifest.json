@@ -1,0 +1,110 @@
+{
+  "ai_weights": {
+    "file_count": 4,
+    "ignored_by_git": false,
+    "needed_for": "candidate checkpoints and manifests",
+    "path": "ai/weights",
+    "previously_deleted_by_sync_commit_8c7067c": true,
+    "representative_filenames": [
+      "ai/weights/intention_lstm.pth",
+      "ai/weights/model_manifest.json",
+      "ai/weights/situation_feature_normalizer.json",
+      "ai/weights/situation_gcn.pth"
+    ],
+    "safe_backup_instructions_needed": true,
+    "status": "exists",
+    "total_size_bytes": 13665458,
+    "tracked_by_git": true
+  },
+  "experiments": {
+    "file_count": 111,
+    "ignored_by_git": false,
+    "needed_for": "formal and diagnostic evidence",
+    "path": "experiments/shenji_agent",
+    "previously_deleted_by_sync_commit_8c7067c": false,
+    "representative_filenames": [
+      "experiments/shenji_agent/20260428_235555/config.yaml",
+      "experiments/shenji_agent/20260428_235555/metrics.json",
+      "experiments/shenji_agent/20260428_235555/situation_feature_normalizer.json",
+      "experiments/shenji_agent/20260428_235555/slice_report.json",
+      "experiments/shenji_agent/20260428_235555/summary.md",
+      "experiments/shenji_agent/authentication_failure_analysis.md",
+      "experiments/shenji_agent/authorized_environment_search.md",
+      "experiments/shenji_agent/current_interfaces.txt"
+    ],
+    "safe_backup_instructions_needed": true,
+    "status": "exists",
+    "total_size_bytes": 20101859,
+    "tracked_by_git": true
+  },
+  "incumbent_rule": {
+    "file_count": 1,
+    "ignored_by_git": false,
+    "needed_for": "rule incumbent manifest",
+    "path": "ai/weights_incumbent_rule",
+    "previously_deleted_by_sync_commit_8c7067c": true,
+    "representative_filenames": [
+      "ai/weights_incumbent_rule/model_manifest.json"
+    ],
+    "safe_backup_instructions_needed": true,
+    "status": "exists",
+    "total_size_bytes": 197,
+    "tracked_by_git": true
+  },
+  "sdk_maps": {
+    "file_count": 48,
+    "ignored_by_git": false,
+    "needed_for": "map, cost, visibility data",
+    "path": "land_wargame_sdk/Data/Data/maps",
+    "previously_deleted_by_sync_commit_8c7067c": true,
+    "representative_filenames": [
+      "land_wargame_sdk/Data/Data/maps/map_123/123see.npz",
+      "land_wargame_sdk/Data/Data/maps/map_123/basic.json",
+      "land_wargame_sdk/Data/Data/maps/map_123/cost.pickle",
+      "land_wargame_sdk/Data/Data/maps/map_19/19see.npz",
+      "land_wargame_sdk/Data/Data/maps/map_19/basic.json",
+      "land_wargame_sdk/Data/Data/maps/map_19/cost.pickle",
+      "land_wargame_sdk/Data/Data/maps/map_21/21see.npz",
+      "land_wargame_sdk/Data/Data/maps/map_21/basic.json"
+    ],
+    "safe_backup_instructions_needed": true,
+    "status": "exists",
+    "total_size_bytes": 179220393,
+    "tracked_by_git": true
+  },
+  "sdk_scenarios": {
+    "file_count": 50,
+    "ignored_by_git": false,
+    "needed_for": "scenario data",
+    "path": "land_wargame_sdk/Data/Data/scenarios",
+    "previously_deleted_by_sync_commit_8c7067c": true,
+    "representative_filenames": [
+      "land_wargame_sdk/Data/Data/scenarios/1231.json",
+      "land_wargame_sdk/Data/Data/scenarios/1531.json",
+      "land_wargame_sdk/Data/Data/scenarios/1631.json",
+      "land_wargame_sdk/Data/Data/scenarios/1910631192.json",
+      "land_wargame_sdk/Data/Data/scenarios/1930331196.json",
+      "land_wargame_sdk/Data/Data/scenarios/1930631192.json",
+      "land_wargame_sdk/Data/Data/scenarios/2010131194.json",
+      "land_wargame_sdk/Data/Data/scenarios/2010141294.json"
+    ],
+    "safe_backup_instructions_needed": true,
+    "status": "exists",
+    "total_size_bytes": 3408840,
+    "tracked_by_git": true
+  },
+  "sdk_wheel": {
+    "file_count": 1,
+    "ignored_by_git": false,
+    "needed_for": "SDK environment install",
+    "path": "land_wargame_sdk/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+    "previously_deleted_by_sync_commit_8c7067c": true,
+    "representative_filenames": [
+      "land_wargame_sdk/land_wargame_train_env-4.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+    ],
+    "safe_backup_instructions_needed": true,
+    "status": "exists",
+    "total_size_bytes": 24705556,
+    "tracked_by_git": true
+  }
+}

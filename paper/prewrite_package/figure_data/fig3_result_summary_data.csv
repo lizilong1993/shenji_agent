@@ -1,0 +1,4 @@
+metric,value,evidence_path,caveat
+promotion_accepted,True,experiments/shenji_agent/league_20260429_032914,one sidecar only; learned coverage may be zero
+win_rate,0.5,experiments/shenji_agent/league_20260429_032914,sidecar point estimate
+learned_path_coverage,0.0,experiments/shenji_agent/league_20260429_032914,do not infer tactical contribution
