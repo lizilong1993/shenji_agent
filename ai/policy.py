@@ -8,6 +8,7 @@ from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
+from .artifacts import resolve_manifest_assets
 from .features import FEATURE_DIM, TACTICAL_FEATURE_DIM, action_feature_vector, build_feature_similarity_graph, operator_to_feature, operator_to_graph_feature
 
 try:
@@ -224,14 +225,15 @@ class LearnedPolicy:
             self.history_len = int(payload.get("history_len", self.history_len))
             self.enemy_histories = defaultdict(lambda: deque(maxlen=self.history_len))
 
-            intent_name = payload.get("intent_lstm") or payload.get("intent_model")
-            situation_name = payload.get("situation_gcn") or payload.get("situation_model")
-            if not intent_name or not situation_name:
+            resolutions = resolve_manifest_assets(candidate_dir, payload)
+            intent_resolution = resolutions.get("intent_lstm") or resolutions.get("intent_model")
+            situation_resolution = resolutions.get("situation_gcn") or resolutions.get("situation_model")
+            if not intent_resolution or not situation_resolution:
                 continue
 
-            intent_path = candidate_dir / intent_name
-            situation_path = candidate_dir / situation_name
-            if not intent_path.exists() or not situation_path.exists():
+            intent_path = intent_resolution.path
+            situation_path = situation_resolution.path
+            if not intent_resolution.exists or not situation_resolution.exists:
                 continue
 
             try:
@@ -248,9 +250,9 @@ class LearnedPolicy:
             self._feature_normalizer = self._load_normalizer(candidate_dir)
 
             # Load tactical model if available
-            tactical_name = payload.get("tactical_model") or "tactical_model.pt"
-            tactical_path = candidate_dir / tactical_name
-            if tactical_path.exists():
+            tactical_resolution = resolutions.get("tactical_model")
+            tactical_path = tactical_resolution.path if tactical_resolution else candidate_dir / "tactical_model.pt"
+            if tactical_resolution and tactical_resolution.exists:
                 try:
                     tactical_state = torch.load(tactical_path, map_location="cpu")
                     self.tactical_model = self._move_to_device(self._load_tactical_model(tactical_state))

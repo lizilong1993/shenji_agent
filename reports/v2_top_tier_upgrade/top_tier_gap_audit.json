@@ -1,0 +1,110 @@
+{
+  "date": "2026-05-13",
+  "state": "not_top_tier_ready",
+  "phase_1_decision": "proceed_to_reproducibility_and_asset_contract_repair_before_major_experiments",
+  "key_blockers": [
+    {
+      "id": "checkpoint_manifest_mismatch",
+      "evidence": {
+        "manifest": "ai/weights/model_manifest.json",
+        "manifest_expected": [
+          "intent_lstm.pt",
+          "situation_gcn.pt",
+          "tactical_model.pt"
+        ],
+        "existing_files": [
+          "ai/weights/intention_lstm.pth",
+          "ai/weights/situation_gcn.pth",
+          "ai/weights/situation_feature_normalizer.json",
+          "ai/weights/model_manifest.json"
+        ]
+      },
+      "claim_impact": "reproducibility_fragile"
+    },
+    {
+      "id": "tactical_checkpoint_missing",
+      "evidence": "paper/prewrite_package/validation/tactical_diagnostic.json",
+      "metrics": {
+        "tactical_model_exists": false,
+        "tactical_model_loaded": false,
+        "tactical_nonzero_count": 0
+      },
+      "claim_impact": "tactical_contribution_forbidden"
+    },
+    {
+      "id": "route_empty_rate_high",
+      "evidence": "paper/prewrite_package/validation/route_diagnostic.json",
+      "metrics": {
+        "total_move_attempts": 23580,
+        "empty_route_count": 15641,
+        "empty_route_rate": 0.6633163698049194,
+        "route_failure_reasons": {
+          "no_valid_move_candidate": 15641
+        }
+      },
+      "claim_impact": "route_reliability_forbidden"
+    },
+    {
+      "id": "two_window_not_proven",
+      "evidence": "paper/prewrite_package/03_formal_artifact_inventory.md",
+      "claim_impact": "two_window_success_forbidden"
+    },
+    {
+      "id": "baseline_ablation_statistical_evidence_incomplete",
+      "evidence": [
+        "paper/prewrite_package/05_results_for_tables.md",
+        "paper/prewrite_package/09_reviewer_risk_register.md"
+      ],
+      "claim_impact": "top_tier_readiness_forbidden"
+    }
+  ],
+  "dimensions": [
+    {
+      "dimension": "Soundness",
+      "current_status": "Promotion sidecars and validators exist, but route and tactical gates fail and no two-window proof is extracted.",
+      "required_for_top_tier": "Protocol-matched evaluation with clear candidate/incumbent identities, deterministic seeds, leak checks, failure analysis, and statistical confidence.",
+      "gap": "Missing two-window proof, route reliability, tactical branch validity, and multi-seed confidence intervals.",
+      "planned_fix": "Repair asset contract, then run route/tactical diagnostics, baselines, ablations, and statistical summaries.",
+      "can_fix_in_repo": "partial"
+    },
+    {
+      "dimension": "Novelty",
+      "current_status": "Standard LSTM and GraphSAGE-style components; evidence-gated workflow is the strongest framing.",
+      "required_for_top_tier": "Method contribution with ablation support.",
+      "gap": "Weak algorithmic novelty if framed as model architecture.",
+      "planned_fix": "Evaluate evidence-gated or route-aware policy composition as the feasible method upgrade.",
+      "can_fix_in_repo": "partial"
+    },
+    {
+      "dimension": "Evidence",
+      "current_status": "Intent/situation checkpoint files exist but do not match manifest; tactical checkpoint missing; route empty-rate high.",
+      "required_for_top_tier": "Executable baselines, ablations, route/tactical diagnostics, multi-seed statistics, and validated sidecars.",
+      "gap": "Core V2 evidence missing.",
+      "planned_fix": "Create V2 validators and rerunnable smoke/formal artifacts where SDK permits.",
+      "can_fix_in_repo": "partial"
+    },
+    {
+      "dimension": "Significance",
+      "current_status": "Domain-relevant closed-loop local SDK evaluation.",
+      "required_for_top_tier": "Clear venue relevance, scenario/map diversity, and strong external or protocol-matched baselines.",
+      "gap": "Narrow local scope and no public SOTA comparison.",
+      "planned_fix": "Add scenario/map stratification and honest venue-fit decision.",
+      "can_fix_in_repo": "partial"
+    },
+    {
+      "dimension": "Reproducibility",
+      "current_status": "Assets exist but contract is inconsistent; SDK/auth constraints may affect reruns.",
+      "required_for_top_tier": "Manifest-resolved checkpoints, deterministic commands, asset provenance, and fail-closed validators.",
+      "gap": "Manifest, filenames, loaders, and validators disagree.",
+      "planned_fix": "Make asset resolution explicit and tested.",
+      "can_fix_in_repo": "yes"
+    }
+  ],
+  "forbidden_claims_remain": [
+    "tactical_module_improves_performance",
+    "route_planner_is_reliable",
+    "two_window_hard_stop_success",
+    "public_sota",
+    "top_tier_submission_ready"
+  ]
+}

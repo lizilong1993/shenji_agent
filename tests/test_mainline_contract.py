@@ -1775,6 +1775,9 @@ class MainlineContractTest(unittest.TestCase):
                         "generated_at": "20260427_000000",
                         "source_commit_sha": "candsha",
                         "snapshot_role": "accepted_learned_mainline",
+                        "intent_lstm": "intent_lstm.pt",
+                        "situation_gcn": "situation_gcn.pt",
+                        "tactical_model": "tactical_model.pt",
                         "managed_files": ["intent_lstm.pt", "situation_gcn.pt", "tactical_model.pt", "model_manifest.json"],
                     }
                 ),
@@ -1792,7 +1795,7 @@ class MainlineContractTest(unittest.TestCase):
         self.assertTrue(diagnostics["manifest_loaded"])
         self.assertTrue(diagnostics["intent_model_loaded"])
         self.assertTrue(diagnostics["situation_model_loaded"])
-        self.assertTrue(diagnostics["tactical_model_present"])
+        self.assertFalse(diagnostics["tactical_model_present"])
         self.assertFalse(diagnostics["tactical_model_loaded"])
         self.assertTrue(diagnostics["learned_policy_requested"])
         self.assertTrue(diagnostics["learned_policy_enabled"])

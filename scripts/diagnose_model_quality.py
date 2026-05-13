@@ -18,6 +18,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from ai.artifacts import missing_required_assets, resolution_to_dict, resolve_manifest_assets
+
 try:
     import torch
     TORCH_AVAILABLE = True
@@ -27,7 +33,7 @@ except ImportError:
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return ROOT
 
 
 def _git_head() -> str:
@@ -152,9 +158,13 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
     manifest_path = artifact_dir / "model_manifest.json"
     manifest = _load_json(manifest_path)
 
-    intent_path = artifact_dir / "intent_lstm.pt"
-    situation_path = artifact_dir / "situation_gcn.pt"
-    tactical_path = artifact_dir / "tactical_model.pt"
+    resolutions = resolve_manifest_assets(artifact_dir, manifest or {})
+    intent_resolution = resolutions.get("intent_lstm") or resolutions.get("intent_model")
+    situation_resolution = resolutions.get("situation_gcn") or resolutions.get("situation_model")
+    tactical_resolution = resolutions.get("tactical_model")
+    intent_path = intent_resolution.path if intent_resolution else artifact_dir / "intent_lstm.pt"
+    situation_path = situation_resolution.path if situation_resolution else artifact_dir / "situation_gcn.pt"
+    tactical_path = tactical_resolution.path if tactical_resolution else artifact_dir / "tactical_model.pt"
 
     intent_model, intent_payload = _load_intent_model(intent_path, device)
     situation_model, situation_payload = _load_situation_model(situation_path, device)
@@ -177,6 +187,8 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
         "tactical_checkpoint_loaded": tactical_model is not None,
         "normalizer_available": normalizer is not None,
         "normalizer_loaded": False,
+        "asset_resolutions": {key: resolution_to_dict(value) for key, value in resolutions.items()},
+        "missing_required_assets": {key: resolution_to_dict(value) for key, value in missing_required_assets(resolutions).items()},
         "warnings": [],
         "recommended_next_actions": [],
     }

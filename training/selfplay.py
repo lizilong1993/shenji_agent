@@ -19,6 +19,8 @@ from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
 
+from ai.artifacts import resolve_manifest_assets
+
 from .common import dump_yaml, ensure_dir, git_head_sha, git_show_text, load_config, now_tag, repo_root, save_json, set_seed
 from .evaluate import promotion_decision, summarize_matches
 from .maps import (
@@ -1275,11 +1277,9 @@ def _build_match_policy_diagnostics(
     learned_policy_requested = profile != "baseline"
     learned_policy_enabled = learned_policy_requested and intent_model_loaded and situation_model_loaded
     fallback_reasons = _policy_fallback_reasons(stats, profile=profile, manifest_loaded=bool(manifest))
-    tactical_model_name = manifest.get("tactical_model") if isinstance(manifest, dict) else None
-    tactical_model_path = Path(artifacts) / str(tactical_model_name or "tactical_model.pt")
-    tactical_model_present = tactical_model_path.exists() or (
-        isinstance(managed_files, list) and str(tactical_model_path.name) in managed_files
-    )
+    resolutions = resolve_manifest_assets(Path(artifacts), manifest) if isinstance(manifest, dict) else {}
+    tactical_resolution = resolutions.get("tactical_model")
+    tactical_model_present = bool(tactical_resolution and tactical_resolution.exists)
     return {
         "user_name": participant["user_name"],
         "artifact_dir": _resolved_path_string(artifacts),

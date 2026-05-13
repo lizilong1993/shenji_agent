@@ -1,0 +1,50 @@
+{
+  "date": "2026-05-13",
+  "decision": "Path B - tactical removal/demotion from contribution claims",
+  "checkpoint_existence": {
+    "path": "ai/weights/tactical_model.pt",
+    "exists": false
+  },
+  "manifest_entry": {
+    "path": "ai/weights/model_manifest.json",
+    "tactical_model": "tactical_model.pt"
+  },
+  "model_class": "ai.models.TacticalScorer",
+  "loader_path": "ai/policy.py",
+  "feature_construction": [
+    "ai.features.action_feature_vector",
+    "ai/policy.py::_tactical_score"
+  ],
+  "expected_input_dim": 32,
+  "device_placement": "policy loader moves loaded tactical model to resolved inference device",
+  "candidate_eligibility": false,
+  "branch_reached": false,
+  "tactical_nonzero_count": 0,
+  "tactical_reached_count": 0,
+  "tactical_changed_action_count": null,
+  "tactical_on_win_rate": null,
+  "tactical_off_win_rate": null,
+  "confidence_interval": null,
+  "blockers": [
+    "missing tactical checkpoint ai/weights/tactical_model.pt",
+    "no alternate tactical checkpoint found in workspace",
+    "no Wargame_Feature_Dataset.csv found in workspace for retraining"
+  ],
+  "executable_evidence": {
+    "diagnostic_command": "python scripts/round005_tactical_diagnostic.py --out reports/v2_top_tier_upgrade/tactical_diagnostics/tactical_diagnostic.json",
+    "diagnostic_exit_code": 2,
+    "diagnostic_output": "reports/v2_top_tier_upgrade/tactical_diagnostics/tactical_diagnostic.json"
+  },
+  "claim_boundary": {
+    "forbidden": [
+      "tactical model improves performance",
+      "tactical scores contributed to reported policy behavior",
+      "tactical-on versus tactical-off ablation supports the method"
+    ],
+    "allowed": [
+      "tactical code exists as inactive/future-work branch",
+      "tactical contribution is unproven and excluded from V2 claims"
+    ]
+  },
+  "top_tier_impact": "main contribution must be non-tactical; top-tier readiness remains blocked unless alternate novelty and evidence are proven"
+}

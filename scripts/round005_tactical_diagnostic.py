@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from ai.artifacts import resolution_to_dict, resolve_manifest_assets
 
 
 def diagnose(artifact_dir: Path) -> Dict[str, Any]:
@@ -22,11 +27,13 @@ def diagnose(artifact_dir: Path) -> Dict[str, Any]:
         payload["blockers"].append(f"missing manifest: {manifest_path}")
         return payload
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    tactical_name = manifest.get("tactical_model") or "tactical_model.pt"
-    tactical_path = artifact_dir / str(tactical_name)
+    resolutions = resolve_manifest_assets(artifact_dir, manifest)
+    tactical_resolution = resolutions.get("tactical_model")
+    tactical_path = tactical_resolution.path if tactical_resolution else artifact_dir / "tactical_model.pt"
+    payload["asset_resolutions"] = {key: resolution_to_dict(value) for key, value in resolutions.items()}
     payload["tactical_model_path"] = str(tactical_path)
-    payload["tactical_model_exists"] = tactical_path.exists()
-    if not tactical_path.exists():
+    payload["tactical_model_exists"] = bool(tactical_resolution and tactical_resolution.exists)
+    if not payload["tactical_model_exists"]:
         payload["blockers"].append(f"missing tactical model file: {tactical_path}")
     return payload
 

@@ -3,8 +3,8 @@
   "source_commit_sha": "3d3e69a5aa688cf4eeff948db60d507d90bee86c",
   "history_len": 8,
   "horizons": 5,
-  "intent_lstm": "intent_lstm.pt",
-  "situation_gcn": "situation_gcn.pt",
+  "intent_lstm": "intention_lstm.pth",
+  "situation_gcn": "situation_gcn.pth",
   "situation_feature_normalizer": "situation_feature_normalizer.json",
   "situation_normalizer_kind": "per_dimension_zscore",
   "situation_normalizer_fitted_on": "situation_train_split",
@@ -26,8 +26,8 @@
     "reason": "existing artifacts yielded no high-confidence score/capture/damage labels; policy uses objective heuristic scoring while new diagnostics collect stronger labels"
   },
   "managed_files": [
-    "intent_lstm.pt",
-    "situation_gcn.pt",
+    "intention_lstm.pth",
+    "situation_gcn.pth",
     "situation_feature_normalizer.json",
     "model_manifest.json",
     "tactical_model.pt"

@@ -1,0 +1,91 @@
+{
+  "blockers": [
+    {
+      "component": "candidate_artifact_dir",
+      "missing": [
+        "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt"
+      ]
+    }
+  ],
+  "candidate_artifact_dir": "/remote-home/lizilong/shenji_agent/ai/weights",
+  "candidate_assets": {
+    "manifest_exists": true,
+    "manifest_path": "/remote-home/lizilong/shenji_agent/ai/weights/model_manifest.json",
+    "missing_required": {
+      "tactical_model": {
+        "alias_for": null,
+        "exists": false,
+        "expected_name": "tactical_model.pt",
+        "key": "tactical_model",
+        "required": true,
+        "resolved_by_alias": false,
+        "resolved_path": "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt"
+      }
+    },
+    "models_required": true,
+    "naming_mismatches": {},
+    "resolutions": {
+      "intent_lstm": {
+        "alias_for": null,
+        "exists": true,
+        "expected_name": "intention_lstm.pth",
+        "key": "intent_lstm",
+        "required": true,
+        "resolved_by_alias": false,
+        "resolved_path": "/remote-home/lizilong/shenji_agent/ai/weights/intention_lstm.pth"
+      },
+      "situation_gcn": {
+        "alias_for": null,
+        "exists": true,
+        "expected_name": "situation_gcn.pth",
+        "key": "situation_gcn",
+        "required": true,
+        "resolved_by_alias": false,
+        "resolved_path": "/remote-home/lizilong/shenji_agent/ai/weights/situation_gcn.pth"
+      },
+      "tactical_model": {
+        "alias_for": null,
+        "exists": false,
+        "expected_name": "tactical_model.pt",
+        "key": "tactical_model",
+        "required": true,
+        "resolved_by_alias": false,
+        "resolved_path": "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt"
+      }
+    },
+    "snapshot_role": null
+  },
+  "incumbent_artifact_dir": "/remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule",
+  "incumbent_assets": {
+    "manifest_exists": true,
+    "manifest_path": "/remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule/model_manifest.json",
+    "missing_required": {},
+    "models_required": false,
+    "naming_mismatches": {},
+    "resolutions": {
+      "intent_lstm": {
+        "alias_for": null,
+        "exists": false,
+        "expected_name": "intent_lstm.pt",
+        "key": "intent_lstm",
+        "required": true,
+        "resolved_by_alias": false,
+        "resolved_path": "/remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule/intent_lstm.pt"
+      },
+      "situation_gcn": {
+        "alias_for": null,
+        "exists": false,
+        "expected_name": "situation_gcn.pt",
+        "key": "situation_gcn",
+        "required": true,
+        "resolved_by_alias": false,
+        "resolved_path": "/remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule/situation_gcn.pt"
+      }
+    },
+    "snapshot_role": "bootstrap_rule_baseline"
+  },
+  "map_basic_count": 16,
+  "scenario_count": 50,
+  "status": "blocked",
+  "would_run": "python -m training.selfplay --config configs/selfplay_minimal.yaml --candidate /remote-home/lizilong/shenji_agent/ai/weights --incumbent /remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule"
+}

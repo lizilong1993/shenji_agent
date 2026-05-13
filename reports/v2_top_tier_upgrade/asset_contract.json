@@ -1,0 +1,65 @@
+{
+  "date": "2026-05-13",
+  "candidate_artifact_dir": "ai/weights",
+  "candidate_manifest": "ai/weights/model_manifest.json",
+  "canonical_policy": "manifest_is_source_of_truth",
+  "legacy_aliases": {
+    "intent_lstm.pt": [
+      "intention_lstm.pth"
+    ],
+    "situation_gcn.pt": [
+      "situation_gcn.pth"
+    ]
+  },
+  "candidate_assets": {
+    "intent_lstm": {
+      "manifest_name": "intention_lstm.pth",
+      "path": "ai/weights/intention_lstm.pth",
+      "exists": true,
+      "required": true
+    },
+    "situation_gcn": {
+      "manifest_name": "situation_gcn.pth",
+      "path": "ai/weights/situation_gcn.pth",
+      "exists": true,
+      "required": true
+    },
+    "situation_feature_normalizer": {
+      "manifest_name": "situation_feature_normalizer.json",
+      "path": "ai/weights/situation_feature_normalizer.json",
+      "exists": true,
+      "required": true
+    },
+    "tactical_model": {
+      "manifest_name": "tactical_model.pt",
+      "path": "ai/weights/tactical_model.pt",
+      "exists": false,
+      "required": true,
+      "fail_closed": true
+    }
+  },
+  "incumbent_artifact_dir": "ai/weights_incumbent_rule",
+  "incumbent_manifest": "ai/weights_incumbent_rule/model_manifest.json",
+  "incumbent_snapshot_role": "bootstrap_rule_baseline",
+  "incumbent_model_checkpoints_required": false,
+  "updated_consumers": [
+    "ai/policy.py",
+    "training/selfplay.py",
+    "scripts/run_round005_smoke_pipeline.py"
+  ],
+  "tests": {
+    "command": "python -m unittest tests.test_v2_asset_contract -v",
+    "result": "pass",
+    "tests_run": 6
+  },
+  "preflight": {
+    "command": "python scripts/run_round005_smoke_pipeline.py --out reports/v2_top_tier_upgrade/smoke_preflight_v2",
+    "exit_code": 2,
+    "expected": "fail_closed_due_to_missing_tactical_checkpoint",
+    "output": "reports/v2_top_tier_upgrade/smoke_preflight_v2/smoke_preflight.json"
+  },
+  "claim_impact": {
+    "reproducibility": "candidate intent/situation checkpoint contract repaired",
+    "tactical_contribution": "still_forbidden_until_checkpoint_and_ablation_evidence_exist"
+  }
+}

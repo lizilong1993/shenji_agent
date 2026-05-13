@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from ai.artifacts import missing_required_assets, naming_mismatches, resolution_to_dict, resolve_manifest_assets
 
 
 def read_json(path: Path) -> Dict[str, Any]:
@@ -23,13 +28,37 @@ def manifest_missing_files(artifact_dir: Path) -> List[str]:
     if not manifest_path.exists():
         return [str(manifest_path)]
     manifest = read_json(manifest_path)
-    required = []
-    for key in ("intent_lstm", "intent_model", "situation_gcn", "situation_model", "tactical_model"):
-        value = manifest.get(key)
-        if value:
-            required.append(artifact_dir / str(value))
-    missing = [str(path) for path in required if not path.exists()]
-    return missing
+    if manifest.get("snapshot_role") == "bootstrap_rule_baseline":
+        return []
+    resolutions = resolve_manifest_assets(artifact_dir, manifest)
+    missing = missing_required_assets(resolutions)
+    return [str(item.path) for item in missing.values()]
+
+
+def manifest_asset_report(artifact_dir: Path) -> Dict[str, Any]:
+    manifest_path = artifact_dir / "model_manifest.json"
+    if not manifest_path.exists():
+        return {
+            "manifest_path": str(manifest_path),
+            "manifest_exists": False,
+            "resolutions": {},
+            "missing_required": [str(manifest_path)],
+            "naming_mismatches": {},
+        }
+    manifest = read_json(manifest_path)
+    models_required = manifest.get("snapshot_role") != "bootstrap_rule_baseline"
+    resolutions = resolve_manifest_assets(artifact_dir, manifest)
+    missing = missing_required_assets(resolutions) if models_required else {}
+    mismatches = naming_mismatches(resolutions)
+    return {
+        "manifest_path": str(manifest_path),
+        "manifest_exists": True,
+        "models_required": models_required,
+        "snapshot_role": manifest.get("snapshot_role"),
+        "resolutions": {key: resolution_to_dict(value) for key, value in resolutions.items()},
+        "missing_required": {key: resolution_to_dict(value) for key, value in missing.items()},
+        "naming_mismatches": {key: resolution_to_dict(value) for key, value in mismatches.items()},
+    }
 
 
 def scenario_count() -> int:
@@ -58,6 +87,8 @@ def build_report(candidate: Path, incumbent: Path) -> Dict[str, Any]:
         "status": "blocked" if blockers else "ready",
         "candidate_artifact_dir": str(candidate),
         "incumbent_artifact_dir": str(incumbent),
+        "candidate_assets": manifest_asset_report(candidate),
+        "incumbent_assets": manifest_asset_report(incumbent),
         "scenario_count": scenarios,
         "map_basic_count": maps,
         "blockers": blockers,
