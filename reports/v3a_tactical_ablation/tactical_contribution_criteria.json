@@ -1,0 +1,39 @@
+{
+  "criteria_version": "1.0",
+  "levels": {
+    "level_1_compatibility_only": {
+      "status": "already_achieved",
+      "commit": "7ee858b",
+      "requirements": [
+        "checkpoint loads",
+        "dataset validates",
+        "tactical branch produces nonzero scores",
+        "compatibility smoke passes"
+      ],
+      "allowed_claim": "The tactical branch can be loaded and produces nonzero scores under compatibility diagnostics.",
+      "forbidden_claim": "The tactical branch improves agent performance."
+    },
+    "level_2_action_level_contribution": {
+      "requirements": [
+        "tactical_reached_count > 0",
+        "tactical_nonzero_score_count > 0",
+        "tactical_changed_action_count > 0",
+        "changed_action_rate is measured",
+        "changed actions are legal",
+        "route empty-rate does not worsen substantially"
+      ],
+      "allowed_claim": "The tactical branch measurably changes selected actions in a bounded diagnostic setting."
+    },
+    "level_3_outcome_level_contribution": {
+      "requirements": [
+        "win rate improves, or rating improves, or promotion metric improves, or diagnostic objective improves",
+        "effect shown across multiple seeds or with confidence interval"
+      ],
+      "allowed_claim": "The tactical branch improves the evaluated metric under the tested protocol.",
+      "note": "Only Level 3 can support strong tactical contribution in a paper."
+    }
+  },
+  "decision_gates": {
+    "before_proceeding_to_strong_claim": "Action-level contribution must be supported first."
+  }
+}

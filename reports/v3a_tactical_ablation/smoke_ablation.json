@@ -1,0 +1,33 @@
+{
+  "evaluation_version": "1.0",
+  "status": "SMOKE_PASS",
+  "analysis_date": "2026-05-14",
+  "not_formal_evidence": true,
+  "protocol": {
+    "type": "diagnostic_level_smoke",
+    "seeds": [0, 1, 2],
+    "candidates_per_seed": 24,
+    "tactical_off_baseline": "always_zero"
+  },
+  "per_seed": [
+    {"seed": 0, "reached": 24, "nonzero": 24, "changed": 24, "score_mean": -0.125969, "score_std": 0.148254},
+    {"seed": 1, "reached": 24, "nonzero": 24, "changed": 24, "score_mean": -0.142884, "score_std": 0.130185},
+    {"seed": 2, "reached": 24, "nonzero": 24, "changed": 24, "score_mean": -0.147665, "score_std": 0.126392}
+  ],
+  "aggregate": {
+    "total_candidates": 72,
+    "total_nonzero": 72,
+    "total_changed": 72,
+    "changed_action_rate": 1.0,
+    "mean_tactical_on_score": -0.138839,
+    "mean_tactical_off_score": 0.0,
+    "score_delta": -0.138839,
+    "game_level_metrics_available": false
+  },
+  "limitations": [
+    "Synthetic candidates only",
+    "No win-rate or game-level metrics",
+    "All scores negative (under 0.5 BCE probability)",
+    "Formal outcome contribution remains unproven"
+  ]
+}

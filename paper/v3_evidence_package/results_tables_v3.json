@@ -1,0 +1,30 @@
+{
+  "tables_version": "1.0",
+  "date": "2026-05-14",
+  "tactical_action_diagnostic": {
+    "candidates_examined": 18,
+    "nonzero_score_rate": 1.0,
+    "changed_action_rate": 1.0,
+    "mean_score": -0.138,
+    "score_std": 0.101,
+    "types": {"shoot": 9, "move_city": 9}
+  },
+  "tactical_smoke_ablation": {
+    "seeds": [0, 1, 2],
+    "candidates_per_seed": 24,
+    "nonzero_rate": 1.0,
+    "changed_action_rate": 1.0,
+    "mean_scores": [-0.126, -0.143, -0.148],
+    "not_formal_evidence": true
+  },
+  "tactical_multiseed_ablation": {
+    "seeds": [0, 1, 2, 3, 4],
+    "total_candidates": 120,
+    "mean_of_seed_means": -0.138,
+    "std_of_seed_means": 0.010,
+    "bootstrap_95_ci": [-0.146, -0.129],
+    "changed_action_rate": 1.0,
+    "game_level_metrics_available": false,
+    "not_formal_evidence": true
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "decision_version": "1.0",
+  "decision_date": "2026-05-14",
+  "decision": "TACTICAL_ACTION_LEVEL_ONLY_SUPPORTED",
+  "evidence_levels": {
+    "level_1_compatibility": {"status": "achieved", "commit": "7ee858b"},
+    "level_2_action_level": {
+      "status": "supported",
+      "metrics": {
+        "tactical_reached_count": 24,
+        "tactical_nonzero_score_count": 24,
+        "tactical_changed_action_count": 24,
+        "changed_action_rate": 1.0,
+        "changed_action_legality_rate": 1.0,
+        "seeds": 5,
+        "all_seeds_consistent": true
+      }
+    },
+    "level_3_outcome_level": {
+      "status": "not_supported",
+      "reason": "Game-level evaluation blocked by pre-existing model-architecture mismatch in intent/situation models",
+      "missing_metrics": ["win_rate", "rating", "promotion_metric", "diagnostic_objective"]
+    }
+  },
+  "allowed_claim": "The tactical branch changes action selection under diagnostic evaluation, but outcome contribution remains limited or unproven.",
+  "forbidden_claim": "The tactical branch improves agent performance.",
+  "blocker_for_outcome_evaluation": "Pre-existing model_architecture mismatch: saved intention_lstm.pth state dict uses old fc_intent architecture, current code expects head.0.weight keys"
+}

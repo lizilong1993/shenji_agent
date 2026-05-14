@@ -1,0 +1,28 @@
+{
+  "evaluation_version": "1.0",
+  "status": "ACTION_LEVEL_TACTICAL_CONTRIBUTION_SUPPORTED",
+  "analysis_date": "2026-05-14",
+  "diagnostic_type": "synthetic_candidate_scoring",
+  "metrics": {
+    "states_examined": 1,
+    "candidate_actions_examined": 18,
+    "tactical_reached_count": 18,
+    "tactical_nonzero_score_count": 18,
+    "tactical_changed_action_count": 18,
+    "changed_action_rate": 1.0,
+    "changed_action_types": {"shoot": 9, "move_city": 9},
+    "changed_action_legality_rate": 1.0,
+    "changed_action_route_empty_rate": 0.0
+  },
+  "score_statistics": {
+    "min": -0.243375,
+    "max": -0.033543,
+    "mean": -0.138397,
+    "std": 0.100685
+  },
+  "limitations": [
+    "Synthetic candidate states, not derived from live game replay",
+    "Absolute scores and rankings may differ under real game conditions"
+  ],
+  "next_phase": "Phase 4 — Smoke ablation evaluation"
+}

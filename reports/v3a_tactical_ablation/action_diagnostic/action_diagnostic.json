@@ -1,0 +1,192 @@
+{
+  "checkpoint": "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt",
+  "tactical_mode_on": "enabled",
+  "tactical_mode_off": "disabled_(always_zero)",
+  "analysis_note": "Synthetic candidate states; not derived from live game replay",
+  "status": "ACTION_LEVEL_TACTICAL_CONTRIBUTION_SUPPORTED",
+  "errors": [],
+  "checkpoint_validation_status": "TACTICAL_CHECKPOINT_COMPATIBLE",
+  "states_examined": 1,
+  "candidate_actions_examined": 18,
+  "tactical_reached_count": 18,
+  "tactical_nonzero_score_count": 18,
+  "tactical_changed_action_count": 18,
+  "changed_action_rate": 1.0,
+  "changed_action_types": {
+    "shoot": 9,
+    "move_city": 9
+  },
+  "changed_action_legality_rate": 1.0,
+  "changed_action_route_empty_rate": 0.0,
+  "score_statistics": {
+    "min": -0.243375,
+    "max": -0.033543,
+    "mean": -0.138397,
+    "std": 0.100685
+  },
+  "reason_if_no_change": null,
+  "per_candidate_traces": [
+    {
+      "mode": "shoot",
+      "operator_hex": 100,
+      "tactical_on_score": -0.24337509274482727,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 8.789095282554626,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "shoot",
+      "operator_hex": 100,
+      "tactical_on_score": -0.24001842737197876,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 8.805636167526245,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "shoot",
+      "operator_hex": 100,
+      "tactical_on_score": -0.23630130290985107,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 8.823961019515991,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "shoot",
+      "operator_hex": 100,
+      "tactical_on_score": -0.24001111090183258,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 8.805673122406006,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "shoot",
+      "operator_hex": 100,
+      "tactical_on_score": -0.239996537566185,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 8.805744051933289,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "shoot",
+      "operator_hex": 100,
+      "tactical_on_score": -0.23995275795459747,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 8.805959224700928,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "shoot",
+      "operator_hex": 100,
+      "tactical_on_score": -0.23725442588329315,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 8.819261193275452,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "shoot",
+      "operator_hex": 100,
+      "tactical_on_score": -0.23725150525569916,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 8.819276094436646,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "shoot",
+      "operator_hex": 100,
+      "tactical_on_score": -0.23724570870399475,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 8.81930410861969,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "move_city",
+      "operator_hex": 100,
+      "tactical_on_score": -0.03451758623123169,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 9.827429056167603,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "move_city",
+      "operator_hex": 100,
+      "tactical_on_score": -0.03776511549949646,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 9.811196327209473,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "move_city",
+      "operator_hex": 100,
+      "tactical_on_score": -0.041341014206409454,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 9.79332447052002,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "move_city",
+      "operator_hex": 100,
+      "tactical_on_score": -0.03354295343160629,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 9.832300543785095,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "move_city",
+      "operator_hex": 100,
+      "tactical_on_score": -0.03584331274032593,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 9.82080340385437,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "move_city",
+      "operator_hex": 100,
+      "tactical_on_score": -0.04258207604289055,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 9.787120819091797,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "move_city",
+      "operator_hex": 100,
+      "tactical_on_score": -0.03959762677550316,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 9.802038669586182,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "move_city",
+      "operator_hex": 100,
+      "tactical_on_score": -0.03395253047347069,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 9.830254316329956,
+      "nonzero": true,
+      "error": null
+    },
+    {
+      "mode": "move_city",
+      "operator_hex": 100,
+      "tactical_on_score": -0.040589816868305206,
+      "tactical_off_score": 0.0,
+      "tactical_contribution_if_on": 9.797078967094421,
+      "nonzero": true,
+      "error": null
+    }
+  ]
+}

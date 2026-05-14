@@ -77,6 +77,7 @@ class LearnedPolicy:
         self.loaded_from: Optional[Path] = None
         self.manifest: Dict[str, Any] = {}
         self._observation_cache: Optional[Dict[str, Any]] = None
+        self.tactical_mode: str = "on"
         self._reset_diagnostics()
 
     def _reset_diagnostics(self) -> None:
@@ -112,24 +113,26 @@ class LearnedPolicy:
         self._reset_move_route_diagnostics()
 
     def _load_intent_model(self, payload: Dict[str, Any]) -> Any:
-        hidden_dim = int(payload.get("hidden_dim") or payload["model_state"]["lstm.weight_ih_l0"].shape[0] // 4)
+        state = payload.get("model_state") or payload
+        hidden_dim = int(payload.get("hidden_dim") or state["lstm.weight_ih_l0"].shape[0] // 4)
         model = MultiHorizonIntentionModel(
             input_dim=int(payload.get("feature_dim", FEATURE_DIM)),
             hidden_dim=hidden_dim,
             horizons=int(payload.get("horizons", 5)),
             num_classes=int(payload.get("num_classes", 7)),
         )
-        model.load_state_dict(payload["model_state"])
+        model.load_state_dict(state)
         model.eval()
         return model
 
     def _load_situation_model(self, payload: Dict[str, Any]) -> Any:
-        hidden_dim = int(payload.get("hidden_dim") or payload["model_state"]["backbone.sage1.linear.weight"].shape[0])
+        state = payload.get("model_state") or payload
+        hidden_dim = int(payload.get("hidden_dim") or state["backbone.sage1.linear.weight"].shape[0])
         model = GraphSituationModel(
             num_features=int(payload.get("input_dim", FEATURE_DIM)),
             hidden_dim=hidden_dim,
         )
-        model.load_state_dict(payload["model_state"])
+        model.load_state_dict(state)
         model.eval()
         return model
 
@@ -192,9 +195,10 @@ class LearnedPolicy:
             self._load_situation_model(situation_state)
         )
 
-    def configure(self, faction: int, artifact_dir: Optional[str] = None, policy_profile: str = "challenger") -> None:
+    def configure(self, faction: int, artifact_dir: Optional[str] = None, policy_profile: str = "challenger", tactical_mode: str = "on") -> None:
         self.faction = faction
         self.policy_profile = policy_profile or "challenger"
+        self.tactical_mode = tactical_mode
         self.history_len = 8
         self.device = "cpu"
         self.requested_device = "auto"
@@ -346,6 +350,7 @@ class LearnedPolicy:
             )
         return {
             "policy_profile": self.policy_profile,
+            "tactical_mode": self.tactical_mode,
             "device": self.device,
             "requested_device": self.requested_device,
             "loaded_from": str(self.loaded_from) if self.loaded_from else None,
@@ -553,7 +558,11 @@ class LearnedPolicy:
         city: Optional[Dict[str, Any]] = None,
     ) -> float:
         """Evaluate action quality using the tactical model (BCE logit, higher = better)."""
+        if self.tactical_mode == "off":
+            return 0.0
         if self.tactical_model is None:
+            if self.tactical_mode == "missing_fail_closed":
+                raise RuntimeError("tactical_mode=missing_fail_closed but tactical_model is not loaded")
             return 0.0
         features = action_feature_vector(operator, candidate, target_operator=target_operator, city=city)
         tensor = self._move_to_device(torch.tensor(features, dtype=torch.float32).unsqueeze(0))

@@ -1,0 +1,32 @@
+{
+  "evaluation_version": "1.0",
+  "status": "MULTISEED_COMPLETED",
+  "analysis_date": "2026-05-14",
+  "not_formal_evidence": true,
+  "protocol": {
+    "type": "diagnostic_level_multiseed",
+    "seeds": [0, 1, 2, 3, 4],
+    "candidates_per_seed": 24,
+    "total_candidates": 120,
+    "tactical_off_baseline": "always_zero"
+  },
+  "statistics": {
+    "changed_action_rate": 1.0,
+    "mean_of_seed_means": -0.137922,
+    "std_of_seed_means": 0.009816,
+    "pooled_score_mean": -0.137922,
+    "pooled_score_std": 0.13758,
+    "bootstrap_95_ci_lower": -0.14627,
+    "bootstrap_95_ci_upper": -0.12943,
+    "all_seeds_negative": true,
+    "min_seed_mean": -0.147665,
+    "max_seed_mean": -0.125969,
+    "game_level_metrics_available": false
+  },
+  "limitations": [
+    "Synthetic candidates only",
+    "No win-rate, rating, or promotion metrics",
+    "Game-level evaluation blocked by pre-existing model-architecture mismatch",
+    "Formal outcome contribution remains unproven"
+  ]
+}
