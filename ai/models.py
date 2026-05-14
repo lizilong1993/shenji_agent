@@ -113,6 +113,56 @@ class TacticalScorer(nn.Module):
         return self.model(x)
 
 
+class LegacyIntentModel(nn.Module):
+    """Load old IntentionLSTM checkpoints (fc_intent style) and output [batch, 1, 7].
+
+    The restored checkpoint at ai/weights/intention_lstm.pth was trained with an
+    8-class IntentionLSTM. This wrapper loads that checkpoint and adapts the output
+    to match the current policy expectation: [batch, horizons, num_classes] = [batch, 1, 7].
+    The 8th class (index 7) is truncated because _DIRECTION_STEPS only defines 0-6.
+    """
+    def __init__(self, input_dim=108, hidden_dim=256, output_classes=7):
+        super().__init__()
+        self.horizons = 1
+        self.num_classes = output_classes
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers=2, batch_first=True, bidirectional=True)
+        self.attention = nn.MultiheadAttention(embed_dim=hidden_dim * 2, num_heads=4)
+        self.fc_intent = nn.Linear(hidden_dim * 2, 8)  # 8 classes for checkpoint compatibility
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        out_t = out.transpose(0, 1)
+        attn_out, _ = self.attention(out_t, out_t, out_t)
+        attn_out = attn_out.transpose(0, 1)
+        logits = self.fc_intent(attn_out[:, -1, :])      # [batch, 8]
+        logits = logits[:, :self.num_classes]             # [batch, 7] - drop 8th class
+        return logits.unsqueeze(1)                        # [batch, 1, 7]
+
+
+class LegacySituationModel(nn.Module):
+    """Load old SituationGCN checkpoints (bare keys) into GraphSituationModel-compatible interface.
+
+    The restored checkpoint at ai/weights/situation_gcn.pth was saved from a bare
+    SituationGCN with keys: sage1.linear.weight, fc_score.weight, etc. (no 'backbone.' prefix).
+    This wrapper automatically prefixes bare keys on load.
+    """
+    def __init__(self, num_features=108, hidden_dim=64):
+        super().__init__()
+        self.inner = SituationGCN(num_features=num_features, hidden_dim=hidden_dim, output_dim=1)
+
+    def forward(self, x, adj):
+        node_scores = self.inner(x, adj)
+        return node_scores.mean(dim=0)
+
+    def load_state_dict(self, state_dict, strict=True):
+        """Override: auto-prefix bare keys with 'inner.' so bare SituationGCN checkpoints load."""
+        is_bare = any(k.startswith("sage") or k.startswith("fc_") for k in state_dict)
+        if is_bare:
+            adjusted = {"inner." + k: v for k, v in state_dict.items()}
+            return super().load_state_dict(adjusted, strict)
+        return super().load_state_dict(state_dict, strict)
+
+
 class GraphSituationModel(nn.Module):
     def __init__(self, num_features=108, hidden_dim=64):
         super().__init__()

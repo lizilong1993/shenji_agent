@@ -14,13 +14,15 @@ from .features import FEATURE_DIM, TACTICAL_FEATURE_DIM, action_feature_vector, 
 try:
     import torch
 
-    from .models import GraphSituationModel, MultiHorizonIntentionModel, TacticalScorer
+    from .models import GraphSituationModel, LegacyIntentModel, LegacySituationModel, MultiHorizonIntentionModel, TacticalScorer
 
     TORCH_AVAILABLE = True
 except ImportError:  # pragma: no cover
     TORCH_AVAILABLE = False
     torch = None  # type: ignore[assignment]
     GraphSituationModel = None  # type: ignore[assignment]
+    LegacyIntentModel = None  # type: ignore[assignment]
+    LegacySituationModel = None  # type: ignore[assignment]
     MultiHorizonIntentionModel = None  # type: ignore[assignment]
     TacticalScorer = None  # type: ignore[assignment]
 
@@ -115,23 +117,40 @@ class LearnedPolicy:
     def _load_intent_model(self, payload: Dict[str, Any]) -> Any:
         state = payload.get("model_state") or payload
         hidden_dim = int(payload.get("hidden_dim") or state["lstm.weight_ih_l0"].shape[0] // 4)
-        model = MultiHorizonIntentionModel(
-            input_dim=int(payload.get("feature_dim", FEATURE_DIM)),
-            hidden_dim=hidden_dim,
-            horizons=int(payload.get("horizons", 5)),
-            num_classes=int(payload.get("num_classes", 7)),
-        )
+        # Detect old fc_intent checkpoints that cannot load into MultiHorizonIntentionModel
+        if any("fc_intent" in k for k in state):
+            model = LegacyIntentModel(
+                input_dim=int(payload.get("feature_dim", FEATURE_DIM)),
+                hidden_dim=hidden_dim,
+                output_classes=int(payload.get("num_classes", 7)),
+            )
+        else:
+            model = MultiHorizonIntentionModel(
+                input_dim=int(payload.get("feature_dim", FEATURE_DIM)),
+                hidden_dim=hidden_dim,
+                horizons=int(payload.get("horizons", 5)),
+                num_classes=int(payload.get("num_classes", 7)),
+            )
         model.load_state_dict(state)
         model.eval()
         return model
 
     def _load_situation_model(self, payload: Dict[str, Any]) -> Any:
         state = payload.get("model_state") or payload
-        hidden_dim = int(payload.get("hidden_dim") or state["backbone.sage1.linear.weight"].shape[0])
-        model = GraphSituationModel(
-            num_features=int(payload.get("input_dim", FEATURE_DIM)),
-            hidden_dim=hidden_dim,
-        )
+        # Detect old bare SituationGCN checkpoints (keys like sage1.linear.weight, no backbone. prefix)
+        is_bare = any(k.startswith("sage") or k.startswith("fc_") for k in state)
+        if is_bare:
+            hidden_dim = int(payload.get("hidden_dim") or state["sage1.linear.weight"].shape[0])
+            model = LegacySituationModel(
+                num_features=int(payload.get("input_dim", FEATURE_DIM)),
+                hidden_dim=hidden_dim,
+            )
+        else:
+            hidden_dim = int(payload.get("hidden_dim") or state["backbone.sage1.linear.weight"].shape[0])
+            model = GraphSituationModel(
+                num_features=int(payload.get("input_dim", FEATURE_DIM)),
+                hidden_dim=hidden_dim,
+            )
         model.load_state_dict(state)
         model.eval()
         return model
@@ -355,6 +374,7 @@ class LearnedPolicy:
             "requested_device": self.requested_device,
             "loaded_from": str(self.loaded_from) if self.loaded_from else None,
             "intent_model_loaded": self.intent_model is not None,
+            "intent_model_architecture": self.intent_model.__class__.__name__ if self.intent_model is not None else None,
             "situation_model_loaded": self.situation_model is not None,
             "tactical_model_loaded": self.tactical_model is not None,
             "normalizer_loaded": self.has_normalizer(),
