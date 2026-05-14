@@ -1,0 +1,142 @@
+{
+  "checkpoint_path": "/remote-home/lizilong/shenji_agent/ai/weights/intention_lstm.pth",
+  "readable": true,
+  "checkpoint_top_level_type": "OrderedDict",
+  "is_dict": true,
+  "state_key_used": "payload_is_state_dict",
+  "state_dict_found": true,
+  "key_total_keys": 22,
+  "key_fc_intent_keys": [
+    "fc_intent.bias",
+    "fc_intent.weight"
+  ],
+  "key_head_keys": [],
+  "key_lstm_keys": [
+    "lstm.bias_hh_l0",
+    "lstm.bias_hh_l0_reverse",
+    "lstm.bias_hh_l1",
+    "lstm.bias_hh_l1_reverse",
+    "lstm.bias_ih_l0",
+    "lstm.bias_ih_l0_reverse",
+    "lstm.bias_ih_l1",
+    "lstm.bias_ih_l1_reverse",
+    "lstm.weight_hh_l0",
+    "lstm.weight_hh_l0_reverse",
+    "lstm.weight_hh_l1",
+    "lstm.weight_hh_l1_reverse",
+    "lstm.weight_ih_l0",
+    "lstm.weight_ih_l0_reverse",
+    "lstm.weight_ih_l1",
+    "lstm.weight_ih_l1_reverse"
+  ],
+  "key_attention_keys": [
+    "attention.in_proj_bias",
+    "attention.in_proj_weight",
+    "attention.out_proj.bias",
+    "attention.out_proj.weight"
+  ],
+  "key_other_keys": [],
+  "key_classified_architecture": "old_fc_intent",
+  "current_model_instantiable": true,
+  "current_model_comparison": {
+    "missing_keys": [
+      "head.0.bias",
+      "head.0.weight",
+      "head.1.bias",
+      "head.1.weight",
+      "head.3.bias",
+      "head.3.weight"
+    ],
+    "unexpected_keys": [
+      "fc_intent.bias",
+      "fc_intent.weight"
+    ],
+    "shape_mismatches": [],
+    "simple_rename_possible": false,
+    "rename_issues": [
+      "head.3 weight shape (8, 512) != expected (35, 512)"
+    ]
+  },
+  "old_model_instantiable": true,
+  "old_model_comparison": {
+    "missing_keys": [],
+    "unexpected_keys": [],
+    "shape_mismatches": [
+      {
+        "key": "fc_intent.weight",
+        "checkpoint_shape": [
+          8,
+          512
+        ],
+        "model_shape": [
+          4,
+          512
+        ]
+      },
+      {
+        "key": "fc_intent.bias",
+        "checkpoint_shape": [
+          8
+        ],
+        "model_shape": [
+          4
+        ]
+      }
+    ],
+    "simple_rename_possible": false,
+    "rename_issues": [
+      "Renamed fc_intent keys not in model (head.3)"
+    ]
+  },
+  "current_model_hidden_dim": 256,
+  "old_model_expected_keys": [
+    "attention.in_proj_bias",
+    "attention.in_proj_weight",
+    "attention.out_proj.bias",
+    "attention.out_proj.weight",
+    "fc_intent.bias",
+    "fc_intent.weight",
+    "lstm.bias_hh_l0",
+    "lstm.bias_hh_l0_reverse",
+    "lstm.bias_hh_l1",
+    "lstm.bias_hh_l1_reverse",
+    "lstm.bias_ih_l0",
+    "lstm.bias_ih_l0_reverse",
+    "lstm.bias_ih_l1",
+    "lstm.bias_ih_l1_reverse",
+    "lstm.weight_hh_l0",
+    "lstm.weight_hh_l0_reverse",
+    "lstm.weight_hh_l1",
+    "lstm.weight_hh_l1_reverse",
+    "lstm.weight_ih_l0",
+    "lstm.weight_ih_l0_reverse",
+    "lstm.weight_ih_l1",
+    "lstm.weight_ih_l1_reverse"
+  ],
+  "compatibility_assessment": "incompatible",
+  "compatibility_details": {
+    "missing": [
+      "head.0.bias",
+      "head.0.weight",
+      "head.1.bias",
+      "head.1.weight",
+      "head.3.bias",
+      "head.3.weight"
+    ],
+    "unexpected": [
+      "fc_intent.bias",
+      "fc_intent.weight"
+    ],
+    "shape_mismatches": []
+  },
+  "conclusions": {
+    "is_readable": true,
+    "old_fc_intent_style": true,
+    "current_head_style": false,
+    "can_load_directly": false,
+    "can_map_by_key_renaming": false,
+    "tensor_shapes_compatible": false,
+    "legacy_class_needed": false,
+    "retraining_required": true
+  }
+}

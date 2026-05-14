@@ -1,0 +1,20 @@
+{
+  "strategy": "B",
+  "name": "LegacyIntentLoader",
+  "feasible": true,
+  "safe": true,
+  "description": "Load old IntentionLSTM(num_classes=8) checkpoint via IntentionLSTM class, wrap output to [batch, 1, 7] with horizon dim and 8→7 truncation",
+  "rationale": [
+    "IntentionLSTM class still exists in ai/models.py",
+    "All 22 checkpoint keys match IntentionLSTM(num_classes=8) exactly",
+    "Only output dimension differs (8 vs 7 directions)",
+    "8th class (index 7) is safely discarded as _DIRECTION_STEPS has only 0-6",
+    "Original checkpoint remains untouched"
+  ],
+  "risks": [
+    "8th class may have semantic meaning - truncation loses it",
+    "Not production quality without retraining"
+  ],
+  "fallback": "Strategy D: RetrainingRequiredForOutcomeAblation",
+  "selected": true
+}

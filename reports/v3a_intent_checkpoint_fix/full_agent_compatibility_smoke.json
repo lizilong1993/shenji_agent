@@ -1,0 +1,46 @@
+{
+  "smoke_timestamp": "2026-05-14",
+  "phases": {
+    "agent_module_import": {
+      "status": "PASS",
+      "detail": "agent module imported from /remote-home/lizilong/shenji_agent/ai/agent.py"
+    },
+    "agent_class_import": {
+      "status": "PASS",
+      "detail": "Agent class imported from ai.agent"
+    },
+    "policy_configure": {
+      "status": "PASS"
+    },
+    "intent_model_loading": {
+      "status": "PASS",
+      "architecture": "LegacyIntentModel",
+      "loaded": true
+    },
+    "situation_model_loading": {
+      "status": "PASS",
+      "loaded": true
+    },
+    "tactical_model_loading": {
+      "status": "PASS",
+      "loaded": true
+    },
+    "diagnostics": {
+      "status": "PASS",
+      "intent_model_architecture": "LegacyIntentModel",
+      "tactical_mode": "on",
+      "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+      "policy_profile": "challenger"
+    },
+    "intent_inference": {
+      "status": "PASS",
+      "top_direction": 0,
+      "confidence": 0.2918,
+      "distribution_length": 7
+    },
+    "situation_scoring_smoke": {
+      "status": "PASS"
+    }
+  },
+  "overall": "PASS"
+}

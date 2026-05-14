@@ -1,0 +1,39 @@
+{
+  "smoke_timestamp": "2026-05-14",
+  "phases": {
+    "tactical_on": {
+      "status": "PASS",
+      "intent_loaded": true,
+      "intent_architecture": "LegacyIntentModel",
+      "situation_loaded": true,
+      "tactical_loaded": true,
+      "tactical_mode": "on"
+    },
+    "tactical_off": {
+      "status": "PASS",
+      "intent_loaded": true,
+      "intent_architecture": "LegacyIntentModel",
+      "situation_loaded": true,
+      "tactical_loaded": true,
+      "tactical_mode": "off"
+    },
+    "intent_inference_tactical_on": {
+      "status": "PASS",
+      "top_direction": 0,
+      "confidence": 0.2687,
+      "distribution_length": 7
+    },
+    "intent_inference_tactical_off": {
+      "status": "PASS",
+      "top_direction": 0,
+      "confidence": 0.2125,
+      "distribution_length": 7
+    },
+    "tactical_score_difference": {
+      "status": "PASS",
+      "tactical_on_score": -0.031009,
+      "tactical_off_score": 0.0
+    }
+  },
+  "overall": "PASS"
+}

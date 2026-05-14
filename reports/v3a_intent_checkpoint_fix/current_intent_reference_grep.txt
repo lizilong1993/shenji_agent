@@ -1,0 +1,214 @@
+ai/policy.py:17:    from .models import GraphSituationModel, MultiHorizonIntentionModel, TacticalScorer
+ai/policy.py:24:    MultiHorizonIntentionModel = None  # type: ignore[assignment]
+ai/policy.py:70:        self.intent_model = None
+ai/policy.py:89:            "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "objective_score": 0.0, "combined_score": 0.0},
+ai/policy.py:90:            "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "objective_score": 0.0, "combined_score": 0.0},
+ai/policy.py:115:    def _load_intent_model(self, payload: Dict[str, Any]) -> Any:
+ai/policy.py:118:        model = MultiHorizonIntentionModel(
+ai/policy.py:157:        return self.intent_model is not None and self.situation_model is not None
+ai/policy.py:191:    def _load_models(self, intent_path: Path, situation_path: Path) -> Tuple[Any, Any]:
+ai/policy.py:192:        intent_state = torch.load(intent_path, map_location="cpu")
+ai/policy.py:194:        return self._move_to_device(self._load_intent_model(intent_state)), self._move_to_device(
+ai/policy.py:205:        self.intent_model = None
+ai/policy.py:233:            intent_resolution = resolutions.get("intent_lstm") or resolutions.get("intent_model")
+ai/policy.py:235:            if not intent_resolution or not situation_resolution:
+ai/policy.py:238:            intent_path = intent_resolution.path
+ai/policy.py:240:            if not intent_resolution.exists or not situation_resolution.exists:
+ai/policy.py:244:                self.intent_model, self.situation_model = self._load_models(intent_path, situation_path)
+ai/policy.py:249:                self.intent_model, self.situation_model = self._load_models(intent_path, situation_path)
+ai/policy.py:281:            numeric_fields = ("intent_bias", "situation_score", "tactical_score", "objective_score", "combined_score")
+ai/policy.py:289:                for field in ("obj_id", "candidate_id", "intent_bias", "situation_score", "tactical_score", "objective_score", "combined_score", "reason"):
+ai/policy.py:334:                "intent_bias": float(totals["intent_bias"] / samples) if samples else 0.0,
+ai/policy.py:357:            "intent_model_loaded": self.intent_model is not None,
+ai/policy.py:448:    def _intent_distribution(self, enemy_id: int) -> Optional[List[float]]:
+ai/policy.py:449:        if self.intent_model is None or enemy_id not in self.enemy_histories:
+ai/policy.py:458:            logits = self.intent_model(tensor)[0, 0]
+ai/policy.py:461:    def predict_intent(self, enemy_id: int) -> Dict[str, Any]:
+ai/policy.py:462:        distribution = self._intent_distribution(enemy_id)
+ai/policy.py:474:        intent = self.predict_intent(enemy_id)
+ai/policy.py:475:        direction = int(intent["top_direction"])
+ai/policy.py:596:            intent = self.predict_intent(int(target_id))
+ai/policy.py:598:            intent_bias = 0.0
+ai/policy.py:602:                    intent_bias = max(0.0, 8.0 - float(distance)) * float(intent["confidence"]) * 2.0
+ai/policy.py:625:                + intent_bias
+ai/policy.py:636:                "intent_bias": float(intent_bias),
+ai/policy.py:690:            intent_bias = -threat_penalty
+ai/policy.py:723:                + intent_bias
+ai/policy.py:731:                "intent_bias": float(intent_bias),
+ai/artifacts.py:8:MODEL_KEYS = ("intent_lstm", "intent_model", "situation_gcn", "situation_model", "tactical_model")
+ai/artifacts.py:11:    "intent_lstm.pt": ("intention_lstm.pth",),
+training/data.py:24:    intent_dir = discover_dir(datasets_root, contains="WargameData_mini01", required_file="train.json")
+training/data.py:28:        "intent": intent_dir,
+training/data.py:339:        "intent_train": paths["intent"] / "train.json",
+training/data.py:340:        "intent_val": paths["intent"] / "test.json",
+ai/models.py:7:class IntentionLSTM(nn.Module):
+ai/models.py:9:        super(IntentionLSTM, self).__init__()
+ai/models.py:12:        self.fc_intent = nn.Linear(hidden_dim*2, num_classes)  # ATTACK, DEFENSE, RECON, RETREAT
+ai/models.py:24:        return self.fc_intent(attn_out[:, -1, :])
+ai/models.py:62:class MultiHorizonIntentionModel(nn.Module):
+training/supervised.py:16:from ai.models import GraphSituationModel, MultiHorizonIntentionModel, TacticalScorer
+training/supervised.py:68:def train_intent_model(
+training/supervised.py:81:        training_files["intent_train"],
+training/supervised.py:90:        training_files["intent_val"],
+training/supervised.py:101:    model = MultiHorizonIntentionModel(
+training/supervised.py:144:    weight_path = run_dir / "intent_lstm.pt"
+training/supervised.py:343:        f"- intent_immediate_accuracy: `{metrics['intent']['val_immediate_accuracy']:.4f}`",
+training/supervised.py:346:        f"- complex_bucket_intent_accuracy: `{metrics['intent']['bucket_accuracy'].get('complex', 0.0):.4f}`",
+training/supervised.py:347:        f"- medium_bucket_intent_accuracy: `{metrics['intent']['bucket_accuracy'].get('medium', 0.0):.4f}`",
+training/supervised.py:348:        f"- simple_bucket_intent_accuracy: `{metrics['intent']['bucket_accuracy'].get('simple', 0.0):.4f}`",
+training/supervised.py:349:        f"- intent_bucket_counts_train: `{metrics['intent']['bucket_counts']['train']}`",
+training/supervised.py:350:        f"- intent_bucket_counts_val: `{metrics['intent']['bucket_counts']['val']}`",
+training/supervised.py:359:        "intent_lstm.pt",
+training/supervised.py:370:        "history_len": int(config["intent"]["history_len"]),
+training/supervised.py:371:        "horizons": int(config["intent"]["horizons"]),
+training/supervised.py:372:        "intent_lstm": "intent_lstm.pt",
+training/supervised.py:419:        "intent": train_intent_model(
+training/supervised.py:420:            config["intent"],
+training/supervised.py:423:            dataset_contract.get("intent", {}),
+training/supervised.py:441:            "intent_bucket_accuracy": metrics["intent"]["bucket_accuracy"],
+training/supervised.py:442:            "intent_bucket_counts": metrics["intent"]["bucket_counts"],
+training/selfplay.py:1255:    intent_loaded = bool(stats.get("intent_model_loaded_count"))
+training/selfplay.py:1261:    elif not intent_loaded or not situation_loaded:
+training/selfplay.py:1275:    intent_model_loaded = bool(stats.get("intent_model_loaded_count"))
+training/selfplay.py:1278:    learned_policy_enabled = learned_policy_requested and intent_model_loaded and situation_model_loaded
+training/selfplay.py:1293:        "intent_model_loaded": intent_model_loaded,
+training/selfplay.py:1314:        "move": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "objective_score": 0.0, "combined_score": 0.0},
+training/selfplay.py:1315:        "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "tactical_score": 0.0, "objective_score": 0.0, "combined_score": 0.0},
+training/selfplay.py:1321:    intent_model_loaded_count = 0
+training/selfplay.py:1349:            for metric in ("intent_bias", "situation_score", "tactical_score", "objective_score", "combined_score"):
+training/selfplay.py:1362:            intent_model_loaded_count += int(bool(payload.get("intent_model_loaded")))
+training/selfplay.py:1415:            "intent_bias": float(values["intent_bias"] / samples) if samples else 0.0,
+training/selfplay.py:1431:        "intent_model_loaded_count": intent_model_loaded_count,
+scripts/generate_paper_prewrite_package.py:151:        {"Claim ID": "C2", "Candidate manuscript claim": "Candidate agent uses learned intent/situation components.", "Status": "supported", "Evidence path": "ai/models.py; ai/weights/model_manifest.json; ai/weights/*.pth", "Evidence type": "code, manifests, checkpoints", "Exact metric or observation": "intent and situation checkpoints exist", "Known caveat": "sidecars may show zero learned action-path coverage", "Allowed wording": "loads learned intent/situation components", "Forbidden wording": "learned components drove all decisions"},
+scripts/generate_paper_prewrite_package.py:208:            ("Intent model", "ai/models.py; ai/weights/intention_lstm.pth", "learned intent model exists", "standard LSTM/attention"),
+scripts/generate_paper_prewrite_package.py:289:    write(FIG / "fig1_architecture_spec.md", "# Figure 1 Architecture Spec\n\nShow SDK environment state -> legal action candidates -> intent model -> situation model -> tactical scorer (marked unproven) -> rule/objective fallback -> route planner -> selected action -> league/promotion evaluator -> sidecar artifacts.")
+scripts/generate_paper_prewrite_package.py:300:4. Learned components: `ai/models.py`, `ai/weights/intention_lstm.pth`, `ai/weights/situation_gcn.pth`.
+scripts/generate_paper_prewrite_package.py:337:| Candidate checkpoints | `ai/weights/intention_lstm.pth`, `ai/weights/situation_gcn.pth` | intent/situation checkpoints restored |
+scripts/diagnose_model_quality.py:84:def _load_intent_model(weights_path: Path, device: str = "cpu") -> Tuple[Optional[Any], Optional[Dict[str, Any]]]:
+scripts/diagnose_model_quality.py:89:        from ai.models import MultiHorizonIntentionModel
+scripts/diagnose_model_quality.py:101:        model = MultiHorizonIntentionModel(
+scripts/diagnose_model_quality.py:162:    intent_resolution = resolutions.get("intent_lstm") or resolutions.get("intent_model")
+scripts/diagnose_model_quality.py:165:    intent_path = intent_resolution.path if intent_resolution else artifact_dir / "intent_lstm.pt"
+scripts/diagnose_model_quality.py:169:    intent_model, intent_payload = _load_intent_model(intent_path, device)
+scripts/diagnose_model_quality.py:179:        "intent_model_path": str(intent_path) if intent_path.exists() else None,
+scripts/diagnose_model_quality.py:186:        "intent_checkpoint_loaded": intent_model is not None,
+scripts/diagnose_model_quality.py:260:    if intent_model is not None:
+scripts/diagnose_model_quality.py:262:            feat_dim = int(intent_payload.get("feature_dim", 108)) if intent_payload else 108
+scripts/diagnose_model_quality.py:264:            horizons = int(intent_payload.get("horizons", 5)) if intent_payload else 5
+scripts/diagnose_model_quality.py:265:            num_classes = int(intent_payload.get("num_classes", 7)) if intent_payload else 7
+scripts/diagnose_model_quality.py:269:                logits = intent_model(seq)
+scripts/diagnose_model_quality.py:273:            result["intent_output_distribution"] = {f"class_{i}": float(v) for i, v in enumerate(class_means)}
+scripts/diagnose_model_quality.py:279:                result["warnings"].append("intent_negative_move_bias")
+scripts/diagnose_model_quality.py:281:                result["warnings"].append("intent_overconfident_class")
+scripts/diagnose_model_quality.py:283:            result["warnings"].append(f"intent_diagnosis_error: {exc}")
+scripts/diagnose_model_quality.py:354:        intent_dir = None
+scripts/diagnose_model_quality.py:358:                    intent_dir = parent
+scripts/diagnose_model_quality.py:360:            if intent_dir:
+scripts/diagnose_model_quality.py:363:        if intent_dir:
+scripts/diagnose_model_quality.py:364:            result["datasets_intent_available"] = True
+scripts/diagnose_model_quality.py:365:            train_json = intent_dir / "train.json"
+scripts/diagnose_model_quality.py:367:                result["datasets_intent_train_size"] = train_json.stat().st_size
+scripts/diagnose_model_quality.py:385:    if not result["intent_checkpoint_loaded"]:
+scripts/diagnose_model_quality.py:386:        recs.append("train_intent_model")
+scripts/diagnose_model_quality.py:396:        if "intent_negative_move_bias" in result["warnings"]:
+scripts/diagnose_model_quality.py:397:            recs.append("address_intent_move_bias")
+scripts/diagnose_model_quality.py:462:    print(f"Intent model: {'LOADED' if result['intent_checkpoint_loaded'] else 'MISSING'}")
+scripts/diagnose_model_quality.py:476:        if "intent_output_distribution" in result:
+scripts/diagnose_model_quality.py:477:            print(f"  class distribution: {result['intent_output_distribution']}")
+ai/weights_incumbent_rule/model_manifest.json:5:  "intent_lstm": "intent_lstm.pt",
+training/evaluate.py:41:        "intent_model_loaded_match_count": 0,
+training/evaluate.py:52:                "intent_bias": 0.0,
+training/evaluate.py:60:                "intent_bias": 0.0,
+training/evaluate.py:89:            for metric in ("intent_bias", "situation_score", "tactical_score", "objective_score", "combined_score"):
+training/evaluate.py:94:            totals["intent_model_loaded_match_count"] += int(bool(diagnostics.get("intent_model_loaded")))
+training/evaluate.py:136:            "intent_bias": float(values["intent_bias"] / samples) if samples else 0.0,
+training/evaluate.py:159:        "intent_model_loaded_match_count": int(totals["intent_model_loaded_match_count"]),
+ai/weights/model_manifest.json:6:  "intent_lstm": "intention_lstm.pth",
+ai/weights/model_manifest.json:29:    "intention_lstm.pth",
+scripts/inspect_intent_checkpoint_architecture.py:2:"""Inspect ai/weights/intention_lstm.pth and compare with current model architecture."""
+scripts/inspect_intent_checkpoint_architecture.py:14:from ai.models import MultiHorizonIntentionModel, IntentionLSTM
+scripts/inspect_intent_checkpoint_architecture.py:18:    """Classify state_dict keys as old fc_intent, current head, or unknown."""
+scripts/inspect_intent_checkpoint_architecture.py:19:    fc_intent_keys = [k for k in state_dict if "fc_intent" in k]
+scripts/inspect_intent_checkpoint_architecture.py:23:    other_keys = [k for k in state_dict if k not in fc_intent_keys + head_keys + lstm_keys + attention_keys]
+scripts/inspect_intent_checkpoint_architecture.py:26:    has_fc_intent = len(fc_intent_keys) > 0
+scripts/inspect_intent_checkpoint_architecture.py:29:    if has_fc_intent and not has_head:
+scripts/inspect_intent_checkpoint_architecture.py:30:        arch = "old_fc_intent"
+scripts/inspect_intent_checkpoint_architecture.py:31:    elif has_head and not has_fc_intent:
+scripts/inspect_intent_checkpoint_architecture.py:33:    elif has_head and has_fc_intent:
+scripts/inspect_intent_checkpoint_architecture.py:40:        "fc_intent_keys": sorted(fc_intent_keys),
+scripts/inspect_intent_checkpoint_architecture.py:49:def _compare_shapes(checkpoint_state, model, model_name="MultiHorizonIntentionModel"):
+scripts/inspect_intent_checkpoint_architecture.py:69:    # Check if renaming fc_intent -> head could work
+scripts/inspect_intent_checkpoint_architecture.py:72:    if any("fc_intent" in k for k in checkpoint_keys):
+scripts/inspect_intent_checkpoint_architecture.py:75:            new_k = k.replace("fc_intent", "head.3")  # head.3 is the final Linear
+scripts/inspect_intent_checkpoint_architecture.py:88:            rename_issues.append("Renamed fc_intent keys not in model (head.3)")
+scripts/inspect_intent_checkpoint_architecture.py:165:        current_model = MultiHorizonIntentionModel(
+scripts/inspect_intent_checkpoint_architecture.py:170:        result["current_model_comparison"] = _compare_shapes(state, current_model, "MultiHorizonIntentionModel")
+scripts/inspect_intent_checkpoint_architecture.py:175:    # Also try old IntentionLSTM for reference
+scripts/inspect_intent_checkpoint_architecture.py:177:        old_model = IntentionLSTM(input_dim=108, hidden_dim=256, num_classes=4)
+scripts/inspect_intent_checkpoint_architecture.py:182:        result["old_model_comparison"] = _compare_shapes(state, old_model, "IntentionLSTM")
+scripts/inspect_intent_checkpoint_architecture.py:215:            "old_fc_intent_style": arch == "old_fc_intent",
+scripts/inspect_intent_checkpoint_architecture.py:226:            "old_fc_intent_style": arch == "old_fc_intent",
+scripts/inspect_intent_checkpoint_architecture.py:251:            "old_fc_intent_style": arch == "old_fc_intent",
+scripts/inspect_intent_checkpoint_architecture.py:262:            "old_fc_intent_style": None,
+scripts/inspect_intent_checkpoint_architecture.py:275:    parser = argparse.ArgumentParser(description="Inspect intent checkpoint architecture")
+scripts/inspect_intent_checkpoint_architecture.py:276:    parser.add_argument("--checkpoint", default="ai/weights/intention_lstm.pth", help="Path to checkpoint")
+ai/agent.py:573:                    "learned policy requested but canonical intent+gcn artifacts unavailable, falling back to rules"
+scripts/run_v3a_tactical_action_diagnostic.py:5:in the intent/situation models, this diagnostic evaluates the tactical scorer
+scripts/run_v3a_tactical_ablation_smoke.py:4:in intent/situation model weights, this smoke evaluates tactical contribution
+scripts/verify_learned_policy_engagement.py:44:    if not bool(candidate_diagnostics.get("intent_model_loaded")):
+scripts/verify_learned_policy_engagement.py:45:        failures.append("candidate_intent_model_not_loaded")
+tests/test_move_route_diagnostics.py:133:            agent.policy.intent_model = mock.MagicMock()
+tests/test_model_quality_diagnostics.py:32:            "intent_model_path", "situation_model_path", "tactical_model_path",
+tests/test_model_quality_diagnostics.py:33:            "situation_checkpoint_loaded", "intent_checkpoint_loaded",
+tests/test_model_quality_diagnostics.py:147:        from ai.models import MultiHorizonIntentionModel
+tests/test_model_quality_diagnostics.py:149:        model = MultiHorizonIntentionModel(input_dim=108, hidden_dim=128, horizons=5, num_classes=7)
+tests/test_model_quality_diagnostics.py:165:        }, artifacts / "intent_lstm.pt")
+tests/test_learned_policy_engagement_contract.py:130:                    "intent_model_loaded": True,
+tests/test_promotion_artifact_contract.py:216:                            "intent_bias": 1.0,
+tests/test_promotion_artifact_contract.py:224:                            "intent_bias": 2.0,
+tests/test_promotion_artifact_contract.py:236:                    "intent_model_loaded": True,
+tests/test_promotion_artifact_contract.py:256:        self.assertIn("intent_model_loaded_match_count", policy)
+tests/test_promotion_artifact_contract.py:288:                    "intent_model_loaded_count": 0,
+tests/test_promotion_artifact_contract.py:296:        self.assertFalse(diagnostics_with_fallback["intent_model_loaded"])
+tests/test_promotion_artifact_contract.py:312:                    "intent_model_loaded_count": 0,
+tests/test_promotion_artifact_contract.py:341:                    "intent_model_loaded_count": 0,
+tests/test_mainline_contract.py:1577:                json.dumps({"history_len": 4, "intent_lstm": "intent.pt", "situation_gcn": "situation.pt"}),
+tests/test_mainline_contract.py:1580:            (artifacts / "intent.pt").write_bytes(b"intent")
+tests/test_mainline_contract.py:1582:            intent_model = DummyModel()
+tests/test_mainline_contract.py:1587:                mock.patch.object(policy_module.LearnedPolicy, "_load_intent_model", return_value=intent_model),
+tests/test_mainline_contract.py:1594:        self.assertEqual(intent_model.devices, ["cuda"])
+tests/test_mainline_contract.py:1613:                json.dumps({"history_len": 4, "intent_lstm": "intent.pt", "situation_gcn": "situation.pt"}),
+tests/test_mainline_contract.py:1616:            (artifacts / "intent.pt").write_bytes(b"intent")
+tests/test_mainline_contract.py:1618:            intent_model = DummyModel()
+tests/test_mainline_contract.py:1623:                mock.patch.object(policy_module.LearnedPolicy, "_load_intent_model", return_value=intent_model),
+tests/test_mainline_contract.py:1630:        self.assertEqual(intent_model.devices, ["cpu"])
+tests/test_mainline_contract.py:1649:                json.dumps({"history_len": 4, "intent_lstm": "intent.pt", "situation_gcn": "situation.pt"}),
+tests/test_mainline_contract.py:1652:            (artifacts / "intent.pt").write_bytes(b"intent")
+tests/test_mainline_contract.py:1654:            intent_model = DummyModel()
+tests/test_mainline_contract.py:1660:                mock.patch.object(policy_module.LearnedPolicy, "_load_intent_model", return_value=intent_model),
+tests/test_mainline_contract.py:1668:        self.assertEqual(intent_model.devices, ["cpu"])
+tests/test_mainline_contract.py:1737:                "intent_model_loaded": True,
+tests/test_mainline_contract.py:1744:                    "move": {"samples": 1, "intent_bias": 1.0, "situation_score": 0.4, "combined_score": 2.0},
+tests/test_mainline_contract.py:1745:                    "shoot": {"samples": 0, "intent_bias": 0.0, "situation_score": 0.0, "combined_score": 0.0},
+tests/test_mainline_contract.py:1752:                "intent_model_loaded": True,
+tests/test_mainline_contract.py:1759:                    "move": {"samples": 1, "intent_bias": 3.0, "situation_score": 0.6, "combined_score": 4.0},
+tests/test_mainline_contract.py:1760:                    "shoot": {"samples": 1, "intent_bias": 2.0, "situation_score": 0.7, "combined_score": 5.0},
+tests/test_mainline_contract.py:1767:        self.assertEqual(merged["intent_model_loaded_count"], 2)
+tests/test_mainline_contract.py:1778:                        "intent_lstm": "intent_lstm.pt",
+tests/test_mainline_contract.py:1781:                        "managed_files": ["intent_lstm.pt", "situation_gcn.pt", "tactical_model.pt", "model_manifest.json"],
+tests/test_mainline_contract.py:1796:        self.assertTrue(diagnostics["intent_model_loaded"])
+tests/test_mainline_contract.py:1820:                            "intent_bias": 1.0,
+tests/test_mainline_contract.py:1828:                            "intent_bias": 2.0,
+tests/test_mainline_contract.py:1840:                    "intent_model_loaded": True,
+tests/test_mainline_contract.py:1854:        self.assertEqual(summary["policy"]["intent_model_loaded_match_count"], 1)
+tests/test_feature_normalizer_consistency.py:42:    config = {"intent": {"history_len": 8, "horizons": 5}}
+tests/test_feature_normalizer_consistency.py:81:    policy.intent_model = object()
+tests/test_v2_asset_contract.py:19:        self.assertTrue(resolutions["intent_lstm"].exists)
+tests/test_v2_asset_contract.py:20:        self.assertEqual(resolutions["intent_lstm"].path.name, "intention_lstm.pth")
+tests/test_v2_asset_contract.py:21:        self.assertFalse(resolutions["intent_lstm"].resolved_by_alias)
+tests/test_v2_asset_contract.py:28:            "intent_lstm": "intent_lstm.pt",
+tests/test_v2_asset_contract.py:37:        self.assertNotIn("intent_lstm", missing)
+tests/test_v2_asset_contract.py:39:        self.assertIn("intent_lstm", mismatches)
+tests/test_policy_score_tuning.py:164:        for field in ("obj_id", "candidate_id", "intent_bias", "situation_score", "combined_score"):
+tests/test_policy_score_tuning.py:219:        for field in ("obj_id", "candidate_id", "intent_bias", "situation_score", "combined_score"):
+tests/test_policy_score_tuning.py:286:            assert "intent_bias" in means
