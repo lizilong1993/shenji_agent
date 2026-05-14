@@ -1,0 +1,23 @@
+{
+  "state": "BACKUP_PARTIAL_REVIEW_REQUIRED",
+  "source_backup_path": "/remote-home/lizilong/shenji_agent_backup",
+  "quarantine_path": "/remote-home/lizilong/recovery/shenji_backup_audit/candidate_shenji_agent_backup_20260514_hardlink_041215",
+  "current_project_path": "/remote-home/lizilong/shenji_agent",
+  "restore_performed": false,
+  "candidate_restore_paths": [
+    "ai/weights/tactical_model.pt",
+    "experiments/shenji_agent/20260327_141522/tactical_model.pt",
+    "datasets/陆战兵棋态势特征数据集/Wargame_Feature_Dataset.csv"
+  ],
+  "must_not_restore_automatically": [
+    "ai/*.py",
+    "training/*.py",
+    "scripts/*.py",
+    "tests/*.py",
+    "land_wargame_sdk/Data/Data/**",
+    "__pycache__/**",
+    "tmp/**",
+    "logs/**"
+  ],
+  "next_action": "Human review required before any selected non-destructive restore of large assets."
+}

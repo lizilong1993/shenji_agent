@@ -1,0 +1,3 @@
+/remote-home/lizilong/recovery/shenji_backup_audit
+/remote-home/lizilong/recovery/shenji_backup_audit/candidate_shenji_agent_backup_20260513_082959
+/remote-home/lizilong/shenji_agent_backup
