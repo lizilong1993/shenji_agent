@@ -1,0 +1,41 @@
+{
+  "checkpoint": "/remote-home/lizilong/shenji_agent/external_assets_recovered/shenji_backup_20260514/ai/weights/tactical_model_from_experiment_20260327_141522.pt",
+  "errors": [],
+  "exists": true,
+  "hidden_dim": 128,
+  "input_dim": 32,
+  "model_state_shapes": {
+    "model.0.bias": [
+      128
+    ],
+    "model.0.weight": [
+      128,
+      32
+    ],
+    "model.3.bias": [
+      64
+    ],
+    "model.3.weight": [
+      64,
+      128
+    ],
+    "model.5.bias": [
+      1
+    ],
+    "model.5.weight": [
+      1,
+      64
+    ]
+  },
+  "sha256": "9fc261e560112e33c4a79c7b40a47a0ebf1314595ad37970cb3b6eef6209cb04",
+  "size_bytes": 53013,
+  "status": "TACTICAL_CHECKPOINT_COMPATIBLE",
+  "tactical_model_class": "ai.models.TacticalScorer",
+  "top_level_keys": [
+    "input_dim",
+    "model_state"
+  ],
+  "top_level_type": "dict",
+  "torch_weights_only_used": true,
+  "warnings": []
+}

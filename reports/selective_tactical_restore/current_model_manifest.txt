@@ -1,0 +1,35 @@
+{
+  "generated_at": "20260428_235813",
+  "source_commit_sha": "3d3e69a5aa688cf4eeff948db60d507d90bee86c",
+  "history_len": 8,
+  "horizons": 5,
+  "intent_lstm": "intention_lstm.pth",
+  "situation_gcn": "situation_gcn.pth",
+  "situation_feature_normalizer": "situation_feature_normalizer.json",
+  "situation_normalizer_kind": "per_dimension_zscore",
+  "situation_normalizer_fitted_on": "situation_train_split",
+  "situation_normalizer_feature_dim": 108,
+  "situation_normalizer_zero_std_count": 50,
+  "situation_training_applied_normalizer": true,
+  "tactical_model": "tactical_model.pt",
+  "objective_enabled": true,
+  "objective_mode": "heuristic_policy_score",
+  "objective_label_source": "experiments/shenji_agent/objective_labels/latest/objective_labels.jsonl",
+  "objective_label_counts": {
+    "total": 1480,
+    "high_confidence": 0,
+    "medium_confidence": 1453,
+    "low_confidence": 27
+  },
+  "objective_metrics": {
+    "model_trained": false,
+    "reason": "existing artifacts yielded no high-confidence score/capture/damage labels; policy uses objective heuristic scoring while new diagnostics collect stronger labels"
+  },
+  "managed_files": [
+    "intention_lstm.pth",
+    "situation_gcn.pth",
+    "situation_feature_normalizer.json",
+    "model_manifest.json",
+    "tactical_model.pt"
+  ]
+}

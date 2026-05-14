@@ -39,10 +39,10 @@ class V2AssetContractTests(unittest.TestCase):
         self.assertIn("intent_lstm", mismatches)
         self.assertIn("situation_gcn", mismatches)
 
-    def test_tactical_checkpoint_missing_status_is_fail_closed(self) -> None:
+    def test_tactical_checkpoint_restored_status_is_ready(self) -> None:
         missing = manifest_missing_files(Path("ai/weights"))
 
-        self.assertIn("ai/weights/tactical_model.pt", missing)
+        self.assertNotIn("ai/weights/tactical_model.pt", missing)
 
     def test_rule_incumbent_assets_are_not_required_for_candidate_smoke(self) -> None:
         missing = manifest_missing_files(Path("ai/weights_incumbent_rule"))
@@ -52,11 +52,11 @@ class V2AssetContractTests(unittest.TestCase):
     def test_smoke_preflight_reports_asset_contract_details(self) -> None:
         report = build_report(Path("ai/weights"), Path("ai/weights_incumbent_rule"))
 
-        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["status"], "ready")
         self.assertIn("candidate_assets", report)
         self.assertIn("incumbent_assets", report)
         self.assertFalse(report["incumbent_assets"]["models_required"])
-        self.assertIn("tactical_model", report["candidate_assets"]["missing_required"])
+        self.assertNotIn("tactical_model", report["candidate_assets"]["missing_required"])
         self.assertEqual(report["candidate_assets"]["naming_mismatches"], {})
 
     def test_manifest_missing_file_remains_blocking(self) -> None:

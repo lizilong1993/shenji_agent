@@ -1,0 +1,65 @@
+{
+  "column_count": 18,
+  "columns": [
+    "ID",
+    "算子类型",
+    "算子所属方",
+    "样本标签",
+    "起始点",
+    "目标点",
+    "起始点机动范围",
+    "起始点观察范围",
+    "起始点暴露范围",
+    "起始点夺控能力",
+    "目标点机动范围",
+    "目标点观察范围",
+    "目标点暴露范围",
+    "目标点夺控能力",
+    "主要夺控点",
+    "次要夺控点",
+    "特殊地形",
+    "整体移动方向"
+  ],
+  "dataset": "/remote-home/lizilong/shenji_agent/datasets/陆战兵棋态势特征数据集/Wargame_Feature_Dataset.csv",
+  "errors": [],
+  "exists": true,
+  "expected_feature_dim": 32,
+  "feature_column_count_sample": 17,
+  "feature_columns_sample": [
+    "ID",
+    "算子类型",
+    "算子所属方",
+    "起始点",
+    "目标点",
+    "起始点机动范围",
+    "起始点观察范围",
+    "起始点暴露范围",
+    "起始点夺控能力",
+    "目标点机动范围",
+    "目标点观察范围",
+    "目标点暴露范围",
+    "目标点夺控能力",
+    "主要夺控点",
+    "次要夺控点",
+    "特殊地形",
+    "整体移动方向"
+  ],
+  "feature_matrix_shape_sample": [
+    5000,
+    32
+  ],
+  "label_column": "样本标签",
+  "label_column_present": true,
+  "label_distribution_parsed_sample": {
+    "1.0": 5000
+  },
+  "label_distribution_sample": {
+    "1": 5000
+  },
+  "missing_values_in_sample": 6,
+  "row_count_sample": 5000,
+  "sample_rows_checked": 5000,
+  "size_bytes": 409055700,
+  "status": "TACTICAL_DATASET_COMPATIBLE",
+  "warnings": []
+}

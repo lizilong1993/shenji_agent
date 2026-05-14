@@ -1,0 +1,90 @@
+ai/weights/model_manifest.json:14:  "tactical_model": "tactical_model.pt",
+ai/weights/model_manifest.json:33:    "tactical_model.pt"
+paper/prewrite_package/results_tables.json:137:    "tactical_model_loaded_match_count": 2,
+tests/test_feature_normalizer_consistency.py:60:    assert "tactical_model.pt" in manifest["managed_files"]
+tests/test_mainline_contract.py:1780:                        "tactical_model": "tactical_model.pt",
+tests/test_mainline_contract.py:1781:                        "managed_files": ["intent_lstm.pt", "situation_gcn.pt", "tactical_model.pt", "model_manifest.json"],
+tests/test_mainline_contract.py:1798:        self.assertFalse(diagnostics["tactical_model_present"])
+tests/test_mainline_contract.py:1799:        self.assertFalse(diagnostics["tactical_model_loaded"])
+tests/test_mainline_contract.py:1842:                    "tactical_model_loaded": False,
+tests/test_mainline_contract.py:1856:        self.assertEqual(summary["policy"]["tactical_model_loaded_match_count"], 0)
+ai/policy.py:72:        self.tactical_model = None
+ai/policy.py:136:    def _load_tactical_model(self, payload: Dict[str, Any]) -> Any:
+ai/policy.py:157:        return self.tactical_model is not None
+ai/policy.py:203:        self.tactical_model = None
+ai/policy.py:253:            tactical_resolution = resolutions.get("tactical_model")
+ai/policy.py:254:            tactical_path = tactical_resolution.path if tactical_resolution else candidate_dir / "tactical_model.pt"
+ai/policy.py:258:                    self.tactical_model = self._move_to_device(self._load_tactical_model(tactical_state))
+ai/policy.py:354:            "tactical_model_loaded": self.tactical_model is not None,
+ai/policy.py:556:        if self.tactical_model is None:
+ai/policy.py:561:            logit = self.tactical_model(tensor).item()
+tests/test_v2_asset_contract.py:30:            "tactical_model": "tactical_model.pt",
+tests/test_v2_asset_contract.py:45:        self.assertIn("ai/weights/tactical_model.pt", missing)
+tests/test_v2_asset_contract.py:59:        self.assertIn("tactical_model", report["candidate_assets"]["missing_required"])
+tests/test_promotion_artifact_contract.py:238:                    "tactical_model_loaded": False,
+tests/test_promotion_artifact_contract.py:258:        self.assertIn("tactical_model_loaded_match_count", policy)
+tests/test_promotion_artifact_contract.py:290:                    "tactical_model_loaded_count": 0,
+tests/test_model_quality_diagnostics.py:32:            "intent_model_path", "situation_model_path", "tactical_model_path",
+tests/test_model_quality_diagnostics.py:54:        # At minimum tactical_model_missing should trigger
+training/supervised.py:179:def train_tactical_model(
+training/supervised.py:224:    weight_path = run_dir / "tactical_model.pt"
+training/supervised.py:232:            "feature_columns": dataset.feature_columns,
+training/supervised.py:365:        managed_files.append("tactical_model.pt")
+training/supervised.py:380:        "tactical_model": "tactical_model.pt" if not tactical_skipped else None,
+training/supervised.py:405:        tactical_metrics = train_tactical_model(
+ai/artifacts.py:8:MODEL_KEYS = ("intent_lstm", "intent_model", "situation_gcn", "situation_model", "tactical_model")
+paper/prewrite_package/11_validation_log.md:7:| `python scripts/run_round005_smoke_pipeline.py --out paper/prewrite_package/validation/smoke_preflight` | 2 | fail-closed acceptable | `paper/prewrite_package/validation/smoke_preflight/smoke_preflight.json` | Blocked before launching self-play because manifest names expect `intent_lstm.pt`, `situation_gcn.pt`, and `tactical_model.pt`; restored current files are `.pth` for intent/situation and tactical checkpoint is absent. |
+training/data.py:26:    tactical_dir = discover_dir(datasets_root, required_file="Wargame_Feature_Dataset.csv")
+training/data.py:341:        "tactical_csv": paths["tactical"] / "Wargame_Feature_Dataset.csv",
+tests/test_tactical_asset_restore.py:15:    checkpoint = tmp_path / "tactical_model.pt"
+tests/test_tactical_asset_restore.py:21:    assert report["tactical_model_class"] == "ai.models.TacticalScorer"
+tests/test_tactical_asset_restore.py:32:    dataset = tmp_path / "Wargame_Feature_Dataset.csv"
+training/selfplay.py:1281:    tactical_resolution = resolutions.get("tactical_model")
+training/selfplay.py:1282:    tactical_model_present = bool(tactical_resolution and tactical_resolution.exists)
+training/selfplay.py:1295:        "tactical_model_present": tactical_model_present,
+training/selfplay.py:1296:        "tactical_model_loaded": bool(stats.get("tactical_model_loaded_count", 0) > 0),
+training/selfplay.py:1323:    tactical_model_loaded_count = 0
+training/selfplay.py:1364:            tactical_model_loaded_count += int(bool(payload.get("tactical_model_loaded")))
+training/selfplay.py:1433:        "tactical_model_loaded_count": tactical_model_loaded_count,
+scripts/round005_tactical_diagnostic.py:22:        "tactical_model_loaded": False,
+scripts/round005_tactical_diagnostic.py:31:    tactical_resolution = resolutions.get("tactical_model")
+scripts/round005_tactical_diagnostic.py:32:    tactical_path = tactical_resolution.path if tactical_resolution else artifact_dir / "tactical_model.pt"
+scripts/round005_tactical_diagnostic.py:34:    payload["tactical_model_path"] = str(tactical_path)
+scripts/round005_tactical_diagnostic.py:35:    payload["tactical_model_exists"] = bool(tactical_resolution and tactical_resolution.exists)
+scripts/round005_tactical_diagnostic.py:36:    if not payload["tactical_model_exists"]:
+scripts/run_tactical_enabled_smoke.py:49:    parser.add_argument("--checkpoint", default="ai/weights/tactical_model.pt")
+scripts/run_tactical_enabled_smoke.py:50:    parser.add_argument("--dataset", default="datasets/陆战兵棋态势特征数据集/Wargame_Feature_Dataset.csv")
+scripts/diagnose_model_quality.py:113:def _load_tactical_model(weights_path: Path, device: str = "cpu") -> Tuple[Optional[Any], Optional[Dict[str, Any]]]:
+scripts/diagnose_model_quality.py:164:    tactical_resolution = resolutions.get("tactical_model")
+scripts/diagnose_model_quality.py:167:    tactical_path = tactical_resolution.path if tactical_resolution else artifact_dir / "tactical_model.pt"
+scripts/diagnose_model_quality.py:171:    tactical_model, tactical_payload = _load_tactical_model(tactical_path, device)
+scripts/diagnose_model_quality.py:181:        "tactical_model_path": str(tactical_path) if tactical_path.exists() else None,
+scripts/diagnose_model_quality.py:187:        "tactical_checkpoint_loaded": tactical_model is not None,
+scripts/diagnose_model_quality.py:286:    if tactical_model is not None:
+scripts/diagnose_model_quality.py:292:                out = tactical_model(x)
+scripts/diagnose_model_quality.py:300:        result["warnings"].append("tactical_model_missing")
+scripts/diagnose_model_quality.py:373:                    tactical_csv = parent / "Wargame_Feature_Dataset.csv"
+scripts/diagnose_model_quality.py:388:        recs.append("train_tactical_model")
+scripts/diagnose_model_quality.py:400:        if "tactical_model_missing" in result["warnings"]:
+scripts/diagnose_model_quality.py:401:            recs.append("enable_and_train_tactical_model")
+training/evaluate.py:43:        "tactical_model_loaded_match_count": 0,
+training/evaluate.py:96:            totals["tactical_model_loaded_match_count"] += int(bool(diagnostics.get("tactical_model_loaded")))
+training/evaluate.py:161:        "tactical_model_loaded_match_count": int(totals["tactical_model_loaded_match_count"]),
+scripts/generate_paper_prewrite_package.py:131:        "tactical_model_loaded_match_count": policy.get("tactical_model_loaded_match_count", "not_available") if isinstance(policy, dict) else "not_available",
+scripts/generate_paper_prewrite_package.py:148:    tactical_exists = (ROOT / "ai" / "weights" / "tactical_model.pt").exists() or (ROOT / "ai" / "weights" / "tactical_model.pth").exists()
+scripts/validate_tactical_checkpoint.py:100:        report["tactical_model_class"] = "ai.models.TacticalScorer"
+scripts/run_tactical_branch_diagnostic.py:22:        "tactical_model_class": None,
+scripts/run_tactical_branch_diagnostic.py:52:        report["tactical_model_class"] = "ai.models.TacticalScorer"
+scripts/run_tactical_branch_diagnostic.py:80:    parser.add_argument("--checkpoint", default="ai/weights/tactical_model.pt")
+paper/prewrite_package/formal_artifacts_index.json:24:    "tactical_model_loaded_match_count": 2,
+paper/prewrite_package/formal_artifacts_index.json:55:    "tactical_model_loaded_match_count": 5,
+paper/prewrite_package/formal_artifacts_index.json:83:    "tactical_model_loaded_match_count": 2,
+paper/prewrite_package/formal_artifacts_index.json:114:    "tactical_model_loaded_match_count": "not_available",
+paper/prewrite_package/formal_artifacts_index.json:142:    "tactical_model_loaded_match_count": 1,
+paper/prewrite_package/formal_artifacts_index.json:170:    "tactical_model_loaded_match_count": 0,
+paper/prewrite_package/formal_artifacts_index.json:198:    "tactical_model_loaded_match_count": 0,
+paper/prewrite_package/validation/tactical_diagnostic.json:4:    "missing tactical model file: /remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt"
+paper/prewrite_package/validation/tactical_diagnostic.json:7:  "tactical_model_exists": false,
+paper/prewrite_package/validation/tactical_diagnostic.json:8:  "tactical_model_loaded": false,
+paper/prewrite_package/validation/tactical_diagnostic.json:9:  "tactical_model_path": "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt",
+paper/prewrite_package/validation/smoke_preflight/smoke_preflight.json:8:        "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt"

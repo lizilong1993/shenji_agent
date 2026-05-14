@@ -1,0 +1,43 @@
+{
+  "branch_diagnostic": {
+    "checkpoint": "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt",
+    "checkpoint_validation_status": "TACTICAL_CHECKPOINT_COMPATIBLE",
+    "errors": [],
+    "reason_if_zero": null,
+    "score_sample": [
+      -0.03264318034052849,
+      -0.054553430527448654,
+      -0.022193744778633118,
+      -0.05505894497036934,
+      -0.032218270003795624,
+      -0.033369433134794235,
+      -0.040390364825725555,
+      -0.016668420284986496,
+      -0.05570916831493378,
+      -0.030311930924654007
+    ],
+    "status": "TACTICAL_BRANCH_LOADS_AND_PRODUCES_NONZERO_SCORES",
+    "tactical_candidate_count": 16,
+    "tactical_changed_action_count": null,
+    "tactical_checkpoint_loaded": true,
+    "tactical_checkpoint_resolved": true,
+    "tactical_feature_builder_available": true,
+    "tactical_model_class": "ai.models.TacticalScorer",
+    "tactical_nonzero_score_count": 16,
+    "tactical_reached_count": 16
+  },
+  "dataset_validation_status": "TACTICAL_DATASET_COMPATIBLE",
+  "episodes_attempted": 1,
+  "episodes_completed": 1,
+  "errors": [],
+  "games_attempted": 0,
+  "games_completed": 0,
+  "not_formal_evidence": true,
+  "route_empty_count": 0,
+  "route_empty_rate": 0.0,
+  "status": "TACTICAL_ENABLED_COMPATIBILITY_SMOKE_PASS",
+  "tactical_changed_action_count": null,
+  "tactical_loaded": true,
+  "tactical_nonzero_score_count": 16,
+  "tactical_reached_count": 16
+}

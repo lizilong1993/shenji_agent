@@ -870,7 +870,7 @@ def _load_agent_class_from_commit(commit_sha: str) -> type[Any]:
         package.__package__ = package_name
         sys.modules[package_name] = package
 
-    for module_name in ("features", "models", "policy", "agent"):
+    for module_name in ("artifacts", "features", "models", "policy", "agent"):
         qualified_name = f"{package_name}.{module_name}"
         if qualified_name in sys.modules:
             continue
