@@ -1,0 +1,156 @@
+{
+  "manifest": {
+    "start_time": "2026-05-15T15:51:42.494559",
+    "protocol": "V3B Formal Tactical Outcome Ablation",
+    "scenarios": [
+      "1231"
+    ],
+    "seeds": [
+      0
+    ],
+    "policy_profile": "challenger",
+    "timeout_steps": 2000,
+    "artifacts_dir": null,
+    "pairs_attempted": 1
+  },
+  "end_time": "2026-05-15T15:52:31.375407",
+  "overall": {
+    "total_pairs_attempted": 1,
+    "total_pairs_completed": 1,
+    "total_errors": 0,
+    "statistics": {
+      "total_pairs": 1,
+      "completed_pairs": 1,
+      "failed_on": 0,
+      "failed_off": 0,
+      "crashed_on": 0,
+      "crashed_off": 0,
+      "statistics": {
+        "score_delta": {
+          "mean": -10.0,
+          "std": NaN,
+          "min": -10.0,
+          "max": -10.0,
+          "bootstrap_95_ci_lower": NaN,
+          "bootstrap_95_ci_upper": NaN,
+          "n_resamples": 1000,
+          "effect_size_cohens_d": null,
+          "n": 1,
+          "positive_count": 0,
+          "negative_count": 1,
+          "zero_count": 0
+        },
+        "route_empty_rate": {
+          "tactical_on_mean": 0.0,
+          "tactical_off_mean": 0.0,
+          "mean_delta": 0.0,
+          "bootstrap_95_ci_lower": NaN,
+          "bootstrap_95_ci_upper": NaN,
+          "n": 1
+        },
+        "steps": {
+          "tactical_on_mean": 1801.0,
+          "tactical_off_mean": 1801.0,
+          "mean_delta": 0.0
+        },
+        "duration": {
+          "tactical_on_mean": 33.37,
+          "tactical_off_mean": 9.48,
+          "mean_delta": 23.88
+        },
+        "win_rate": {
+          "tactical_on": {
+            "wins": 0,
+            "games": 1,
+            "win_rate": 0.0
+          },
+          "tactical_off": {
+            "wins": 0,
+            "games": 1,
+            "win_rate": 0.0
+          },
+          "win_rate_delta": 0.0
+        }
+      },
+      "warnings": []
+    },
+    "warnings": []
+  },
+  "per_scenario": {
+    "1231": {
+      "statistics": {
+        "total_pairs": 1,
+        "completed_pairs": 1,
+        "failed_on": 0,
+        "failed_off": 0,
+        "crashed_on": 0,
+        "crashed_off": 0,
+        "statistics": {
+          "score_delta": {
+            "mean": -10.0,
+            "std": NaN,
+            "min": -10.0,
+            "max": -10.0,
+            "bootstrap_95_ci_lower": NaN,
+            "bootstrap_95_ci_upper": NaN,
+            "n_resamples": 1000,
+            "effect_size_cohens_d": null,
+            "n": 1,
+            "positive_count": 0,
+            "negative_count": 1,
+            "zero_count": 0
+          },
+          "route_empty_rate": {
+            "tactical_on_mean": 0.0,
+            "tactical_off_mean": 0.0,
+            "mean_delta": 0.0,
+            "bootstrap_95_ci_lower": NaN,
+            "bootstrap_95_ci_upper": NaN,
+            "n": 1
+          },
+          "steps": {
+            "tactical_on_mean": 1801.0,
+            "tactical_off_mean": 1801.0,
+            "mean_delta": 0.0
+          },
+          "duration": {
+            "tactical_on_mean": 33.37,
+            "tactical_off_mean": 9.48,
+            "mean_delta": 23.88
+          },
+          "win_rate": {
+            "tactical_on": {
+              "wins": 0,
+              "games": 1,
+              "win_rate": 0.0
+            },
+            "tactical_off": {
+              "wins": 0,
+              "games": 1,
+              "win_rate": 0.0
+            },
+            "win_rate_delta": 0.0
+          }
+        },
+        "warnings": []
+      },
+      "pair_count": 1
+    }
+  },
+  "errors": [],
+  "elapsed_seconds": 48.88,
+  "action_divergence": {
+    "divergence_per_pair": [
+      {
+        "seed": 0,
+        "scenario": "1231",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 6,
+        "off_tactical_invocation": 14
+      }
+    ]
+  }
+}

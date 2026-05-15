@@ -15,3 +15,17 @@ tactical_multiseed,std_of_seed_means,0.010
 tactical_multiseed,bootstrap_95_ci_lower,-0.146
 tactical_multiseed,bootstrap_95_ci_upper,-0.129
 tactical_multiseed,changed_action_rate,1.0
+v3d_authenticated_ablation,paired_comparisons,15
+v3d_authenticated_ablation,completion_rate,1.0
+v3d_authenticated_ablation,tactical_nonzero_on_total,351
+v3d_authenticated_ablation,tactical_nonzero_off_total,0
+v3d_authenticated_ablation,score_delta_mean,-1.2667
+v3d_authenticated_ablation,score_delta_std,85.8424
+v3d_authenticated_ablation,bootstrap_95_ci_lower,-50.07
+v3d_authenticated_ablation,bootstrap_95_ci_upper,34.82
+v3d_authenticated_ablation,cohens_d,-0.0148
+v3d_authenticated_ablation,win_rate_on,0.5333
+v3d_authenticated_ablation,win_rate_off,0.5333
+v3d_authenticated_ablation,win_rate_delta,0.0
+v3d_authenticated_ablation,route_empty_rate_on,0.0
+v3d_authenticated_ablation,route_empty_rate_off,0.0

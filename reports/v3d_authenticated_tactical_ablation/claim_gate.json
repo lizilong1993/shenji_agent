@@ -1,0 +1,17 @@
+{
+  "claim_gate": "TACTICAL_OUTCOME_CONTRIBUTION_WEAK_OR_INCONCLUSIVE",
+  "evaluation_date": "2026-05-15",
+  "paired_pairs_attempted": 15,
+  "paired_pairs_completed": 15,
+  "score_delta_mean": -1.2667,
+  "score_delta_std": 85.8424,
+  "bootstrap_95_ci": [-50.07, 34.8183],
+  "cohens_d": -0.0148,
+  "win_rate_delta": 0.0,
+  "tactical_invoked": true,
+  "tactical_nonzero_on_total": 351,
+  "tactical_nonzero_off_total": 0,
+  "route_empty_rate": 0.0,
+  "illegal_action_metrics": "not directly recorded",
+  "rationale": "Authenticated paired tactical-on/off evaluation completes successfully. Tactical branch is reliably invoked with nonzero scores. Route metrics are clean (0% empty). However outcome delta mean is -1.27, bootstrap 95% CI crosses zero [-50.07, 34.82], Cohen's d is negligible (-0.015), and win rate is identical. Outcome contribution is weak or inconclusive."
+}

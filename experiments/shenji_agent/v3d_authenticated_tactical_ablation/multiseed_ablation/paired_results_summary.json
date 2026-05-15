@@ -1,0 +1,420 @@
+{
+  "manifest": {
+    "start_time": "2026-05-15T15:54:14.685967",
+    "protocol": "V3B Formal Tactical Outcome Ablation",
+    "scenarios": [
+      "1231",
+      "1531",
+      "1910631192"
+    ],
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "policy_profile": "challenger",
+    "timeout_steps": 2000,
+    "artifacts_dir": null,
+    "pairs_attempted": 15
+  },
+  "end_time": "2026-05-15T16:02:21.448762",
+  "overall": {
+    "total_pairs_attempted": 15,
+    "total_pairs_completed": 15,
+    "total_errors": 0,
+    "statistics": {
+      "total_pairs": 15,
+      "completed_pairs": 15,
+      "failed_on": 0,
+      "failed_off": 0,
+      "crashed_on": 0,
+      "crashed_off": 0,
+      "statistics": {
+        "score_delta": {
+          "mean": -1.2667,
+          "std": 85.8424,
+          "min": -264.0,
+          "max": 158.0,
+          "bootstrap_95_ci_lower": -50.07,
+          "bootstrap_95_ci_upper": 34.8183,
+          "n_resamples": 1000,
+          "effect_size_cohens_d": -0.0148,
+          "n": 15,
+          "positive_count": 6,
+          "negative_count": 3,
+          "zero_count": 6
+        },
+        "route_empty_rate": {
+          "tactical_on_mean": 0.0,
+          "tactical_off_mean": 0.0,
+          "mean_delta": 0.0,
+          "bootstrap_95_ci_lower": 0.0,
+          "bootstrap_95_ci_upper": 0.0,
+          "n": 15
+        },
+        "steps": {
+          "tactical_on_mean": 1801.0,
+          "tactical_off_mean": 1801.0,
+          "mean_delta": 0.0
+        },
+        "duration": {
+          "tactical_on_mean": 15.25,
+          "tactical_off_mean": 13.93,
+          "mean_delta": 1.32
+        },
+        "win_rate": {
+          "tactical_on": {
+            "wins": 8,
+            "games": 15,
+            "win_rate": 0.5333
+          },
+          "tactical_off": {
+            "wins": 8,
+            "games": 15,
+            "win_rate": 0.5333
+          },
+          "win_rate_delta": 0.0
+        }
+      },
+      "warnings": []
+    },
+    "warnings": []
+  },
+  "per_scenario": {
+    "1231": {
+      "statistics": {
+        "total_pairs": 5,
+        "completed_pairs": 5,
+        "failed_on": 0,
+        "failed_off": 0,
+        "crashed_on": 0,
+        "crashed_off": 0,
+        "statistics": {
+          "score_delta": {
+            "mean": 17.6,
+            "std": 36.8619,
+            "min": -20.0,
+            "max": 78.0,
+            "bootstrap_95_ci_lower": -8.0,
+            "bootstrap_95_ci_upper": 50.8,
+            "n_resamples": 1000,
+            "effect_size_cohens_d": 0.4775,
+            "n": 5,
+            "positive_count": 3,
+            "negative_count": 1,
+            "zero_count": 1
+          },
+          "route_empty_rate": {
+            "tactical_on_mean": 0.0,
+            "tactical_off_mean": 0.0,
+            "mean_delta": 0.0,
+            "bootstrap_95_ci_lower": 0.0,
+            "bootstrap_95_ci_upper": 0.0,
+            "n": 5
+          },
+          "steps": {
+            "tactical_on_mean": 1801.0,
+            "tactical_off_mean": 1801.0,
+            "mean_delta": 0.0
+          },
+          "duration": {
+            "tactical_on_mean": 13.62,
+            "tactical_off_mean": 9.34,
+            "mean_delta": 4.28
+          },
+          "win_rate": {
+            "tactical_on": {
+              "wins": 0,
+              "games": 5,
+              "win_rate": 0.0
+            },
+            "tactical_off": {
+              "wins": 0,
+              "games": 5,
+              "win_rate": 0.0
+            },
+            "win_rate_delta": 0.0
+          }
+        },
+        "warnings": []
+      },
+      "pair_count": 5
+    },
+    "1531": {
+      "statistics": {
+        "total_pairs": 5,
+        "completed_pairs": 5,
+        "failed_on": 0,
+        "failed_off": 0,
+        "crashed_on": 0,
+        "crashed_off": 0,
+        "statistics": {
+          "score_delta": {
+            "mean": -21.4,
+            "std": 153.2279,
+            "min": -264.0,
+            "max": 158.0,
+            "bootstrap_95_ci_lower": -150.445,
+            "bootstrap_95_ci_upper": 82.215,
+            "n_resamples": 1000,
+            "effect_size_cohens_d": -0.1397,
+            "n": 5,
+            "positive_count": 3,
+            "negative_count": 2,
+            "zero_count": 0
+          },
+          "route_empty_rate": {
+            "tactical_on_mean": 0.0,
+            "tactical_off_mean": 0.0,
+            "mean_delta": 0.0,
+            "bootstrap_95_ci_lower": 0.0,
+            "bootstrap_95_ci_upper": 0.0,
+            "n": 5
+          },
+          "steps": {
+            "tactical_on_mean": 1801.0,
+            "tactical_off_mean": 1801.0,
+            "mean_delta": 0.0
+          },
+          "duration": {
+            "tactical_on_mean": 9.24,
+            "tactical_off_mean": 9.8,
+            "mean_delta": -0.56
+          },
+          "win_rate": {
+            "tactical_on": {
+              "wins": 3,
+              "games": 5,
+              "win_rate": 0.6
+            },
+            "tactical_off": {
+              "wins": 3,
+              "games": 5,
+              "win_rate": 0.6
+            },
+            "win_rate_delta": 0.0
+          }
+        },
+        "warnings": []
+      },
+      "pair_count": 5
+    },
+    "1910631192": {
+      "statistics": {
+        "total_pairs": 5,
+        "completed_pairs": 5,
+        "failed_on": 0,
+        "failed_off": 0,
+        "crashed_on": 0,
+        "crashed_off": 0,
+        "statistics": {
+          "score_delta": {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "bootstrap_95_ci_lower": 0.0,
+            "bootstrap_95_ci_upper": 0.0,
+            "n_resamples": 1000,
+            "effect_size_cohens_d": null,
+            "n": 5,
+            "positive_count": 0,
+            "negative_count": 0,
+            "zero_count": 5
+          },
+          "route_empty_rate": {
+            "tactical_on_mean": 0.0,
+            "tactical_off_mean": 0.0,
+            "mean_delta": 0.0,
+            "bootstrap_95_ci_lower": 0.0,
+            "bootstrap_95_ci_upper": 0.0,
+            "n": 5
+          },
+          "steps": {
+            "tactical_on_mean": 1801.0,
+            "tactical_off_mean": 1801.0,
+            "mean_delta": 0.0
+          },
+          "duration": {
+            "tactical_on_mean": 22.89,
+            "tactical_off_mean": 22.66,
+            "mean_delta": 0.24
+          },
+          "win_rate": {
+            "tactical_on": {
+              "wins": 5,
+              "games": 5,
+              "win_rate": 1.0
+            },
+            "tactical_off": {
+              "wins": 5,
+              "games": 5,
+              "win_rate": 1.0
+            },
+            "win_rate_delta": 0.0
+          }
+        },
+        "warnings": []
+      },
+      "pair_count": 5
+    }
+  },
+  "errors": [],
+  "elapsed_seconds": 486.76,
+  "action_divergence": {
+    "divergence_per_pair": [
+      {
+        "seed": 0,
+        "scenario": "1231",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 15,
+        "off_tactical_invocation": 7
+      },
+      {
+        "seed": 1,
+        "scenario": "1231",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 8,
+        "off_tactical_invocation": 12
+      },
+      {
+        "seed": 2,
+        "scenario": "1231",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 8,
+        "off_tactical_invocation": 8
+      },
+      {
+        "seed": 3,
+        "scenario": "1231",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 10,
+        "off_tactical_invocation": 8
+      },
+      {
+        "seed": 4,
+        "scenario": "1231",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 23,
+        "off_tactical_invocation": 11
+      },
+      {
+        "seed": 0,
+        "scenario": "1531",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 45,
+        "off_tactical_invocation": 47
+      },
+      {
+        "seed": 1,
+        "scenario": "1531",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 17,
+        "off_tactical_invocation": 39
+      },
+      {
+        "seed": 2,
+        "scenario": "1531",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 22,
+        "off_tactical_invocation": 21
+      },
+      {
+        "seed": 3,
+        "scenario": "1531",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 13,
+        "off_tactical_invocation": 14
+      },
+      {
+        "seed": 4,
+        "scenario": "1531",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 32,
+        "off_tactical_invocation": 32
+      },
+      {
+        "seed": 0,
+        "scenario": "1910631192",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 32,
+        "off_tactical_invocation": 32
+      },
+      {
+        "seed": 1,
+        "scenario": "1910631192",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 32,
+        "off_tactical_invocation": 32
+      },
+      {
+        "seed": 2,
+        "scenario": "1910631192",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 31,
+        "off_tactical_invocation": 31
+      },
+      {
+        "seed": 3,
+        "scenario": "1910631192",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 32,
+        "off_tactical_invocation": 32
+      },
+      {
+        "seed": 4,
+        "scenario": "1910631192",
+        "on_learned_move": 0,
+        "off_learned_move": 0,
+        "on_learned_shoot": 0,
+        "off_learned_shoot": 0,
+        "on_tactical_invocation": 31,
+        "off_tactical_invocation": 31
+      }
+    ]
+  }
+}

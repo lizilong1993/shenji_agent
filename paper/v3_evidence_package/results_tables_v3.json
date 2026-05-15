@@ -1,6 +1,6 @@
 {
-  "tables_version": "1.0",
-  "date": "2026-05-14",
+  "tables_version": "2.0",
+  "date": "2026-05-15",
   "tactical_action_diagnostic": {
     "candidates_examined": 18,
     "nonzero_score_rate": 1.0,
@@ -26,5 +26,24 @@
     "changed_action_rate": 1.0,
     "game_level_metrics_available": false,
     "not_formal_evidence": true
+  },
+  "v3d_authenticated_ablation": {
+    "date": "2026-05-15",
+    "paired_comparisons": 15,
+    "seeds": [0, 1, 2, 3, 4],
+    "scenarios": ["1231", "1531", "1910631192"],
+    "completion_rate": 1.0,
+    "tactical_nonzero_on_total": 351,
+    "tactical_nonzero_off_total": 0,
+    "score_delta_mean": -1.2667,
+    "score_delta_std": 85.8424,
+    "bootstrap_95_ci": [-50.07, 34.82],
+    "cohens_d": -0.0148,
+    "win_rate_on": 0.5333,
+    "win_rate_off": 0.5333,
+    "win_rate_delta": 0.0,
+    "route_empty_rate_on": 0.0,
+    "route_empty_rate_off": 0.0,
+    "claim_gate": "TACTICAL_OUTCOME_CONTRIBUTION_WEAK_OR_INCONCLUSIVE"
   }
 }

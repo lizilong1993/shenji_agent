@@ -1,0 +1,15 @@
+{
+  "decision": "RESUME_V3_WITH_TACTICAL_DIAGNOSTIC_OR_WEAK_CLAIM",
+  "date": "2026-05-15",
+  "claim_gate": "TACTICAL_OUTCOME_CONTRIBUTION_WEAK_OR_INCONCLUSIVE",
+  "authenticated_replay": true,
+  "pairs_attempted": 15,
+  "pairs_completed": 15,
+  "score_delta_mean": -1.2667,
+  "bootstrap_95_ci": [-50.07, 34.82],
+  "tactical_invoked": true,
+  "route_empty_rate": 0.0,
+  "tests_passed": 87,
+  "compileall_clean": true,
+  "rationale": "Authenticated paired tactical-on/off evaluation completes successfully. Tactical branch invoked with nonzero scores. Route metrics clean. Outcome contribution weak or inconclusive (CI crosses zero, negligible effect size). Claim tactical as diagnostic/action-level contribution only."
+}

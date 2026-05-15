@@ -1,0 +1,879 @@
+{
+  "seed": 3,
+  "scenario": "1531",
+  "map": "53",
+  "tactical_on": {
+    "seed": 3,
+    "scenario": "1531",
+    "map": "53",
+    "tactical_mode": "on",
+    "policy_profile": "challenger",
+    "status": "completed",
+    "error": null,
+    "steps": 1801,
+    "winner": 1,
+    "score": null,
+    "reward": null,
+    "route_metrics": {
+      "route_empty_count": 0,
+      "total_move_attempts": 10,
+      "route_empty_rate": 0.0
+    },
+    "tactical_stats": {
+      "tactical_invocation_count": 13,
+      "tactical_nonzero_count": 13
+    },
+    "action_divergence": null,
+    "duration": 10.183,
+    "policy_stats": {
+      "policy_profile": "challenger",
+      "tactical_mode": "on",
+      "device": "cuda",
+      "requested_device": "auto",
+      "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+      "intent_model_loaded": true,
+      "intent_model_architecture": "LegacyIntentModel",
+      "situation_model_loaded": true,
+      "tactical_model_loaded": true,
+      "normalizer_loaded": true,
+      "objective_model_loaded": false,
+      "objective_score_used": true,
+      "objective_weight": 1.0,
+      "objective_fallback_reason": "objective_model_missing_using_heuristic",
+      "objective_top_action": "move",
+      "selected_action_objective_score": 159.0,
+      "objective_score_by_action_type": {
+        "move": {
+          "samples": 10,
+          "mean": 136.35
+        },
+        "shoot": {
+          "samples": 3,
+          "mean": 4.666666666666667
+        }
+      },
+      "normalizer_diagnostics": {
+        "normalizer_loaded": true,
+        "normalizer_applied_count": 23,
+        "normalizer_mismatch_count": 0,
+        "feature_dim_before_norm": 108,
+        "feature_mean_before_norm": 166.78240966796875,
+        "feature_std_before_norm": 1460.66015625,
+        "feature_mean_after_norm": 0.011228442192077637,
+        "feature_std_after_norm": 1.1699984073638916,
+        "normalizer_feature_dim": 108,
+        "normalizer_mismatch_reason": null
+      },
+      "counts": {
+        "move": {
+          "total": 10,
+          "learned": 10
+        },
+        "shoot": {
+          "total": 3,
+          "learned": 3
+        }
+      },
+      "learned_path_coverage": 1.0,
+      "move_path_coverage": 1.0,
+      "shoot_path_coverage": 1.0,
+      "score_means": {
+        "move": {
+          "intent_bias": -1.7,
+          "situation_score": 0.47288955450057985,
+          "tactical_score": -0.040262294188141826,
+          "objective_score": 136.35,
+          "combined_score": 244.51767360448835,
+          "samples": 10
+        },
+        "shoot": {
+          "intent_bias": 1.8619109988212585,
+          "situation_score": 0.4749455749988556,
+          "tactical_score": 308.1171875,
+          "objective_score": 4.666666666666667,
+          "combined_score": 148.68980183204016,
+          "samples": 3
+        }
+      },
+      "trace_samples": [
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14983,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.4774963855743408,
+          "tactical_score": -0.03273327648639679,
+          "objective_score": 129.0,
+          "combined_score": 225.46598685264587
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14985,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.4758935570716858,
+          "tactical_score": -0.03284173086285591,
+          "objective_score": 129.0,
+          "combined_score": 225.14516219615936
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.47433602809906006,
+          "tactical_score": -0.03284173086285591,
+          "objective_score": 129.0,
+          "combined_score": 224.9894092988968
+        },
+        {
+          "action": "shoot",
+          "used_learned": true,
+          "obj_id": 14983,
+          "candidate_id": 14977,
+          "intent_bias": 1.5567414164543152,
+          "situation_score": 0.47212374210357666,
+          "tactical_score": 308.3148193359375,
+          "objective_score": 5.0,
+          "combined_score": 148.61911562681198
+        },
+        {
+          "action": "shoot",
+          "used_learned": true,
+          "obj_id": 14983,
+          "candidate_id": 14977,
+          "intent_bias": 3.0607634782791138,
+          "situation_score": 0.4759933650493622,
+          "tactical_score": 308.31378173828125,
+          "objective_score": 5.0,
+          "combined_score": 158.56009998321534
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -8.0,
+          "situation_score": 0.47314098477363586,
+          "tactical_score": -0.046122606843709946,
+          "objective_score": 129.0,
+          "combined_score": 242.36352625370026
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14983,
+          "candidate_id": 3317,
+          "intent_bias": -2.0,
+          "situation_score": 0.47593069076538086,
+          "tactical_score": -0.02909879758954048,
+          "objective_score": 127.5,
+          "combined_score": 207.54758546352386
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.4679308831691742,
+          "tactical_score": -0.04612037166953087,
+          "objective_score": 129.0,
+          "combined_score": 249.9225274181366
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -4.0,
+          "situation_score": 0.47175586223602295,
+          "tactical_score": -0.04589652642607689,
+          "objective_score": 136.5,
+          "combined_score": 253.8861441040039
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.46853435039520264,
+          "tactical_score": -0.04589422419667244,
+          "objective_score": 144.0,
+          "combined_score": 265.14400424480436
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.46853435039520264,
+          "tactical_score": -0.04565517604351044,
+          "objective_score": 151.5,
+          "combined_score": 272.72519931793215
+        },
+        {
+          "action": "shoot",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 14980,
+          "intent_bias": 0.9682281017303467,
+          "situation_score": 0.47671961784362793,
+          "tactical_score": 307.72296142578125,
+          "objective_score": 4.0,
+          "combined_score": 138.89018988609314
+        }
+      ],
+      "move_route_aggregate": {
+        "total_attempts": 10,
+        "empty_route_count": 0,
+        "reachable_city_total": 19,
+        "by_move_type": {
+          "Maneuver": {
+            "total": 7,
+            "empty": 0
+          },
+          "Walk": {
+            "total": 3,
+            "empty": 0
+          }
+        },
+        "route_failure_reasons": {}
+      },
+      "move_route_samples": [
+        {
+          "operator_id": 14983,
+          "operator_type": 2,
+          "current_hex": 1908,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 14,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14985,
+          "operator_type": 2,
+          "current_hex": 1707,
+          "move_type": 2,
+          "move_type_name": "Walk",
+          "target_kind": "city",
+          "target_source": "learned_fallback_move_type_2",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 16,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 1707,
+          "move_type": 2,
+          "move_type_name": "Walk",
+          "target_kind": "city",
+          "target_source": "learned_fallback_move_type_2",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 16,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2212,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 9,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14983,
+          "operator_type": 2,
+          "current_hex": 2818,
+          "move_type": 2,
+          "move_type_name": "Walk",
+          "target_kind": "city",
+          "target_source": "learned_fallback_move_type_2",
+          "target_city_id": 3317,
+          "target_hex": 3317,
+          "reachable_city_count": 1,
+          "total_cities": 2,
+          "route_len": 5,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2213,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 8,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2313,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 7,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2314,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 6,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2415,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 5,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2515,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 4,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        }
+      ]
+    },
+    "score_red": 22,
+    "score_blue": 344,
+    "final_scores": {
+      "red_occupy": 0,
+      "red_remain": 0,
+      "red_remain_max": 104,
+      "red_attack": 22,
+      "red_total": 22,
+      "red_win": -322,
+      "blue_occupy": 130,
+      "blue_remain": 110,
+      "blue_remain_max": 132,
+      "blue_attack": 104,
+      "blue_total": 344,
+      "blue_win": 322
+    }
+  },
+  "tactical_off": {
+    "seed": 3,
+    "scenario": "1531",
+    "map": "53",
+    "tactical_mode": "off",
+    "policy_profile": "challenger",
+    "status": "completed",
+    "error": null,
+    "steps": 1801,
+    "winner": 1,
+    "score": null,
+    "reward": null,
+    "route_metrics": {
+      "route_empty_count": 0,
+      "total_move_attempts": 10,
+      "route_empty_rate": 0.0
+    },
+    "tactical_stats": {
+      "tactical_invocation_count": 14,
+      "tactical_nonzero_count": 0
+    },
+    "action_divergence": null,
+    "duration": 10.213,
+    "policy_stats": {
+      "policy_profile": "challenger",
+      "tactical_mode": "off",
+      "device": "cuda",
+      "requested_device": "auto",
+      "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+      "intent_model_loaded": true,
+      "intent_model_architecture": "LegacyIntentModel",
+      "situation_model_loaded": true,
+      "tactical_model_loaded": true,
+      "normalizer_loaded": true,
+      "objective_model_loaded": false,
+      "objective_score_used": true,
+      "objective_weight": 1.0,
+      "objective_fallback_reason": "objective_model_missing_using_heuristic",
+      "objective_top_action": "move",
+      "selected_action_objective_score": 159.0,
+      "objective_score_by_action_type": {
+        "move": {
+          "samples": 10,
+          "mean": 136.35
+        },
+        "shoot": {
+          "samples": 4,
+          "mean": 4.75
+        }
+      },
+      "normalizer_diagnostics": {
+        "normalizer_loaded": true,
+        "normalizer_applied_count": 25,
+        "normalizer_mismatch_count": 0,
+        "feature_dim_before_norm": 108,
+        "feature_mean_before_norm": 166.77777099609375,
+        "feature_std_before_norm": 1460.66015625,
+        "feature_mean_after_norm": 0.001969180768355727,
+        "feature_std_after_norm": 1.201287865638733,
+        "normalizer_feature_dim": 108,
+        "normalizer_mismatch_reason": null
+      },
+      "counts": {
+        "move": {
+          "total": 10,
+          "learned": 10
+        },
+        "shoot": {
+          "total": 4,
+          "learned": 4
+        }
+      },
+      "learned_path_coverage": 1.0,
+      "move_path_coverage": 1.0,
+      "shoot_path_coverage": 1.0,
+      "score_means": {
+        "move": {
+          "intent_bias": -1.7,
+          "situation_score": 0.47281429171562195,
+          "tactical_score": 0.0,
+          "objective_score": 136.35,
+          "combined_score": 244.71142917156217,
+          "samples": 10
+        },
+        "shoot": {
+          "intent_bias": 2.2366696521639824,
+          "situation_score": 0.4758606255054474,
+          "tactical_score": 0.0,
+          "objective_score": 4.75,
+          "combined_score": 141.3102322027087,
+          "samples": 4
+        }
+      },
+      "trace_samples": [
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14983,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.4774963855743408,
+          "tactical_score": 0.0,
+          "objective_score": 129.0,
+          "combined_score": 225.62963855743408
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14985,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.4758935570716858,
+          "tactical_score": 0.0,
+          "objective_score": 129.0,
+          "combined_score": 225.30935570716858
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.47433602809906006,
+          "tactical_score": 0.0,
+          "objective_score": 129.0,
+          "combined_score": 225.153602809906
+        },
+        {
+          "action": "shoot",
+          "used_learned": true,
+          "obj_id": 14983,
+          "candidate_id": 14977,
+          "intent_bias": 1.5567414164543152,
+          "situation_score": 0.47212374210357666,
+          "tactical_score": 0.0,
+          "objective_score": 5.0,
+          "combined_score": 138.61911562681198
+        },
+        {
+          "action": "shoot",
+          "used_learned": true,
+          "obj_id": 14983,
+          "candidate_id": 14977,
+          "intent_bias": 2.757691740989685,
+          "situation_score": 0.4766324460506439,
+          "tactical_score": 0.0,
+          "objective_score": 5.0,
+          "combined_score": 148.37093634605407
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -8.0,
+          "situation_score": 0.4729023277759552,
+          "tactical_score": 0.0,
+          "objective_score": 129.0,
+          "combined_score": 242.57023277759552
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14983,
+          "candidate_id": 3317,
+          "intent_bias": -2.0,
+          "situation_score": 0.4748631715774536,
+          "tactical_score": 0.0,
+          "objective_score": 127.5,
+          "combined_score": 207.58631715774536
+        },
+        {
+          "action": "shoot",
+          "used_learned": true,
+          "obj_id": 14983,
+          "candidate_id": 14978,
+          "intent_bias": 3.3796336352825165,
+          "situation_score": 0.47796669602394104,
+          "tactical_score": 0.0,
+          "objective_score": 5.0,
+          "combined_score": 149.07630323767663
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.4679308831691742,
+          "tactical_score": 0.0,
+          "objective_score": 129.0,
+          "combined_score": 250.15308831691743
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -4.0,
+          "situation_score": 0.47248220443725586,
+          "tactical_score": 0.0,
+          "objective_score": 136.5,
+          "combined_score": 254.18822044372558
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.46853435039520264,
+          "tactical_score": 0.0,
+          "objective_score": 144.0,
+          "combined_score": 265.37343503952025
+        },
+        {
+          "action": "move",
+          "used_learned": true,
+          "obj_id": 14986,
+          "candidate_id": 2818,
+          "intent_bias": -0.0,
+          "situation_score": 0.46853435039520264,
+          "tactical_score": 0.0,
+          "objective_score": 151.5,
+          "combined_score": 272.9534350395203
+        }
+      ],
+      "move_route_aggregate": {
+        "total_attempts": 10,
+        "empty_route_count": 0,
+        "reachable_city_total": 19,
+        "by_move_type": {
+          "Maneuver": {
+            "total": 7,
+            "empty": 0
+          },
+          "Walk": {
+            "total": 3,
+            "empty": 0
+          }
+        },
+        "route_failure_reasons": {}
+      },
+      "move_route_samples": [
+        {
+          "operator_id": 14983,
+          "operator_type": 2,
+          "current_hex": 1908,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 14,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14985,
+          "operator_type": 2,
+          "current_hex": 1707,
+          "move_type": 2,
+          "move_type_name": "Walk",
+          "target_kind": "city",
+          "target_source": "learned_fallback_move_type_2",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 16,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 1707,
+          "move_type": 2,
+          "move_type_name": "Walk",
+          "target_kind": "city",
+          "target_source": "learned_fallback_move_type_2",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 16,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2212,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 9,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14983,
+          "operator_type": 2,
+          "current_hex": 2818,
+          "move_type": 2,
+          "move_type_name": "Walk",
+          "target_kind": "city",
+          "target_source": "learned_fallback_move_type_2",
+          "target_city_id": 3317,
+          "target_hex": 3317,
+          "reachable_city_count": 1,
+          "total_cities": 2,
+          "route_len": 5,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2213,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 8,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2313,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 7,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2314,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 6,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2415,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 5,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        },
+        {
+          "operator_id": 14986,
+          "operator_type": 2,
+          "current_hex": 2515,
+          "move_type": 0,
+          "move_type_name": "Maneuver",
+          "target_kind": "city",
+          "target_source": "learned",
+          "target_city_id": 2818,
+          "target_hex": 2818,
+          "reachable_city_count": 2,
+          "total_cities": 2,
+          "route_len": 4,
+          "route_empty": false,
+          "route_failure_reason": "none",
+          "selected_by_learned": true
+        }
+      ]
+    },
+    "score_red": 54,
+    "score_blue": 312,
+    "final_scores": {
+      "red_occupy": 0,
+      "red_remain": 0,
+      "red_remain_max": 104,
+      "red_attack": 54,
+      "red_total": 54,
+      "red_win": -258,
+      "blue_occupy": 130,
+      "blue_remain": 78,
+      "blue_remain_max": 132,
+      "blue_attack": 104,
+      "blue_total": 312,
+      "blue_win": 258
+    }
+  },
+  "paired_delta": {
+    "score_delta": -32.0,
+    "route_empty_rate_delta": 0.0,
+    "steps_delta": 0,
+    "duration_delta": -0.03,
+    "on_status": "completed",
+    "off_status": "completed"
+  }
+}

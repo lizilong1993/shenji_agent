@@ -1,0 +1,56 @@
+{
+  "total_pairs": 15,
+  "completed_pairs": 15,
+  "failed_on": 0,
+  "failed_off": 0,
+  "crashed_on": 0,
+  "crashed_off": 0,
+  "statistics": {
+    "score_delta": {
+      "mean": -1.2667,
+      "std": 85.8424,
+      "min": -264.0,
+      "max": 158.0,
+      "bootstrap_95_ci_lower": -50.07,
+      "bootstrap_95_ci_upper": 34.8183,
+      "n_resamples": 1000,
+      "effect_size_cohens_d": -0.0148,
+      "n": 15,
+      "positive_count": 6,
+      "negative_count": 3,
+      "zero_count": 6
+    },
+    "route_empty_rate": {
+      "tactical_on_mean": 0.0,
+      "tactical_off_mean": 0.0,
+      "mean_delta": 0.0,
+      "bootstrap_95_ci_lower": 0.0,
+      "bootstrap_95_ci_upper": 0.0,
+      "n": 15
+    },
+    "steps": {
+      "tactical_on_mean": 1801.0,
+      "tactical_off_mean": 1801.0,
+      "mean_delta": 0.0
+    },
+    "duration": {
+      "tactical_on_mean": 15.25,
+      "tactical_off_mean": 13.93,
+      "mean_delta": 1.32
+    },
+    "win_rate": {
+      "tactical_on": {
+        "wins": 8,
+        "games": 15,
+        "win_rate": 0.5333
+      },
+      "tactical_off": {
+        "wins": 8,
+        "games": 15,
+        "win_rate": 0.5333
+      },
+      "win_rate_delta": 0.0
+    }
+  },
+  "warnings": []
+}

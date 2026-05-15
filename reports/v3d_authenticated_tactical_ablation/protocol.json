@@ -1,0 +1,24 @@
+{
+  "protocol": "V3D Authenticated Tactical Outcome Ablation",
+  "seeds": [0, 1, 2, 3, 4],
+  "scenarios": ["1231", "1531", "1910631192"],
+  "paired_design": "tactical_on vs tactical_off, same seed/scenario/map each pair",
+  "policy_profile": "challenger",
+  "blue_profile": "baseline",
+  "timeout_steps": 2000,
+  "seed_offset_blue": 1000,
+  "total_pairs": 15,
+  "primary_metric": "score_red",
+  "secondary_metrics": ["winner", "steps", "duration", "tactical_invocation_count", "tactical_nonzero_count", "route_empty_rate"],
+  "bootstrap": {"n_resamples": 1000, "confidence_level": 0.95, "seed": 42},
+  "stopping_rules": {
+    "max_failure_rate": 0.5,
+    "max_wall_hours": 12
+  },
+  "claim_gates": {
+    "OUTCOME_CONTRIBUTION_SUPPORTED": "positive delta, CI > 0, tactical invoked",
+    "WEAK_OR_INCONCLUSIVE": "delta small or CI crosses zero",
+    "NOT_SHOWN": "delta <= 0",
+    "BLOCKED": "cannot produce paired outcomes"
+  }
+}
