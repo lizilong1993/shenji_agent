@@ -1,0 +1,34 @@
+{
+  "claims": {
+    "closed_loop_sdk_evaluation": "SUPPORTED",
+    "authenticated_replay_available": "SUPPORTED",
+    "learned_intent_situation_components": "SUPPORTED",
+    "tactical_branch_invoked": "SUPPORTED",
+    "tactical_action_selection_change": "PARTIALLY_SUPPORTED",
+    "tactical_outcome_improvement": "WEAK_OR_INCONCLUSIVE",
+    "route_empty_issue_solved": "UNSUPPORTED",
+    "route_degradation_absent_v3d": "SUPPORTED (limited to 3 scenarios)",
+    "candidate_beats_incumbent": "SUPPORTED",
+    "promotion_gate_exists": "SUPPORTED",
+    "one_promotion_window": "SUPPORTED",
+    "two_window_success": "FORBIDDEN",
+    "public_sota": "FORBIDDEN",
+    "top_tier_readiness": "FORBIDDEN",
+    "baseline_coverage_strong": "UNSUPPORTED",
+    "manuscript_ready_evidence": "PARTIALLY_SUPPORTED"
+  },
+  "v3e_corrections": [
+    {
+      "claim": "route_degradation_absent_v3d",
+      "previous_status": "V3_READINESS said 'unproven (zero-denominator)' — INCORRECT",
+      "corrected_status": "SUPPORTED (limited to 3 scenarios)",
+      "reason": "Prior audit erroneously reported V3D total_move_attempts=0 (confused V3B pre-auth with V3D auth data). V3D actually has 590 genuine move attempts with 0% empty rate. Claim is supported within the scope of 3 tested scenarios but not broadly proven."
+    }
+  ],
+  "freeze_boundaries": {
+    "tactical": "TACTICAL_ACTION_LEVEL_SUPPORTED + TACTICAL_OUTCOME_WEAK_OR_INCONCLUSIVE",
+    "route": "ROUTE_NO_DEGRADATION_OBSERVED_ONLY",
+    "baseline": "BASELINE_COVERAGE_INSUFFICIENT_FOR_STRONG_PAPER",
+    "promotion": "PROMOTION_SINGLE_WINDOW_ONLY"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "action_level": "TACTICAL_ACTION_LEVEL_SUPPORTED",
+  "outcome_level": "TACTICAL_OUTCOME_WEAK_OR_INCONCLUSIVE",
+  "v3a_action_evidence": true,
+  "v3b_formal_evaluation_attempted": true,
+  "v3b_auth_blocked": true,
+  "v3c_auth_recovered": true,
+  "v3d_authenticated_ablation_completed": true,
+  "paired_comparisons": 15,
+  "score_delta_mean": -1.2667,
+  "ci_95": [-50.07, 34.8183],
+  "cohens_d": -0.0148,
+  "win_rate_delta": 0.0,
+  "route_empty_rate": 0.0,
+  "allowed_claim": "The tactical branch is invoked and produces nonzero diagnostic/action-level effects under authenticated replay, but paired multi-seed outcome ablation does not show a reliable performance benefit.",
+  "forbidden_claims": [
+    "Tactical improves win rate",
+    "Tactical improves outcome performance",
+    "Tactical is a main performance contribution",
+    "Tactical contribution is formally proven"
+  ]
+}

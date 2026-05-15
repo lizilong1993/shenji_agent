@@ -1,0 +1,33 @@
+{
+  "decision": "CLAIMS_FROZEN_NEEDS_ROUTE_EVIDENCE",
+  "date": "2026-05-15",
+  "phases_completed": {
+    "phase_0_start_state": true,
+    "phase_1_tactical_freeze": true,
+    "phase_2_route_audit": true,
+    "phase_3_baseline_audit": true,
+    "phase_4_promotion_audit": true,
+    "phase_5_claim_matrix": true,
+    "phase_6_manuscript_readiness": true,
+    "phase_7_consistency_tests": true,
+    "phase_8_validation": true,
+    "phase_9_final_decision": true
+  },
+  "tactical_classification": {
+    "action_level": "TACTICAL_ACTION_LEVEL_SUPPORTED",
+    "outcome_level": "TACTICAL_OUTCOME_WEAK_OR_INCONCLUSIVE"
+  },
+  "route_classification": "ROUTE_NO_DEGRADATION_OBSERVED_ONLY",
+  "baseline_classification": "BASELINE_COVERAGE_INSUFFICIENT_FOR_STRONG_PAPER",
+  "promotion_classification": "PROMOTION_SINGLE_WINDOW_ONLY",
+  "primary_blocker": "route reliability unproven (66.3% league empty rate unresolved)",
+  "secondary_blockers": [
+    "baseline/ablation coverage limited",
+    "two-window promotion not achieved"
+  ],
+  "tests_passed": 21,
+  "compileall_clean": true,
+  "archived_sidecars_edited_by_hand": false,
+  "unsupported_claims_introduced": false,
+  "recommended_next_goal": "v3f_route_reliability_repair_and_evaluation"
+}

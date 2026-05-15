@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/remote-home/lizilong/shenji_agent/scripts/round005_route_diagnostic.py", line 52, in <module>
+    raise SystemExit(main())
+  File "/remote-home/lizilong/shenji_agent/scripts/round005_route_diagnostic.py", line 46, in main
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+  File "/usr/lib/python3.10/pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+PermissionError: [Errno 13] Permission denied: '/remote-home/lizilong/shenji_agent/reports/round005_source_recovery'

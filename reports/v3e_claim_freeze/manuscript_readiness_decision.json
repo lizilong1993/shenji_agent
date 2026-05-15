@@ -1,0 +1,14 @@
+{
+  "decision": "NEEDS_ROUTE_RELIABILITY_EVIDENCE_BEFORE_MANUSCRIPT",
+  "tactical_frozen": true,
+  "route_audited": true,
+  "baseline_audited": true,
+  "promotion_audited": true,
+  "claim_matrix_consistent": true,
+  "main_blockers": [
+    "route reliability unproven (66.3% empty rate unresolved)",
+    "baseline/ablation coverage limited (no component-level ablations)",
+    "two-window promotion not achieved"
+  ],
+  "recommended_next_goal": "v3f_route_reliability_repair_and_evaluation"
+}

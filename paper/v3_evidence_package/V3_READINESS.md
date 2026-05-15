@@ -7,7 +7,7 @@
 | Claim | V2 status | V3A status | V3A-FIX status | V3B status | V3C status | V3D status | Change |
 |-------|-----------|------------|----------------|------------|------------|------------|--------|
 | tactical contribution | forbidden | partially supported (action-level only) | partially supported (action-level only, outcome executable) | inconclusive (auth-blocked) | auth recovered | weak/inconclusive (outcome) | upgraded from V3B (auth no longer blocks) |
-| route reliability | forbidden | forbidden (unchanged) | forbidden (unchanged) | inconclusive (no move routes) | — | measured (0% empty) | unproven but measured |
+| route reliability | forbidden | forbidden (unchanged) | forbidden (unchanged) | inconclusive (no move routes) | — | no degradation observed (3 scenarios) | V3D shows 0% empty over 590 attempts (3 scenarios) but league shows 66.3% empty — not broadly proven |
 | two-window success | forbidden | forbidden (unchanged) | forbidden (unchanged) | forbidden (unchanged) | — | — | — |
 | baseline superiority | forbidden | forbidden (unchanged) | forbidden (unchanged) | forbidden (unchanged) | — | — | — |
 | method novelty | unsupported | unsupported (unchanged) | unsupported (unchanged) | unsupported (unchanged) | — | — | — |
@@ -21,7 +21,7 @@
 - ✅ Authenticated paired tactical-on/off evaluation completed (15 pairs, 30 games)
 - ✅ 15/15 pairs completed, 0 errors
 - ✅ Tactical branch invoked in all tactical-on runs (nonzero scores), zero in all tactical-off runs
-- ✅ Route metrics recorded (0% empty rate across all runs)
+- ✅ Route metrics: 0% empty rate over 590 genuine move attempts (288 ON, 302 OFF) in 3 scenarios — non-trivial measurement
 - ✅ Score deltas computed: mean=-1.27, CI [-50.07, 34.82]
 - ✅ Claim gate decision: TACTICAL_OUTCOME_CONTRIBUTION_WEAK_OR_INCONCLUSIVE
 - ✅ V3 evidence package updated conservatively
@@ -53,6 +53,6 @@
 ## Remaining blockers
 
 1. ~~**SDK authentication**~~ — **RESOLVED**. MAC binding recovered.
-2. **Route reliability unproven** — empty rate is 0% under V3D (good sign) but formal route reliability evaluation not yet conducted.
+2. **Route reliability unproven** — V3D shows 0% empty rate over 590 attempts (3 scenarios) but league evaluation shows 66.3% empty rate (15,641/23,580) across ~100 scenarios. Route planner reliability not broadly proven.
 3. **Long-horizon and generalization evaluation** — not yet attempted.
 4. **Outcome-level tactical contribution** — evaluated; result is WEAK_OR_INCONCLUSIVE.

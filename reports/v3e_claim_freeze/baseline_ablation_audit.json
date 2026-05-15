@@ -1,0 +1,143 @@
+{
+  "classification": "BASELINE_COVERAGE_INSUFFICIENT_FOR_STRONG_PAPER",
+  "audit_date": "2026-05-15",
+  "branch": "main (0f5bd0d)",
+  "inventoried_variants": {
+    "rule_incumbent": {
+      "exists": true,
+      "evidence_path": "experiments/shenji_agent/league_20260501_170204/ (participants.json, rating.json, promotion.json); ai/weights_incumbent_rule/model_manifest.json",
+      "formal_or_smoke": "formal",
+      "n_games": 100,
+      "outcome_metric": "win_rate 0.87 (95% CI [0.80, 0.93]), elo_delta_lower_bound 240.8, promotion accepted=true",
+      "limitations": "Rule-only incumbent with no model weights; single SDK; not an external/strong baseline",
+      "supports_manuscript": true
+    },
+    "tactical_on_vs_off": {
+      "exists": true,
+      "evidence_path": "reports/v3d_authenticated_tactical_ablation/multiseed_ablation.json, statistics.json, FINAL_DECISION.md",
+      "formal_or_smoke": "formal",
+      "n_games": 30,
+      "outcome_metric": "score_delta_mean -1.27 (CI [-50.07, 34.82]), win_rate_delta 0.0, cohens_d -0.015",
+      "limitations": "Outcome weak/inconclusive; 3 scenarios only; all timeout at 1801 steps; high variance",
+      "supports_manuscript": true
+    },
+    "intent_only": {
+      "exists": false,
+      "evidence_path": null,
+      "formal_or_smoke": null,
+      "n_games": null,
+      "outcome_metric": null,
+      "limitations": "No config or experiment isolates intent-only scoring. All configs enable both intent and situation concurrently.",
+      "supports_manuscript": false
+    },
+    "situation_only": {
+      "exists": false,
+      "evidence_path": null,
+      "formal_or_smoke": null,
+      "n_games": null,
+      "outcome_metric": null,
+      "limitations": "No config or experiment isolates situation-only scoring.",
+      "supports_manuscript": false
+    },
+    "no_learned_fallback": {
+      "exists": false,
+      "evidence_path": "ai/policy.py (fallback logic); rating.json policy.fallback_reasons. Proxy: rule incumbent baseline comparison.",
+      "formal_or_smoke": null,
+      "n_games": null,
+      "outcome_metric": "Fallback rate tracked (66.3% empty route moves) but no dedicated learned-disabled ablation.",
+      "limitations": "No experimental condition where candidate learned components are disabled while architecture is identical. Rule incumbent serves as proxy baseline.",
+      "supports_manuscript": false
+    },
+    "objective_only": {
+      "exists": false,
+      "evidence_path": "scripts/build_objective_labels.py (exists but no evaluation). rating.json shows objective_score component values.",
+      "formal_or_smoke": null,
+      "n_games": null,
+      "outcome_metric": null,
+      "limitations": "No objective-only baseline evaluation was conducted.",
+      "supports_manuscript": false
+    },
+    "random_legal": {
+      "exists": false,
+      "evidence_path": null,
+      "formal_or_smoke": null,
+      "n_games": null,
+      "outcome_metric": null,
+      "limitations": "Not implemented at any level.",
+      "supports_manuscript": false
+    },
+    "route_variants": {
+      "exists": false,
+      "evidence_path": "reports/v3e_claim_freeze/02_route_reliability_audit.md (route diagnostics only). Route rate metrics in rating.json (move_route_aggregate).",
+      "formal_or_smoke": null,
+      "n_games": null,
+      "outcome_metric": "Route empty rate 0% in V3D; 66.3% in full league. No route-on/off ablation.",
+      "limitations": "No route-aware vs route-disabled experimental comparison.",
+      "supports_manuscript": false
+    },
+    "exploiter_robustness": {
+      "exists": true,
+      "evidence_path": "experiments/shenji_agent/league_20260501_170204/exploitability.json; present in many other leagues",
+      "formal_or_smoke": "smoke",
+      "n_games": 8,
+      "outcome_metric": "aggressive_exploiter wr=0.0, occupy_exploiter wr=0.25; max_exploiter_win_rate=0.25 (gate 0.45 passed)",
+      "limitations": "Only 2 exploiter types; only 4 matches each; not a standalone robustness study",
+      "supports_manuscript": false
+    },
+    "training_metrics": {
+      "exists": true,
+      "evidence_path": "experiments/shenji_agent/*/summary.md (9 training summaries). Key: 20260428_235555/summary.md (tactical_accuracy=0.962).",
+      "formal_or_smoke": "diagnostic",
+      "n_games": 9,
+      "outcome_metric": "intent_accuracy 0.618-0.622, situation_accuracy 0.545-0.591, tactical_accuracy 0.962 (1 run only)",
+      "limitations": "Accuracy only; no loss curves; no per-epoch tracking; limited training data (4096 samples); tactical only measured once",
+      "supports_manuscript": false
+    },
+    "auth_smoke": {
+      "exists": true,
+      "evidence_path": "reports/v3c_sdk_auth_recovery/replay_smoke.json",
+      "formal_or_smoke": "smoke",
+      "n_games": 1,
+      "outcome_metric": "Auth passed (deployment+battle phases entered). Tactical nonzero: ON=3, OFF=0",
+      "limitations": "Single-pair smoke only; limited steps (200); infrastructure verification only",
+      "supports_manuscript": false
+    },
+    "auth_multiseed": {
+      "exists": true,
+      "evidence_path": "reports/v3d_authenticated_tactical_ablation/multiseed_ablation.json",
+      "formal_or_smoke": "formal",
+      "n_games": 30,
+      "outcome_metric": "15 pairs completed. Score delta mean -1.27, CI [-50.07, 34.82], Cohens d -0.015",
+      "limitations": "3 scenarios; outcome weak/inconclusive; no move/shoot learned actions",
+      "supports_manuscript": true
+    },
+    "two_window_promotion": {
+      "exists": false,
+      "evidence_path": "experiments/shenji_agent/league_20260501_170204/league_state.json (consecutive_windows=0). Many single-window accepted=true leagues exist.",
+      "formal_or_smoke": "formal",
+      "n_games": 100,
+      "outcome_metric": "Single window only: accepted=true, consecutive_windows=0, champion never updated",
+      "limitations": "Two-window success NOT demonstrated despite many league runs. Champion always ai/weights.",
+      "supports_manuscript": false
+    },
+    "prewrite_baselines": {
+      "exists": true,
+      "evidence_path": "paper/prewrite_package/ (04_claim_to_evidence_matrix.md, results_tables.json, formal_artifacts_index.json)",
+      "formal_or_smoke": "inventory",
+      "n_games": 6,
+      "outcome_metric": "Systematic claim-to-evidence matrix (14 claims); baseline/ablation claim C10 rated partially_supported",
+      "limitations": "Pre-write inventory only; does not add new experimental evidence; snapshotted before V3D",
+      "supports_manuscript": true
+    }
+  },
+  "allowed_claim": "The project includes a rule-incumbent comparison and authenticated tactical-on/off ablation, but broader baseline and component-ablation coverage remains limited.",
+  "forbidden_claims": [
+    "The method outperforms strong baselines",
+    "The method is SOTA",
+    "The method is broadly validated across baseline families",
+    "Comprehensive ablation study completed",
+    "Component contributions isolated and validated",
+    "Route planner reliability is proven",
+    "Two-window promotion success"
+  ]
+}

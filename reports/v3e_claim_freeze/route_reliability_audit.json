@@ -1,0 +1,39 @@
+{
+  "classification": "ROUTE_NO_DEGRADATION_OBSERVED_ONLY",
+  "v3d_empty_rate": 0.0,
+  "n_games": 30,
+  "move_attempts_found": 590,
+  "route_planned_moves_found": 590,
+  "route_empty_events": 0,
+  "denominator_available": true,
+  "battle_phase_progressed": true,
+  "steps_mean": 1801,
+  "v3d_per_scenario_breakdown": {
+    "1231": {"total_move_attempts": 60, "empty_routes": 0, "seeds": 5},
+    "1531": {"total_move_attempts": 214, "empty_routes": 0, "seeds": 5},
+    "1910631192": {"total_move_attempts": 316, "empty_routes": 0, "seeds": 5}
+  },
+  "learned_path_coverage": 1.0,
+  "comparable_to_earlier_high_empty_evidence": "unknown",
+  "comparison_notes": "V3D used 3 scenarios (590 attempts, 0% empty). League used 100+ scenarios (23,580 attempts, 66.3% empty). Scenario sets do not overlap and are not directly comparable. V3D results are non-artifactual but limited in scope.",
+  "route_diagnostic_league": {
+    "total_move_attempts": 23580,
+    "empty_route_count": 15641,
+    "empty_route_rate": 0.6633,
+    "source": "experiments/shenji_agent/league_20260501_170204/rating.json",
+    "by_move_type": {
+      "Fly": {"total": 8716, "empty": 7182, "empty_rate": 0.824},
+      "Maneuver": {"total": 10093, "empty": 7595, "empty_rate": 0.752},
+      "Walk": {"total": 4771, "empty": 864, "empty_rate": 0.181}
+    },
+    "failure_reasons": {"no_valid_move_candidate": 15641}
+  },
+  "prior_audit_error": "The existing route_reliability_audit.json/02_route_reliability_audit.md incorrectly reported V3D total_move_attempts=0 for all 30 games. This was a confusion with V3B data (pre-auth, all zeros). V3D actually has 590 move attempts across 30 games. The route_empty_rate=0.0 is genuine, not a zero-denominator artifact.",
+  "allowed_claim": "In the authenticated V3D tactical ablation runs, no route-empty degradation was observed between tactical modes, with 0% empty rate across 590 move-route decisions in 3 evaluation scenarios. However, broader route reliability remains claim-bounded unless move-route coverage (more scenarios) and denominator evidence (comparison with league scenario set) support a stronger statement.",
+  "forbidden_claims": [
+    "Route reliability is fixed",
+    "Route planner is robust",
+    "Empty-route issue is solved",
+    "Route reliability improved"
+  ]
+}

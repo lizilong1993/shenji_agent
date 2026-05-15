@@ -1,0 +1,52 @@
+{
+  "classification": "PROMOTION_SINGLE_WINDOW_ONLY",
+  "q_and_a": [
+    {
+      "question": "How many promotion windows are formally verified?",
+      "answer": "One. Latest league (league_20260501_170204): accepted=true. consecutive_windows=0."
+    },
+    {
+      "question": "Is there a two-window hard-stop success?",
+      "answer": "No. consecutive_windows=0 in latest league. Earlier league_20260501_085914 showed cw=1 but latest resets to 0."
+    },
+    {
+      "question": "Are candidate/incumbent participants distinct?",
+      "answer": "Yes. Candidate=ai/weights (challenger), Incumbent=ai/weights_incumbent_rule (baseline/rule)."
+    },
+    {
+      "question": "Are rating/promotion sidecars complete?",
+      "answer": "Yes. All required files exist and are readable."
+    },
+    {
+      "question": "Are latest sidecars consistent with paper claims?",
+      "answer": "Yes. PAPER_WRITING_READY.md correctly states single-window only."
+    },
+    {
+      "question": "Is any manuscript/report prose overstating promotion status?",
+      "answer": "No. Current evidence package is consistent with single-window only."
+    }
+  ],
+  "latest_sidecar": {
+    "league": "league_20260501_170204",
+    "promotion_accepted": true,
+    "point_estimate": 0.87,
+    "ci95_lower": 0.80,
+    "complex_pe": 0.82,
+    "complex_ci95_lower": 0.64,
+    "elo_delta_lower_bound": 240.82,
+    "max_exploiter_win_rate": 0.25,
+    "learned_path_coverage": 0.37,
+    "move_path_coverage": 0.34,
+    "shoot_path_coverage": 1.0,
+    "consecutive_windows": 0,
+    "champion": "ai/weights"
+  },
+  "two_window_evidence": "Not proven. consecutive_windows=0 in latest league. Champion never updated from ai/weights.",
+  "allowed_wording": "A single formal promotion window is verified: the learned candidate beats the rule incumbent with rating 0.87 (95% CI [0.80, 0.93]) and passes all promotion gate criteria. Two-window success has not yet been demonstrated.",
+  "forbidden_claims": [
+    "two-window hard-stop success",
+    "promotion criteria fully passed",
+    "top-tier readiness",
+    "method is promotion-ready for publication"
+  ]
+}
