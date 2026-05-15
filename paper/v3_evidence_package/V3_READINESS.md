@@ -42,11 +42,23 @@
 - ✅ Metrics pipeline with bootstrap CIs built
 - ✅ 30/30 games completed, 0 errors
 - ✅ Full transparency and documentation
-- ⚠️ Outcome-level assessment INCONCLUSIVE — SDK authentication blocks full game replay
+- ⚠️ Outcome-level assessment INCONCLUSIBLE — SDK authentication blocks full game replay
 - ⚠️ MAC mismatch: `02:42:ac:11:00:07` (current) vs `02:42:ac:11:00:02` (required)
+
+### V3C (SDK auth replay recovery)
+- ✅ SDK MAC binding diagnosed and classified: SDK_MAC_BINDING_CONFIRMED
+- ✅ `.engine_config` rebind applied via `authenticator.set_mac_time()` (equivalent to `rebind_engine_config.py --apply`)
+- ✅ `mac_match=true`, `auth_environment_ready=true`
+- ✅ Minimal authenticated replay smoke completed (1 pair, 200 steps)
+- ✅ Authentication passed, deployment and battle phases entered
+- ✅ Tactical invocations nonzero: on=3, off=0
+- ✅ 87/87 tests pass, all modules compile
+- ✅ Final state: `SDK_REPLAY_AUTH_RECOVERED`
+- ⚠️ Formal outcome ablation must be rerun for outcome-level claim
 
 ## Remaining blockers
 
-1. **SDK authentication** — formal outcome-level evaluation requires authorized Docker environment with matching MAC.
-2. **Route reliability still unproven** — not addressed in this round (blocked by same auth issue).
-3. **V3C/V3D evaluation not started** — long-horizon and generalization evaluation not yet attempted.
+1. ~~**SDK authentication**~~ — **RESOLVED**. MAC binding recovered via `.engine_config` rebind to `02:42:ac:11:00:07`.
+2. **Route reliability still unproven** — formal evaluation not yet attempted.
+3. **V3C/V3D evaluation not started** — long-horizon and generalization evaluation not yet attempted. Infrastructure now unblocked for V3C+.
+4. **Outcome ablation must be rerun** — V3B ran 30 games but all timed out; auth was the diagnosed blocker. With auth fixed, outcome delta can be measured properly.

@@ -19,13 +19,18 @@ The tactical branch produces nonzero, variegated scores and changes action selec
 
 ## Current limitation
 
-The `intention_lstm.pth` checkpoint was saved with `fc_intent` output head, but the current `MultiHorizonIntentionModel` defines a `head` sequential module. This prevents full-policy loading and game-level evaluation.
+The `intention_lstm.pth` checkpoint was saved with `fc_intent` output head, but the current `MultiHorizonIntentionModel` defines a `head` sequential module. This was fixed in V3A-FIX via `LegacyIntentModel` adapter. The SDK MAC binding that blocked V3B replay was recovered in V3C.
+
+## SDK auth recovery (V3C)
+
+SDK replay authentication was restored at smoke level. Formal outcome ablation must be rerun before any tactical outcome contribution claim.
 
 ## Recommended path
 
-1. Fix model weight compatibility (retrain or adapt intent/situation models)
-2. Run full-game tactical-on/off ablation (Phase 4 repeat with real replay)
-3. Determine outcome-level contribution
+1. ~~Fix model weight compatibility (retrain or adapt intent/situation models)~~ — **DONE** (V3A-FIX)
+2. ~~Fix SDK MAC binding~~ — **DONE** (V3C)
+3. Run full-game tactical-on/off ablation with fixed auth
+4. Determine outcome-level contribution
 
 ## Paper claim classification
 

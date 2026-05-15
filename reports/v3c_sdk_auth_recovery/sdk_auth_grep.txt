@@ -1,0 +1,100 @@
+training/selfplay.py:38:    ".local/lib/python3.10/site-packages/train_env/env/authenticate/.engine_config"
+training/selfplay.py:284:def _current_mac_addresses() -> List[str]:
+training/selfplay.py:366:        return {"path": str(path), "exists": False, "bound_mac": None, "timestamp": None}
+training/selfplay.py:372:        return {"path": str(path), "exists": True, "bound_mac": None, "timestamp": None, "decode_error": True}
+training/selfplay.py:377:        "bound_mac": parts[0].lower() if parts and parts[0] else None,
+training/selfplay.py:382:def _sdk_auth_status(env_backend: str) -> Dict[str, object]:
+training/selfplay.py:386:    current_macs = _current_mac_addresses()
+training/selfplay.py:387:    bound_mac = config.get("bound_mac")
+training/selfplay.py:388:    if bound_mac and bound_mac not in current_macs:
+training/selfplay.py:389:        status = "failed_mac_mismatch"
+training/selfplay.py:390:    elif bound_mac and bound_mac in current_macs:
+training/selfplay.py:391:        status = "mac_match_unverified"
+training/selfplay.py:400:        "current_macs": current_macs,
+training/selfplay.py:420:        return "deployment"
+training/selfplay.py:422:        return "battle"
+training/selfplay.py:451:    if phase == "deployment" and set(selected_counts).issubset(DEPLOYMENT_ACTION_TYPES):
+training/selfplay.py:452:        return "deployment_stage_branch"
+training/selfplay.py:456:def _no_battle_action_reason(
+training/selfplay.py:461:    auth_status: str,
+training/selfplay.py:463:    battle_valid = sum(int(valid_counts.get(name, 0)) for name in NORMAL_BATTLE_ACTIONS)
+training/selfplay.py:464:    battle_selected = sum(int(selected_counts.get(name, 0)) for name in NORMAL_BATTLE_ACTIONS)
+training/selfplay.py:465:    if phase != "battle" and auth_status.startswith("failed"):
+training/selfplay.py:466:        return "auth_failed_or_unverified_stage_stuck"
+training/selfplay.py:467:    if phase != "battle":
+training/selfplay.py:468:        return "deployment_or_setup_phase"
+training/selfplay.py:469:    if battle_valid <= 0:
+training/selfplay.py:471:    if battle_selected <= 0:
+training/selfplay.py:485:    auth_status: Dict[str, object],
+training/selfplay.py:488:    auth_state = str(auth_status.get("status", "unknown"))
+training/selfplay.py:505:                "auth_status": auth_state,
+training/selfplay.py:508:                "step_type": "battle" if phase == "battle" else "setup_or_deployment",
+training/selfplay.py:514:                "deployment_action_count": int(setup_count),
+training/selfplay.py:530:                "no_battle_action_reason": _no_battle_action_reason(
+training/selfplay.py:534:                    auth_status=auth_state,
+training/selfplay.py:625:    auth_status = _sdk_auth_status(env_backend)
+training/selfplay.py:657:                auth_status=auth_status,
+training/selfplay.py:683:            stats["auth_status"] = auth_status
+training/selfplay.py:1331:    auth_statuses: List[Dict[str, object]] = []
+training/selfplay.py:1397:            auth_status = payload.get("auth_status")
+training/selfplay.py:1398:            if isinstance(auth_status, dict):
+training/selfplay.py:1399:                auth_statuses.append(auth_status)
+training/selfplay.py:1443:        "auth_statuses": auth_statuses,
+training/selfplay.py:1513:        "auth_statuses": list(stats.pop("auth_statuses", [])),
+training/selfplay.py:1537:        str(record.get("no_battle_action_reason"))
+training/selfplay.py:1539:        if record.get("no_battle_action_reason")
+training/selfplay.py:1541:    auth_failure_count = sum(1 for record in records if str(record.get("auth_status", "")).startswith("failed"))
+training/selfplay.py:1542:    first_battle_turn = None
+training/selfplay.py:1544:        if record.get("phase") == "battle":
+training/selfplay.py:1545:            first_battle_turn = int(record.get("turn", 0))
+training/selfplay.py:1565:        "turns_with_setup_deployment_only": sum(1 for record in records if record.get("phase") != "battle"),
+training/selfplay.py:1572:        "battle_phase_entered": first_battle_turn is not None,
+training/selfplay.py:1573:        "first_battle_turn": first_battle_turn,
+training/selfplay.py:1574:        "auth_failure_count": int(auth_failure_count),
+training/selfplay.py:1575:        "no_battle_action_reason_distribution": dict(sorted(reason_counts.items())),
+training/selfplay.py:1591:            "no_battle_action_reason": record.get("no_battle_action_reason"),
+training/selfplay.py:1601:def _apply_battle_phase_gate(decision: Dict[str, object], phase_summary: Dict[str, object]) -> Dict[str, object]:
+training/selfplay.py:1604:    if not bool(phase_summary.get("battle_phase_entered")):
+training/selfplay.py:1605:        failures.append("battle_phase_not_entered")
+training/selfplay.py:1617:    gated["battle_phase_entered"] = bool(phase_summary.get("battle_phase_entered"))
+training/selfplay.py:1682:    auth_status_records: List[Dict[str, object]] = []
+training/selfplay.py:1759:                auth_status_records.extend(objective_records["auth_statuses"])
+training/selfplay.py:1894:    decision = _apply_battle_phase_gate(
+training/selfplay.py:1919:    save_json({"auth_statuses": auth_status_records}, run_dir / "auth_status_diagnostics.json")
+training/selfplay.py:1969:                f"- battle_phase_entered: `{phase_summary.get('battle_phase_entered')}`",
+training/selfplay.py:1970:                f"- first_battle_turn: `{phase_summary.get('first_battle_turn')}`",
+training/selfplay.py:1971:                f"- turns_with_setup_deployment_only: `{phase_summary.get('turns_with_setup_deployment_only')}`",
+training/selfplay.py:1975:                f"- auth_failure_count: `{phase_summary.get('auth_failure_count')}`",
+training/selfplay.py:1976:                f"- no_battle_action_reason_distribution: `{phase_summary.get('no_battle_action_reason_distribution')}`",
+scripts/generate_paper_prewrite_package.py:161:        {"Claim ID": "C12", "Candidate manuscript claim": "Evaluation is reproducible.", "Status": "partially supported", "Evidence path": "00_repository_state.md; 01_asset_provenance.md; 11_validation_log.md", "Evidence type": "inventory and validation", "Exact metric or observation": "assets and commands documented; auth/local SDK may constrain reruns", "Known caveat": "SDK/auth and missing tactical checkpoint risks", "Allowed wording": "repo-local reproducibility package", "Forbidden wording": "fully independently reproducible"},
+scripts/generate_paper_prewrite_package.py:214:            ("League evaluator", "training/selfplay.py", "league evaluation entrypoint exists", "SDK/auth constrained"),
+scripts/generate_paper_prewrite_package.py:267:Before any cross-machine sync, create a branch or archive copy and verify `ai/weights/`, `ai/weights_incumbent_rule/`, `land_wargame_sdk/Data/Data/`, and `experiments/shenji_agent/` after transfer.
+scripts/generate_paper_prewrite_package.py:290:    write(FIG / "fig2_evidence_gate_spec.md", "# Figure 2 Evidence Gate Spec\n\nShow candidate generation, battle/evaluation, rating, promotion gate, sidecar validation, claim boundary, and SAFE_STOP/PARTIAL_READY branches when evidence is insufficient.")
+scripts/generate_paper_prewrite_package.py:297:1. Environment and SDK setup: local Python environment with `land_wargame_sdk/land_wargame_train_env-4.1.0-*.whl`; SDK auth may be required.
+scripts/run_selfplay_authorized_mac.sh:4:AUTHORIZED_MAC="${AUTHORIZED_MAC:-02:42:ac:11:00:45}"
+scripts/run_selfplay_authorized_mac.sh:5:CONFIG="${SELFPLAY_CONFIG:-configs/selfplay_smoke_battle_phase.yaml}"
+scripts/run_selfplay_authorized_mac.sh:9:current_macs="$(cat /sys/class/net/*/address 2>/dev/null | grep -iv '^00:00:00:00:00:00$' || true)"
+scripts/run_selfplay_authorized_mac.sh:11:echo "authorized_mac=${AUTHORIZED_MAC}"
+scripts/run_selfplay_authorized_mac.sh:12:echo "current_macs=${current_macs//$'\n'/,}"
+scripts/run_selfplay_authorized_mac.sh:14:if printf '%s\n' "${current_macs}" | grep -qi "^${AUTHORIZED_MAC}$"; then
+scripts/run_selfplay_authorized_mac.sh:23:Current container MAC does not match the SDK .engine_config binding.
+scripts/run_selfplay_authorized_mac.sh:25:Run from the project root in an authorized Docker environment:
+scripts/run_selfplay_authorized_mac.sh:27:  docker compose -f docker-compose.yml -f docker-compose.auth-mac.yml up -d --build dev
+scripts/run_selfplay_authorized_mac.sh:28:  docker compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec dev bash -lc \\
+scripts/run_selfplay_authorized_mac.sh:31:If authentication still fails after the container has MAC ${AUTHORIZED_MAC},
+scripts/run_selfplay_authorized_mac.sh:32:request a regenerated .engine_config from the SDK provider for the actual runtime MAC.
+scripts/admin_run_authorized_selfplay.sh:4:AUTHORIZED_MAC="${AUTHORIZED_MAC:-02:42:ac:11:00:45}"
+scripts/admin_run_authorized_selfplay.sh:6:CONFIG="${SELFPLAY_CONFIG:-configs/selfplay_smoke_battle_phase.yaml}"
+scripts/admin_run_authorized_selfplay.sh:31:echo "Starting ${SERVICE} with authorized MAC ${AUTHORIZED_MAC}..."
+scripts/admin_run_authorized_selfplay.sh:32:compose -f docker-compose.yml -f docker-compose.auth-mac.yml up -d --build "${SERVICE}"
+scripts/admin_run_authorized_selfplay.sh:34:echo "Verifying container MAC..."
+scripts/admin_run_authorized_selfplay.sh:35:compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec -T "${SERVICE}" bash -lc \
+scripts/admin_run_authorized_selfplay.sh:36:  "cat /sys/class/net/*/address | grep -qi '^${AUTHORIZED_MAC}$'"
+scripts/admin_run_authorized_selfplay.sh:38:echo "Running SDK auth preflight inside authorized container..."
+scripts/admin_run_authorized_selfplay.sh:39:compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec -T "${SERVICE}" bash -lc \
+scripts/admin_run_authorized_selfplay.sh:40:  "cd /app && python3.10 scripts/check_sdk_auth_environment.py --output experiments/shenji_agent/sdk_auth_environment_check.json"
+scripts/admin_run_authorized_selfplay.sh:42:echo "Running battle smoke inside authorized container..."
+scripts/admin_run_authorized_selfplay.sh:43:compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec -T "${SERVICE}" bash -lc \
+scripts/admin_run_authorized_selfplay.sh:46:echo "Validating auth, battle phase, and selected Move/Shoot/Occupy evidence..."
+scripts/admin_run_authorized_selfplay.sh:47:compose -f docker-compose.yml -f docker-compose.auth-mac.yml exec -T "${SERVICE}" bash -lc \
+scripts/admin_run_authorized_selfplay.sh:57:auth = json.loads((run / 'auth_status_diagnostics.json').read_text(encoding='utf-8'))

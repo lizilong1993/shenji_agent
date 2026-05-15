@@ -149,6 +149,10 @@ class LegacySituationModel(nn.Module):
     def __init__(self, num_features=108, hidden_dim=64):
         super().__init__()
         self.inner = SituationGCN(num_features=num_features, hidden_dim=hidden_dim, output_dim=1)
+        # Expose inner as `backbone` without registering as a submodule,
+        # so policy.py line 567 (self.situation_model.backbone(x, adj)) works
+        # without polluting the state dict with conflicting backbone.* keys.
+        self.__dict__["backbone"] = self.inner
 
     def forward(self, x, adj):
         node_scores = self.inner(x, adj)

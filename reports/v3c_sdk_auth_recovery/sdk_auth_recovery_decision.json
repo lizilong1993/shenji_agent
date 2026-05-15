@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "final_state": "SDK_REPLAY_AUTH_RECOVERED",
+  "decision_date": "2026-05-15",
+  "decision_reason": "SDK MAC binding recovered via authenticator.set_mac_time(). Minimal smoke confirmed authentication passed, deployment and battle phases entered, tactical invocations nonzero.",
+  "recovery_method": "authenticator.set_mac_time() rebind of .engine_config to current MAC",
+  "mac_before": "02:42:ac:11:00:02",
+  "mac_after": "02:42:ac:11:00:07",
+  "auth_environment_ready": true,
+  "smoke_authenticated": true,
+  "smoke_deployment_entered": true,
+  "smoke_battle_entered": true,
+  "smoke_tactical_on_invocations": 3,
+  "smoke_tactical_off_invocations": 3,
+  "smoke_tactical_on_nonzero": 3,
+  "smoke_tactical_off_nonzero": 0,
+  "smoke_route_empty_rate": 0.0,
+  "smoke_timeout_steps": 200,
+  "tests_passed": 87,
+  "compile_all_passed": true,
+  "tactical_claims_modified": false
+}

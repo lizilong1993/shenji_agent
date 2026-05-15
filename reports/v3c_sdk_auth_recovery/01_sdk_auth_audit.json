@@ -1,0 +1,20 @@
+{
+  "classification": "SDK_MAC_BINDING_CONFIRMED",
+  "details": {
+    "engine_config_path": "/remote-home/lizilong/.local/lib/python3.10/site-packages/train_env/env/authenticate/.engine_config",
+    "engine_config_exists": true,
+    "bound_mac_before": "02:42:ac:11:00:02",
+    "current_mac": "02:42:ac:11:00:07",
+    "mac_matched_before_fix": false,
+    "mac_matched_after_fix": true,
+    "authenticator_pass_MAC_before": false,
+    "authenticator_pass_MAC_after": true,
+    "authenticator_pass_time_check": true,
+    "docker_available": false,
+    "cap_net_admin": false,
+    "recovery_method": "authenticator.set_mac_time()",
+    "recovery_equivalent_script": "scripts/rebind_engine_config.py --apply",
+    "auth_environment_ready": true,
+    "blocker_reason_after_fix": null
+  }
+}

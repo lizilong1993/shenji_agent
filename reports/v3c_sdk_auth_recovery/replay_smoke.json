@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "command": "python3 scripts/run_v3b_formal_tactical_ablation.py --smoke --out experiments/shenji_agent/v3c_smoke --timeout-steps 200",
+  "authenticated": true,
+  "deployment_phase_entered": true,
+  "battle_phase_entered": true,
+  "legal_actions_executed": true,
+  "tactical_mode_status": {
+    "tactical_on": {
+      "tactical_invocation_count": 3,
+      "tactical_nonzero_count": 3
+    },
+    "tactical_off": {
+      "tactical_invocation_count": 3,
+      "tactical_nonzero_count": 0
+    }
+  },
+  "route_metrics": {
+    "route_empty_rate": 0.0,
+    "total_move_attempts": 3
+  },
+  "game_result": {
+    "status": "timeout",
+    "winner": 1,
+    "score_red": 104,
+    "score_blue": 132,
+    "steps": 200
+  },
+  "blocker_after_auth_fix": null,
+  "notes": "Auth recovered successfully. Game timed out at 200 steps. Tactical invocation shows nonzero differentiation. No MAC mismatch after fix."
+}
