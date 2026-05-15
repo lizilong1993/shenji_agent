@@ -1,0 +1,253 @@
+{
+  "seed": 3,
+  "scenario": "1531",
+  "map": "53",
+  "tactical_on": {
+    "seed": 3,
+    "scenario": "1531",
+    "map": "53",
+    "tactical_mode": "on",
+    "policy_profile": "challenger",
+    "status": "completed",
+    "error": null,
+    "steps": 1801,
+    "winner": 1,
+    "score": null,
+    "reward": null,
+    "route_metrics": {
+      "route_empty_count": 0,
+      "total_move_attempts": 0,
+      "route_empty_rate": 0.0
+    },
+    "tactical_stats": {
+      "tactical_invocation_count": 0,
+      "tactical_nonzero_count": 0
+    },
+    "action_divergence": null,
+    "duration": 10.757,
+    "policy_stats": {
+      "policy_profile": "challenger",
+      "tactical_mode": "on",
+      "device": "cuda",
+      "requested_device": "auto",
+      "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+      "intent_model_loaded": true,
+      "intent_model_architecture": "LegacyIntentModel",
+      "situation_model_loaded": true,
+      "tactical_model_loaded": true,
+      "normalizer_loaded": true,
+      "objective_model_loaded": false,
+      "objective_score_used": false,
+      "objective_weight": 1.0,
+      "objective_fallback_reason": "objective_model_missing_using_heuristic",
+      "objective_top_action": null,
+      "selected_action_objective_score": null,
+      "objective_score_by_action_type": {
+        "move": {
+          "samples": 0,
+          "mean": 0.0
+        },
+        "shoot": {
+          "samples": 0,
+          "mean": 0.0
+        }
+      },
+      "normalizer_diagnostics": {
+        "normalizer_loaded": false,
+        "normalizer_applied_count": 0,
+        "normalizer_mismatch_count": 0,
+        "feature_dim_before_norm": null,
+        "feature_mean_before_norm": null,
+        "feature_std_before_norm": null,
+        "feature_mean_after_norm": null,
+        "feature_std_after_norm": null,
+        "normalizer_feature_dim": null,
+        "normalizer_mismatch_reason": null
+      },
+      "counts": {
+        "move": {
+          "total": 0,
+          "learned": 0
+        },
+        "shoot": {
+          "total": 0,
+          "learned": 0
+        }
+      },
+      "learned_path_coverage": 0.0,
+      "move_path_coverage": 0.0,
+      "shoot_path_coverage": 0.0,
+      "score_means": {
+        "move": {
+          "intent_bias": 0.0,
+          "situation_score": 0.0,
+          "tactical_score": 0.0,
+          "objective_score": 0.0,
+          "combined_score": 0.0,
+          "samples": 0
+        },
+        "shoot": {
+          "intent_bias": 0.0,
+          "situation_score": 0.0,
+          "tactical_score": 0.0,
+          "objective_score": 0.0,
+          "combined_score": 0.0,
+          "samples": 0
+        }
+      },
+      "trace_samples": [],
+      "move_route_aggregate": {
+        "total_attempts": 0,
+        "empty_route_count": 0,
+        "reachable_city_total": 0,
+        "by_move_type": {},
+        "route_failure_reasons": {}
+      },
+      "move_route_samples": []
+    },
+    "score_red": 104,
+    "score_blue": 132,
+    "final_scores": {
+      "red_occupy": 0,
+      "red_remain": 104,
+      "red_remain_max": 104,
+      "red_attack": 0,
+      "red_total": 104,
+      "red_win": -28,
+      "blue_occupy": 0,
+      "blue_remain": 132,
+      "blue_remain_max": 132,
+      "blue_attack": 0,
+      "blue_total": 132,
+      "blue_win": 28
+    }
+  },
+  "tactical_off": {
+    "seed": 3,
+    "scenario": "1531",
+    "map": "53",
+    "tactical_mode": "off",
+    "policy_profile": "challenger",
+    "status": "completed",
+    "error": null,
+    "steps": 1801,
+    "winner": 1,
+    "score": null,
+    "reward": null,
+    "route_metrics": {
+      "route_empty_count": 0,
+      "total_move_attempts": 0,
+      "route_empty_rate": 0.0
+    },
+    "tactical_stats": {
+      "tactical_invocation_count": 0,
+      "tactical_nonzero_count": 0
+    },
+    "action_divergence": null,
+    "duration": 10.591,
+    "policy_stats": {
+      "policy_profile": "challenger",
+      "tactical_mode": "off",
+      "device": "cuda",
+      "requested_device": "auto",
+      "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+      "intent_model_loaded": true,
+      "intent_model_architecture": "LegacyIntentModel",
+      "situation_model_loaded": true,
+      "tactical_model_loaded": true,
+      "normalizer_loaded": true,
+      "objective_model_loaded": false,
+      "objective_score_used": false,
+      "objective_weight": 1.0,
+      "objective_fallback_reason": "objective_model_missing_using_heuristic",
+      "objective_top_action": null,
+      "selected_action_objective_score": null,
+      "objective_score_by_action_type": {
+        "move": {
+          "samples": 0,
+          "mean": 0.0
+        },
+        "shoot": {
+          "samples": 0,
+          "mean": 0.0
+        }
+      },
+      "normalizer_diagnostics": {
+        "normalizer_loaded": false,
+        "normalizer_applied_count": 0,
+        "normalizer_mismatch_count": 0,
+        "feature_dim_before_norm": null,
+        "feature_mean_before_norm": null,
+        "feature_std_before_norm": null,
+        "feature_mean_after_norm": null,
+        "feature_std_after_norm": null,
+        "normalizer_feature_dim": null,
+        "normalizer_mismatch_reason": null
+      },
+      "counts": {
+        "move": {
+          "total": 0,
+          "learned": 0
+        },
+        "shoot": {
+          "total": 0,
+          "learned": 0
+        }
+      },
+      "learned_path_coverage": 0.0,
+      "move_path_coverage": 0.0,
+      "shoot_path_coverage": 0.0,
+      "score_means": {
+        "move": {
+          "intent_bias": 0.0,
+          "situation_score": 0.0,
+          "tactical_score": 0.0,
+          "objective_score": 0.0,
+          "combined_score": 0.0,
+          "samples": 0
+        },
+        "shoot": {
+          "intent_bias": 0.0,
+          "situation_score": 0.0,
+          "tactical_score": 0.0,
+          "objective_score": 0.0,
+          "combined_score": 0.0,
+          "samples": 0
+        }
+      },
+      "trace_samples": [],
+      "move_route_aggregate": {
+        "total_attempts": 0,
+        "empty_route_count": 0,
+        "reachable_city_total": 0,
+        "by_move_type": {},
+        "route_failure_reasons": {}
+      },
+      "move_route_samples": []
+    },
+    "score_red": 104,
+    "score_blue": 132,
+    "final_scores": {
+      "red_occupy": 0,
+      "red_remain": 104,
+      "red_remain_max": 104,
+      "red_attack": 0,
+      "red_total": 104,
+      "red_win": -28,
+      "blue_occupy": 0,
+      "blue_remain": 132,
+      "blue_remain_max": 132,
+      "blue_attack": 0,
+      "blue_total": 132,
+      "blue_win": 28
+    }
+  },
+  "paired_delta": {
+    "score_delta": 0.0,
+    "route_empty_rate_delta": 0.0,
+    "steps_delta": 0,
+    "duration_delta": 0.166,
+    "on_status": "completed",
+    "off_status": "completed"
+  }
+}

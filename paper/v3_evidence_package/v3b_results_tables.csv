@@ -1,0 +1,5 @@
+scenario,seeds,pairs_total,pairs_completed,score_delta_mean,score_delta_ci_lower,score_delta_ci_upper,route_empty_delta,steps_delta
+1231,5,5,5,0.0,0.0,0.0,0.0,0.0
+1531,5,5,5,0.0,0.0,0.0,0.0,0.0
+1910631192,5,5,5,0.0,0.0,0.0,0.0,0.0
+all,15,15,15,0.0,0.0,0.0,0.0,0.0

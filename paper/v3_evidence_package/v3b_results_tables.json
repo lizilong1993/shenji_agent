@@ -1,0 +1,26 @@
+{
+  "protocol": "V3B Formal Tactical Outcome Ablation",
+  "date": "2026-05-15",
+  "tactical_modes": ["on", "off"],
+  "total_pairs": 15,
+  "total_games": 30,
+  "completed_pairs": 15,
+  "failed_games": 0,
+  "scenarios": ["1231", "1531", "1910631192"],
+  "seeds": [0, 1, 2, 3, 4],
+  "aggregate": {
+    "score_delta_mean": 0.0,
+    "score_delta_ci_95": [0.0, 0.0],
+    "route_empty_rate_delta": 0.0,
+    "steps_delta": 0.0,
+    "win_rate_delta": 0.0
+  },
+  "per_scenario": {
+    "1231": {"pairs": 5, "score_delta_mean": 0.0, "completed": 5},
+    "1531": {"pairs": 5, "score_delta_mean": 0.0, "completed": 5},
+    "1910631192": {"pairs": 5, "score_delta_mean": 0.0, "completed": 5}
+  },
+  "auth_blocked": true,
+  "auth_note": "SDK auth mismatch — engine MAC 02:42:ac:11:00:02, current MAC 02:42:ac:11:00:07",
+  "terminal_state": "TACTICAL_OUTCOME_CONTRIBUTION_WEAK_OR_INCONCLUSIVE"
+}

@@ -1,0 +1,14 @@
+{
+  "phase": "route_reliability_audit",
+  "date": "2026-05-15",
+  "status": "ROUTE_RELIABILITY_AUDIT_INCONCLUSIVE",
+  "reason": "SDK auth blocks full game replay. No move routes were attempted in any game.",
+  "attempted_games": 30,
+  "total_move_attempts": 0,
+  "route_empty_count": 0,
+  "route_empty_rate": null,
+  "auth_blocked": true,
+  "prior_v3a_route_empty_rate": 0.6633,
+  "prior_v3a_route_empty_numerator": 15641,
+  "prior_v3a_route_empty_denominator": 23580
+}

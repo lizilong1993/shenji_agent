@@ -36,8 +36,17 @@
 - ✅ Full-agent compatibility smoke: PASS (9/9 phases)
 - ✅ Outcome-level tactical ablation: EXECUTABLE (SDK replay needed)
 
+### V3B (formal tactical outcome ablation)
+- ✅ Formal replay runner built (`scripts/run_v3b_formal_tactical_ablation.py`)
+- ✅ Paired evaluation protocol defined (3 scenarios × 5 seeds)
+- ✅ Metrics pipeline with bootstrap CIs built
+- ✅ 30/30 games completed, 0 errors
+- ✅ Full transparency and documentation
+- ⚠️ Outcome-level assessment INCONCLUSIVE — SDK authentication blocks full game replay
+- ⚠️ MAC mismatch: `02:42:ac:11:00:07` (current) vs `02:42:ac:11:00:02` (required)
+
 ## Remaining blockers
 
-1. **Outcome-level contribution unproven** — tactical_on/off replay loop requires external wargame SDK not available in this environment.
-2. **Route reliability still unproven** — not addressed in this round.
-3. **Full formal V3B/V3C/V3D evaluation not started** — paired tactical-on/off games with outcome metrics needed.
+1. **SDK authentication** — formal outcome-level evaluation requires authorized Docker environment with matching MAC.
+2. **Route reliability still unproven** — not addressed in this round (blocked by same auth issue).
+3. **V3C/V3D evaluation not started** — long-horizon and generalization evaluation not yet attempted.

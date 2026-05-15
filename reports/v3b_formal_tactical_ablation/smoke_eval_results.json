@@ -1,0 +1,16 @@
+{
+  "phase": "smoke_evaluation",
+  "date": "2026-05-15",
+  "status": "SMOKE_COMPLETED",
+  "pairs": 1,
+  "completed": 1,
+  "failed": 0,
+  "auth_limited": true,
+  "auth_note": "SDK auth blocks full game replay. All games stuck in deployment stage.",
+  "results_summary": {
+    "tactical_on": {"steps": 1801, "winner": "blue", "score_red": 104, "score_blue": 132},
+    "tactical_off": {"steps": 1801, "winner": "blue", "score_red": 104, "score_blue": 132},
+    "score_delta": 0.0,
+    "route_empty_rate_delta": 0.0
+  }
+}
