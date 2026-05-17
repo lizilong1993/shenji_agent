@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=1 SHENJI_POLICY_DEVICE=cuda /remote-home/lizilong/venvs/shenji/bin/python -m training.selfplay --config .agent/round18_smoke_post212051fix_20260427_024127/smoke_config.yaml --candidate .agent/round18_smoke_post212051fix_20260427_024127/candidate_weights --incumbent artifacts/best_agent/weights

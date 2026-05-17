@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "-c",
+    "import sys,time; print('dummy-stdout', flush=True); print('dummy-stderr', file=sys.stderr, flush=True); time.sleep(1); sys.exit(7)"
+  ],
+  "compare_pgid": 2928902,
+  "compare_pid": 2928902,
+  "compare_sid": 2928902,
+  "cwd": "/remote-home/lizilong/shenji_agent",
+  "launcher_pgid": 2928901,
+  "launcher_pid": 2928901,
+  "launcher_sid": 2928901,
+  "metadata_file": "/remote-home/lizilong/shenji_agent/.agent/round11_dummy.metadata.json",
+  "pid_file": "/remote-home/lizilong/shenji_agent/.agent/round11_dummy.pid",
+  "started_at": "2026-04-24T04:59:50.250362Z",
+  "status_file": "/remote-home/lizilong/shenji_agent/.agent/round11_dummy.status.json",
+  "stderr_log": "/remote-home/lizilong/shenji_agent/.agent/round11_dummy.stderr.log",
+  "stdin_target": "/dev/null",
+  "stdout_log": "/remote-home/lizilong/shenji_agent/.agent/round11_dummy.stdout.log"
+}

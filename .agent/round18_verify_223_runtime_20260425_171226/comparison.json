@@ -1,0 +1,101 @@
+{
+  "after": {
+    "candidate_empty_route_total": 0,
+    "candidate_empty_route_with_no_reachable_city_total": 0,
+    "candidate_empty_route_with_reachable_alternative_total": 0,
+    "candidate_move_path_coverage": 1.0,
+    "candidate_windows": {
+      "0-120": {
+        "empty_route": 0,
+        "empty_route_with_no_reachable_city": 0,
+        "empty_route_with_reachable_alternative": 0,
+        "learned_success": 35,
+        "map_missing": 0,
+        "no_cities": 0,
+        "no_selection": 0,
+        "reachable_route_available": 35,
+        "reachable_route_unavailable": 0,
+        "total_move_evals": 35
+      },
+      "121-280": {
+        "empty_route": 0,
+        "empty_route_with_no_reachable_city": 0,
+        "empty_route_with_reachable_alternative": 0,
+        "learned_success": 31,
+        "map_missing": 0,
+        "no_cities": 0,
+        "no_selection": 0,
+        "reachable_route_available": 31,
+        "reachable_route_unavailable": 0,
+        "total_move_evals": 31
+      },
+      "281-400": {
+        "empty_route": 0,
+        "empty_route_with_no_reachable_city": 0,
+        "empty_route_with_reachable_alternative": 0,
+        "learned_success": 36,
+        "map_missing": 0,
+        "no_cities": 0,
+        "no_selection": 0,
+        "reachable_route_available": 36,
+        "reachable_route_unavailable": 0,
+        "total_move_evals": 36
+      }
+    },
+    "map_id": 53
+  },
+  "after_summary_path": "/remote-home/lizilong/shenji_agent/.agent/round18_verify_223_runtime_20260425_171226/summary.json",
+  "baseline": {
+    "candidate_empty_route_total": 4910,
+    "candidate_empty_route_with_no_reachable_city_total": 4014,
+    "candidate_empty_route_with_reachable_alternative_total": 896,
+    "candidate_move_path_coverage": 0.005065856129685917,
+    "candidate_windows": {
+      "0-120": {
+        "empty_route": 1215,
+        "empty_route_with_no_reachable_city": 1204,
+        "empty_route_with_reachable_alternative": 11,
+        "learned_success": 16,
+        "map_missing": 0,
+        "no_cities": 0,
+        "no_selection": 0,
+        "reachable_route_available": 27,
+        "reachable_route_unavailable": 1204,
+        "total_move_evals": 1231
+      },
+      "121-280": {
+        "empty_route": 2021,
+        "empty_route_with_no_reachable_city": 1614,
+        "empty_route_with_reachable_alternative": 407,
+        "learned_success": 1,
+        "map_missing": 0,
+        "no_cities": 0,
+        "no_selection": 0,
+        "reachable_route_available": 408,
+        "reachable_route_unavailable": 1614,
+        "total_move_evals": 2022
+      },
+      "281-400": {
+        "empty_route": 1674,
+        "empty_route_with_no_reachable_city": 1196,
+        "empty_route_with_reachable_alternative": 478,
+        "learned_success": 8,
+        "map_missing": 0,
+        "no_cities": 0,
+        "no_selection": 0,
+        "reachable_route_available": 486,
+        "reachable_route_unavailable": 1196,
+        "total_move_evals": 1682
+      }
+    },
+    "map_id": 221
+  },
+  "baseline_summary_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_gpu_20260425_154341/probe_output/summary.json",
+  "delta": {
+    "candidate_empty_route_total": -4910,
+    "candidate_empty_route_with_no_reachable_city_total": -4014,
+    "candidate_move_path_coverage": 0.9949341438703141
+  },
+  "generated_at": "2026-04-25T17:17:13.680140Z",
+  "scenario": "2230531221.json"
+}

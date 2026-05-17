@@ -1,0 +1,15 @@
+已完成一个最小聚焦补丁，只动了这两个文件。
+
+[training/selfplay.py](/remote-home/lizilong/shenji_agent/training/selfplay.py:74) 里把 `basic.json` 的 normalize/validate helper 收回到 `_load_case_data()` 内部，只处理这五组正式字段映射：`nb -> neighbors`、`rd -> roads`、`rv -> rivers`、`cd -> cond`、`e -> elev`。旧字段保留，返回给 env/agent 的 `basic_data` 会补齐正式字段；坏 schema 会在 `_load_case_data()` 阶段直接抛 `ValueError`，消息包含 `map_id`、`basic.json` 路径和具体坏点。
+
+[tests/test_mainline_contract.py](/remote-home/lizilong/shenji_agent/tests/test_mainline_contract.py:667) 补上了缺失的直接 `_load_case_data()` 回归，现在三类覆盖都在：
+- 直接 `_load_case_data()` 补齐旧 schema 且保留旧字段
+- 坏 schema 在 `_load_case_data()` 提前报 `ValueError`
+- `_run_single()` 路径里 `FakeEnv.setup` 和 `FakeAgent.setup` 收到的 `basic_data` 都已含正式字段
+
+本地已验证通过：
+```bash
+/remote-home/lizilong/venvs/shenji/bin/python -m unittest tests.test_mainline_contract.MainlineContractTest.test_selfplay_load_case_data_normalizes_legacy_basic_schema tests.test_mainline_contract.MainlineContractTest.test_selfplay_load_case_data_rejects_invalid_basic_schema_early tests.test_mainline_contract.MainlineContractTest.test_selfplay_run_single_normalizes_legacy_basic_schema_for_env_and_agent
+```
+
+建议主 agent 复用上面这条作为最小验证命令。

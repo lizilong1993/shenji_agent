@@ -1,5 +1,9 @@
-# CHANGELOG.md
+# Paper Changelog
 
-## 2026-05-13 Paper Prewrite Evidence Package
+| Version | Date       | Changes |
+|---------|------------|---------|
+| v0      | (initial)  | Raw manuscript before versioning was introduced. Not archived. |
+| v1      | 2026-05-11 | Major revision: expanded abstract with consecutive-window note; expanded Introduction with four-claim structure; added Problem Setting with formal notation; expanded Method with scoring component details, gate thresholds, and hard-stop rule (consecutive_windows=0 documented); added Results tables (main, bucketed, exploiter) and Diagnostic Analysis subsection with score means and route planner analysis; improved Related Work; expanded Limitations (6 items); strengthened Conclusion with enumerated next steps; applied humanizer cleanup pass; updated source_evidence.md with two-window gap and move route analysis; improved figure LaTeX sources. |
+| v2      | 2026-05-11 | Added `project_note` fields to all references.bib entries with Relevance/Inspiration/Relation/Use in paper/Status metadata; probed image generation tools (none available — documented in figures/README.md); re-ran AI reviewer (0 unsupported, 15 unverifiable — unchanged); minor prose polish; improved archiving to include figure README. |
+| v3      | 2026-05-11 | Score: Soundness 5.0, Clarity 5.0, Novelty 4.5, Significance 4.0, Evidence 5.0, Overall 5.6/6.0. Changes: upgraded run_ai_reviewer.py with --llm mode for structured NeurIPS-style quality scoring (scores.json, 5 dimensions + overall); moved paper-specific code to paper/scripts/ and paper/configs/ for isolation; updated GOAL.md with scoring process, per-round diff reporting, and code isolation rules; strengthened Significance in main.tex (limitations opening and conclusion now emphasize generalizable protocol contribution); re-ran reviewer from paper/ directory. |
 
-Prepared manuscript prewriting evidence materials under `paper/prewrite_package/`. This was an evidence packaging task, not a `paper/main.tex` manuscript revision.

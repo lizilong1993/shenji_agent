@@ -1,0 +1,62 @@
+{
+  "commands": {
+    "original": "CUDA_VISIBLE_DEVICES=0 SHENJI_POLICY_DEVICE=cuda ... python -m training.selfplay --config configs/selfplay_sota_stop.yaml --candidate ai/weights --incumbent artifacts/best_agent/weights",
+    "relaunch": "CUDA_VISIBLE_DEVICES=1 SHENJI_POLICY_DEVICE=cuda ... python -m training.selfplay --config configs/selfplay_sota_stop.yaml --candidate ai/weights --incumbent artifacts/best_agent/weights",
+    "only_material_difference": "GPU ordinal 0 -> 1"
+  },
+  "lineage_alignment": {
+    "candidate_source_commit_sha": "2a5ac08ef5dc7a6cc9694aa7cbbd5e1ceb5f0bb7",
+    "incumbent_source_commit_sha": "bb26fd52af4aec9029643c8f3666237eb06a1a6d",
+    "map_list_sha_082209": "74305715b26cc7cdcddd34a951f019c6108511bd631288441d6a01bad1341281",
+    "map_list_sha_160721": "74305715b26cc7cdcddd34a951f019c6108511bd631288441d6a01bad1341281",
+    "first_91_core_matches_equal": true
+  },
+  "run_082209": {
+    "completed_pairs": 91,
+    "candidate_zero_count_matches": 0,
+    "opponent_zero_count_matches": 0,
+    "learned_path_coverage_partial": 0.05177909764603313,
+    "move_path_coverage_partial": 0.04174066272938779,
+    "shoot_path_coverage_partial": 1.0,
+    "all_zero_score_quads": true,
+    "elapsed_seconds_to_last_checkpoint": 26575.865451
+  },
+  "run_160721": {
+    "completed_pairs": 100,
+    "candidate_zero_count_matches": 100,
+    "opponent_zero_count_matches": 100,
+    "learned_path_coverage": 0.0,
+    "move_path_coverage": 0.0,
+    "shoot_path_coverage": 0.0,
+    "candidate_model_loaded_count_pairs": [
+      [
+        2,
+        2
+      ]
+    ],
+    "opponent_model_loaded_count_pairs": [
+      [
+        2,
+        2
+      ]
+    ],
+    "candidate_inference_devices": [
+      [
+        "cuda"
+      ]
+    ],
+    "opponent_inference_devices": [
+      []
+    ],
+    "all_zero_score_quads": true,
+    "elapsed_seconds_to_exit": 4031.724309
+  },
+  "inference": {
+    "speed_ratio_original_over_relaunch": 6.591687182497775,
+    "most_likely_cause_class": "runtime_action_path_difference",
+    "ruled_out_primary_cause_classes": [
+      "posthoc_stats_aggregation_bug",
+      "simple_launcher_command_mismatch"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+结论：最小回归点应落在 [training/selfplay.py](/remote-home/lizilong/shenji_agent/training/selfplay.py:74) 的 `_load_case_data`，不要落在 `main`。现有 `_run_single` 测试已经把 `_load_case_data` patch 掉了（见 [tests/test_mainline_contract.py](/remote-home/lizilong/shenji_agent/tests/test_mainline_contract.py:605)），`main` 测试又把 `_run_single` patch 掉了（见 [tests/test_mainline_contract.py](/remote-home/lizilong/shenji_agent/tests/test_mainline_contract.py:723) 和 [tests/test_mainline_contract.py](/remote-home/lizilong/shenji_agent/tests/test_mainline_contract.py:892)），所以这两层都抓不到 old schema normalize/validate 回归。真实 `map_212/basic.json` 的 cell 只有 `nb/c/r/e/cd/rd/rv`，而消费者 [ai/agent.py](/remote-home/lizilong/shenji_agent/ai/agent.py:83) / [ai/agent.py](/remote-home/lizilong/shenji_agent/ai/agent.py:243) 直接取 `neighbors/roads/rivers/cond/elev`，loader 层是正确 choke point。
+
+建议新增两个测试函数，继续复用现有 `unittest + tempfile + mock.patch.object` 风格：
+
+- `test_selfplay_load_case_data_normalizes_map_212_abbrev_schema`
+  - 直接测 `_load_case_data`，不需要 mock `_train_env_runtime`。
+  - 成功例输入要用 `map_212` 这种旧缩写 cell，至少包含 `nb/e/cd/rd/rv`。
+  - 断言点：
+    - 返回的 `basic_data["map_data"][0][0]` 已有 canonical 键：`neighbors`、`roads`、`rivers`、`cond`、`elev`
+    - `neighbors/roads/rivers` 的值与旧字段 `nb/rd/rv` 对应一致
+    - 最好再补一个 setup 前 smoke 断言：`Map(payload["basic_data"], payload["cost_data"], payload["see_data"]).get_hex_types(0)` 不抛错，且能取到 `roads/neighbors`
+- `test_selfplay_load_case_data_rejects_invalid_legacy_basic_schema`
+  - 也是直接测 `_load_case_data`。
+  - 用最小坏例：legacy cell 保留 `rd/rv/e/cd/r/c`，但故意缺 `nb`（同时也没有 canonical `neighbors`）。
+  - 断言点：
+    - `with self.assertRaisesRegex(ValueError, "nb|neighbors")`
+    - 重点是失败要发生在 loader/validate，而不是后面 `Map`/`setup` 再炸 `KeyError`
+
+是否需要 mock `_train_env_runtime`：不需要。直接测 `_load_case_data` 信号最强、改动最小；如果上升到 `_run_single`，还得补 fake env/fake agent，但 normalize 逻辑本身仍然更适合在 loader 层断言。

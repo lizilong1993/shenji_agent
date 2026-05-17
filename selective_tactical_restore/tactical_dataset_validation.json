@@ -1,0 +1,42 @@
+{
+  "file_exists": true,
+  "size_bytes": 409055700,
+  "sha256": null,
+  "rows": 24080,
+  "columns": 18,
+  "column_names": [
+    "ID",
+    "算子类型",
+    "算子所属方",
+    "样本标签",
+    "起始点",
+    "目标点",
+    "起始点机动范围",
+    "起始点观察范围",
+    "起始点暴露范围",
+    "起始点夺控能力",
+    "目标点机动范围",
+    "目标点观察范围",
+    "目标点暴露范围",
+    "目标点夺控能力",
+    "主要夺控点",
+    "次要夺控点",
+    "特殊地形",
+    "整体移动方向"
+  ],
+  "label_column_found": true,
+  "label_column_name": "样本标签",
+  "numeric_column_count": null,
+  "feature_dim": 17,
+  "expected_feature_dim": 32,
+  "missing_value_ratio": null,
+  "feature_matrix_shape_sample": [
+    100,
+    32
+  ],
+  "errors": [],
+  "warnings": [],
+  "final_state": "COMPATIBLE",
+  "status": "TACTICAL_DATASET_COMPATIBLE",
+  "_encoding": "gbk"
+}

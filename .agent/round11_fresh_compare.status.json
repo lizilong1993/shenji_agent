@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/remote-home/lizilong/venvs/shenji/bin/python",
+    "-m",
+    "training.selfplay",
+    "--config",
+    "configs/selfplay_baseline.yaml",
+    "--candidate",
+    "ai/weights",
+    "--incumbent",
+    "artifacts/best_agent/weights"
+  ],
+  "ended_at": "2026-04-24T05:37:42.175008Z",
+  "exit_code": 1,
+  "pid": 2928919,
+  "return_code": 1,
+  "signal_name": null,
+  "signal_number": null,
+  "started_at": "2026-04-24T05:00:18.274465Z"
+}

@@ -1,0 +1,23 @@
+{
+  "event": "target_completed",
+  "ts": "2026-04-26T02:52:27.510712Z",
+  "scenario": "2120511121.json",
+  "map_id": 212,
+  "paired_score": 0.5,
+  "first_leg": {
+    "candidate": 0.0,
+    "opponent": 0.0
+  },
+  "second_leg": {
+    "candidate": 0.0,
+    "opponent": 0.0
+  },
+  "candidate_move_cov": 0.0,
+  "candidate_learned_cov": 0.0,
+  "candidate_shoot_cov": 0.0,
+  "opponent_move_cov": 0.0,
+  "opponent_learned_cov": 0.0,
+  "opponent_shoot_cov": 0.0,
+  "completed_pairs": 21,
+  "heartbeat_ts": "2026-04-26T02:52:25.944177Z"
+}

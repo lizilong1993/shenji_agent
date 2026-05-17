@@ -1,0 +1,13 @@
+{
+  "torch_cuda_available": false,
+  "policy_device": "cpu",
+  "intent_param_device": "cpu",
+  "situation_param_device": "cpu",
+  "intent_distribution_len": 7,
+  "intent_distribution_head": [
+    0.465851,
+    0.062803,
+    0.125691
+  ],
+  "situation_score": 0.4900026321411133
+}

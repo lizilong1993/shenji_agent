@@ -1,0 +1,10 @@
+{
+  "argv": [
+    ".agent/round18_probe_212051_maps_20260426_004500/probe_212051_candidate_maps.py"
+  ],
+  "cuda_visible_devices": "0",
+  "cwd": "/remote-home/lizilong/shenji_agent",
+  "output_dir": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212051_maps_20260426_004500/probe_output",
+  "requested_device_env": "cuda",
+  "run_dir": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212051_maps_20260426_004500"
+}

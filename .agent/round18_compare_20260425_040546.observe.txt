@@ -1,0 +1,47 @@
+timestamp_utc=2026-04-25T04:09:18Z
+[ps]
+3026265       1 3026265 3026265     128 /remote-home/lizilong/venvs/shenji/bin/python /remote-home/lizilong/shenji_agent/scripts/launch_detached_compare.py --launcher-log /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.stderr.log.launcher.log --supervise --cwd /remote-home/lizilong/shenji_agent --pid-file /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.pid --stdout-log /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.stdout.log --stderr-log /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.stderr.log --status-file /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.status.json --metadata-file /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.metadata.json -- /remote-home/lizilong/venvs/shenji/bin/python -m training.selfplay --config configs/selfplay_sota_stop.yaml --candidate ai/weights --incumbent artifacts/best_agent/weights
+3026266 3026265 3026266 3026266     128 /remote-home/lizilong/venvs/shenji/bin/python -m training.selfplay --config configs/selfplay_sota_stop.yaml --candidate ai/weights --incumbent artifacts/best_agent/weights
+[progress.json]
+{
+  "env_backend": "train_env.TrainEnv",
+  "phase": "formal_compare",
+  "completed_pairs": 0,
+  "total_pairs": 100,
+  "candidate_source_commit_sha": "9ab8ec47a67409e945c65689d4bc04eb765f4f30",
+  "incumbent_source_commit_sha": "bb26fd52af4aec9029643c8f3666237eb06a1a6d",
+  "heartbeat_ts": "2026-04-25T04:09:18.654366Z",
+  "current_order_index": 0,
+  "current_map_id": 221,
+  "current_scenario": "2230531221.json",
+  "current_bucket": "complex",
+  "current_leg_index": 1,
+  "leg_steps": 167
+}[partial_match_results.summary]
+{
+  "heartbeat_ts": "2026-04-25T04:09:18.654366Z",
+  "completed_pairs": 0,
+  "total_pairs": 100,
+  "current_match": {
+    "status": "in_progress",
+    "scenario": "2230531221.json",
+    "bucket": "complex",
+    "map_id": 221,
+    "order_index": 0,
+    "current_leg_index": 1,
+    "leg_steps": 167,
+    "first_leg": {
+      "candidate": 0.0,
+      "opponent": 0.0
+    },
+    "second_leg": null,
+    "candidate_artifacts": "/remote-home/lizilong/shenji_agent/ai/weights",
+    "opponent_artifacts": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+    "candidate_source_commit_sha": "9ab8ec47a67409e945c65689d4bc04eb765f4f30",
+    "opponent_source_commit_sha": "bb26fd52af4aec9029643c8f3666237eb06a1a6d",
+    "candidate_code_origin": "git:9ab8ec47a67409e945c65689d4bc04eb765f4f30",
+    "opponent_code_origin": "git:bb26fd52af4aec9029643c8f3666237eb06a1a6d",
+    "candidate_profile": "challenger",
+    "opponent_profile": "incumbent"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "generated_at": "20260423_024831",
+  "history_len": 8,
+  "horizons": 5,
+  "intent_lstm": "intent_lstm.pt",
+  "situation_gcn": "situation_gcn.pt",
+  "managed_files": [
+    "intent_lstm.pt",
+    "situation_gcn.pt",
+    "intent_model.pt",
+    "situation_model.pt",
+    "tactical_model.pt",
+    "model_manifest.json"
+  ],
+  "snapshot_role": "accepted_learned_mainline",
+  "source_commit_sha": "bb26fd52af4aec9029643c8f3666237eb06a1a6d"
+}

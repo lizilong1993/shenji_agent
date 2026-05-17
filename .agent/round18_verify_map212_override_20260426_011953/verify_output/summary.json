@@ -1,0 +1,1109 @@
+{
+  "generated_at": "2026-04-26T01:25:50.057478Z",
+  "env_backend": "train_env.TrainEnv",
+  "requested_device_env": "cuda",
+  "cuda_visible_devices": "0",
+  "baseline_summary_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212013_family_20260426_010048/probe_output/summary.json",
+  "scenarios": [
+    "2120131194.json",
+    "2120131294.json"
+  ],
+  "scenarios_by_name": {
+    "2120131194.json": {
+      "scenario": "2120131194.json",
+      "resolved_map_id": 94,
+      "resolved_bucket": "simple",
+      "resolved_map_fit": {
+        "map_id": 94,
+        "map_name": "map_94",
+        "bucket": "simple",
+        "rows": 92,
+        "cols": 77,
+        "city_total": 5,
+        "city_in_bounds": 5,
+        "city_oob_count": 0,
+        "operator_total": 54,
+        "operator_in_bounds": 54,
+        "operator_oob_count": 0
+      },
+      "legs": [
+        {
+          "leg_index": 0,
+          "red_role": "candidate",
+          "blue_role": "opponent",
+          "steps_executed": 400,
+          "done": false,
+          "red_score": 0.0,
+          "blue_score": 0.0
+        },
+        {
+          "leg_index": 1,
+          "red_role": "opponent",
+          "blue_role": "candidate",
+          "steps_executed": 400,
+          "done": false,
+          "red_score": 0.0,
+          "blue_score": 0.0
+        }
+      ],
+      "merged_policy_stats": {
+        "candidate": {
+          "counts": {
+            "move": {
+              "total": 92,
+              "learned": 92
+            },
+            "shoot": {
+              "total": 5,
+              "learned": 5
+            }
+          },
+          "learned_path_coverage": 1.0,
+          "move_path_coverage": 1.0,
+          "shoot_path_coverage": 1.0,
+          "score_means": {
+            "move": {
+              "samples": 92,
+              "intent_bias": -1.6630434782608696,
+              "situation_score": 9.447449150888571e-09,
+              "combined_score": 9.939674857788393
+            },
+            "shoot": {
+              "samples": 5,
+              "intent_bias": 0.20069188475608826,
+              "situation_score": 1.4293830297162912e-08,
+              "combined_score": 54.43069331413911
+            }
+          },
+          "policy_profiles": [
+            "challenger"
+          ],
+          "inference_devices": [
+            "cuda"
+          ],
+          "loaded_from_dirs": [
+            "/remote-home/lizilong/shenji_agent/ai/weights"
+          ],
+          "intent_model_loaded_count": 2,
+          "situation_model_loaded_count": 2,
+          "trace_samples": [
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 0,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 4.3265452331908705e-10,
+              "combined_score": 10.050000043265452
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 1,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 4.3259684723295777e-10,
+              "combined_score": 9.350000043259687
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 2,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 4.3247730396878126e-10,
+              "combined_score": 8.650000043247731
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 100,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 4.327581071272846e-10,
+              "combined_score": 9.70000004327581
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 101,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 4.325482749756304e-10,
+              "combined_score": 9.000000043254829
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 102,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 4.324710312086921e-10,
+              "combined_score": 8.300000043247103
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 3,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 4.4792716757946494e-10,
+              "combined_score": 8.300000044792718
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 4,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 4.4792716757946494e-10,
+              "combined_score": 7.950000044792718
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 5,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 4.4792383691039106e-10,
+              "combined_score": 9.000000044792383
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 6,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 4.4792383691039106e-10,
+              "combined_score": 8.650000044792383
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 7,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 4.4791509390407214e-10,
+              "combined_score": 10.05000004479151
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 8,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 4.479150383929209e-10,
+              "combined_score": 9.700000044791505
+            }
+          ]
+        },
+        "opponent": {
+          "counts": {
+            "move": {
+              "total": 86,
+              "learned": 86
+            },
+            "shoot": {
+              "total": 10,
+              "learned": 10
+            }
+          },
+          "learned_path_coverage": 1.0,
+          "move_path_coverage": 1.0,
+          "shoot_path_coverage": 1.0,
+          "score_means": {
+            "move": {
+              "samples": 86,
+              "intent_bias": -1.7209302325581395,
+              "situation_score": 0.0024818600626489106,
+              "combined_score": 10.138883680683499
+            },
+            "shoot": {
+              "samples": 10,
+              "intent_bias": 0.34399128556251524,
+              "situation_score": 0.0035733955213800074,
+              "combined_score": 59.751330837700515
+            }
+          },
+          "policy_profiles": [
+            "incumbent"
+          ],
+          "inference_devices": [
+            "cuda"
+          ],
+          "loaded_from_dirs": [
+            "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights"
+          ],
+          "intent_model_loaded_count": 2,
+          "situation_model_loaded_count": 2,
+          "trace_samples": [
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 3,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.000679652439430356,
+              "combined_score": 8.367965243943036
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 4,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.0006796523812226951,
+              "combined_score": 8.01796523812227
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 5,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.0006796516827307642,
+              "combined_score": 9.067965168273076
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 6,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.0006796516827307642,
+              "combined_score": 8.717965168273077
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 7,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.0006796497036702931,
+              "combined_score": 10.11796497036703
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 8,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.000679649761877954,
+              "combined_score": 9.767964976187795
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 0,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 0.0006700755329802632,
+              "combined_score": 10.117007553298027
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 1,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 0.0006700533558614552,
+              "combined_score": 9.417005335586147
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 2,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 0.000670001667458564,
+              "combined_score": 8.717000166745857
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 100,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 0.0006701223319396377,
+              "combined_score": 9.767012233193963
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 101,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 0.0006700294325128198,
+              "combined_score": 9.067002943251282
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 102,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 0.0006699952064082026,
+              "combined_score": 8.366999520640821
+            }
+          ]
+        }
+      },
+      "windows": {
+        "candidate": {
+          "0-120": {
+            "counts": {
+              "move": {
+                "total": 32,
+                "learned": 32
+              },
+              "shoot": {
+                "total": 0,
+                "learned": 0
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 0.0
+          },
+          "121-280": {
+            "counts": {
+              "move": {
+                "total": 18,
+                "learned": 18
+              },
+              "shoot": {
+                "total": 2,
+                "learned": 2
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 1.0
+          },
+          "281-400": {
+            "counts": {
+              "move": {
+                "total": 42,
+                "learned": 42
+              },
+              "shoot": {
+                "total": 3,
+                "learned": 3
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 1.0
+          }
+        },
+        "opponent": {
+          "0-120": {
+            "counts": {
+              "move": {
+                "total": 32,
+                "learned": 32
+              },
+              "shoot": {
+                "total": 0,
+                "learned": 0
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 0.0
+          },
+          "121-280": {
+            "counts": {
+              "move": {
+                "total": 18,
+                "learned": 18
+              },
+              "shoot": {
+                "total": 2,
+                "learned": 2
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 1.0
+          },
+          "281-400": {
+            "counts": {
+              "move": {
+                "total": 36,
+                "learned": 36
+              },
+              "shoot": {
+                "total": 8,
+                "learned": 8
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 1.0
+          }
+        }
+      },
+      "move_failures": {
+        "candidate": {
+          "0-120": {
+            "total_move_evals": 32,
+            "learned_success": 32,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 32,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          },
+          "121-280": {
+            "total_move_evals": 18,
+            "learned_success": 18,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 18,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          },
+          "281-400": {
+            "total_move_evals": 42,
+            "learned_success": 42,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 42,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          }
+        },
+        "opponent": {
+          "0-120": {
+            "total_move_evals": 32,
+            "learned_success": 32,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 32,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          },
+          "121-280": {
+            "total_move_evals": 18,
+            "learned_success": 18,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 18,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          },
+          "281-400": {
+            "total_move_evals": 36,
+            "learned_success": 36,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 36,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          }
+        }
+      },
+      "candidate_metrics": {
+        "paired_score": 0.5,
+        "move_total": 92,
+        "move_learned": 92,
+        "move_path_coverage": 1.0,
+        "learned_path_coverage": 1.0,
+        "shoot_path_coverage": 1.0,
+        "empty_route_total": 0,
+        "empty_route_with_no_reachable_city_total": 0,
+        "empty_route_with_reachable_alternative_total": 0,
+        "reachable_route_available_total": 92,
+        "reachable_route_unavailable_total": 0,
+        "learned_success_total": 92,
+        "total_move_evals": 92,
+        "window_move_path_coverage": {
+          "0-120": 1.0,
+          "121-280": 1.0,
+          "281-400": 1.0
+        }
+      },
+      "before_after_vs_prepatch_map212": {
+        "before_map_id": 212,
+        "after_map_id": 94,
+        "before_move_path_coverage": 0.029114676173499703,
+        "after_move_path_coverage": 1.0,
+        "before_learned_path_coverage": 0.029691211401425176,
+        "after_learned_path_coverage": 1.0,
+        "before_empty_route_with_no_reachable_city": 1634,
+        "after_empty_route_with_no_reachable_city": 0,
+        "before_empty_route_with_reachable_alternative": 0,
+        "after_empty_route_with_reachable_alternative": 0,
+        "before_operator_fit": 32,
+        "before_operator_total": 54
+      }
+    },
+    "2120131294.json": {
+      "scenario": "2120131294.json",
+      "resolved_map_id": 94,
+      "resolved_bucket": "simple",
+      "resolved_map_fit": {
+        "map_id": 94,
+        "map_name": "map_94",
+        "bucket": "simple",
+        "rows": 92,
+        "cols": 77,
+        "city_total": 5,
+        "city_in_bounds": 5,
+        "city_oob_count": 0,
+        "operator_total": 61,
+        "operator_in_bounds": 61,
+        "operator_oob_count": 0
+      },
+      "legs": [
+        {
+          "leg_index": 0,
+          "red_role": "candidate",
+          "blue_role": "opponent",
+          "steps_executed": 400,
+          "done": false,
+          "red_score": 0.0,
+          "blue_score": 0.0
+        },
+        {
+          "leg_index": 1,
+          "red_role": "opponent",
+          "blue_role": "candidate",
+          "steps_executed": 400,
+          "done": false,
+          "red_score": 0.0,
+          "blue_score": 0.0
+        }
+      ],
+      "merged_policy_stats": {
+        "candidate": {
+          "counts": {
+            "move": {
+              "total": 83,
+              "learned": 83
+            },
+            "shoot": {
+              "total": 6,
+              "learned": 6
+            }
+          },
+          "learned_path_coverage": 1.0,
+          "move_path_coverage": 1.0,
+          "shoot_path_coverage": 1.0,
+          "score_means": {
+            "move": {
+              "samples": 83,
+              "intent_bias": -1.7228915662650603,
+              "situation_score": 4.2739169833738577e-10,
+              "combined_score": 7.719277151172905
+            },
+            "shoot": {
+              "samples": 6,
+              "intent_bias": 0.8636594464381536,
+              "situation_score": 5.431216171247755e-10,
+              "combined_score": 58.146992834083655
+            }
+          },
+          "policy_profiles": [
+            "challenger"
+          ],
+          "inference_devices": [
+            "cuda"
+          ],
+          "loaded_from_dirs": [
+            "/remote-home/lizilong/shenji_agent/ai/weights"
+          ],
+          "intent_model_loaded_count": 2,
+          "situation_model_loaded_count": 2,
+          "trace_samples": [
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 500,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 2.828061743120891e-11,
+              "combined_score": 7.6000000028280645
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 501,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 2.8280613961761958e-11,
+              "combined_score": 7.950000002828064
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 601,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 3.455594144163854e-11,
+              "combined_score": 7.600000003455595
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 600,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 3.520358657360667e-11,
+              "combined_score": 7.250000003520359
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 600,
+              "candidate_id": 1532,
+              "intent_bias": -4.0,
+              "situation_score": 1.9627584280090815e-10,
+              "combined_score": 9.550000019627586
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 74,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 3.344692578455266e-10,
+              "combined_score": 9.000000033446927
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 502,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 2.6170137237824243e-11,
+              "combined_score": 6.550000002617015
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 503,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 2.6170208361486758e-11,
+              "combined_score": 6.900000002617022
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 603,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 2.864543498237726e-11,
+              "combined_score": 6.550000002864543
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 602,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 6.572316996189542e-11,
+              "combined_score": 6.200000006572319
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 12,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 9.832776259877107e-11,
+              "combined_score": 8.300000009832775
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 13,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 9.832777647655888e-11,
+              "combined_score": 7.950000009832779
+            }
+          ]
+        },
+        "opponent": {
+          "counts": {
+            "move": {
+              "total": 80,
+              "learned": 80
+            },
+            "shoot": {
+              "total": 6,
+              "learned": 6
+            }
+          },
+          "learned_path_coverage": 1.0,
+          "move_path_coverage": 1.0,
+          "shoot_path_coverage": 1.0,
+          "score_means": {
+            "move": {
+              "samples": 80,
+              "intent_bias": -2.3875,
+              "situation_score": 0.002332476266019512,
+              "combined_score": 7.563247626601952
+            },
+            "shoot": {
+              "samples": 6,
+              "intent_bias": 1.7760858535766602,
+              "situation_score": 0.00274359795730561,
+              "combined_score": 50.00044564930722
+            }
+          },
+          "policy_profiles": [
+            "incumbent"
+          ],
+          "inference_devices": [
+            "cuda"
+          ],
+          "loaded_from_dirs": [
+            "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights"
+          ],
+          "intent_model_loaded_count": 2,
+          "situation_model_loaded_count": 2,
+          "trace_samples": [
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 502,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.00044933820026926696,
+              "combined_score": 6.594933820026927
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 503,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.0004493383748922497,
+              "combined_score": 6.944933837489225
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 603,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.0004664601292461157,
+              "combined_score": 6.596646012924612
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 602,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.000651825568638742,
+              "combined_score": 6.265182556863875
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 12,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.0007859413744881749,
+              "combined_score": 8.378594137448818
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 13,
+              "candidate_id": 1532,
+              "intent_bias": -0.0,
+              "situation_score": 0.000785941316280514,
+              "combined_score": 8.028594131628052
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 500,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 0.00044742715544998646,
+              "combined_score": 7.644742715545
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 501,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 0.000447427126346156,
+              "combined_score": 7.994742712634617
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 601,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 0.00048398738726973534,
+              "combined_score": 7.648398738726975
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 600,
+              "candidate_id": 1227,
+              "intent_bias": -0.0,
+              "situation_score": 0.00048739989870227873,
+              "combined_score": 7.298739989870228
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 600,
+              "candidate_id": 1532,
+              "intent_bias": -5.0,
+              "situation_score": 0.0009644126403145492,
+              "combined_score": 8.646441264031456
+            },
+            {
+              "action": "move",
+              "used_learned": true,
+              "obj_id": 74,
+              "candidate_id": 1227,
+              "intent_bias": -1.0,
+              "situation_score": 0.0011645086342468858,
+              "combined_score": 8.116450863424689
+            }
+          ]
+        }
+      },
+      "windows": {
+        "candidate": {
+          "0-120": {
+            "counts": {
+              "move": {
+                "total": 16,
+                "learned": 16
+              },
+              "shoot": {
+                "total": 0,
+                "learned": 0
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 0.0
+          },
+          "121-280": {
+            "counts": {
+              "move": {
+                "total": 35,
+                "learned": 35
+              },
+              "shoot": {
+                "total": 3,
+                "learned": 3
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 1.0
+          },
+          "281-400": {
+            "counts": {
+              "move": {
+                "total": 32,
+                "learned": 32
+              },
+              "shoot": {
+                "total": 3,
+                "learned": 3
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 1.0
+          }
+        },
+        "opponent": {
+          "0-120": {
+            "counts": {
+              "move": {
+                "total": 16,
+                "learned": 16
+              },
+              "shoot": {
+                "total": 0,
+                "learned": 0
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 0.0
+          },
+          "121-280": {
+            "counts": {
+              "move": {
+                "total": 33,
+                "learned": 33
+              },
+              "shoot": {
+                "total": 4,
+                "learned": 4
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 1.0
+          },
+          "281-400": {
+            "counts": {
+              "move": {
+                "total": 31,
+                "learned": 31
+              },
+              "shoot": {
+                "total": 2,
+                "learned": 2
+              }
+            },
+            "learned_path_coverage": 1.0,
+            "move_path_coverage": 1.0,
+            "shoot_path_coverage": 1.0
+          }
+        }
+      },
+      "move_failures": {
+        "candidate": {
+          "0-120": {
+            "total_move_evals": 16,
+            "learned_success": 16,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 16,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          },
+          "121-280": {
+            "total_move_evals": 35,
+            "learned_success": 35,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 35,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          },
+          "281-400": {
+            "total_move_evals": 32,
+            "learned_success": 32,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 32,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          }
+        },
+        "opponent": {
+          "0-120": {
+            "total_move_evals": 16,
+            "learned_success": 16,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 16,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          },
+          "121-280": {
+            "total_move_evals": 33,
+            "learned_success": 33,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 33,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          },
+          "281-400": {
+            "total_move_evals": 31,
+            "learned_success": 31,
+            "empty_route": 0,
+            "no_selection": 0,
+            "no_cities": 0,
+            "map_missing": 0,
+            "reachable_route_available": 31,
+            "reachable_route_unavailable": 0,
+            "empty_route_with_reachable_alternative": 0,
+            "empty_route_with_no_reachable_city": 0
+          }
+        }
+      },
+      "candidate_metrics": {
+        "paired_score": 0.5,
+        "move_total": 83,
+        "move_learned": 83,
+        "move_path_coverage": 1.0,
+        "learned_path_coverage": 1.0,
+        "shoot_path_coverage": 1.0,
+        "empty_route_total": 0,
+        "empty_route_with_no_reachable_city_total": 0,
+        "empty_route_with_reachable_alternative_total": 0,
+        "reachable_route_available_total": 83,
+        "reachable_route_unavailable_total": 0,
+        "learned_success_total": 83,
+        "total_move_evals": 83,
+        "window_move_path_coverage": {
+          "0-120": 1.0,
+          "121-280": 1.0,
+          "281-400": 1.0
+        }
+      },
+      "before_after_vs_prepatch_map212": {
+        "before_map_id": 212,
+        "after_map_id": 94,
+        "before_move_path_coverage": 0.01845018450184502,
+        "after_move_path_coverage": 1.0,
+        "before_learned_path_coverage": 0.01925440393281442,
+        "after_learned_path_coverage": 1.0,
+        "before_empty_route_with_no_reachable_city": 2394,
+        "after_empty_route_with_no_reachable_city": 0,
+        "before_empty_route_with_reachable_alternative": 0,
+        "after_empty_route_with_reachable_alternative": 0,
+        "before_operator_fit": 36,
+        "before_operator_total": 61
+      }
+    }
+  }
+}

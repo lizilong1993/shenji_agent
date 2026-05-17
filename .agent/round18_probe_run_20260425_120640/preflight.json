@@ -1,0 +1,47 @@
+{
+  "ai_agent_file": "/remote-home/lizilong/shenji_agent/ai/agent.py",
+  "ai_policy_file": "/remote-home/lizilong/shenji_agent/ai/policy.py",
+  "env_backend": "train_env.TrainEnv",
+  "event": "probe_preflight",
+  "git_dirty_paths": [
+    " M ai/agent.py",
+    " M ai/policy.py",
+    " M training/selfplay.py",
+    "?? .agent/round18_coverage_probe/probe.py"
+  ],
+  "git_head": "9ab8ec47a67409e945c65689d4bc04eb765f4f30",
+  "participants": {
+    "candidate": {
+      "artifacts": "/remote-home/lizilong/shenji_agent/ai/weights",
+      "intent_model_loaded": true,
+      "intent_param_device": "cuda:0",
+      "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+      "policy_device": "cuda",
+      "profile": "challenger",
+      "requested_device": "cuda",
+      "situation_model_loaded": true,
+      "situation_param_device": "cuda:0"
+    },
+    "incumbent": {
+      "artifacts": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+      "intent_model_loaded": true,
+      "intent_param_device": "cuda:0",
+      "loaded_from": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+      "policy_device": "cuda",
+      "profile": "incumbent",
+      "requested_device": "cuda",
+      "situation_model_loaded": true,
+      "situation_param_device": "cuda:0"
+    }
+  },
+  "participants_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_run_20260425_120640/participants_worktree.json",
+  "probe_path": "/remote-home/lizilong/shenji_agent/.agent/round18_coverage_probe/probe.py",
+  "repo_root": "/remote-home/lizilong/shenji_agent",
+  "requested_device_env": "cuda",
+  "run_dir": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_run_20260425_120640",
+  "torch_available": true,
+  "torch_cuda_available": true,
+  "torch_cuda_current_device": 0,
+  "torch_cuda_device_count": 8,
+  "torch_cuda_device_name": "NVIDIA GeForce RTX 3090"
+}

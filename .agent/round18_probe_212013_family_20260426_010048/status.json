@@ -1,0 +1,46 @@
+{
+  "available_map_ids": [
+    212,
+    94
+  ],
+  "completed_pairs": [
+    {
+      "map_id": 212,
+      "scenario": "2120131194.json"
+    },
+    {
+      "map_id": 94,
+      "scenario": "2120131194.json"
+    },
+    {
+      "map_id": 212,
+      "scenario": "2120131294.json"
+    },
+    {
+      "map_id": 94,
+      "scenario": "2120131294.json"
+    }
+  ],
+  "current_leg_index": null,
+  "current_map_id": null,
+  "current_scenario": null,
+  "max_steps": 400,
+  "memo_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212013_family_20260426_010048/probe_output/memo.md",
+  "missing_requested_map_ids": [
+    13
+  ],
+  "move_events_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212013_family_20260426_010048/probe_output/move_events.jsonl",
+  "phase": "completed",
+  "requested_map_ids": [
+    212,
+    13,
+    94
+  ],
+  "scenarios": [
+    "2120131194.json",
+    "2120131294.json"
+  ],
+  "step_records_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212013_family_20260426_010048/probe_output/step_records.jsonl",
+  "summary_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212013_family_20260426_010048/probe_output/summary.json",
+  "updated_at": "2026-04-26T01:10:17.449869Z"
+}

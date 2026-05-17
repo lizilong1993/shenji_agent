@@ -1,0 +1,27 @@
+{
+  "command": [
+    "/remote-home/lizilong/venvs/shenji/bin/python",
+    "-m",
+    "training.selfplay",
+    "--config",
+    "configs/selfplay_baseline.yaml",
+    "--candidate",
+    "ai/weights",
+    "--incumbent",
+    "artifacts/best_agent/weights"
+  ],
+  "compare_pgid": 2933881,
+  "compare_pid": 2933881,
+  "compare_sid": 2933881,
+  "cwd": "/remote-home/lizilong/shenji_agent",
+  "launcher_pgid": 2933880,
+  "launcher_pid": 2933880,
+  "launcher_sid": 2933880,
+  "metadata_file": "/remote-home/lizilong/shenji_agent/.agent/round13_final_fresh_compare.metadata.json",
+  "pid_file": "/remote-home/lizilong/shenji_agent/.agent/round13_final_fresh_compare.pid",
+  "started_at": "2026-04-24T06:09:13.509499Z",
+  "status_file": "/remote-home/lizilong/shenji_agent/.agent/round13_final_fresh_compare.status.json",
+  "stderr_log": "/remote-home/lizilong/shenji_agent/.agent/round13_final_fresh_compare.stderr.log",
+  "stdin_target": "/dev/null",
+  "stdout_log": "/remote-home/lizilong/shenji_agent/.agent/round13_final_fresh_compare.stdout.log"
+}

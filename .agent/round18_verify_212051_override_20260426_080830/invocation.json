@@ -1,0 +1,10 @@
+{
+  "argv": [
+    ".agent/round18_verify_212051_override_20260426_080830/verify_212051_override.py"
+  ],
+  "cuda_visible_devices": "",
+  "cwd": "/remote-home/lizilong/shenji_agent",
+  "probe_path": "/remote-home/lizilong/shenji_agent/.agent/round18_coverage_probe/probe.py",
+  "requested_device_env": "",
+  "run_dir": "/remote-home/lizilong/shenji_agent/.agent/round18_verify_212051_override_20260426_080830"
+}

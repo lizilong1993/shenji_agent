@@ -1,0 +1,25 @@
+1. 当前真实调用链是：[`Agent.step`]( /remote-home/lizilong/shenji_agent/ai/agent.py:623 ) 遍历 `valid_actions`，对 Move 走到 [`Agent._generate_action`]( /remote-home/lizilong/shenji_agent/ai/agent.py:701 ) 的 learned 分支；这里先调用 [`LearnedPolicy.choose_city`]( /remote-home/lizilong/shenji_agent/ai/policy.py:359 ) 选全局 `cities` 里的目标点，再由 agent 自己用 [`Agent.get_move_type`]( /remote-home/lizilong/shenji_agent/ai/agent.py:688 ) 算 `move_type`，最后调用 [`Map.gen_move_route`]( /remote-home/lizilong/shenji_agent/ai/agent.py:110 )。`empty_route` 就发生在 [`ai/agent.py:725-737`]( /remote-home/lizilong/shenji_agent/ai/agent.py:725 ) 这段，失败后再经 [`LearnedPolicy.note_action`]( /remote-home/lizilong/shenji_agent/ai/policy.py:153 ) 记成 `used_learned=false`。  
+结论：最小、最稳妥的修复层应放在 `ai/agent.py`，不是 `ai/policy.py`。原因有三点：  
+- 路由可达性依赖 `get_move_type`，这层逻辑现在只在 agent 里；放进 policy 要么改 `choose_city` 签名，要么复制 move-type 规则，面更大。  
+- `choose_city` 只有这一个调用点，caller 侧做“选点失败后缩小候选集重试”是最窄改动。  
+- 当前工作树里 `ai/policy.py` 已有未提交改动，`git diff` 显示改在 `_intent_distribution` / `predict_intent` 一段（约 [`ai/policy.py:246-269`]( /remote-home/lizilong/shenji_agent/ai/policy.py:246 )）；`ai/agent.py` 当前不在脏文件里。即使不是同一 hunk，继续往 `ai/policy.py` 写也有冲突风险。
+
+2. 满足“只提升 Move learned 落地概率，不改 Shoot，不改 coverage 定义”的最小代码改动集合应是两处：[`ai/agent.py`]( /remote-home/lizilong/shenji_agent/ai/agent.py:701 ) 和 [`tests/test_mainline_contract.py`]( /remote-home/lizilong/shenji_agent/tests/test_mainline_contract.py:1298 )。  
+具体到函数级别，`ai/agent.py` 只改 `Agent._generate_action` 的 Move learned 分支：  
+- 保持 `LearnedPolicy.choose_city` 不动。  
+- 在 agent 里拿 `remaining_cities` 循环调用 `choose_city`；若当前候选 `gen_move_route(...)` 为空，就把该 `coord` 从候选集移除，再试下一个 learned 候选。  
+- 只在找到首个非空 route 时调用一次 `note_action("move", True, trace)`。  
+- 如果所有 city 都试完仍为空，只调用一次 `note_action("move", False, {"reason":"empty_route", ...})` 并返回 `None`。  
+这样不会碰 Shoot 分支，也不会碰 [`LearnedPolicy.get_diagnostics`]( /remote-home/lizilong/shenji_agent/ai/policy.py:174 ) 的 coverage 统计定义。关键约束是“`note_action` 仍然一条 action 只记一次”，否则 coverage 会被改坏。
+
+3. 最小回归测试方案建议直接追加在现有 [`tests/test_mainline_contract.py`]( /remote-home/lizilong/shenji_agent/tests/test_mainline_contract.py:1298 )，沿用当前文件里对 `Agent._generate_action` 的直接单测风格，不新建测试文件。最小应有 1 个必测 + 1 个建议负例：  
+- 必测：`test_learned_move_retries_reachable_city_after_empty_route`。用 fake `policy.choose_city` 先返回一个不可达高分 city，再在候选缩小后返回一个可达 city；fake `map.gen_move_route` 对前者返回 `[]`、对后者返回非空 path。断言返回的是 Move action，且 `note_action` 只被调用一次、`used_learned=True`。这条测试直接防“empty_route 大面积发生但其实有可达备选点”。  
+- 建议负例：`test_learned_move_keeps_empty_route_when_no_city_reachable`。所有 city 都返回空 route，断言 `_generate_action(...) is None`，且 `note_action` 只记一次 `used_learned=False, reason="empty_route"`。这条测试保证没有通过改 coverage 或假落地来“刷”指标。  
+不需要改 [`tests/test_mainline_contract.py:1393-1416`]( /remote-home/lizilong/shenji_agent/tests/test_mainline_contract.py:1393 ) 的 coverage 汇总测试，因为公式不该变。
+
+4. 最小验证切入点建议优先看正式窗口 [`match_results.json`]( /remote-home/lizilong/shenji_agent/experiments/shenji_agent/league_20260424_060947/match_results.json ) 里的这几组：  
+- `2120511121.json`，`order_index=20`：当前 trace 里 `obj_id 500/501` 选 `5140` 后 `empty_route`，但地图审计显示它们都有可达备选 `[4838, 4341]`。这是最干净的正例。  
+- `2120531121.json`，`order_index=30`（同类重复也在 47/69/86）：`obj_id 0/400/3/4/5/6` 当前都选 `2450` 后 `empty_route`，但都有可达备选 `[2749, 2546, 2248]`。这是第二个强正例。  
+- `2230531221.json`，`order_index=0`（同类重复也在 54/70/81/89）：当前 trace 里的 `obj_id 4/5/6/7/8/9` 对 `4838/5140` 失败，而且我核对后这些样本 `reachable=[]`。这应作为负控，修复后这里仍应允许 `empty_route` 保留，证明没有改 coverage 定义或伪造落地。  
+
+补充风险：除了 `ai/policy.py` 已脏，`tests/test_mainline_contract.py` 也有大量未提交改动；如果后续 worker 要落测试，建议只在现有 agent 单测附近最小追加，避免重排整文件。

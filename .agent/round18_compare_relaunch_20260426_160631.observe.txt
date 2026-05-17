@@ -1,0 +1,37 @@
+resource_selection:
+  policy: choose the lowest-id fully idle device among GPU1/GPU2/GPU3; otherwise fall back to CPU
+  selected_resource: GPU1
+  selected_uuid: GPU-605cd53e-1f70-c9bd-0954-80f782465563
+  selection_basis:
+    - prelaunch check at 2026-04-26T16:06:56Z showed GPU1/GPU2/GPU3 all at 0 utilization, 3 MiB memory, and no compute processes
+    - GPU0 disabled by instruction
+    - GPU4/GPU5/GPU6 disabled by instruction
+
+launcher_receipt:
+  started_at: 2026-04-26T16:06:56.903769Z
+  supervisor_pid: 120079
+  compare_pid: 120080
+  cwd: /remote-home/lizilong/shenji_agent
+
+run_dir_observation:
+  run_dir: /remote-home/lizilong/shenji_agent/experiments/shenji_agent/league_20260426_160721
+  first_seen_files:
+    - map_list.json
+    - progress.json
+    - partial_match_results.json
+
+initial_live_evidence:
+  process:
+    - "120079 /remote-home/lizilong/venvs/shenji/bin/python ... scripts/launch_detached_compare.py --supervise ..."
+    - "120080 /remote-home/lizilong/venvs/shenji/bin/python -m training.selfplay --config configs/selfplay_sota_stop.yaml --candidate ai/weights --incumbent artifacts/best_agent/weights"
+  gpu_after_launch:
+    - "GPU1 memory.used=304 MiB"
+    - "GPU1 compute process observed on UUID GPU-605cd53e-1f70-c9bd-0954-80f782465563 with used_memory=298 MiB"
+  progress_snapshot:
+    - phase=formal_compare
+    - completed_pairs=0/100
+    - current_map_id=53
+    - current_scenario=2230531221.json
+    - current_bucket=complex
+    - leg_steps=81
+    - heartbeat_ts=2026-04-26T16:07:58.925770Z

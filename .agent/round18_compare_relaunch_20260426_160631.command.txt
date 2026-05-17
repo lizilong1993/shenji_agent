@@ -1,0 +1,9 @@
+CUDA_VISIBLE_DEVICES=1 SHENJI_POLICY_DEVICE=cuda /remote-home/lizilong/venvs/shenji/bin/python scripts/launch_detached_compare.py \
+  --cwd /remote-home/lizilong/shenji_agent \
+  --pid-file /remote-home/lizilong/shenji_agent/.agent/round18_compare_relaunch_20260426_160631.pid \
+  --stdout-log /remote-home/lizilong/shenji_agent/.agent/round18_compare_relaunch_20260426_160631.stdout.log \
+  --stderr-log /remote-home/lizilong/shenji_agent/.agent/round18_compare_relaunch_20260426_160631.stderr.log \
+  --status-file /remote-home/lizilong/shenji_agent/.agent/round18_compare_relaunch_20260426_160631.status.json \
+  --metadata-file /remote-home/lizilong/shenji_agent/.agent/round18_compare_relaunch_20260426_160631.metadata.json \
+  --launcher-log /remote-home/lizilong/shenji_agent/.agent/round18_compare_relaunch_20260426_160631.stderr.log.launcher.log \
+  -- /remote-home/lizilong/venvs/shenji/bin/python -m training.selfplay --config configs/selfplay_sota_stop.yaml --candidate ai/weights --incumbent artifacts/best_agent/weights

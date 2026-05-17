@@ -1,0 +1,18 @@
+{
+  "event": "watching",
+  "ts": "2026-04-26T13:00:28.914157Z",
+  "run_dir": "/remote-home/lizilong/shenji_agent/experiments/shenji_agent/league_20260426_082209",
+  "last_live_state": {
+    "heartbeat_ts": "2026-04-26T13:00:28.755937Z",
+    "completed_pairs": 57,
+    "total_pairs": 100,
+    "current_scenario": "2140131194.json",
+    "current_map_id": 21,
+    "current_bucket": "simple",
+    "current_leg_index": 0,
+    "leg_steps": 289,
+    "current_match_status": "in_progress",
+    "progress_mtime": 1777208428.7652006,
+    "partial_mtime": 1777208428.811617
+  }
+}

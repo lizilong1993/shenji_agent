@@ -1,0 +1,33 @@
+实际修改文件只有两个：
+
+- [ai/agent.py](/remote-home/lizilong/shenji_agent/ai/agent.py:718)
+- [tests/test_mainline_contract.py](/remote-home/lizilong/shenji_agent/tests/test_mainline_contract.py:1533)
+
+关键实现点：
+
+- `learned Move` 现在先对当前 `cities` 逐个调用 `gen_move_route(...)`，只保留能生成非空 route 的 reachable city，再把这个子集交给 `policy.choose_city(...)` 排序。
+- 最终返回 action 时直接复用预生成的 route，避免“先选全局最优 city，再二次算 route 变空”的落空链路。
+- 只有真的返回 learned `Move` 时才 `note_action("move", True, ...)`。
+- 当完全没有 reachable city 时，维持 `used_learned=false` 记账并返回 `None`，不会伪造 `move_path`。
+- `coverage` 定义没改，`Shoot` 路径没改，`ai/policy.py` 没动。
+
+新增回归测试：
+
+- [tests/test_mainline_contract.py](/remote-home/lizilong/shenji_agent/tests/test_mainline_contract.py:1533)
+  `test_learned_move_prefers_reachable_city_for_non_empty_route`
+  验证全局高分城市不可达、但存在 reachable city 时，最终返回非空 `move_path` 且记为 learned。
+- [tests/test_mainline_contract.py](/remote-home/lizilong/shenji_agent/tests/test_mainline_contract.py:1603)
+  `test_learned_move_with_no_reachable_city_does_not_claim_learned`
+  验证无 reachable city 时，不会误记 learned，且不会返回伪造 route。
+
+运行测试与结果：
+
+- `python3 -m unittest tests.test_mainline_contract.MainlineContractTest.test_learned_move_prefers_reachable_city_for_non_empty_route` -> `OK`
+- `python3 -m unittest tests.test_mainline_contract.MainlineContractTest.test_learned_move_with_no_reachable_city_does_not_claim_learned` -> `OK`
+- `python3 -m unittest tests.test_mainline_contract.MainlineContractTest.test_learned_move_prefers_reachable_city_for_non_empty_route tests.test_mainline_contract.MainlineContractTest.test_learned_move_with_no_reachable_city_does_not_claim_learned` -> `OK`
+
+冲突风险规避：
+
+- 严格只改了允许的两个文件。
+- `tests/test_mainline_contract.py` 本来就是脏的；我先读取并确认后，只在文件尾部做最小追加，没有回退或改写现有未提交内容。
+- 没有触碰 `Shoot`、`coverage`、`ai/policy.py` 或其他文件。

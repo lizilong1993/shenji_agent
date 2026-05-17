@@ -1,0 +1,15 @@
+在 [training/selfplay.py](/remote-home/lizilong/shenji_agent/training/selfplay.py:30) 我加了一个只在加载入口生效的内部 normalize/validate helper，并让 `_load_case_data()` 在读完 `basic.json` 后立刻调用。它会把旧 schema 的 `nb/rd/rv/cd/e` 补成正式字段 `neighbors/roads/rivers/cond/elev`，保留原字段不删；如果 `map_data` 结构坏掉，或某个 cell 同时缺正式字段和旧别名，就直接抛带 `map_id/path/row/col/field` 的 `ValueError`。因为 `_run_single()` 把同一个 `shared` 同时传给 env 和 agent，这个入口修复会同时覆盖两侧，改动面最小。
+
+在 [tests/test_mainline_contract.py](/remote-home/lizilong/shenji_agent/tests/test_mainline_contract.py:667) 我补了两条回归测试：一条验证旧 schema 走 `_run_single()` 时，`FakeEnv.setup` 和 `FakeAgent.setup` 都能看到正式字段；另一条验证坏 schema 会在 `_load_case_data()` 阶段被明确拦下，而不是后面再炸裸 `KeyError`。
+
+已跑的最小验证：
+```bash
+/remote-home/lizilong/venvs/shenji/bin/python -m unittest \
+  tests.test_mainline_contract.MainlineContractTest.test_selfplay_run_single_emits_step_heartbeats \
+  tests.test_mainline_contract.MainlineContractTest.test_selfplay_run_single_normalizes_legacy_basic_schema_for_env_and_agent \
+  tests.test_mainline_contract.MainlineContractTest.test_selfplay_load_case_data_rejects_invalid_basic_schema_early
+
+/remote-home/lizilong/venvs/shenji/bin/python -m py_compile training/selfplay.py tests/test_mainline_contract.py
+```
+
+建议再做一条最小实测：复跑一次出错的 detached compare 路径，确认 `map_212` 不再出现 `KeyError: 'roads'`。

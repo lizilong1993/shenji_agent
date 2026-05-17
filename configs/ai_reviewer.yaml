@@ -1,0 +1,66 @@
+# AI reviewer evidence-audit adapter for Shenji.
+# The adapter uses only Python stdlib. Draft Detective remains an external tool.
+
+external_tool:
+  name: draft-detective
+  path: C:/Users/lizilong/Desktop/WHUAI/tools/draft-detective
+  repository: https://github.com/agencyenterprise/draft-detective
+  mode: external_reference
+
+model:
+  provider: local_rule_audit
+  name: deterministic-evidence-auditor
+
+inputs:
+  project_rule: program.md
+  manuscript: paper/main.tex
+  source_evidence: paper/source_evidence.md
+  report_docs:
+    - reports/paper_report_outline.md
+    - reports/experiment_results.md
+    - reports/experiment_update_log.md
+  experiment_root: experiments/shenji_agent
+  latest_league_glob: league_*
+  evidence_sidecars:
+    - rating.json
+    - promotion.json
+    - exploitability.json
+    - participants.json
+    - map_list.json
+    - summary.md
+
+outputs:
+  output_dir: reports/ai_reviewer
+  review_summary: review_summary.md
+  claims: claims.jsonl
+  unsupported_claims: unsupported_claims.md
+  evidence_matrix: evidence_matrix.tsv
+  input_bundle: draft_detective_input.md
+  external_status: external_status.json
+
+policy:
+  verdict_labels:
+    - supported
+    - partially_supported
+    - unsupported
+    - unverifiable
+  high_risk_terms:
+    - SOTA
+    - state-of-the-art
+    - stop-ready
+    - stop ready
+    - hard-stop
+    - benchmark
+    - strongest
+    - learned-policy
+    - learned policy
+    - coverage
+    - citation
+    - reference
+  required_stop_sidecars:
+    - rating.json
+    - promotion.json
+    - exploitability.json
+    - participants.json
+    - map_list.json
+    - summary.md

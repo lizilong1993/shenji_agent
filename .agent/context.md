@@ -63,3 +63,12 @@
 1. 修正 strongest snapshot / incumbent profile 合同，确保 candidate 真正在打 strongest learned incumbent。
 2. 在协议可信后，再追 `move_path_coverage = 0.0` 的根因。
 3. 只有满足 hard-stop 的 coverage 与连续窗口条件，才允许停机。
+
+## AI 审稿人集成
+
+- 外部审稿系统：Draft Detective。
+- 本机外部工具路径：`C:\Users\lizilong\Desktop\WHUAI\tools\draft-detective`。
+- 仓库内适配入口：`scripts/run_ai_reviewer.py --config configs/ai_reviewer.yaml`。
+- 默认审稿目标：研究证据审稿，检查 `program.md`、`reports/*.md` 与最新 `experiments/shenji_agent/league_*` sidecars 是否支撑论文/报告 claim。
+- 默认输出目录：`reports/ai_reviewer/`，包含 `review_summary.md`、`claims.jsonl`、`unsupported_claims.md`、`evidence_matrix.tsv`、`draft_detective_input.md`、`external_status.json`。
+- 边界：该审稿器只做证据审查与 Draft Detective 输入打包；不修改训练代码、不修改实验结果、不替代 `program.md` 与 `configs/selfplay_sota_stop.yaml` 的正式停机判定。

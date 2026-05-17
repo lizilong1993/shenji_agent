@@ -1,0 +1,60 @@
+# Findings Log
+
+- `082101` detached prefix launched `training.selfplay` at `2026-04-26T08:21:30.761927Z` with:
+  - `--config configs/selfplay_sota_stop.yaml`
+  - `--candidate ai/weights`
+  - `--incumbent artifacts/best_agent/weights`
+  - evidence: `.agent/round18_compare_post_212051fix_20260426_082101.launch.json`, `.metadata.json`, `.command.txt`
+- The intended run dir is `experiments/shenji_agent/league_20260426_082209`.
+  - It contains only `map_list.json`, `progress.json`, and `partial_match_results.json`.
+  - It does not contain terminal sidecars such as `participants.json`, `match_results.json`, `rating.json`, `promotion.json`, `exploitability.json`, or `summary.md`.
+- `082209` cannot be treated as complete.
+  - Latest checkpoint is non-terminal:
+    - `completed_pairs = 91 / 100`
+    - `heartbeat_ts = 2026-04-26T15:44:26.627378Z`
+    - `current_scenario = 2030111194.json`
+    - `current_map_id = 94`
+    - `current_leg_index = 1`
+    - `leg_steps = 175`
+  - Evidence: `experiments/shenji_agent/league_20260426_082209/progress.json` and `partial_match_results.json`
+- `082209` ended abnormally rather than via normal exit or handled Python exception.
+  - `.agent/round18_compare_post_212051fix_20260426_082101.status.json` is missing.
+  - `.stdout.log`, `.stderr.log`, and `.stderr.log.launcher.log` are all `0 bytes`.
+  - `training/selfplay.py` writes abort sidecars on handled exceptions, but the run dir has none.
+  - Therefore the run most likely died after its last partial snapshot through an external hard stop or supervisor loss, not a clean/handled shutdown.
+- The detached watchdog evidence is stale and not a terminal source of truth.
+  - `.agent/round18_compare_post_212051fix_20260426_082101.watchdog.status.json` stops at `57 / 100` at `2026-04-26T13:00:28.914157Z`.
+  - It is useful only for associating the prefix with run dir `league_20260426_082209`.
+- Partial metrics are recoverable for the interrupted `082209` run, but terminal metrics are not.
+  - From `91` completed pairs:
+    - `overall.point_estimate = 0.5000`
+    - `complex.point_estimate = 0.5000`
+    - `learned_path_coverage = 0.05177909764603313`
+    - `move_path_coverage = 0.04174066272938779`
+    - `shoot_path_coverage = 1.0`
+- `league_20260426_160721` is relevant to the same compare lineage.
+  - It comes from fresh detached relaunch prefix `.agent/round18_compare_relaunch_20260426_160631*`.
+  - Relaunch metadata shows the same compare command, same candidate/incumbent artifact pair, and start time `2026-04-26T16:06:56.903769Z`.
+  - `observe.txt` records a fresh run dir `experiments/shenji_agent/league_20260426_160721` with initial progress `0 / 100`.
+- `160721` is a fresh replay / superseding relaunch, not a continuation of `082209`.
+  - `league_20260426_082209/map_list.json` and `league_20260426_160721/map_list.json` are byte-identical.
+  - The first `91` matches are identical on core match fields when ignoring policy stats.
+  - But policy stats diverge from match `0`:
+    - `082209` has non-zero learned-path counts and coverage.
+    - `160721` records zero learned-path counts and zero coverage throughout.
+  - Therefore `160721` cannot be treated as the missing terminal sidecars of the original `082209` execution; it is a separate rerun under the same lineage/protocol.
+- `160721` completed successfully.
+  - `.agent/round18_compare_relaunch_20260426_160631.status.json` shows exit code `0` at `2026-04-26T17:14:08.628078Z`.
+  - `experiments/shenji_agent/league_20260426_160721` contains complete terminal sidecars.
+  - Terminal relaunch metrics are:
+    - `overall.point_estimate = 0.5000`
+    - all bucket point estimates `= 0.5000`
+    - `learned_path_coverage = 0.0`
+    - `move_path_coverage = 0.0`
+    - `shoot_path_coverage = 0.0`
+    - `promotion.accepted = false`
+- Decision-level diagnosis:
+  - `082209` itself: abnormal non-terminal stop.
+  - Same lineage: already superseded by completed fresh relaunch `160721`.
+  - Original run terminal metrics: not recoverable.
+  - Additional relaunch now: not needed for diagnosis because the relaunch already happened; only required if a new complete window must be generated again.

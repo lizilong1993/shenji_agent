@@ -1,0 +1,7 @@
+{
+  "event": "terminal",
+  "ts": "2026-04-26T07:49:49.122567Z",
+  "completed_pairs": 100,
+  "heartbeat_ts": "2026-04-26T07:48:55.844678Z",
+  "health": "Dsl"
+}

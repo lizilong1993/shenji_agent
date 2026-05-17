@@ -1,0 +1,13 @@
+SDK version: 4.1.0
+did pass authentication
+env_backend=train_env.TrainEnv
+steps_executed=6
+empty_route_events=8
+{"city_coords": [2450, 2749, 2546, 2248, 2754], "cur_hex": 751, "move_state": 0, "move_type": "Maneuver", "obj_id": 1, "stage": 2, "step": 1, "sub_type": 0, "type": 2, "valid_move_candidate_count": 0, "valid_move_candidate_endpoints": []}
+{"city_coords": [2450, 2749, 2546, 2248, 2754], "cur_hex": 1056, "move_state": 0, "move_type": "Maneuver", "obj_id": 2, "stage": 2, "step": 1, "sub_type": 0, "type": 2, "valid_move_candidate_count": 0, "valid_move_candidate_endpoints": []}
+{"city_coords": [2450, 2749, 2546, 2248, 2754], "cur_hex": 552, "move_state": 0, "move_type": "Maneuver", "obj_id": 401, "stage": 2, "step": 1, "sub_type": 4, "type": 2, "valid_move_candidate_count": 0, "valid_move_candidate_endpoints": []}
+{"city_coords": [2450, 2749, 2546, 2248, 2754], "cur_hex": 1058, "move_state": 0, "move_type": "Maneuver", "obj_id": 402, "stage": 2, "step": 1, "sub_type": 4, "type": 2, "valid_move_candidate_count": 0, "valid_move_candidate_endpoints": []}
+{"city_coords": [2450, 2749, 2546, 2248, 2754], "cur_hex": 751, "move_state": 0, "move_type": "Maneuver", "obj_id": 1, "stage": 2, "step": 2, "sub_type": 0, "type": 2, "valid_move_candidate_count": 0, "valid_move_candidate_endpoints": []}
+{"city_coords": [2450, 2749, 2546, 2248, 2754], "cur_hex": 751, "move_state": 0, "move_type": "Maneuver", "obj_id": 1, "stage": 2, "step": 3, "sub_type": 0, "type": 2, "valid_move_candidate_count": 0, "valid_move_candidate_endpoints": []}
+{"city_coords": [2450, 2749, 2546, 2248, 2754], "cur_hex": 751, "move_state": 0, "move_type": "Maneuver", "obj_id": 1, "stage": 2, "step": 4, "sub_type": 0, "type": 2, "valid_move_candidate_count": 0, "valid_move_candidate_endpoints": []}
+{"city_coords": [2450, 2749, 2546, 2248, 2754], "cur_hex": 751, "move_state": 0, "move_type": "Maneuver", "obj_id": 1, "stage": 2, "step": 5, "sub_type": 0, "type": 2, "valid_move_candidate_count": 0, "valid_move_candidate_endpoints": []}

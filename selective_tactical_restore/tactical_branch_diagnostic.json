@@ -1,0 +1,54 @@
+{
+  "checkpoint": "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt",
+  "checkpoint_validation_status": "TACTICAL_CHECKPOINT_COMPATIBLE",
+  "errors": [
+    "torch not available for model probing"
+  ],
+  "partial_state": {
+    "archive_files": [
+      "archive/data.pkl",
+      "archive/.format_version",
+      "archive/.storage_alignment",
+      "archive/byteorder",
+      "archive/data/0",
+      "archive/data/1",
+      "archive/data/2",
+      "archive/data/3",
+      "archive/data/4",
+      "archive/data/5",
+      "archive/version",
+      "archive/.data/serialization_id"
+    ],
+    "checkpoint": "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt",
+    "errors": [],
+    "exists": true,
+    "hidden_dim": 128,
+    "input_dim": 32,
+    "input_dim_value": 32,
+    "model_keys_found": [
+      "model.0.weight",
+      "model.0.bias",
+      "model.3.weight",
+      "model.3.bias",
+      "model.5.weight",
+      "model.5.bias"
+    ],
+    "sha256": "9fc261e560112e33c4a79c7b40a47a0ebf1314595ad37970cb3b6eef6209cb04",
+    "size_bytes": 53013,
+    "status": "TACTICAL_CHECKPOINT_COMPATIBLE",
+    "torch_load_ok": false,
+    "warnings": [
+      "torch unavailable; validated from pickle structure only"
+    ]
+  },
+  "reason_if_zero": null,
+  "status": "TACTICAL_BRANCH_BLOCKED_BY_CHECKPOINT_INCOMPATIBILITY",
+  "tactical_candidate_count": 0,
+  "tactical_changed_action_count": null,
+  "tactical_checkpoint_loaded": false,
+  "tactical_checkpoint_resolved": true,
+  "tactical_feature_builder_available": false,
+  "tactical_model_class": null,
+  "tactical_nonzero_score_count": 0,
+  "tactical_reached_count": 0
+}

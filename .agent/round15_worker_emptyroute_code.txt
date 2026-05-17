@@ -1,0 +1,6 @@
+city_coords= [2450, 2749, 2546, 2248, 2754]
+city_count= 5
+{"components": 1, "components_with_city": 1, "components_without_city": 0, "max_component_size": 2500, "move_type": "Maneuver"}
+{"components": 2, "components_with_city": 0, "components_without_city": 2, "max_component_size": 2, "move_type": "March"}
+{"components": 1, "components_with_city": 1, "components_without_city": 0, "max_component_size": 2500, "move_type": "Walk"}
+{"components": 1, "components_with_city": 1, "components_without_city": 0, "max_component_size": 2500, "move_type": "Fly"}

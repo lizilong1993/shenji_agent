@@ -1,0 +1,13 @@
+{
+  "baseline_map_id": 212,
+  "expected_resolved_map_id": 21,
+  "generated_at": "2026-04-26T08:12:29.988364Z",
+  "resolved_item": {
+    "bucket": "simple",
+    "map_id": 21,
+    "scenario": "2120511121.json"
+  },
+  "resolved_map_id": 21,
+  "resolved_matches_expected": true,
+  "scenario": "2120511121.json"
+}

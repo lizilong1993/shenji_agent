@@ -1,0 +1,35 @@
+# Findings Log
+
+- `league_20260426_160721` finished with complete terminal sidecars and exit code `0`, but all reported policy coverage is zero.
+  - `overall.point_estimate = 0.5000`
+  - `complex.point_estimate = 0.5000`
+  - `learned_path_coverage = 0.0`
+  - `move_path_coverage = 0.0`
+  - `shoot_path_coverage = 0.0`
+- The zero-coverage result is internally consistent with `160721`'s own `match_results.json`.
+  - All `100/100` matches have `candidate_policy_stats.counts.move.total = 0`, `shoot.total = 0`.
+  - The same is true for `opponent_policy_stats`.
+  - Every match has `trace_samples = []`.
+- The zero-coverage result is not trustworthy as a branch-strength result.
+  - In all `160721` matches, the sidecars still report:
+    - `policy_profiles = ['challenger']` for candidate and `['incumbent']` for opponent
+    - `intent_model_loaded_count = 2`
+    - `situation_model_loaded_count = 2`
+    - candidate `inference_devices = ['cuda']`
+    - correct `loaded_from_dirs`
+  - So the run claims both sides loaded their learned models, yet neither side recorded a single `Move` or `Shoot` policy event across `100` paired items.
+- The best control comparison is the interrupted `league_20260426_082209`.
+  - Same candidate/incumbent source SHAs.
+  - Same artifact directories.
+  - Same `map_list.json` hash.
+  - First `91` matches match on core outcome/order fields.
+  - But `082209` has non-zero candidate and opponent policy counts in all `91` completed matches.
+- This rules out a post-hoc summary bug.
+  - `training/selfplay.py` only merges per-leg diagnostics into match sidecars; it does not invent the zeros.
+  - `training/evaluate.py` only re-aggregates the match sidecars into `rating.json`.
+- The discrepancy is therefore most likely a runtime action-path issue in the relaunch compare, not a trustworthy “true zero learned engagement” result.
+  - Available artifacts do not prove the exact low-level cause.
+  - The strongest bounded diagnosis is: learned models loaded, but the relaunch compare never entered any path that called `policy.note_action(...)` on either side, which is incompatible with the earlier same-lineage run.
+- Acceptance judgment:
+  - `160721` should not be accepted as the post-212051fix branch result.
+  - If a branch result is still needed, a fresh compare relaunch is required.

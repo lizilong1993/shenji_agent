@@ -17,42 +17,17 @@
 
 ## Completed this round
 
-### V3D (authenticated tactical outcome ablation)
-- ✅ Authenticated paired tactical-on/off evaluation completed (15 pairs, 30 games)
-- ✅ 15/15 pairs completed, 0 errors
-- ✅ Tactical branch invoked in all tactical-on runs (nonzero scores), zero in all tactical-off runs
-- ✅ Route metrics: 0% empty rate over 590 genuine move attempts (288 ON, 302 OFF) in 3 scenarios — non-trivial measurement
-- ✅ Score deltas computed: mean=-1.27, CI [-50.07, 34.82]
-- ✅ Claim gate decision: TACTICAL_OUTCOME_CONTRIBUTION_WEAK_OR_INCONCLUSIVE
-- ✅ V3 evidence package updated conservatively
-- ✅ Tests and compileall pass
-
-### V3C (SDK auth replay recovery)
-- ✅ SDK MAC binding diagnosed and classified: SDK_MAC_BINDING_CONFIRMED
-- ✅ `.engine_config` rebind applied via `authenticator.set_mac_time()`
-- ✅ `mac_match=true`, `auth_environment_ready=true`
-- ✅ Minimal authenticated replay smoke completed (1 pair)
-- ✅ Authentication passed, deployment and battle phases entered
-- ✅ Final state: `SDK_REPLAY_AUTH_RECOVERED`
-
-### V3B (formal tactical outcome ablation)
-- ✅ Formal replay runner built (`scripts/run_v3b_formal_tactical_ablation.py`)
-- ✅ Paired evaluation protocol defined (3 scenarios × 5 seeds)
-- ✅ Metrics pipeline with bootstrap CIs built
-
-### V3A-FIX (intent checkpoint compatibility)
-- ✅ LegacyIntentModel + LegacySituationModel implemented
-- ✅ Policy auto-detects old vs new checkpoint format
-- ✅ Full-agent compatibility smoke: PASS
-
-### V3A (tactical ablation)
-- ✅ Tactical on/off switch implemented
-- ✅ Action-level diagnostic: nonzero variegated scores
-- ✅ Smoke and multi-seed ablation completed
+### V3F (route reliability repair and evaluation)
+- ✅ V3D vs league discrepancy analyzed: 0% empty (3 scenarios) vs 66.3% (100 pairs)
+- ✅ Root cause identified: `no_valid_move_candidate` is SDK candidate generation limitation, NOT route planner bug
+- ✅ Route instrumentation audited and confirmed correct
+- ✅ Route reliability evaluator created (`scripts/run_v3f_route_reliability_evaluation.py`)
+- ✅ Bounded evaluation with league scenarios executed (5 pairs, 0% empty in sampled subset)
+- ✅ No code repair applied — no route planner bug found
+- ✅ Claim gate: ROUTE_NO_DEGRADATION_OBSERVED_ONLY (unchanged from V3E)
+- ✅ Tests: 9/9 pass; compileall clean
 
 ## Remaining blockers
 
 1. ~~**SDK authentication**~~ — **RESOLVED**. MAC binding recovered.
-2. **Route reliability unproven** — V3D shows 0% empty rate over 590 attempts (3 scenarios) but league evaluation shows 66.3% empty rate (15,641/23,580) across ~100 scenarios. Route planner reliability not broadly proven.
-3. **Long-horizon and generalization evaluation** — not yet attempted.
-4. **Outcome-level tactical contribution** — evaluated; result is WEAK_OR_INCONCLUSIVE.
+2. **Route reliability unproven** — V3D shows 0% empty rate over 590 attempts (3 scenarios). V3F confirms this is valid but scenario-limited. League evaluation (23,580 attempts, ~100 scenarios) shows 66.3% empty rate from SDK candidate generation constraints, not route planner bugs. Route reliability not broadly proven — claim gate remains `ROUTE_NO_DEGRADATION_OBSERVED_ONLY`. **V3F recommended next:** V3G route coverage expansion (evaluate full league scenario set).

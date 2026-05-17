@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/remote-home/lizilong/venvs/shenji/bin/python",
+    "-u",
+    ".agent/round18_probe_gpu_20260425_154341/probe_worktree_wrapper.py",
+    "--participants",
+    ".agent/round18_probe_gpu_20260425_154341/participants_worktree.json",
+    "--output-dir",
+    ".agent/round18_probe_gpu_20260425_154341/probe_output",
+    "--max-steps",
+    "400"
+  ],
+  "ended_at": "2026-04-25T15:54:37.995193Z",
+  "exit_code": 0,
+  "pid": 3037945,
+  "return_code": 0,
+  "signal_name": null,
+  "signal_number": null,
+  "started_at": "2026-04-25T15:44:39.090678Z"
+}

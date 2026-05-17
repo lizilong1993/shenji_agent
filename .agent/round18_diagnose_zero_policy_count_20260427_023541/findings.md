@@ -1,0 +1,22 @@
+# Findings Log
+
+- The anomaly is most likely a runtime action-path degeneration during the relaunch compare, not a post-hoc stats-collection bug.
+- The relaunch command is effectively identical to the original compare command except `CUDA_VISIBLE_DEVICES=1` instead of `0`; `SHENJI_POLICY_DEVICE=cuda` and the `training.selfplay` command are otherwise unchanged.
+- `160721` is self-consistent but suspicious:
+  - all `100` matches report zero candidate and opponent `move.total` and `shoot.total`
+  - all `100` matches report loaded models/profile metadata as expected
+  - all score quads are still `(0.0, 0.0, 0.0, 0.0)`
+- The interrupted control run `082209` uses the same candidate/incumbent SHAs, same artifact dirs, and the same `map_list.json` hash.
+  - First `91` core match records align exactly on scenario/order/score fields.
+  - Yet `082209` records non-zero policy counts and traces in all completed matches.
+- This rules out a `rating.json` / `promotion.json` summarization issue.
+  - `training/selfplay.py` merges raw per-leg diagnostics into per-match sidecars.
+  - `training/evaluate.py` only re-aggregates those per-match fields.
+- The relaunch run also completed far faster than the interrupted run.
+  - `082209`: about `26575.865451` seconds to last live checkpoint.
+  - `160721`: about `4031.724309` seconds to terminal exit.
+  - speed ratio: `6.59x`.
+- The most plausible cause class is therefore:
+  - the relaunch entered a different runtime action path in the environment/backend loop
+  - likely one that never reached meaningful `Move`/`Shoot` decision accounting on either side
+  - rather than a launcher-only difference or a stats-merging difference

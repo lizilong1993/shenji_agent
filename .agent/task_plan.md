@@ -30,3 +30,28 @@ Round 1 之后 strongest snapshot 已经更新为 learned weights，但 `trainin
 
 - 如果协议修正后 arena 仍无法满足 hard-stop，下一轮优先追 `move_path_coverage = 0.0` 的根因，扩大真实 move 决策触发面。
 - 如果 strongest snapshot 元数据不足以区分 rule baseline 与 learned snapshot，则把 snapshot contract 缺失列为 blocker。
+
+## Paper Draft Task 2026-05-11
+
+### 目标
+
+在 `paper/` 目录下生成一篇 NeurIPS 风格英文论文初稿，内容严格来自当前项目代码、项目规则、报告和正式实验 artifacts，不把未验证信息写成已完成结论。
+
+### 使用工具与 skill
+
+- PaperOrchestra：当前 `.agents/skills/paper-orchestra` 是 junction，但目标 `C:\Users\lizilong\paper-orchestra\skills\paper-orchestra\SKILL.md` 不存在，无法读取。
+- 可用替代：`C:\Users\lizilong\.orchestra\skills\20-ml-paper-writing\SKILL.md`，作为 PaperOrchestra/ML paper writing 入口。
+- nature skills：当前未发现独立 `nature` skill；使用 `C:\Users\lizilong\.codex\skills\scientific-writing\SKILL.md` 中 Nature/Science 风格约束作为写作参考，但最终格式按 NeurIPS。
+- bootstrap：规则指定脚本 `C:\Users\lizilong\.codex\automations\weekly-skill-trigger-optimization\codex-runtime-ops.ps1` 缺失，`task_bootstrap.json` 仍是旧任务记录，本轮无法完成指定 bootstrap。
+
+### 文件边界
+
+- 论文相关产物全部放在 `paper/`。
+- `.agent/` 仅记录任务计划、证据和进度，不放论文正文。
+
+### 成功判据
+
+- `paper/main.tex`、`paper/references.bib`、`paper/source_evidence.md`、`paper/README.md` 存在。
+- NeurIPS style 文件随 `paper/` 放置，能本地编译或给出明确编译阻塞。
+- 论文里的结果数字能追溯到 `experiments/shenji_agent/league_20260501_170204/*` 或 `reports/*`。
+- 不声称公开排行榜 SOTA，只声称 SOTA-aligned promotion gate。

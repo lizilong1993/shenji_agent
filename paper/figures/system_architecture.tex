@@ -1,0 +1,16 @@
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{ccccccccccc}
+\fbox{\shortstack{\textbf{\env{} Backend}\\state\\legal actions\\phase\\combat}} &
+$\Rightarrow$ &
+\fbox{\shortstack{\textbf{Feature}\\$\;$\\normalize\\encode}} &
+$\Rightarrow$ &
+\fbox{\shortstack{\textbf{Learned}\\$\;$\\intent LSTM\\situation GCN}} &
+$\Rightarrow$ &
+\fbox{\shortstack{\textbf{Objective}\\$\;$\\score delta\\distance delta}} &
+$\Rightarrow$ &
+\fbox{\shortstack{\textbf{Rank}\\$\;$\\weighted score\\rule fallback}} &
+$\Rightarrow$ &
+\fbox{\shortstack{\textbf{Output}\\$\;$\\legal actions\\diagnostics\\coverage}} \\
+& & & & & & & & & \\
+\multicolumn{10}{c}{\textbf{Diagnostics:} backend validity, auth status, battle phase, action coverage, score means, fallback reasons}
+\end{tabular}}

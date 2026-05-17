@@ -1,0 +1,15 @@
+{
+  "argv": [
+    ".agent/round18_probe_fix_20260425_161832/probe_worktree_wrapper.py",
+    "--participants",
+    ".agent/round18_probe_fix_20260425_161832/participants_worktree.json",
+    "--output-dir",
+    ".agent/round18_probe_fix_20260425_161832/probe_output",
+    "--max-steps",
+    "400"
+  ],
+  "cwd": "/remote-home/lizilong/shenji_agent",
+  "output_dir": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_fix_20260425_161832/probe_output",
+  "participants_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_fix_20260425_161832/participants_worktree.json",
+  "requested_device_env": "cuda"
+}

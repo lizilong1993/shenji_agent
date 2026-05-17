@@ -1,0 +1,135 @@
+{
+  "ai_agent_file": "/remote-home/lizilong/shenji_agent/ai/agent.py",
+  "ai_policy_file": "/remote-home/lizilong/shenji_agent/ai/policy.py",
+  "available_map_ids": [
+    212,
+    94
+  ],
+  "cuda_visible_devices": "0",
+  "env_backend": "train_env.TrainEnv",
+  "generated_at": "2026-04-26T01:06:24.321488Z",
+  "git_dirty_paths": [
+    " M ai/agent.py",
+    " M training/selfplay.py",
+    "?? .agent/round18_coverage_probe/probe.py"
+  ],
+  "git_head": "2a5ac08ef5dc7a6cc9694aa7cbbd5e1ceb5f0bb7",
+  "justified_extra_candidate_map_ids": [
+    94
+  ],
+  "missing_requested_map_ids": [
+    13
+  ],
+  "participants": {
+    "candidate": {
+      "artifacts": "/remote-home/lizilong/shenji_agent/ai/weights",
+      "intent_model_loaded": true,
+      "intent_param_device": "cuda:0",
+      "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+      "policy_device": "cuda",
+      "profile": "challenger",
+      "requested_device": "cuda",
+      "situation_model_loaded": true,
+      "situation_param_device": "cuda:0"
+    },
+    "incumbent": {
+      "artifacts": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+      "intent_model_loaded": true,
+      "intent_param_device": "cuda:0",
+      "loaded_from": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+      "policy_device": "cuda",
+      "profile": "incumbent",
+      "requested_device": "cuda",
+      "situation_model_loaded": true,
+      "situation_param_device": "cuda:0"
+    }
+  },
+  "probe_path": "/remote-home/lizilong/shenji_agent/.agent/round18_coverage_probe/probe.py",
+  "repo_root": "/remote-home/lizilong/shenji_agent",
+  "requested_device_env": "cuda",
+  "requested_map_ids": [
+    212,
+    13,
+    94
+  ],
+  "resolved_items": {
+    "2120131194.json": {
+      "bucket": "medium",
+      "map_id": 212,
+      "scenario": "2120131194.json"
+    },
+    "2120131294.json": {
+      "bucket": "medium",
+      "map_id": 212,
+      "scenario": "2120131294.json"
+    }
+  },
+  "run_dir": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212013_family_20260426_010048",
+  "scenario_map_fits": {
+    "2120131194.json": {
+      "map_212": {
+        "bucket": "medium",
+        "city_in_bounds": 5,
+        "city_oob_count": 0,
+        "city_total": 5,
+        "cols": 50,
+        "map_id": 212,
+        "map_name": "map_212",
+        "operator_in_bounds": 32,
+        "operator_oob_count": 22,
+        "operator_total": 54,
+        "rows": 50
+      },
+      "map_94": {
+        "bucket": "simple",
+        "city_in_bounds": 5,
+        "city_oob_count": 0,
+        "city_total": 5,
+        "cols": 77,
+        "map_id": 94,
+        "map_name": "map_94",
+        "operator_in_bounds": 54,
+        "operator_oob_count": 0,
+        "operator_total": 54,
+        "rows": 92
+      }
+    },
+    "2120131294.json": {
+      "map_212": {
+        "bucket": "medium",
+        "city_in_bounds": 5,
+        "city_oob_count": 0,
+        "city_total": 5,
+        "cols": 50,
+        "map_id": 212,
+        "map_name": "map_212",
+        "operator_in_bounds": 36,
+        "operator_oob_count": 25,
+        "operator_total": 61,
+        "rows": 50
+      },
+      "map_94": {
+        "bucket": "simple",
+        "city_in_bounds": 5,
+        "city_oob_count": 0,
+        "city_total": 5,
+        "cols": 77,
+        "map_id": 94,
+        "map_name": "map_94",
+        "operator_in_bounds": 61,
+        "operator_oob_count": 0,
+        "operator_total": 61,
+        "rows": 92
+      }
+    }
+  },
+  "scenarios": [
+    "2120131194.json",
+    "2120131294.json"
+  ],
+  "torch_available": true,
+  "torch_cuda_available": true,
+  "torch_cuda_current_device": 0,
+  "torch_cuda_device_count": 1,
+  "torch_cuda_device_name": "NVIDIA GeForce RTX 3090"
+}

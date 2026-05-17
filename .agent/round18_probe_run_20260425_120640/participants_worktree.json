@@ -1,0 +1,22 @@
+{
+  "env_backend": "train_env.TrainEnv",
+  "provenance_mode": "current_worktree_ai_modules",
+  "candidate": {
+    "artifacts": "/remote-home/lizilong/shenji_agent/ai/weights",
+    "profile": "challenger",
+    "source_commit_sha": "9ab8ec47a67409e945c65689d4bc04eb765f4f30+dirty",
+    "code_origin": "worktree:/remote-home/lizilong/shenji_agent@9ab8ec47a67409e945c65689d4bc04eb765f4f30+dirty",
+    "snapshot_role": null,
+    "manifest_generated_at": "20260423_093150",
+    "original_artifact_source_commit_sha": "52c7c9ced3f1b3c6eb4bfe8b899e253613281364"
+  },
+  "incumbent": {
+    "artifacts": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+    "profile": "incumbent",
+    "source_commit_sha": "9ab8ec47a67409e945c65689d4bc04eb765f4f30+dirty",
+    "code_origin": "worktree:/remote-home/lizilong/shenji_agent@9ab8ec47a67409e945c65689d4bc04eb765f4f30+dirty",
+    "snapshot_role": "accepted_learned_mainline",
+    "manifest_generated_at": "20260423_024831",
+    "original_artifact_source_commit_sha": "bb26fd52af4aec9029643c8f3666237eb06a1a6d"
+  }
+}

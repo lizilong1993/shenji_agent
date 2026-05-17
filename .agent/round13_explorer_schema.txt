@@ -1,0 +1,37 @@
+**结论**
+- `training/selfplay.py:164-170` 是正确拦截点；`ai/agent.py:543-544` 会把 `basic_data` 直接交给 `Map`，而 `ai/agent.py:166-188`、`238-247`、`846-847` 都直接依赖标准字段 `roads/cond/elev/neighbors/rivers`。
+- `train_env` 这边是编译扩展，不是可读 `.py` 源；但在 `land_wargame_sdk/land_wargame_train_env-4.1.0-...whl` 的 `train_env/env/wgmap/terrain.cpython-310-...so` 字符串里，能明确看到 `Terrain.load` / `Terrain.has_road` / `Terrain.get_neighbors` / `Terrain.get_grid_type` / `Terrain.get_height`，以及 `basic_data["map_data"]` 和 cell 字段 `pos/elev/cond/roads/rivers/neighbors`。`train_env/env/train_env.cpython-310-...so` 里也能看到 `TrainEnv.setup`、`setup_info`、`basic_data`。
+
+**map_212 与正常图差异**
+- `map_212/basic.json` 不是单一旧 schema，而是两种旧 cell 混用：
+- 1444 个 cell：`c,r,nb,e,cd,rd,rv`
+- 1056 个 cell：只有 `c,r,nb,e`
+- 正常过渡图 `map_123/basic.json`：每个 cell 都有 `pos,elev,cond,neighbors,roads,rivers`，同时保留 `c,r,e,nb`；只有部分 cell 额外保留 `cd,rd,rv`。
+- 全字段图 `map_9601/basic.json`：`pos,elev,cond,neighbors,roads,rivers,roadblock,minefield`。
+- 关键反推：在 `map_123/basic.json` 和 `map_221/basic.json` 中，凡是缺 `cd` 的 cell，`cond` 都等于 `0`；缺 `rd` 的 cell，`roads` 都是全 0；缺 `rv` 的 cell，`rivers` 都是全 0。说明 `map_212` 里缺 `cd/rd/rv` 不是坏数据，而是“默认 0”写法。
+
+**最小 Normalize 规则**
+- 输出给下游时，每个 cell 至少补齐：
+- `pos = cell["pos"]`，否则 `row_idx * 100 + col_idx`
+- `neighbors = cell["neighbors"]`，否则 `cell["nb"]`
+- `elev = cell["elev"]`，否则 `cell["e"]`
+- `cond = cell["cond"]`，否则 `cell["cd"]`，再否则 `0`
+- `roads = cell["roads"]`，否则 `cell["rd"]`，再否则 `[0,0,0,0,0,0]`
+- `rivers = cell["rivers"]`，否则 `cell["rv"]`，再否则 `[0,0,0,0,0,0]`
+- 原字段 `c/r/nb/e/cd/rd/rv` 可以保留，但后续代码不能再依赖它们。
+- `roadblock/minefield` 不是这次 compare 修复的必补字段；`83/123/221` 这些正常图都没有。若主 agent 想统一 schema，可默认补 `0`，但不该把它们当成输入必需项。
+
+**最小 Validate 规则**
+- 应在 `training/selfplay.py:_load_case_data()` 前置抛错，不要让 `train_env`/`ai.agent` 再内部 `KeyError`。
+- 应报错的情况：
+- 顶层不是对象，或 `map_data` 不是二维 list。
+- 某一行不是 list，某个 cell 不是对象，或行长不一致。
+- 归一化后缺 `pos/elev/cond/neighbors/roads/rivers` 任一字段。
+- `neighbors/roads/rivers` 归一化后不是长度 6 的 list。
+- `pos/cond/elev` 归一化后不是标量。
+- `pos` 存在但不等于 `row*100+col`。
+- `c/r` 存在但不等于当前 `col/row`。
+- 新旧字段同时存在但不一致，例如 `neighbors != nb`、`elev != e`、`cond != cd`、`roads != rd`、`rivers != rv`。
+- 不应报错的情况：单纯缺 `cd`、缺 `rd`、缺 `rv`。这些应分别归一成 `0`、全 0 `roads`、全 0 `rivers`。
+
+补充一句：当前工作树里的 `training/selfplay.py:126-137` 仍把 `cd/rd/rv` 当成必有 alias，这和真实 `map_212` 不符；`tests/test_mainline_contract.py:769-802` 也只覆盖了“真缺字段”的报错，没有覆盖 `map_212` 这种稀疏旧 cell。

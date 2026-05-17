@@ -1,0 +1,16 @@
+{
+  "candidate": {
+    "artifacts": "/remote-home/lizilong/shenji_agent/ai/weights",
+    "code_origin": "worktree:/remote-home/lizilong/shenji_agent@2a5ac08ef5dc7a6cc9694aa7cbbd5e1ceb5f0bb7",
+    "profile": "challenger",
+    "source_commit_sha": "2a5ac08ef5dc7a6cc9694aa7cbbd5e1ceb5f0bb7"
+  },
+  "env_backend": "train_env.TrainEnv",
+  "incumbent": {
+    "artifacts": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+    "code_origin": "worktree:/remote-home/lizilong/shenji_agent@2a5ac08ef5dc7a6cc9694aa7cbbd5e1ceb5f0bb7",
+    "profile": "incumbent",
+    "source_commit_sha": "2a5ac08ef5dc7a6cc9694aa7cbbd5e1ceb5f0bb7"
+  },
+  "provenance_mode": "current_worktree_ai_modules"
+}

@@ -1,0 +1,81 @@
+{
+  "generated_at": "2026-04-26T01:23:11.919547Z",
+  "scenarios": {
+    "2120131194.json": {
+      "fits": {
+        "heuristic": {
+          "bucket": "simple",
+          "city_in_bounds": 5,
+          "city_oob_count": 0,
+          "city_total": 5,
+          "cols": 77,
+          "map_id": 94,
+          "map_name": "map_94",
+          "operator_in_bounds": 54,
+          "operator_oob_count": 0,
+          "operator_total": 54,
+          "rows": 92
+        },
+        "resolved": {
+          "bucket": "simple",
+          "city_in_bounds": 5,
+          "city_oob_count": 0,
+          "city_total": 5,
+          "cols": 77,
+          "map_id": 94,
+          "map_name": "map_94",
+          "operator_in_bounds": 54,
+          "operator_oob_count": 0,
+          "operator_total": 54,
+          "rows": 92
+        }
+      },
+      "heuristic_map_id": 94,
+      "resolved_via_collect_scenario_candidates": {
+        "bucket": "simple",
+        "map_id": 94,
+        "scenario": "2120131194.json"
+      },
+      "scenario": "2120131194.json",
+      "structured_fallback_map_id": null
+    },
+    "2120131294.json": {
+      "fits": {
+        "heuristic": {
+          "bucket": "simple",
+          "city_in_bounds": 5,
+          "city_oob_count": 0,
+          "city_total": 5,
+          "cols": 77,
+          "map_id": 94,
+          "map_name": "map_94",
+          "operator_in_bounds": 61,
+          "operator_oob_count": 0,
+          "operator_total": 61,
+          "rows": 92
+        },
+        "resolved": {
+          "bucket": "simple",
+          "city_in_bounds": 5,
+          "city_oob_count": 0,
+          "city_total": 5,
+          "cols": 77,
+          "map_id": 94,
+          "map_name": "map_94",
+          "operator_in_bounds": 61,
+          "operator_oob_count": 0,
+          "operator_total": 61,
+          "rows": 92
+        }
+      },
+      "heuristic_map_id": 94,
+      "resolved_via_collect_scenario_candidates": {
+        "bucket": "simple",
+        "map_id": 94,
+        "scenario": "2120131294.json"
+      },
+      "scenario": "2120131294.json",
+      "structured_fallback_map_id": null
+    }
+  }
+}

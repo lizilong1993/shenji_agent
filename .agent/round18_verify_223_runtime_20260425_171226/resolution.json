@@ -1,0 +1,47 @@
+{
+  "fits": {
+    "heuristic": {
+      "city_in_bounds": 7,
+      "city_oob_count": 0,
+      "city_total": 7,
+      "cols": 60,
+      "map_id": 221,
+      "operator_in_bounds": 40,
+      "operator_oob_count": 28,
+      "operator_total": 68,
+      "rows": 70
+    },
+    "resolved": {
+      "city_in_bounds": 7,
+      "city_oob_count": 0,
+      "city_total": 7,
+      "cols": 77,
+      "map_id": 53,
+      "operator_in_bounds": 68,
+      "operator_oob_count": 0,
+      "operator_total": 68,
+      "rows": 92
+    },
+    "structured_fallback": {
+      "city_in_bounds": 7,
+      "city_oob_count": 0,
+      "city_total": 7,
+      "cols": 77,
+      "map_id": 53,
+      "operator_in_bounds": 68,
+      "operator_oob_count": 0,
+      "operator_total": 68,
+      "rows": 92
+    }
+  },
+  "generated_at": "2026-04-25T17:15:52.323592Z",
+  "heuristic_map_id": 221,
+  "resolved_via_collect_scenario_candidates": {
+    "bucket": "complex",
+    "map_id": 53,
+    "scenario": "2230531221.json"
+  },
+  "scenario": "2230531221.json",
+  "scenario_path": "/remote-home/lizilong/shenji_agent/land_wargame_sdk/Data/Data/scenarios/2230531221.json",
+  "structured_fallback_map_id": 53
+}

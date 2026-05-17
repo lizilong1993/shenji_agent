@@ -1,0 +1,216 @@
+\documentclass{article}
+
+\usepackage[nonatbib]{neurips}
+\usepackage[numbers]{natbib}
+\input{extra_pkgs}
+\usepackage{array}
+
+\title{Evidence-Gated Learning-Augmented Agents for Closed-Loop Land Wargame Control}
+
+\author{
+  Anonymous Authors \\
+  Paper draft for internal review \\
+  \texttt{anonymous@example.com}
+}
+
+\newcommand{\method}{Shenji-Gate}
+\newcommand{\env}{\textsc{TrainEnv}}
+\newcommand{\currentai}{\textsc{CurrentAI}}
+\newcommand{\incumbentai}{\textsc{IncumbentAI}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Closed-loop land wargame control is a testbed where tactical value is mediated by terrain, partial phase structure, valid-action constraints, simulator authentication, and multi-step combat outcomes. Static supervised metrics alone provide weak evidence that a learned model improves combat behavior. We present \method, a learning-augmented land-wargame agent and evaluation protocol built around the Miaosuan SDK. The agent keeps a rule-based action scaffold for validity while using learned intent and situation models, feature normalization, objective scoring, and action diagnostics to rank move and shoot candidates. The evaluation protocol treats simulator evidence as part of the result: a promotion run is valid only when it uses the real \env{} backend, completes a saved 100-item paired map list, records distinct candidate and incumbent artifacts, enters battle phase, exercises learned action paths, and passes exploiter checks. In the latest verified run, \currentai{} beats a rule incumbent with an overall win-rate estimate of 0.8700 and 95\% confidence interval lower bound of 0.8000 across 100 paired maps. On the complex bucket, the estimate is 0.8182 with lower bound 0.6364. Learned path, move path, and shoot path coverage are 0.3728, 0.3367, and 1.0000. The project hard-stop requires two consecutive passing windows; the latest folder satisfies the gate in a single window, with zero recorded consecutive windows in the league state. These results support an engineering claim: the learned components affect closed-loop combat actions and pass a SOTA-aligned promotion gate, without implying a public leaderboard state of the art.
+\end{abstract}
+
+\section{Introduction}
+
+Land wargame simulators define a class of sequential decision problems different from board games and standard multi-agent reinforcement learning benchmarks. A controller must operate inside a rule-bound simulator, choose only legal actions, route units over terrain, respect phase transitions, and convert local actions into delayed combat and objective outcomes. A credible result requires that the policy was evaluated in the intended backend, entered combat, chose meaningful actions, and did not exploit a mock environment, an authentication bypass, or a deployment-phase draw.
+
+We present the Shenji project as a NeurIPS-style research artifact. The project targets the Miaosuan land-wargame SDK and implements a hybrid controller that combines a rule scaffold with learned scoring modules. The learned modules include a multi-horizon LSTM intent predictor, a GraphSAGE-style situation scorer, a feature normalizer shared by training and inference, and objective scoring over candidate actions. The agent ranks legal move and shoot candidates and records whether learned paths were used, without replacing the simulator's valid-action contract.
+
+The evaluation protocol draws on self-play promotion in AlphaGo Zero, league and exploiter ideas in AlphaStar, robustness concerns in DeepNash, and held-out scenario evaluation in SMAC-style benchmarks \citep{silver2017alphagozero,vinyals2019alphastar,perolat2022deepnash,samvelyan2019smac,ellis2023smacv2}. The project defines a fail-closed promotion gate requiring artifact completeness, backend validity, battle-phase evidence, 100 ordered paired map items, bucketed confidence bounds, coverage thresholds, and exploiter checks. This is a project-specific protocol. Recent wargame reasoning benchmarks such as WGSR-Bench study large-language-model strategic reasoning rather than the online Miaosuan \env{} control loop \citep{yin2025wgsrbench}; therefore this work does not claim a public leaderboard SOTA.
+
+The draft makes three concrete claims. First, the learning components are integrated into the live action-selection path rather than reported only as offline validation accuracy. Second, the formal promotion artifacts show a statistically strong advantage over the rule incumbent in the latest verified run. Third, the evaluation record rejects common false positives, including mock-backend success, authentication failure, no-battle runs, same-artifact self-play, and learned-policy bypass. A fourth structural claim is the traceability map from each major claim to the corresponding artifact path, captured in the companion evidence file.
+
+\section{Problem Setting}
+
+\subsection{Environment-Agent Interface}
+
+The \textsc{Miaosuan} simulator exposes an environment-agent loop. The environment initializes a scenario and map, passes each side an observation, receives an action list, advances the battle state, and writes replay or diagnostic outputs. An observation includes operators, valid actions, cities, phase and time information, combat adjudication, and communications. The main controllable action types include movement, shooting, occupation, embarkation, disembarkation, state changes, engineering actions, and other support actions. The agent must satisfy the SDK's action schema; invalid output is not a recoverable research signal.
+
+Let $s_t$ denote the private observation available to one side at turn $t$, and let $\mathcal{A}(s_t)$ denote the simulator-provided legal action set. The policy must choose a list of legal unit actions $a_t \subseteq \mathcal{A}(s_t)$. The main evaluation objective is not a supervised label but a closed-loop comparison: a candidate policy should beat an incumbent policy over a paired list of scenarios while satisfying evidence constraints.
+
+\subsection{Evaluation Contract}
+
+Maps and scenarios vary in difficulty, so pairwise comparison is needed. The formal unit is a saved list of 100 ordered paired map items sampled unique-first from 43 unique scenarios. Repeats occur only because the scenario pool is smaller than 100. The evaluation is valid only if the real \env{} backend is used, distinct candidate and incumbent artifact directories are recorded, battle phase is entered, and learned-path counters show non-trivial engagement. The companion promotion gate encodes these constraints as hard requirements.
+
+\section{Method}
+
+\subsection{Hybrid Action Selection}
+
+The runtime policy is a hybrid controller. Rules keep the system inside the legal action manifold, while learned modules rank high-value actions. This design follows a conservative engineering constraint: learned models may influence action priority, but the simulator's valid-action surface remains authoritative. Figure~\ref{fig:architecture} summarizes the loop.
+
+\begin{figure}[t]
+  \centering
+  \input{figures/system_architecture}
+  \caption{\textbf{Learning-augmented action loop.} The agent receives legal actions from the real Miaosuan \env{} backend, builds move and shoot candidates, scores them with learned and objective components, then emits only simulator-valid actions. Diagnostics record backend, authentication, phase, action coverage, and score contributions.}
+  \label{fig:architecture}
+\end{figure}
+
+The policy computes candidate scores from four components:
+
+\begin{itemize}
+  \item \textbf{Intent component.} A multi-horizon LSTM \citep{hochreiter1997lstm} over enemy histories predicts likely enemy intentions at multiple timescales. The model is trained on recorded replay data.
+  \item \textbf{Situation component.} A feature-similarity graph built over operators feeds a GraphSAGE-style aggregation model \citep{hamilton2018graphsage} that scores each operator's tactical position relative to allies and enemies.
+  \item \textbf{Tactical scorer.} Present in the model manifest, but the latest formal run reports zero tactical-model loaded matches. We treat it as an implementation component that is not yet evidenced for the main result.
+  \item \textbf{Objective scorer.} Uses score and objective-distance signals to prioritize actions that improve mission progress. This is a heuristic layer, not a trained neural model.
+\end{itemize}
+
+The final ranking is a weighted combination of learned and heuristic terms, followed by rule fallback when the candidate route or target is invalid. Policy diagnostics record which path (learned or fallback) produced each action.
+
+\subsection{Promotion Gate}
+
+The project uses a promotion gate rather than static validation accuracy. Figure~\ref{fig:gate} summarizes the gate. A run is valid only if all required sidecars exist: \path{rating.json}, \path{promotion.json}, \path{exploitability.json}, \path{participants.json}, \path{summary.md}, \path{match_results.json}, and \path{map_list.json}. The participant file must show distinct candidate and incumbent artifact directories. The map list must contain exactly 100 ordered paired items and the match results must follow that order.
+
+\begin{figure}[t]
+  \centering
+  \input{figures/promotion_gate}
+  \caption{\textbf{Fail-closed promotion protocol.} The gate separates protocol validity from combat performance. A strong win rate alone is insufficient when the backend, artifacts, phase coverage, learned path coverage, or exploiter robustness checks fail.}
+  \label{fig:gate}
+\end{figure}
+
+\paragraph{Thresholds.}
+The gate thresholds are:
+\begin{itemize}
+  \item Overall and complex-bucket win-rate estimates $\geq 0.60$, with 95\% CI lower bounds $> 0.55$.
+  \item Elo-equivalent lower bound $\geq 35$.
+  \item Max bucket regression $\leq 0.03$ below neutral.
+  \item Max exploiter win rate $\leq 0.45$.
+  \item Learned path, move path, shoot path coverage $\geq 0.30$, $0.20$, $0.20$ respectively.
+\end{itemize}
+
+\paragraph{Hard-stop rule.}
+The project hard-stop rule requires two consecutive passing windows. The latest \path{league_state.json} records \path{consecutive_windows = 0}. The verified folder therefore satisfies the gate criteria for a single window but does not fulfill the two-window stability requirement. We report it as a verified single passing window and document the two-window gap as an open item.
+
+\section{Experiments}
+
+\subsection{Setup}
+
+The latest verified formal run is \path{experiments/shenji_agent/league_20260501_170204}. The environment backend is \env{}, with \path{mock_backend = false} recorded in the report material. The candidate is \currentai{} (profile \path{challenger}) with artifact directory \path{/remote-home/lizilong/shenji_agent/ai/weights}. The incumbent is \incumbentai{} (profile \path{baseline}) with artifact directory \path{/remote-home/lizilong/shenji_agent/ai/weights_incumbent_rule}. Participant artifacts are distinct, and both manifest paths are recorded. The run completes 100 paired map items. Because the scenario pool has 43 unique scenarios, repeats fill the remaining slots after unique-first coverage.
+
+\subsection{Metrics}
+
+The main metric is paired win-rate estimate with 95\% confidence intervals. We report overall and bucketed estimates for simple, medium, and complex map buckets. We also report promotion-gate diagnostics: learned path coverage, move path coverage, shoot path coverage, Elo lower bound, maximum exploiter win rate, bucket regression, battle-phase entry, and selected action counts. Coverage metrics matter because a high win rate is not sufficient evidence that learned components affected actions.
+
+\subsection{Results}
+
+Table~\ref{tab:main-results} gives the formal gate results. The candidate obtains an overall win-rate point estimate of 0.8700, with lower confidence bound 0.8000. The complex bucket remains above the hard-stop threshold, with point estimate 0.8182 and lower bound 0.6364. The learned path and move path coverages exceed their thresholds. All shoot decisions in the counted set use the learned path.
+
+\begin{table}[t]
+  \centering
+  \caption{Latest verified promotion-window results from the formal run directory. Higher is better except exploiter win rate and bucket regression.}
+  \label{tab:main-results}
+  \begin{tabular}{lrr}
+    \toprule
+    Metric & Threshold & Result \\
+    \midrule
+    Overall win-rate estimate & $\geq 0.60$ & \textbf{0.8700} \\
+    Overall CI95 lower bound & $> 0.55$ & \textbf{0.8000} \\
+    Complex win-rate estimate & $\geq 0.60$ & \textbf{0.8182} \\
+    Complex CI95 lower bound & $> 0.55$ & \textbf{0.6364} \\
+    Learned path coverage & $\geq 0.30$ & \textbf{0.3728} \\
+    Move path coverage & $\geq 0.20$ & \textbf{0.3367} \\
+    Shoot path coverage & $\geq 0.20$ & \textbf{1.0000} \\
+    Elo lower bound & $\geq 35.0$ & \textbf{240.8240} \\
+    Max bucket regression & $\leq 0.03$ & \textbf{0.0000} \\
+    Max exploiter win rate & $\leq 0.45$ & \textbf{0.2500} \\
+    Selected Move/Shoot/Occupy actions & -- & 94,682 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Bucketed results indicate that the candidate does not win only on the easiest maps. Table~\ref{tab:bucket-results} breaks down performance by difficulty bucket. The simple bucket contains 52 paired items and reaches 0.9038. The medium bucket contains 26 paired items and reaches 0.8462. The complex bucket contains 22 paired items and reaches 0.8182. The confidence bound is widest for the complex bucket because it has the fewest paired items, but it remains above the gate threshold.
+
+\begin{table}[t]
+  \centering
+  \caption{Bucketed paired-map results. Confidence intervals are stored in the formal metrics sidecar.}
+  \label{tab:bucket-results}
+  \begin{tabular}{lrrr}
+    \toprule
+    Bucket & Count & Point estimate & 95\% CI \\
+    \midrule
+    Simple & 52 & 0.9038 & [0.8269, 0.9808] \\
+    Medium & 26 & 0.8462 & [0.7019, 0.9615] \\
+    Complex & 22 & 0.8182 & [0.6364, 0.9545] \\
+    Overall & 100 & 0.8700 & [0.8000, 0.9276] \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Action diagnostics support the interpretation that the evaluation did not record only passive or deployment-phase behavior. The latest summary reports battle phase entered at turn 1, 129,890 turn contexts with move validity or selection, 4,648 with shoot validity or selection, 376 with occupy validity or selection, and zero authentication failures. The counted selected core actions include 89,018 moves, 5,308 shoots, and 356 occupies in the report-level aggregation.
+
+The exploiter check is deliberately small and serves as a gate-side sanity test rather than a full robustness benchmark. Table~\ref{tab:exploiter} summarizes the results. The aggressive exploiter wins 0 of 4 matches against the candidate. The occupy exploiter wins 1 of 4 matches. The maximum exploiter win rate is 0.25, below the 0.45 threshold.
+
+\begin{table}[t]
+  \centering
+  \caption{Exploiter check results. Each exploiter plays 4 matches against the candidate.}
+  \label{tab:exploiter}
+  \begin{tabular}{lrrr}
+    \toprule
+    Exploiter & Win rate & Score rate & Matches \\
+    \midrule
+    Aggressive & 0.00 & 0.375 & 4 \\
+    Occupy & 0.25 & 0.625 & 4 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Diagnostic Analysis}
+
+Score diagnostics show how learned components affect action selection. For moves, mean intent bias is $-0.81$ (negative, indicating the intent model tends to discourage enemy-ward moves), while mean situation score is $+0.41$ and mean objective score is $130.41$. The objective component dominates combined score magnitude. For shoot actions, mean intent bias is $+0.74$ and situation score is $+0.41$, indicating both learned components agree on shoot candidates. Tactical model contributes zero across all scoring columns, consistent with zero loaded-match count.
+
+The route planner shows a bottleneck: out of 23,580 total move attempts, 15,641 have empty routes (66\%). The empty-route fraction is highest in Maneuver (7,595 / 10,093 = 75\%) and Fly (7,182 / 8,716 = 82\%) move types, and lower in Walk (864 / 4,771 = 18\%). This indicates that the current route planner supports Walk moves well but has limited coverage for non-Walk move types, which is a known limitation.
+
+\section{Related Work}
+
+Self-play promotion gates originate in AlphaGo Zero, where a new policy is promoted only after beating the current best policy in an arena \citep{silver2017alphagozero}. AlphaStar extends this with a league of main agents and exploiters \citep{vinyals2019alphastar}. DeepNash emphasizes robust play in imperfect-information games, motivating exploiter checks over reliance on headline win rate alone \citep{perolat2022deepnash}. SMAC and SMACv2 show the value of controlled multi-agent scenarios and held-out evaluation for cooperative combat tasks \citep{samvelyan2019smac,ellis2023smacv2}. WGSR-Bench is a recent wargame reasoning benchmark for large language models \citep{yin2025wgsrbench}, but it is not protocol-matched to the online Miaosuan control loop used here.
+
+\section{Limitations}
+
+The current evidence is strongest as an engineering validation of the Shenji project, not as a broad scientific benchmark.
+
+\textbf{Scenario diversity.} The scenario pool has only 43 unique scenarios, so a 100-item paired list necessarily repeats scenarios after unique-first coverage. The promotion gate should be re-evaluated with a larger scenario pool.
+
+\textbf{Two-window stability.} The project hard-stop rule requires two consecutive passing windows. The latest \path{league_state.json} records zero consecutive windows. The current result represents a single verified passing window.
+
+\textbf{Exploiter suite.} The exploiter suite contains two fixed exploiters with four matches each. This is adequate for the current gate but insufficient for a full robustness claim. A larger exploiter pool would strengthen the robustness argument.
+
+\textbf{Tactical model.} The tactical model is present in the manifest, but the latest formal run reports zero tactical-model loaded matches. Tactical contribution should not be claimed until a future run enables it.
+
+\textbf{Route planner gaps.} Move routing has a high fraction of empty-route fallbacks, especially under Maneuver and Fly move types. This limits the effective action space that the learned policy can influence.
+
+\textbf{No public leaderboard.} The public literature does not define a protocol-matched Miaosuan leaderboard. All SOTA language is qualified as SOTA-aligned evaluation rather than public SOTA.
+
+\section{Conclusion}
+
+\method{} reframes the Shenji project around evidence-gated closed-loop evaluation. The main technical point is that learned scoring components participate in real simulator actions and survive a fail-closed promotion protocol. The latest verified promotion window shows a candidate advantage over the rule incumbent: 0.8700 overall win-rate estimate, 0.8000 lower confidence bound, nontrivial learned move coverage, and a maximum exploiter win rate of 0.25.
+
+The next steps are to expand scenario diversity, strengthen the exploiter suite, repair tactical-model contribution, achieve a second consecutive passing window to satisfy the hard-stop rule, improve route planner coverage for Maneuver and Fly move types, and convert the current project-specific gate into a reusable land-wargame evaluation benchmark.
+
+\section*{Reproducibility Notes}
+
+The paper draft is grounded in local artifacts listed in \path{paper/source_evidence.md}. The current local worktree does not contain the full training and evaluation scripts; the \path{training/} directory contains only \path{cache/}, and \path{scripts/} and \path{tests/} are empty. For this reason, the paper reports existing formal artifacts and does not claim a fresh rerun of training, self-play, or tests in this local session.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\appendix
+\section{Draft NeurIPS Checklist Summary}
+
+This is an internal draft checklist, not the official full NeurIPS checklist. Claims are paired with artifact paths in \path{paper/source_evidence.md}. The paper states limitations, avoids public SOTA claims, identifies the real simulator backend, reports scenario count and repeated sampling, marks missing local rerun capability, and documents the single-window gap versus the two-window hard-stop requirement. A formal submission should replace this summary with the official checklist for the target NeurIPS year.
+
+\end{document}

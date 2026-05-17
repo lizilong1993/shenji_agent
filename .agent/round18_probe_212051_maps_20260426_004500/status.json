@@ -1,0 +1,24 @@
+{
+  "completed_map_ids": [
+    212,
+    21,
+    53,
+    221
+  ],
+  "current_leg_index": null,
+  "current_map_id": null,
+  "max_steps": 400,
+  "memo_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212051_maps_20260426_004500/probe_output/memo.md",
+  "move_events_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212051_maps_20260426_004500/probe_output/move_events.jsonl",
+  "phase": "completed",
+  "scenario": "2120511121.json",
+  "step_records_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212051_maps_20260426_004500/probe_output/step_records.jsonl",
+  "summary_path": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_212051_maps_20260426_004500/probe_output/summary.json",
+  "tested_map_ids": [
+    212,
+    21,
+    53,
+    221
+  ],
+  "updated_at": "2026-04-26T00:55:02.400895Z"
+}

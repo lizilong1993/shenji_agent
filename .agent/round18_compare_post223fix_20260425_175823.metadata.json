@@ -1,0 +1,27 @@
+{
+  "command": [
+    "/remote-home/lizilong/venvs/shenji/bin/python",
+    "-m",
+    "training.selfplay",
+    "--config",
+    "configs/selfplay_sota_stop.yaml",
+    "--candidate",
+    "ai/weights",
+    "--incumbent",
+    "artifacts/best_agent/weights"
+  ],
+  "compare_pgid": 3044176,
+  "compare_pid": 3044176,
+  "compare_sid": 3044176,
+  "cwd": "/remote-home/lizilong/shenji_agent",
+  "launcher_pgid": 3044175,
+  "launcher_pid": 3044175,
+  "launcher_sid": 3044175,
+  "metadata_file": "/remote-home/lizilong/shenji_agent/.agent/round18_compare_post223fix_20260425_175823.metadata.json",
+  "pid_file": "/remote-home/lizilong/shenji_agent/.agent/round18_compare_post223fix_20260425_175823.pid",
+  "started_at": "2026-04-25T17:58:40.355821Z",
+  "status_file": "/remote-home/lizilong/shenji_agent/.agent/round18_compare_post223fix_20260425_175823.status.json",
+  "stderr_log": "/remote-home/lizilong/shenji_agent/.agent/round18_compare_post223fix_20260425_175823.stderr.log",
+  "stdin_target": "/dev/null",
+  "stdout_log": "/remote-home/lizilong/shenji_agent/.agent/round18_compare_post223fix_20260425_175823.stdout.log"
+}

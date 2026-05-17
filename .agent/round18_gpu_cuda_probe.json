@@ -1,0 +1,16 @@
+{
+  "torch_cuda_available": true,
+  "torch_cuda_device_count": 1,
+  "torch_cuda_current_device": 0,
+  "torch_cuda_device_name": "NVIDIA GeForce RTX 3090",
+  "policy_device": "cuda",
+  "intent_param_device": "cuda:0",
+  "situation_param_device": "cuda:0",
+  "intent_distribution_len": 7,
+  "intent_distribution_head": [
+    0.465851,
+    0.062803,
+    0.125691
+  ],
+  "situation_score": 0.4900026321411133
+}

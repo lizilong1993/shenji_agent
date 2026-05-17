@@ -1,0 +1,15 @@
+{
+  "generated_at": "2026-04-25T16:32:14.165960Z",
+  "participants_source": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_fix_20260425_161832/participants_worktree.json",
+  "env_backend": "train_env.TrainEnv",
+  "max_steps": 400,
+  "argv": [
+    "/remote-home/lizilong/shenji_agent/.agent/round18_coverage_probe/probe.py",
+    "--participants",
+    "/remote-home/lizilong/shenji_agent/.agent/round18_probe_fix_20260425_161832/participants_worktree.json",
+    "--output-dir",
+    "/remote-home/lizilong/shenji_agent/.agent/round18_probe_fix_20260425_161832/probe_output",
+    "--max-steps",
+    "400"
+  ]
+}

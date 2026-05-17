@@ -1,0 +1,99 @@
+@article{silver2017alphagozero,
+  title = {Mastering the Game of Go without Human Knowledge},
+  author = {Silver, David and Schrittwieser, Julian and Simonyan, Karen and Antonoglou, Ioannis and Huang, Aja and Guez, Arthur and Hubert, Thomas and Baker, Lucas and Lai, Matthew and Bolton, Adrian and Chen, Yutian and Lillicrap, Timothy and Hui, Fan and Sifre, Laurent and van den Driessche, George and Graepel, Thore and Hassabis, Demis},
+  journal = {Nature},
+  volume = {550},
+  number = {7676},
+  pages = {354--359},
+  year = {2017},
+  month = oct,
+  doi = {10.1038/nature24270},
+  url = {http://dx.doi.org/10.1038/nature24270},
+  project_note = {Relevance: Foundational self-play promotion gate that inspired the Shenji promotion protocol. Inspiration: Arena-style promotion where a new policy beats the current best before acceptance. Relation: Direct inspiration for fail-closed promotion gate design. Use in paper: Cited in Introduction, Related Work as primary promotion-gate reference. Status: verified metadata.}
+}
+
+@article{vinyals2019alphastar,
+  title = {Grandmaster Level in {StarCraft} {II} Using Multi-Agent Reinforcement Learning},
+  author = {Vinyals, Oriol and Babuschkin, Igor and Czarnecki, Wojciech M. and Mathieu, Micha{\"e}l and Dudzik, Andrew and Chung, Junyoung and Choi, David H. and Powell, Richard and Ewalds, Timo and Georgiev, Petko and Oh, Junhyuk and Horgan, Dan and Kroiss, Manuel and Danihelka, Ivo and Huang, Aja and Sifre, Laurent and Cai, Trevor and Agapiou, John P. and Jaderberg, Max and Vezhnevets, Alexander S. and Leblond, R{\'e}mi and Pohlen, Tobias and Dalibard, Valentin and Budden, David and Sulsky, Yury and Molloy, James and Paine, Tom L. and Gulcehre, Caglar and Wang, Ziyu and Pfaff, Tobias and Wu, Yuhuai and Ring, Roman and Yogatama, Dani and W{\"u}nsch, Dario and McKinney, Katrina and Smith, Oliver and Schaul, Tom and Lillicrap, Timothy and Kavukcuoglu, Koray and Hassabis, Demis and Apps, Chris and Silver, David},
+  journal = {Nature},
+  volume = {575},
+  number = {7782},
+  pages = {350--354},
+  year = {2019},
+  month = oct,
+  doi = {10.1038/s41586-019-1724-z},
+  url = {http://dx.doi.org/10.1038/s41586-019-1724-z},
+  project_note = {Relevance: League-based multi-agent evaluation with exploiters, directly relevant to Shenji exploiter checks. Inspiration: League of main agents and exploiters for non-transitive strategic settings. Relation: Direct inspiration for exploiter suite in promotion gate. Use in paper: Cited in Introduction, Related Work as league/evaluation precedent. Status: verified metadata.}
+}
+
+@article{perolat2022deepnash,
+  title = {Mastering the Game of {Stratego} with Model-Free Multiagent Reinforcement Learning},
+  author = {Perolat, Julien and De Vylder, Bart and Hennes, Daniel and Tarassov, Eugene and Strub, Florian and de Boer, Vincent and Muller, Paul and Connor, Jerome T. and Burch, Neil and Anthony, Thomas and McAleer, Stephen and Elie, Romuald and Cen, Sarah H. and Wang, Zhe and Gruslys, Audrunas and Malysheva, Aleksandra and Khan, Mina and Ozair, Sherjil and Timbers, Finbarr and Pohlen, Toby and Eccles, Tom and Rowland, Mark and Lanctot, Marc and Lespiau, Jean-Baptiste and Piot, Bilal and Omidshafiei, Shayegan and Lockhart, Edward and Sifre, Laurent and Beauguerlange, Nathalie and Munos, Remi and Silver, David and Singh, Satinder and Hassabis, Demis and Tuyls, Karl},
+  journal = {Science},
+  volume = {378},
+  number = {6623},
+  pages = {990--996},
+  year = {2022},
+  month = dec,
+  doi = {10.1126/science.add4679},
+  url = {http://dx.doi.org/10.1126/science.add4679},
+  project_note = {Relevance: Robustness-focused evaluation in large imperfect-information games, motivating Shenji exploiter robustness gate. Inspiration: Emphasizing exploitability checks over headline win rate alone. Relation: Direct inspiration for max_exploiter_win_rate threshold. Use in paper: Cited in Introduction, Related Work as robustness precedent. Status: verified metadata.}
+}
+
+@misc{samvelyan2019smac,
+  title = {The {StarCraft} Multi-Agent Challenge},
+  author = {Samvelyan, Mikayel and Rashid, Tabish and de Witt, Christian Schroeder and Farquhar, Gregory and Nardelli, Nantas and Rudner, Tim G. J. and Hung, Chia-Man and Torr, Philip H. S. and Foerster, Jakob and Whiteson, Shimon},
+  year = {2019},
+  eprint = {1902.04043},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  url = {https://arxiv.org/abs/1902.04043},
+  project_note = {Relevance: Standard multi-agent combat benchmark, useful contrast for Shenji evaluation methodology. Inspiration: Held-out scenario evaluation, emphasis on hard scenarios. Relation: Adjacent benchmark — SMAC uses StarCraft micro, Shenji uses Miaosuan full-scope wargame. Use in paper: Cited in Introduction, Related Work as combat evaluation precedent. Status: verified metadata.}
+}
+
+@misc{ellis2023smacv2,
+  title = {{SMACv2}: An Improved Benchmark for Cooperative Multi-Agent Reinforcement Learning},
+  author = {Ellis, Benjamin and Cook, Jonathan and Moalla, Skander and Samvelyan, Mikayel and Sun, Mingfei and Mahajan, Anuj and Foerster, Jakob N. and Whiteson, Shimon},
+  year = {2023},
+  eprint = {2212.07489},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG},
+  url = {https://arxiv.org/abs/2212.07489},
+  project_note = {Relevance: Improved MARL benchmark addressing SMAC limitations, relevant to Shenji evaluation quality. Inspiration: Need for stochasticity and held-out evaluation in combat benchmarks. Relation: Adjacent benchmark — SMACv2 addresses scenario diversity, Shenji has similar diversity concern. Use in paper: Cited in Introduction, Related Work as evaluation methodology reference. Status: verified metadata.}
+}
+
+@misc{yin2025wgsrbench,
+  title = {{WGSR-Bench}: Wargame-Based Game-Theoretic Strategic Reasoning Benchmark for Large Language Models},
+  author = {Yin, Qiyue and Xu, Pei and Li, Qiaozhe and Liu, Shengda and Shen, Shengqi and Wang, Tong and Han, Yihong and Zhao, Xiaonan and Yang, Likun and Cao, Shiyue and Qiu, Shiyu and Liu, Yuxuan and Yu, Shizhao and Cui, Lei and Yan, Chengxin and Sun, Jie and Tang, Xiangquan and Huang, Kaiqi},
+  year = {2025},
+  eprint = {2506.10264},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.AI},
+  url = {https://arxiv.org/abs/2506.10264},
+  project_note = {Relevance: Most directly related wargame AI benchmark, but evaluates LLM reasoning not online control. Inspiration: Parallel wargame AI research direction. Relation: Contrast case — LLM strategic reasoning vs. online Miaosuan control loop. Use in paper: Cited as reason for not claiming public leaderboard SOTA. Status: verified metadata.}
+}
+
+@article{hochreiter1997lstm,
+  title = {Long Short-Term Memory},
+  author = {Hochreiter, Sepp and Schmidhuber, J{\"u}rgen},
+  journal = {Neural Computation},
+  volume = {9},
+  number = {8},
+  pages = {1735--1780},
+  year = {1997},
+  month = nov,
+  doi = {10.1162/neco.1997.9.8.1735},
+  url = {http://dx.doi.org/10.1162/neco.1997.9.8.1735},
+  project_note = {Relevance: Foundational LSTM architecture used in Shenji intent predictor. Inspiration: Multi-horizon sequence modeling for enemy intent prediction. Relation: Methods background — the intent predictor uses LSTM architecture. Use in paper: Cited in Method section for intent component. Status: verified metadata.}
+}
+
+@misc{hamilton2018graphsage,
+  title = {Inductive Representation Learning on Large Graphs},
+  author = {Hamilton, William L. and Ying, Rex and Leskovec, Jure},
+  year = {2018},
+  eprint = {1706.02216},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.SI},
+  url = {https://arxiv.org/abs/1706.02216},
+  project_note = {Relevance: GraphSAGE aggregation used in Shenji situation-scoring model. Inspiration: Inductive graph representation for operator feature-similarity graphs. Relation: Methods background — the situation scorer uses GraphSAGE-style aggregation. Use in paper: Cited in Method section for situation component. Status: verified metadata.}
+}

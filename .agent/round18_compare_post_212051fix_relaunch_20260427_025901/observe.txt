@@ -1,0 +1,63 @@
+provenance_refresh:
+  snapshot_sha: 561af02b18ab60e7d0475e31eff50e8092eba8c0
+  manifest_before_source_commit_sha: 2a5ac08ef5dc7a6cc9694aa7cbbd5e1ceb5f0bb7
+  manifest_after_source_commit_sha: 561af02b18ab60e7d0475e31eff50e8092eba8c0
+  manifest_after_generated_at: 20260427_025901
+
+resource_selection:
+  selected_gpu_index: 1
+  selected_gpu_uuid: GPU-e87066b2-59c9-8eca-5167-7a78012e232f
+  selection_basis:
+    - launch-time nvidia-smi showed GPU1 at 0% utilization with enough free memory for policy inference
+    - prior post-212051fix smoke had already succeeded on CUDA_VISIBLE_DEVICES=1
+
+launcher_receipt:
+  started_at: 2026-04-27T03:02:36.781291Z
+  supervisor_pid: 5293
+  compare_pid: 5294
+  cwd: /remote-home/lizilong/shenji_agent
+
+run_dir_observation:
+  run_dir: /remote-home/lizilong/shenji_agent/experiments/shenji_agent/league_20260427_030310
+  first_seen_files:
+    - map_list.json
+    - progress.json
+    - partial_match_results.json
+
+healthy_live_checkpoint:
+  heartbeat_ts: 2026-04-27T03:03:59.574345Z
+  phase: formal_compare
+  completed_pairs: 0
+  total_pairs: 100
+  current_order_index: 0
+  current_scenario: 2230531221.json
+  current_map_id: 53
+  current_bucket: complex
+  current_leg_index: 0
+  leg_steps: 142
+  candidate_source_commit_sha: 561af02b18ab60e7d0475e31eff50e8092eba8c0
+  incumbent_source_commit_sha: bb26fd52af4aec9029643c8f3666237eb06a1a6d
+  gpu_after_launch:
+    - GPU1 compute process observed with 380 MiB used memory
+
+confirmed_map_bindings:
+  - scenario: 2230531221.json
+    map_id: 53
+    bucket: complex
+    order_index: 0
+  - scenario: 2120131194.json
+    map_id: 94
+    bucket: simple
+    order_index: 35
+  - scenario: 2120131294.json
+    map_id: 94
+    bucket: simple
+    order_index: 39
+  - scenario: 2120511121.json
+    map_id: 21
+    bucket: simple
+    order_index: 20
+
+terminal_status:
+  compare_status_json_present: false
+  status: running

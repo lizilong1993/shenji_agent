@@ -1,0 +1,4414 @@
+{
+  "generated_at": "2026-04-26T01:10:17.050400Z",
+  "env_backend": "train_env.TrainEnv",
+  "requested_device_env": "cuda",
+  "cuda_visible_devices": "0",
+  "scenarios": [
+    "2120131194.json",
+    "2120131294.json"
+  ],
+  "requested_map_ids": [
+    212,
+    13,
+    94
+  ],
+  "available_map_ids": [
+    212,
+    94
+  ],
+  "missing_requested_map_ids": [
+    13
+  ],
+  "scenarios_by_name": {
+    "2120131194.json": {
+      "scenario": "2120131194.json",
+      "current_resolved_map_id": 212,
+      "current_resolved_bucket": "medium",
+      "maps": {
+        "map_212": {
+          "scenario": "2120131194.json",
+          "map_id": 212,
+          "map_fit": {
+            "map_id": 212,
+            "map_name": "map_212",
+            "bucket": "medium",
+            "rows": 50,
+            "cols": 50,
+            "city_total": 5,
+            "city_in_bounds": 5,
+            "city_oob_count": 0,
+            "operator_total": 54,
+            "operator_in_bounds": 32,
+            "operator_oob_count": 22
+          },
+          "legs": [
+            {
+              "leg_index": 0,
+              "red_role": "candidate",
+              "blue_role": "opponent",
+              "steps_executed": 400,
+              "done": false,
+              "red_score": 0.0,
+              "blue_score": 0.0,
+              "red_policy_stats": {
+                "policy_profile": "challenger",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 43,
+                    "learned": 43
+                  },
+                  "shoot": {
+                    "total": 1,
+                    "learned": 1
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -0.11627906976744186,
+                    "situation_score": 8.847377088056328e-09,
+                    "combined_score": 11.975582280086552,
+                    "samples": 43
+                  },
+                  "shoot": {
+                    "intent_bias": 1.2236754894256592,
+                    "situation_score": 1.941462102195146e-08,
+                    "combined_score": 65.07367743088776,
+                    "samples": 1
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 0,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3265452331908705e-10,
+                    "combined_score": 10.050000043265452
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 1,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3259684723295777e-10,
+                    "combined_score": 9.350000043259687
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 2,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3247730396878126e-10,
+                    "combined_score": 8.650000043247731
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 100,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.327581071272846e-10,
+                    "combined_score": 9.70000004327581
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 101,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.325482749756304e-10,
+                    "combined_score": 9.000000043254829
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 102,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.324710312086921e-10,
+                    "combined_score": 8.300000043247103
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 400,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3266892846283156e-10,
+                    "combined_score": 9.350000043266895
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 401,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.326274616328618e-10,
+                    "combined_score": 8.650000043262745
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 402,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3261477733480547e-10,
+                    "combined_score": 7.950000043261477
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3271777827591507e-10,
+                    "combined_score": 8.65000004327178
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.327176672536126e-10,
+                    "combined_score": 8.650000043271769
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3273512551067483e-10,
+                    "combined_score": 8.300000043273513
+                  }
+                ],
+                "use_ai_optimization": true
+              },
+              "blue_policy_stats": {
+                "policy_profile": "incumbent",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 1640,
+                    "learned": 6
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 0.003658536585365854,
+                "move_path_coverage": 0.003658536585365854,
+                "shoot_path_coverage": 0.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -1.0,
+                    "situation_score": 0.0015650550194550306,
+                    "combined_score": 9.206505501945502,
+                    "samples": 6
+                  },
+                  "shoot": {
+                    "intent_bias": 0.0,
+                    "situation_score": 0.0,
+                    "combined_score": 0.0,
+                    "samples": 0
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 3,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000679652439430356,
+                    "combined_score": 8.367965243943036
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 4,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 5,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006796516827307642,
+                    "combined_score": 9.067965168273076
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 6,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006796516827307642,
+                    "combined_score": 8.717965168273077
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 7,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006796497036702931,
+                    "combined_score": 10.11796497036703
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 8,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 602,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 4,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 8,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 602,
+                    "reason": "empty_route"
+                  }
+                ],
+                "use_ai_optimization": true
+              }
+            },
+            {
+              "leg_index": 1,
+              "red_role": "opponent",
+              "blue_role": "candidate",
+              "steps_executed": 400,
+              "done": false,
+              "red_score": 0.0,
+              "blue_score": 0.0,
+              "red_policy_stats": {
+                "policy_profile": "incumbent",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 43,
+                    "learned": 43
+                  },
+                  "shoot": {
+                    "total": 1,
+                    "learned": 1
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -0.09302325581395349,
+                    "situation_score": 0.0021672408397006263,
+                    "combined_score": 12.32253803745844,
+                    "samples": 43
+                  },
+                  "shoot": {
+                    "intent_bias": 0.6559397578239441,
+                    "situation_score": 0.004180782474577427,
+                    "combined_score": 64.92401800528168,
+                    "samples": 1
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 0,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700755329802632,
+                    "combined_score": 10.117007553298027
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 1,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700533558614552,
+                    "combined_score": 9.417005335586147
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 2,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000670001667458564,
+                    "combined_score": 8.717000166745857
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 100,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006701223319396377,
+                    "combined_score": 9.767012233193963
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 101,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700294325128198,
+                    "combined_score": 9.067002943251282
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 102,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006699952064082026,
+                    "combined_score": 8.366999520640821
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 400,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700826925225556,
+                    "combined_score": 9.417008269252257
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 401,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700678495690227,
+                    "combined_score": 8.717006784956903
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 402,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700651720166206,
+                    "combined_score": 8.017006517201663
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700979429297149,
+                    "combined_score": 8.717009794292972
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000670097884722054,
+                    "combined_score": 8.717009788472206
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006701041129417717,
+                    "combined_score": 8.367010411294178
+                  }
+                ],
+                "use_ai_optimization": true
+              },
+              "blue_policy_stats": {
+                "policy_profile": "challenger",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 1640,
+                    "learned": 6
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 0.003658536585365854,
+                "move_path_coverage": 0.003658536585365854,
+                "shoot_path_coverage": 0.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -1.1666666666666667,
+                    "situation_score": 5.738208357549309e-09,
+                    "combined_score": 8.883333907154169,
+                    "samples": 6
+                  },
+                  "shoot": {
+                    "intent_bias": 0.0,
+                    "situation_score": 0.0,
+                    "combined_score": 0.0,
+                    "samples": 0
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 3,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4792716757946494e-10,
+                    "combined_score": 8.300000044792718
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 4,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 5,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4792383691039106e-10,
+                    "combined_score": 9.000000044792383
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 6,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4792383691039106e-10,
+                    "combined_score": 8.650000044792383
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 7,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4791509390407214e-10,
+                    "combined_score": 10.05000004479151
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 8,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 602,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 4,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 8,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 602,
+                    "reason": "empty_route"
+                  }
+                ],
+                "use_ai_optimization": true
+              }
+            }
+          ],
+          "merged_policy_stats": {
+            "candidate": {
+              "counts": {
+                "move": {
+                  "total": 1683,
+                  "learned": 49
+                },
+                "shoot": {
+                  "total": 1,
+                  "learned": 1
+                }
+              },
+              "learned_path_coverage": 0.029691211401425176,
+              "move_path_coverage": 0.029114676173499703,
+              "shoot_path_coverage": 1.0,
+              "score_means": {
+                "move": {
+                  "samples": 49,
+                  "intent_bias": -0.24489795918367346,
+                  "situation_score": 8.466662549626897e-09,
+                  "combined_score": 11.596939622176464
+                },
+                "shoot": {
+                  "samples": 1,
+                  "intent_bias": 1.2236754894256592,
+                  "situation_score": 1.941462102195146e-08,
+                  "combined_score": 65.07367743088776
+                }
+              },
+              "policy_profiles": [
+                "challenger"
+              ],
+              "inference_devices": [
+                "cuda"
+              ],
+              "loaded_from_dirs": [
+                "/remote-home/lizilong/shenji_agent/ai/weights"
+              ],
+              "intent_model_loaded_count": 2,
+              "situation_model_loaded_count": 2,
+              "trace_samples": [
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 0,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.3265452331908705e-10,
+                  "combined_score": 10.050000043265452
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 1,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.3259684723295777e-10,
+                  "combined_score": 9.350000043259687
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 2,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.3247730396878126e-10,
+                  "combined_score": 8.650000043247731
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 100,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.327581071272846e-10,
+                  "combined_score": 9.70000004327581
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 101,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.325482749756304e-10,
+                  "combined_score": 9.000000043254829
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 102,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.324710312086921e-10,
+                  "combined_score": 8.300000043247103
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 3,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.4792716757946494e-10,
+                  "combined_score": 8.300000044792718
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 4,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 5,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.4792383691039106e-10,
+                  "combined_score": 9.000000044792383
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 6,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.4792383691039106e-10,
+                  "combined_score": 8.650000044792383
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 7,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.4791509390407214e-10,
+                  "combined_score": 10.05000004479151
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 8,
+                  "reason": "empty_route"
+                }
+              ]
+            },
+            "opponent": {
+              "counts": {
+                "move": {
+                  "total": 1683,
+                  "learned": 49
+                },
+                "shoot": {
+                  "total": 1,
+                  "learned": 1
+                }
+              },
+              "learned_path_coverage": 0.029691211401425176,
+              "move_path_coverage": 0.029114676173499703,
+              "shoot_path_coverage": 1.0,
+              "score_means": {
+                "move": {
+                  "samples": 49,
+                  "intent_bias": -0.20408163265306123,
+                  "situation_score": 0.00209350380048688,
+                  "combined_score": 11.940983033109916
+                },
+                "shoot": {
+                  "samples": 1,
+                  "intent_bias": 0.6559397578239441,
+                  "situation_score": 0.004180782474577427,
+                  "combined_score": 64.92401800528168
+                }
+              },
+              "policy_profiles": [
+                "incumbent"
+              ],
+              "inference_devices": [
+                "cuda"
+              ],
+              "loaded_from_dirs": [
+                "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights"
+              ],
+              "intent_model_loaded_count": 2,
+              "situation_model_loaded_count": 2,
+              "trace_samples": [
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 3,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.000679652439430356,
+                  "combined_score": 8.367965243943036
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 4,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 5,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006796516827307642,
+                  "combined_score": 9.067965168273076
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 6,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006796516827307642,
+                  "combined_score": 8.717965168273077
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 7,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006796497036702931,
+                  "combined_score": 10.11796497036703
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 8,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 0,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006700755329802632,
+                  "combined_score": 10.117007553298027
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 1,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006700533558614552,
+                  "combined_score": 9.417005335586147
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 2,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.000670001667458564,
+                  "combined_score": 8.717000166745857
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 100,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006701223319396377,
+                  "combined_score": 9.767012233193963
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 101,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006700294325128198,
+                  "combined_score": 9.067002943251282
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 102,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006699952064082026,
+                  "combined_score": 8.366999520640821
+                }
+              ]
+            }
+          },
+          "windows": {
+            "candidate": {
+              "0-120": {
+                "counts": {
+                  "move": {
+                    "total": 519,
+                    "learned": 21
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 0.04046242774566474,
+                "move_path_coverage": 0.04046242774566474,
+                "shoot_path_coverage": 0.0
+              },
+              "121-280": {
+                "counts": {
+                  "move": {
+                    "total": 663,
+                    "learned": 15
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 0.02262443438914027,
+                "move_path_coverage": 0.02262443438914027,
+                "shoot_path_coverage": 0.0
+              },
+              "281-400": {
+                "counts": {
+                  "move": {
+                    "total": 501,
+                    "learned": 13
+                  },
+                  "shoot": {
+                    "total": 1,
+                    "learned": 1
+                  }
+                },
+                "learned_path_coverage": 0.027888446215139442,
+                "move_path_coverage": 0.02594810379241517,
+                "shoot_path_coverage": 1.0
+              }
+            },
+            "opponent": {
+              "0-120": {
+                "counts": {
+                  "move": {
+                    "total": 519,
+                    "learned": 21
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 0.04046242774566474,
+                "move_path_coverage": 0.04046242774566474,
+                "shoot_path_coverage": 0.0
+              },
+              "121-280": {
+                "counts": {
+                  "move": {
+                    "total": 663,
+                    "learned": 15
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 0.02262443438914027,
+                "move_path_coverage": 0.02262443438914027,
+                "shoot_path_coverage": 0.0
+              },
+              "281-400": {
+                "counts": {
+                  "move": {
+                    "total": 501,
+                    "learned": 13
+                  },
+                  "shoot": {
+                    "total": 1,
+                    "learned": 1
+                  }
+                },
+                "learned_path_coverage": 0.027888446215139442,
+                "move_path_coverage": 0.02594810379241517,
+                "shoot_path_coverage": 1.0
+              }
+            }
+          },
+          "move_failures": {
+            "candidate": {
+              "0-120": {
+                "total_move_evals": 519,
+                "learned_success": 21,
+                "empty_route": 498,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 21,
+                "reachable_route_unavailable": 498,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 498
+              },
+              "121-280": {
+                "total_move_evals": 663,
+                "learned_success": 15,
+                "empty_route": 648,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 15,
+                "reachable_route_unavailable": 648,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 648
+              },
+              "281-400": {
+                "total_move_evals": 501,
+                "learned_success": 13,
+                "empty_route": 488,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 13,
+                "reachable_route_unavailable": 488,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 488
+              }
+            },
+            "opponent": {
+              "0-120": {
+                "total_move_evals": 519,
+                "learned_success": 21,
+                "empty_route": 498,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 21,
+                "reachable_route_unavailable": 498,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 498
+              },
+              "121-280": {
+                "total_move_evals": 663,
+                "learned_success": 15,
+                "empty_route": 648,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 15,
+                "reachable_route_unavailable": 648,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 648
+              },
+              "281-400": {
+                "total_move_evals": 501,
+                "learned_success": 13,
+                "empty_route": 488,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 13,
+                "reachable_route_unavailable": 488,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 488
+              }
+            }
+          },
+          "candidate_metrics": {
+            "paired_score": 0.5,
+            "candidate_leg_scores": [
+              {
+                "leg_index": 0,
+                "candidate_score": 0.0,
+                "opponent_score": 0.0
+              },
+              {
+                "leg_index": 1,
+                "candidate_score": 0.0,
+                "opponent_score": 0.0
+              }
+            ],
+            "move_total": 1683,
+            "move_learned": 49,
+            "shoot_total": 1,
+            "shoot_learned": 1,
+            "move_path_coverage": 0.029114676173499703,
+            "learned_path_coverage": 0.029691211401425176,
+            "shoot_path_coverage": 1.0,
+            "empty_route_total": 1634,
+            "empty_route_with_no_reachable_city_total": 1634,
+            "empty_route_with_reachable_alternative_total": 0,
+            "reachable_route_available_total": 49,
+            "reachable_route_unavailable_total": 1634,
+            "learned_success_total": 49,
+            "total_move_evals": 1683,
+            "window_move_path_coverage": {
+              "0-120": 0.04046242774566474,
+              "121-280": 0.02262443438914027,
+              "281-400": 0.02594810379241517
+            },
+            "window_learned_path_coverage": {
+              "0-120": 0.04046242774566474,
+              "121-280": 0.02262443438914027,
+              "281-400": 0.027888446215139442
+            }
+          }
+        },
+        "map_94": {
+          "scenario": "2120131194.json",
+          "map_id": 94,
+          "map_fit": {
+            "map_id": 94,
+            "map_name": "map_94",
+            "bucket": "simple",
+            "rows": 92,
+            "cols": 77,
+            "city_total": 5,
+            "city_in_bounds": 5,
+            "city_oob_count": 0,
+            "operator_total": 54,
+            "operator_in_bounds": 54,
+            "operator_oob_count": 0
+          },
+          "legs": [
+            {
+              "leg_index": 0,
+              "red_role": "candidate",
+              "blue_role": "opponent",
+              "steps_executed": 400,
+              "done": false,
+              "red_score": 0.0,
+              "blue_score": 0.0,
+              "red_policy_stats": {
+                "policy_profile": "challenger",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 49,
+                    "learned": 49
+                  },
+                  "shoot": {
+                    "total": 5,
+                    "learned": 5
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -1.8571428571428572,
+                    "situation_score": 9.643716712947717e-09,
+                    "combined_score": 10.188776474575754,
+                    "samples": 49
+                  },
+                  "shoot": {
+                    "intent_bias": 0.493401837348938,
+                    "situation_score": 1.5373399975260328e-08,
+                    "combined_score": 64.38340337468892,
+                    "samples": 5
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 0,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3265452331908705e-10,
+                    "combined_score": 10.050000043265452
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 1,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3259684723295777e-10,
+                    "combined_score": 9.350000043259687
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 2,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3247730396878126e-10,
+                    "combined_score": 8.650000043247731
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 100,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.327581071272846e-10,
+                    "combined_score": 9.70000004327581
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 101,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.325482749756304e-10,
+                    "combined_score": 9.000000043254829
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 102,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.324710312086921e-10,
+                    "combined_score": 8.300000043247103
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 400,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3266892846283156e-10,
+                    "combined_score": 9.350000043266895
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 401,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.326274616328618e-10,
+                    "combined_score": 8.650000043262745
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 402,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3261477733480547e-10,
+                    "combined_score": 7.950000043261477
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3271777827591507e-10,
+                    "combined_score": 8.65000004327178
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.327176672536126e-10,
+                    "combined_score": 8.650000043271769
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.3273512551067483e-10,
+                    "combined_score": 8.300000043273513
+                  }
+                ],
+                "use_ai_optimization": true
+              },
+              "blue_policy_stats": {
+                "policy_profile": "incumbent",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 36,
+                    "learned": 36
+                  },
+                  "shoot": {
+                    "total": 2,
+                    "learned": 2
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -2.3333333333333335,
+                    "situation_score": 0.0022242385716203395,
+                    "combined_score": 8.865479412717587,
+                    "samples": 36
+                  },
+                  "shoot": {
+                    "intent_bias": 0.2712557017803192,
+                    "situation_score": 0.004103143000975251,
+                    "combined_score": 40.48157000187784,
+                    "samples": 2
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 3,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000679652439430356,
+                    "combined_score": 8.367965243943036
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 4,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006796523812226951,
+                    "combined_score": 8.01796523812227
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 5,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006796516827307642,
+                    "combined_score": 9.067965168273076
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 6,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006796516827307642,
+                    "combined_score": 8.717965168273077
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 7,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006796497036702931,
+                    "combined_score": 10.11796497036703
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 8,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000679649761877954,
+                    "combined_score": 9.767964976187795
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 103,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006796782254241407,
+                    "combined_score": 7.6679678225424155
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 104,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006797151872888207,
+                    "combined_score": 7.317971518728882
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 105,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006797100650146604,
+                    "combined_score": 8.367971006501467
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 106,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006797098903916776,
+                    "combined_score": 8.017970989039169
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 107,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006796557572670281,
+                    "combined_score": 9.417965575726704
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 108,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006796635570935905,
+                    "combined_score": 9.067966355709359
+                  }
+                ],
+                "use_ai_optimization": true
+              }
+            },
+            {
+              "leg_index": 1,
+              "red_role": "opponent",
+              "blue_role": "candidate",
+              "steps_executed": 400,
+              "done": false,
+              "red_score": 0.0,
+              "blue_score": 0.0,
+              "red_policy_stats": {
+                "policy_profile": "incumbent",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 57,
+                    "learned": 57
+                  },
+                  "shoot": {
+                    "total": 4,
+                    "learned": 4
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -1.1403508771929824,
+                    "situation_score": 0.0035386590456606398,
+                    "combined_score": 11.239830816846778,
+                    "samples": 57
+                  },
+                  "shoot": {
+                    "intent_bias": 0.21355505287647247,
+                    "situation_score": 0.004780816496349871,
+                    "combined_score": 62.56663670251145,
+                    "samples": 4
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 0,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700755329802632,
+                    "combined_score": 10.117007553298027
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 1,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700533558614552,
+                    "combined_score": 9.417005335586147
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 2,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000670001667458564,
+                    "combined_score": 8.717000166745857
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 100,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006701223319396377,
+                    "combined_score": 9.767012233193963
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 101,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700294325128198,
+                    "combined_score": 9.067002943251282
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 102,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006699952064082026,
+                    "combined_score": 8.366999520640821
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 400,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700826925225556,
+                    "combined_score": 9.417008269252257
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 401,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700678495690227,
+                    "combined_score": 8.717006784956903
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 402,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700651720166206,
+                    "combined_score": 8.017006517201663
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006700979429297149,
+                    "combined_score": 8.717009794292972
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000670097884722054,
+                    "combined_score": 8.717009788472206
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0006701041129417717,
+                    "combined_score": 8.367010411294178
+                  }
+                ],
+                "use_ai_optimization": true
+              },
+              "blue_policy_stats": {
+                "policy_profile": "challenger",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 37,
+                    "learned": 37
+                  },
+                  "shoot": {
+                    "total": 5,
+                    "learned": 5
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -2.0,
+                    "situation_score": 6.339312198301096e-09,
+                    "combined_score": 9.036487120417709,
+                    "samples": 37
+                  },
+                  "shoot": {
+                    "intent_bias": 0.0940929889678955,
+                    "situation_score": 1.384722985164899e-08,
+                    "combined_score": 54.324094373690876,
+                    "samples": 5
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 3,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4792716757946494e-10,
+                    "combined_score": 8.300000044792718
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 4,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4792716757946494e-10,
+                    "combined_score": 7.950000044792718
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 5,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4792383691039106e-10,
+                    "combined_score": 9.000000044792383
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 6,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4792383691039106e-10,
+                    "combined_score": 8.650000044792383
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 7,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4791509390407214e-10,
+                    "combined_score": 10.05000004479151
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 8,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.479150383929209e-10,
+                    "combined_score": 9.700000044791505
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 103,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.47977710482661e-10,
+                    "combined_score": 7.600000044797774
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 104,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4804596144309983e-10,
+                    "combined_score": 7.250000044804597
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 105,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.480274762297398e-10,
+                    "combined_score": 8.300000044802747
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 106,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.480273096962861e-10,
+                    "combined_score": 7.950000044802733
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 107,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4792694553486e-10,
+                    "combined_score": 9.350000044792697
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 108,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.4794143394533137e-10,
+                    "combined_score": 9.000000044794142
+                  }
+                ],
+                "use_ai_optimization": true
+              }
+            }
+          ],
+          "merged_policy_stats": {
+            "candidate": {
+              "counts": {
+                "move": {
+                  "total": 86,
+                  "learned": 86
+                },
+                "shoot": {
+                  "total": 10,
+                  "learned": 10
+                }
+              },
+              "learned_path_coverage": 1.0,
+              "move_path_coverage": 1.0,
+              "shoot_path_coverage": 1.0,
+              "score_means": {
+                "move": {
+                  "samples": 86,
+                  "intent_bias": -1.9186046511627908,
+                  "situation_score": 8.222054305483473e-09,
+                  "combined_score": 9.693024078019386
+                },
+                "shoot": {
+                  "samples": 10,
+                  "intent_bias": 0.29374741315841674,
+                  "situation_score": 1.4610314913454658e-08,
+                  "combined_score": 59.3537488741899
+                }
+              },
+              "policy_profiles": [
+                "challenger"
+              ],
+              "inference_devices": [
+                "cuda"
+              ],
+              "loaded_from_dirs": [
+                "/remote-home/lizilong/shenji_agent/ai/weights"
+              ],
+              "intent_model_loaded_count": 2,
+              "situation_model_loaded_count": 2,
+              "trace_samples": [
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 0,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.3265452331908705e-10,
+                  "combined_score": 10.050000043265452
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 1,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.3259684723295777e-10,
+                  "combined_score": 9.350000043259687
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 2,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.3247730396878126e-10,
+                  "combined_score": 8.650000043247731
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 100,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.327581071272846e-10,
+                  "combined_score": 9.70000004327581
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 101,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.325482749756304e-10,
+                  "combined_score": 9.000000043254829
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 102,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.324710312086921e-10,
+                  "combined_score": 8.300000043247103
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 3,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.4792716757946494e-10,
+                  "combined_score": 8.300000044792718
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 4,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.4792716757946494e-10,
+                  "combined_score": 7.950000044792718
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 5,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.4792383691039106e-10,
+                  "combined_score": 9.000000044792383
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 6,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.4792383691039106e-10,
+                  "combined_score": 8.650000044792383
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 7,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.4791509390407214e-10,
+                  "combined_score": 10.05000004479151
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 8,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 4.479150383929209e-10,
+                  "combined_score": 9.700000044791505
+                }
+              ]
+            },
+            "opponent": {
+              "counts": {
+                "move": {
+                  "total": 93,
+                  "learned": 93
+                },
+                "shoot": {
+                  "total": 6,
+                  "learned": 6
+                }
+              },
+              "learned_path_coverage": 1.0,
+              "move_path_coverage": 1.0,
+              "shoot_path_coverage": 1.0,
+              "score_means": {
+                "move": {
+                  "samples": 93,
+                  "intent_bias": -1.6021505376344085,
+                  "situation_score": 0.0030298511202256845,
+                  "combined_score": 10.320727047506445
+                },
+                "shoot": {
+                  "samples": 6,
+                  "intent_bias": 0.23278860251108804,
+                  "situation_score": 0.0045549253312249975,
+                  "combined_score": 55.20494780230025
+                }
+              },
+              "policy_profiles": [
+                "incumbent"
+              ],
+              "inference_devices": [
+                "cuda"
+              ],
+              "loaded_from_dirs": [
+                "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights"
+              ],
+              "intent_model_loaded_count": 2,
+              "situation_model_loaded_count": 2,
+              "trace_samples": [
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 3,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.000679652439430356,
+                  "combined_score": 8.367965243943036
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 4,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006796523812226951,
+                  "combined_score": 8.01796523812227
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 5,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006796516827307642,
+                  "combined_score": 9.067965168273076
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 6,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006796516827307642,
+                  "combined_score": 8.717965168273077
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 7,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006796497036702931,
+                  "combined_score": 10.11796497036703
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 8,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.000679649761877954,
+                  "combined_score": 9.767964976187795
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 0,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006700755329802632,
+                  "combined_score": 10.117007553298027
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 1,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006700533558614552,
+                  "combined_score": 9.417005335586147
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 2,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.000670001667458564,
+                  "combined_score": 8.717000166745857
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 100,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006701223319396377,
+                  "combined_score": 9.767012233193963
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 101,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006700294325128198,
+                  "combined_score": 9.067002943251282
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 102,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0006699952064082026,
+                  "combined_score": 8.366999520640821
+                }
+              ]
+            }
+          },
+          "windows": {
+            "candidate": {
+              "0-120": {
+                "counts": {
+                  "move": {
+                    "total": 32,
+                    "learned": 32
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 0.0
+              },
+              "121-280": {
+                "counts": {
+                  "move": {
+                    "total": 18,
+                    "learned": 18
+                  },
+                  "shoot": {
+                    "total": 2,
+                    "learned": 2
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0
+              },
+              "281-400": {
+                "counts": {
+                  "move": {
+                    "total": 36,
+                    "learned": 36
+                  },
+                  "shoot": {
+                    "total": 8,
+                    "learned": 8
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0
+              }
+            },
+            "opponent": {
+              "0-120": {
+                "counts": {
+                  "move": {
+                    "total": 32,
+                    "learned": 32
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 0.0
+              },
+              "121-280": {
+                "counts": {
+                  "move": {
+                    "total": 18,
+                    "learned": 18
+                  },
+                  "shoot": {
+                    "total": 2,
+                    "learned": 2
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0
+              },
+              "281-400": {
+                "counts": {
+                  "move": {
+                    "total": 43,
+                    "learned": 43
+                  },
+                  "shoot": {
+                    "total": 4,
+                    "learned": 4
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0
+              }
+            }
+          },
+          "move_failures": {
+            "candidate": {
+              "0-120": {
+                "total_move_evals": 32,
+                "learned_success": 32,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 32,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              },
+              "121-280": {
+                "total_move_evals": 18,
+                "learned_success": 18,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 18,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              },
+              "281-400": {
+                "total_move_evals": 36,
+                "learned_success": 36,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 36,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              }
+            },
+            "opponent": {
+              "0-120": {
+                "total_move_evals": 32,
+                "learned_success": 32,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 32,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              },
+              "121-280": {
+                "total_move_evals": 18,
+                "learned_success": 18,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 18,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              },
+              "281-400": {
+                "total_move_evals": 43,
+                "learned_success": 43,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 43,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              }
+            }
+          },
+          "candidate_metrics": {
+            "paired_score": 0.5,
+            "candidate_leg_scores": [
+              {
+                "leg_index": 0,
+                "candidate_score": 0.0,
+                "opponent_score": 0.0
+              },
+              {
+                "leg_index": 1,
+                "candidate_score": 0.0,
+                "opponent_score": 0.0
+              }
+            ],
+            "move_total": 86,
+            "move_learned": 86,
+            "shoot_total": 10,
+            "shoot_learned": 10,
+            "move_path_coverage": 1.0,
+            "learned_path_coverage": 1.0,
+            "shoot_path_coverage": 1.0,
+            "empty_route_total": 0,
+            "empty_route_with_no_reachable_city_total": 0,
+            "empty_route_with_reachable_alternative_total": 0,
+            "reachable_route_available_total": 86,
+            "reachable_route_unavailable_total": 0,
+            "learned_success_total": 86,
+            "total_move_evals": 86,
+            "window_move_path_coverage": {
+              "0-120": 1.0,
+              "121-280": 1.0,
+              "281-400": 1.0
+            },
+            "window_learned_path_coverage": {
+              "0-120": 1.0,
+              "121-280": 1.0,
+              "281-400": 1.0
+            }
+          }
+        }
+      }
+    },
+    "2120131294.json": {
+      "scenario": "2120131294.json",
+      "current_resolved_map_id": 212,
+      "current_resolved_bucket": "medium",
+      "maps": {
+        "map_212": {
+          "scenario": "2120131294.json",
+          "map_id": 212,
+          "map_fit": {
+            "map_id": 212,
+            "map_name": "map_212",
+            "bucket": "medium",
+            "rows": 50,
+            "cols": 50,
+            "city_total": 5,
+            "city_in_bounds": 5,
+            "city_oob_count": 0,
+            "operator_total": 61,
+            "operator_in_bounds": 36,
+            "operator_oob_count": 25
+          },
+          "legs": [
+            {
+              "leg_index": 0,
+              "red_role": "candidate",
+              "blue_role": "opponent",
+              "steps_executed": 400,
+              "done": false,
+              "red_score": 0.0,
+              "blue_score": 0.0,
+              "red_policy_stats": {
+                "policy_profile": "challenger",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 37,
+                    "learned": 37
+                  },
+                  "shoot": {
+                    "total": 2,
+                    "learned": 2
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": 0.0,
+                    "situation_score": 4.964340057652402e-10,
+                    "combined_score": 11.658108157751512,
+                    "samples": 37
+                  },
+                  "shoot": {
+                    "intent_bias": 0.0,
+                    "situation_score": 6.079780567880277e-10,
+                    "combined_score": 63.950000060797805,
+                    "samples": 2
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 2.828061743120891e-11,
+                    "combined_score": 7.6000000028280645
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 2.8280613961761958e-11,
+                    "combined_score": 7.950000002828064
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 601,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.455594144163854e-11,
+                    "combined_score": 7.600000003455595
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.520358657360667e-11,
+                    "combined_score": 7.250000003520359
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 2.003571752950961e-10,
+                    "combined_score": 13.550000020035718
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 62,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.379530821856491e-10,
+                    "combined_score": 9.00000003379531
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 101,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.380750679404798e-10,
+                    "combined_score": 10.400000033807506
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 72,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.4231972811937794e-10,
+                    "combined_score": 10.400000034231974
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 77,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.4229705181409997e-10,
+                    "combined_score": 9.000000034229704
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.336236925084336e-10,
+                    "combined_score": 13.55000004336237
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 4.5131565151734776e-10,
+                    "combined_score": 13.550000045131565
+                  },
+                  {
+                    "action": "shoot",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 5,
+                    "intent_bias": 0.0,
+                    "situation_score": 4.75211703321321e-10,
+                    "combined_score": 63.95000004752117
+                  }
+                ],
+                "use_ai_optimization": true
+              },
+              "blue_policy_stats": {
+                "policy_profile": "incumbent",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 2421,
+                    "learned": 7
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 0.0028913672036348617,
+                "move_path_coverage": 0.0028913672036348617,
+                "shoot_path_coverage": 0.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -1.7142857142857142,
+                    "situation_score": 0.0014976504358596035,
+                    "combined_score": 8.035479329300246,
+                    "samples": 7
+                  },
+                  "shoot": {
+                    "intent_bias": 0.0,
+                    "situation_score": 0.0,
+                    "combined_score": 0.0,
+                    "samples": 0
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  }
+                ],
+                "use_ai_optimization": true
+              }
+            },
+            {
+              "leg_index": 1,
+              "red_role": "opponent",
+              "blue_role": "candidate",
+              "steps_executed": 400,
+              "done": false,
+              "red_score": 0.0,
+              "blue_score": 0.0,
+              "red_policy_stats": {
+                "policy_profile": "incumbent",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 37,
+                    "learned": 37
+                  },
+                  "shoot": {
+                    "total": 2,
+                    "learned": 2
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": 0.0,
+                    "situation_score": 0.0017818608384176685,
+                    "combined_score": 11.836294191949879,
+                    "samples": 37
+                  },
+                  "shoot": {
+                    "intent_bias": 0.0,
+                    "situation_score": 0.0020215529948472977,
+                    "combined_score": 64.15215529948473,
+                    "samples": 2
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.00044742715544998646,
+                    "combined_score": 7.644742715545
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000447427126346156,
+                    "combined_score": 7.994742712634617
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 601,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.00048398738726973534,
+                    "combined_score": 7.648398738726975
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.00048739989870227873,
+                    "combined_score": 7.298739989870228
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0009732715552672744,
+                    "combined_score": 13.647327155526728
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 62,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.001172590535134077,
+                    "combined_score": 9.117259053513408
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 101,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0011727414093911648,
+                    "combined_score": 10.517274140939117
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 72,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0011805290123447776,
+                    "combined_score": 10.518052901234478
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 77,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.001180505147203803,
+                    "combined_score": 9.11805051472038
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0013986265985295177,
+                    "combined_score": 13.689862659852952
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0014398775529116392,
+                    "combined_score": 13.693987755291165
+                  },
+                  {
+                    "action": "shoot",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 5,
+                    "intent_bias": 0.0,
+                    "situation_score": 0.0014951333869248629,
+                    "combined_score": 64.09951333869249
+                  }
+                ],
+                "use_ai_optimization": true
+              },
+              "blue_policy_stats": {
+                "policy_profile": "challenger",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 2402,
+                    "learned": 8
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 0.0033305578684429643,
+                "move_path_coverage": 0.0033305578684429643,
+                "shoot_path_coverage": 0.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -1.125,
+                    "situation_score": 3.9827358511851374e-10,
+                    "combined_score": 8.83750003982736,
+                    "samples": 8
+                  },
+                  "shoot": {
+                    "intent_bias": 0.0,
+                    "situation_score": 0.0,
+                    "combined_score": 0.0,
+                    "samples": 0
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 502,
+                    "reason": "empty_route"
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": false,
+                    "obj_id": 503,
+                    "reason": "empty_route"
+                  }
+                ],
+                "use_ai_optimization": true
+              }
+            }
+          ],
+          "merged_policy_stats": {
+            "candidate": {
+              "counts": {
+                "move": {
+                  "total": 2439,
+                  "learned": 45
+                },
+                "shoot": {
+                  "total": 2,
+                  "learned": 2
+                }
+              },
+              "learned_path_coverage": 0.01925440393281442,
+              "move_path_coverage": 0.01845018450184502,
+              "shoot_path_coverage": 1.0,
+              "score_means": {
+                "move": {
+                  "samples": 45,
+                  "intent_bias": -0.2,
+                  "situation_score": 4.789832643169333e-10,
+                  "combined_score": 11.156666714564995
+                },
+                "shoot": {
+                  "samples": 2,
+                  "intent_bias": 0.0,
+                  "situation_score": 6.079780567880277e-10,
+                  "combined_score": 63.950000060797805
+                }
+              },
+              "policy_profiles": [
+                "challenger"
+              ],
+              "inference_devices": [
+                "cuda"
+              ],
+              "loaded_from_dirs": [
+                "/remote-home/lizilong/shenji_agent/ai/weights"
+              ],
+              "intent_model_loaded_count": 2,
+              "situation_model_loaded_count": 2,
+              "trace_samples": [
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 500,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 2.828061743120891e-11,
+                  "combined_score": 7.6000000028280645
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 501,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 2.8280613961761958e-11,
+                  "combined_score": 7.950000002828064
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 601,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 3.455594144163854e-11,
+                  "combined_score": 7.600000003455595
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 600,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 3.520358657360667e-11,
+                  "combined_score": 7.250000003520359
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 600,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 2.003571752950961e-10,
+                  "combined_score": 13.550000020035718
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 62,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 3.379530821856491e-10,
+                  "combined_score": 9.00000003379531
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 502,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 503,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 502,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 503,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 502,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 503,
+                  "reason": "empty_route"
+                }
+              ]
+            },
+            "opponent": {
+              "counts": {
+                "move": {
+                  "total": 2458,
+                  "learned": 44
+                },
+                "shoot": {
+                  "total": 2,
+                  "learned": 2
+                }
+              },
+              "learned_path_coverage": 0.01869918699186992,
+              "move_path_coverage": 0.01790073230268511,
+              "shoot_path_coverage": 1.0,
+              "score_means": {
+                "move": {
+                  "samples": 44,
+                  "intent_bias": -0.2727272727272727,
+                  "situation_score": 0.0017366455471016127,
+                  "combined_score": 11.231619100164709
+                },
+                "shoot": {
+                  "samples": 2,
+                  "intent_bias": 0.0,
+                  "situation_score": 0.0020215529948472977,
+                  "combined_score": 64.15215529948473
+                }
+              },
+              "policy_profiles": [
+                "incumbent"
+              ],
+              "inference_devices": [
+                "cuda"
+              ],
+              "loaded_from_dirs": [
+                "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights"
+              ],
+              "intent_model_loaded_count": 2,
+              "situation_model_loaded_count": 2,
+              "trace_samples": [
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 502,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 503,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 502,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 503,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 502,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": false,
+                  "obj_id": 503,
+                  "reason": "empty_route"
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 500,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.00044742715544998646,
+                  "combined_score": 7.644742715545
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 501,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.000447427126346156,
+                  "combined_score": 7.994742712634617
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 601,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.00048398738726973534,
+                  "combined_score": 7.648398738726975
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 600,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.00048739989870227873,
+                  "combined_score": 7.298739989870228
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 600,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0009732715552672744,
+                  "combined_score": 13.647327155526728
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 62,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.001172590535134077,
+                  "combined_score": 9.117259053513408
+                }
+              ]
+            }
+          },
+          "windows": {
+            "candidate": {
+              "0-120": {
+                "counts": {
+                  "move": {
+                    "total": 392,
+                    "learned": 9
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 0.02295918367346939,
+                "move_path_coverage": 0.02295918367346939,
+                "shoot_path_coverage": 0.0
+              },
+              "121-280": {
+                "counts": {
+                  "move": {
+                    "total": 965,
+                    "learned": 19
+                  },
+                  "shoot": {
+                    "total": 1,
+                    "learned": 1
+                  }
+                },
+                "learned_path_coverage": 0.020703933747412008,
+                "move_path_coverage": 0.019689119170984457,
+                "shoot_path_coverage": 1.0
+              },
+              "281-400": {
+                "counts": {
+                  "move": {
+                    "total": 1082,
+                    "learned": 17
+                  },
+                  "shoot": {
+                    "total": 1,
+                    "learned": 1
+                  }
+                },
+                "learned_path_coverage": 0.01662049861495845,
+                "move_path_coverage": 0.015711645101663587,
+                "shoot_path_coverage": 1.0
+              }
+            },
+            "opponent": {
+              "0-120": {
+                "counts": {
+                  "move": {
+                    "total": 392,
+                    "learned": 9
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 0.02295918367346939,
+                "move_path_coverage": 0.02295918367346939,
+                "shoot_path_coverage": 0.0
+              },
+              "121-280": {
+                "counts": {
+                  "move": {
+                    "total": 962,
+                    "learned": 21
+                  },
+                  "shoot": {
+                    "total": 1,
+                    "learned": 1
+                  }
+                },
+                "learned_path_coverage": 0.02284527518172378,
+                "move_path_coverage": 0.02182952182952183,
+                "shoot_path_coverage": 1.0
+              },
+              "281-400": {
+                "counts": {
+                  "move": {
+                    "total": 1104,
+                    "learned": 14
+                  },
+                  "shoot": {
+                    "total": 1,
+                    "learned": 1
+                  }
+                },
+                "learned_path_coverage": 0.013574660633484163,
+                "move_path_coverage": 0.012681159420289856,
+                "shoot_path_coverage": 1.0
+              }
+            }
+          },
+          "move_failures": {
+            "candidate": {
+              "0-120": {
+                "total_move_evals": 392,
+                "learned_success": 9,
+                "empty_route": 383,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 9,
+                "reachable_route_unavailable": 383,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 383
+              },
+              "121-280": {
+                "total_move_evals": 965,
+                "learned_success": 19,
+                "empty_route": 946,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 19,
+                "reachable_route_unavailable": 946,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 946
+              },
+              "281-400": {
+                "total_move_evals": 1082,
+                "learned_success": 17,
+                "empty_route": 1065,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 17,
+                "reachable_route_unavailable": 1065,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 1065
+              }
+            },
+            "opponent": {
+              "0-120": {
+                "total_move_evals": 392,
+                "learned_success": 9,
+                "empty_route": 383,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 9,
+                "reachable_route_unavailable": 383,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 383
+              },
+              "121-280": {
+                "total_move_evals": 962,
+                "learned_success": 21,
+                "empty_route": 941,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 21,
+                "reachable_route_unavailable": 941,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 941
+              },
+              "281-400": {
+                "total_move_evals": 1104,
+                "learned_success": 14,
+                "empty_route": 1090,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 14,
+                "reachable_route_unavailable": 1090,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 1090
+              }
+            }
+          },
+          "candidate_metrics": {
+            "paired_score": 0.5,
+            "candidate_leg_scores": [
+              {
+                "leg_index": 0,
+                "candidate_score": 0.0,
+                "opponent_score": 0.0
+              },
+              {
+                "leg_index": 1,
+                "candidate_score": 0.0,
+                "opponent_score": 0.0
+              }
+            ],
+            "move_total": 2439,
+            "move_learned": 45,
+            "shoot_total": 2,
+            "shoot_learned": 2,
+            "move_path_coverage": 0.01845018450184502,
+            "learned_path_coverage": 0.01925440393281442,
+            "shoot_path_coverage": 1.0,
+            "empty_route_total": 2394,
+            "empty_route_with_no_reachable_city_total": 2394,
+            "empty_route_with_reachable_alternative_total": 0,
+            "reachable_route_available_total": 45,
+            "reachable_route_unavailable_total": 2394,
+            "learned_success_total": 45,
+            "total_move_evals": 2439,
+            "window_move_path_coverage": {
+              "0-120": 0.02295918367346939,
+              "121-280": 0.019689119170984457,
+              "281-400": 0.015711645101663587
+            },
+            "window_learned_path_coverage": {
+              "0-120": 0.02295918367346939,
+              "121-280": 0.020703933747412008,
+              "281-400": 0.01662049861495845
+            }
+          }
+        },
+        "map_94": {
+          "scenario": "2120131294.json",
+          "map_id": 94,
+          "map_fit": {
+            "map_id": 94,
+            "map_name": "map_94",
+            "bucket": "simple",
+            "rows": 92,
+            "cols": 77,
+            "city_total": 5,
+            "city_in_bounds": 5,
+            "city_oob_count": 0,
+            "operator_total": 61,
+            "operator_in_bounds": 61,
+            "operator_oob_count": 0
+          },
+          "legs": [
+            {
+              "leg_index": 0,
+              "red_role": "candidate",
+              "blue_role": "opponent",
+              "steps_executed": 400,
+              "done": false,
+              "red_score": 0.0,
+              "blue_score": 0.0,
+              "red_policy_stats": {
+                "policy_profile": "challenger",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 37,
+                    "learned": 37
+                  },
+                  "shoot": {
+                    "total": 4,
+                    "learned": 4
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -1.7297297297297298,
+                    "situation_score": 4.440858315464198e-10,
+                    "combined_score": 8.504054098462637,
+                    "samples": 37
+                  },
+                  "shoot": {
+                    "intent_bias": 0.11835300177335739,
+                    "situation_score": 5.161366820050084e-10,
+                    "combined_score": 64.06835305338703,
+                    "samples": 4
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 2.828061743120891e-11,
+                    "combined_score": 7.6000000028280645
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 2.8280613961761958e-11,
+                    "combined_score": 7.950000002828064
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 601,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.455594144163854e-11,
+                    "combined_score": 7.600000003455595
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.520358657360667e-11,
+                    "combined_score": 7.250000003520359
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1532,
+                    "intent_bias": -4.0,
+                    "situation_score": 1.9627584280090815e-10,
+                    "combined_score": 9.550000019627586
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 74,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.344692578455266e-10,
+                    "combined_score": 9.000000033446927
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 101,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.3453204095756917e-10,
+                    "combined_score": 10.400000033453205
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 84,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.3867425530687e-10,
+                    "combined_score": 10.400000033867427
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 89,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 3.3860650394679226e-10,
+                    "combined_score": 9.000000033860651
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1532,
+                    "intent_bias": -5.0,
+                    "situation_score": 4.279496756964818e-10,
+                    "combined_score": 8.550000042794967
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1532,
+                    "intent_bias": -5.0,
+                    "situation_score": 4.455844859752034e-10,
+                    "combined_score": 8.550000044558448
+                  },
+                  {
+                    "action": "shoot",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 7,
+                    "intent_bias": 0.0,
+                    "situation_score": 4.692635724445893e-10,
+                    "combined_score": 63.95000004692636
+                  }
+                ],
+                "use_ai_optimization": true
+              },
+              "blue_policy_stats": {
+                "policy_profile": "incumbent",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 42,
+                    "learned": 42
+                  },
+                  "shoot": {
+                    "total": 2,
+                    "learned": 2
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -2.119047619047619,
+                    "situation_score": 0.002415407508600592,
+                    "combined_score": 7.303445512764823,
+                    "samples": 42
+                  },
+                  "shoot": {
+                    "intent_bias": 5.3282575607299805,
+                    "situation_score": 0.002313756966032088,
+                    "combined_score": 21.50963325733319,
+                    "samples": 2
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 502,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.00044933820026926696,
+                    "combined_score": 6.594933820026927
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 503,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0004493383748922497,
+                    "combined_score": 6.944933837489225
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 603,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0004664601292461157,
+                    "combined_score": 6.596646012924612
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 602,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000651825568638742,
+                    "combined_score": 6.265182556863875
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 12,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0007859413744881749,
+                    "combined_score": 8.378594137448818
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 13,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000785941316280514,
+                    "combined_score": 8.028594131628052
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 14,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0007859414909034967,
+                    "combined_score": 9.07859414909035
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 15,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0007859414909034967,
+                    "combined_score": 8.72859414909035
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 16,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000785941956564784,
+                    "combined_score": 10.12859419565648
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 17,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000785941956564784,
+                    "combined_score": 9.778594195656478
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 603,
+                    "candidate_id": 1733,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.0009723830735310912,
+                    "combined_score": 9.39723830735311
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 603,
+                    "candidate_id": 1532,
+                    "intent_bias": -1.0,
+                    "situation_score": 0.0010184227721765637,
+                    "combined_score": 14.401842277217657
+                  }
+                ],
+                "use_ai_optimization": true
+              }
+            },
+            {
+              "leg_index": 1,
+              "red_role": "opponent",
+              "blue_role": "candidate",
+              "steps_executed": 400,
+              "done": false,
+              "red_score": 0.0,
+              "blue_score": 0.0,
+              "red_policy_stats": {
+                "policy_profile": "incumbent",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 35,
+                    "learned": 35
+                  },
+                  "shoot": {
+                    "total": 4,
+                    "learned": 4
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -1.8285714285714285,
+                    "situation_score": 0.0016080701973156205,
+                    "combined_score": 8.779378448302992,
+                    "samples": 35
+                  },
+                  "shoot": {
+                    "intent_bias": 0.0,
+                    "situation_score": 0.001701691362541169,
+                    "combined_score": 64.12016913625412,
+                    "samples": 4
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.00044742715544998646,
+                    "combined_score": 7.644742715545
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.000447427126346156,
+                    "combined_score": 7.994742712634617
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 601,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.00048398738726973534,
+                    "combined_score": 7.648398738726975
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1227,
+                    "intent_bias": -0.0,
+                    "situation_score": 0.00048739989870227873,
+                    "combined_score": 7.298739989870228
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 1532,
+                    "intent_bias": -5.0,
+                    "situation_score": 0.0009644126403145492,
+                    "combined_score": 8.646441264031456
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 74,
+                    "candidate_id": 1227,
+                    "intent_bias": -1.0,
+                    "situation_score": 0.0011645086342468858,
+                    "combined_score": 8.116450863424689
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 101,
+                    "candidate_id": 1227,
+                    "intent_bias": -1.0,
+                    "situation_score": 0.0011645848862826824,
+                    "combined_score": 9.516458488628269
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 84,
+                    "candidate_id": 1227,
+                    "intent_bias": -1.0,
+                    "situation_score": 0.0011723083443939686,
+                    "combined_score": 9.517230834439397
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 89,
+                    "candidate_id": 1227,
+                    "intent_bias": -1.0,
+                    "situation_score": 0.001172219286672771,
+                    "combined_score": 8.117221928667277
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 501,
+                    "candidate_id": 1532,
+                    "intent_bias": -5.0,
+                    "situation_score": 0.0013897853204980493,
+                    "combined_score": 8.688978532049806
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 500,
+                    "candidate_id": 1532,
+                    "intent_bias": -5.0,
+                    "situation_score": 0.0014324260409921408,
+                    "combined_score": 8.693242604099215
+                  },
+                  {
+                    "action": "shoot",
+                    "used_learned": true,
+                    "obj_id": 600,
+                    "candidate_id": 7,
+                    "intent_bias": 0.0,
+                    "situation_score": 0.0014866726705804467,
+                    "combined_score": 64.09866726705805
+                  }
+                ],
+                "use_ai_optimization": true
+              },
+              "blue_policy_stats": {
+                "policy_profile": "challenger",
+                "device": "cuda",
+                "requested_device": "cuda",
+                "loaded_from": "/remote-home/lizilong/shenji_agent/ai/weights",
+                "intent_model_loaded": true,
+                "situation_model_loaded": true,
+                "counts": {
+                  "move": {
+                    "total": 42,
+                    "learned": 42
+                  },
+                  "shoot": {
+                    "total": 2,
+                    "learned": 2
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0,
+                "score_means": {
+                  "move": {
+                    "intent_bias": -2.4047619047619047,
+                    "situation_score": 5.090716998078557e-10,
+                    "combined_score": 6.789285765192884,
+                    "samples": 42
+                  },
+                  "shoot": {
+                    "intent_bias": 2.1039438247680664,
+                    "situation_score": 5.913342038255109e-10,
+                    "combined_score": 46.05394388390149,
+                    "samples": 2
+                  }
+                },
+                "trace_samples": [
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 502,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 2.6170137237824243e-11,
+                    "combined_score": 6.550000002617015
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 503,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 2.6170208361486758e-11,
+                    "combined_score": 6.900000002617022
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 603,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 2.864543498237726e-11,
+                    "combined_score": 6.550000002864543
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 602,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 6.572316996189542e-11,
+                    "combined_score": 6.200000006572319
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 12,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 9.832776259877107e-11,
+                    "combined_score": 8.300000009832775
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 13,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 9.832777647655888e-11,
+                    "combined_score": 7.950000009832779
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 14,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 9.832733932624294e-11,
+                    "combined_score": 9.000000009832736
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 15,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 9.832733932624294e-11,
+                    "combined_score": 8.650000009832736
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 16,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 9.832624991990002e-11,
+                    "combined_score": 10.050000009832626
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 17,
+                    "candidate_id": 1532,
+                    "intent_bias": -0.0,
+                    "situation_score": 9.832624991990002e-11,
+                    "combined_score": 9.700000009832625
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 603,
+                    "candidate_id": 1733,
+                    "intent_bias": -0.0,
+                    "situation_score": 1.9198136136377997e-10,
+                    "combined_score": 9.300000019198137
+                  },
+                  {
+                    "action": "move",
+                    "used_learned": true,
+                    "obj_id": 603,
+                    "candidate_id": 1532,
+                    "intent_bias": -2.0,
+                    "situation_score": 2.261407172632346e-10,
+                    "combined_score": 13.300000022614071
+                  }
+                ],
+                "use_ai_optimization": true
+              }
+            }
+          ],
+          "merged_policy_stats": {
+            "candidate": {
+              "counts": {
+                "move": {
+                  "total": 79,
+                  "learned": 79
+                },
+                "shoot": {
+                  "total": 6,
+                  "learned": 6
+                }
+              },
+              "learned_path_coverage": 1.0,
+              "move_path_coverage": 1.0,
+              "shoot_path_coverage": 1.0,
+              "score_means": {
+                "move": {
+                  "samples": 79,
+                  "intent_bias": -2.088607594936709,
+                  "situation_score": 4.786352804955376e-10,
+                  "combined_score": 7.592405111154667
+                },
+                "shoot": {
+                  "samples": 6,
+                  "intent_bias": 0.7802166094382604,
+                  "situation_score": 5.412025226118425e-10,
+                  "combined_score": 58.06354999689185
+                }
+              },
+              "policy_profiles": [
+                "challenger"
+              ],
+              "inference_devices": [
+                "cuda"
+              ],
+              "loaded_from_dirs": [
+                "/remote-home/lizilong/shenji_agent/ai/weights"
+              ],
+              "intent_model_loaded_count": 2,
+              "situation_model_loaded_count": 2,
+              "trace_samples": [
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 500,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 2.828061743120891e-11,
+                  "combined_score": 7.6000000028280645
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 501,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 2.8280613961761958e-11,
+                  "combined_score": 7.950000002828064
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 601,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 3.455594144163854e-11,
+                  "combined_score": 7.600000003455595
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 600,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 3.520358657360667e-11,
+                  "combined_score": 7.250000003520359
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 600,
+                  "candidate_id": 1532,
+                  "intent_bias": -4.0,
+                  "situation_score": 1.9627584280090815e-10,
+                  "combined_score": 9.550000019627586
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 74,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 3.344692578455266e-10,
+                  "combined_score": 9.000000033446927
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 502,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 2.6170137237824243e-11,
+                  "combined_score": 6.550000002617015
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 503,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 2.6170208361486758e-11,
+                  "combined_score": 6.900000002617022
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 603,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 2.864543498237726e-11,
+                  "combined_score": 6.550000002864543
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 602,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 6.572316996189542e-11,
+                  "combined_score": 6.200000006572319
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 12,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 9.832776259877107e-11,
+                  "combined_score": 8.300000009832775
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 13,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 9.832777647655888e-11,
+                  "combined_score": 7.950000009832779
+                }
+              ]
+            },
+            "opponent": {
+              "counts": {
+                "move": {
+                  "total": 77,
+                  "learned": 77
+                },
+                "shoot": {
+                  "total": 6,
+                  "learned": 6
+                }
+              },
+              "learned_path_coverage": 1.0,
+              "move_path_coverage": 1.0,
+              "shoot_path_coverage": 1.0,
+              "score_means": {
+                "move": {
+                  "samples": 77,
+                  "intent_bias": -1.9870129870129871,
+                  "situation_score": 0.0020484360034710596,
+                  "combined_score": 7.974324119827628
+                },
+                "shoot": {
+                  "samples": 6,
+                  "intent_bias": 1.7760858535766602,
+                  "situation_score": 0.0019057132303714752,
+                  "combined_score": 49.9166571766138
+                }
+              },
+              "policy_profiles": [
+                "incumbent"
+              ],
+              "inference_devices": [
+                "cuda"
+              ],
+              "loaded_from_dirs": [
+                "/remote-home/lizilong/shenji_agent/artifacts/best_agent/weights"
+              ],
+              "intent_model_loaded_count": 2,
+              "situation_model_loaded_count": 2,
+              "trace_samples": [
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 502,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.00044933820026926696,
+                  "combined_score": 6.594933820026927
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 503,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0004493383748922497,
+                  "combined_score": 6.944933837489225
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 603,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0004664601292461157,
+                  "combined_score": 6.596646012924612
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 602,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.000651825568638742,
+                  "combined_score": 6.265182556863875
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 12,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.0007859413744881749,
+                  "combined_score": 8.378594137448818
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 13,
+                  "candidate_id": 1532,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.000785941316280514,
+                  "combined_score": 8.028594131628052
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 500,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.00044742715544998646,
+                  "combined_score": 7.644742715545
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 501,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.000447427126346156,
+                  "combined_score": 7.994742712634617
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 601,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.00048398738726973534,
+                  "combined_score": 7.648398738726975
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 600,
+                  "candidate_id": 1227,
+                  "intent_bias": -0.0,
+                  "situation_score": 0.00048739989870227873,
+                  "combined_score": 7.298739989870228
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 600,
+                  "candidate_id": 1532,
+                  "intent_bias": -5.0,
+                  "situation_score": 0.0009644126403145492,
+                  "combined_score": 8.646441264031456
+                },
+                {
+                  "action": "move",
+                  "used_learned": true,
+                  "obj_id": 74,
+                  "candidate_id": 1227,
+                  "intent_bias": -1.0,
+                  "situation_score": 0.0011645086342468858,
+                  "combined_score": 8.116450863424689
+                }
+              ]
+            }
+          },
+          "windows": {
+            "candidate": {
+              "0-120": {
+                "counts": {
+                  "move": {
+                    "total": 16,
+                    "learned": 16
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 0.0
+              },
+              "121-280": {
+                "counts": {
+                  "move": {
+                    "total": 35,
+                    "learned": 35
+                  },
+                  "shoot": {
+                    "total": 3,
+                    "learned": 3
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0
+              },
+              "281-400": {
+                "counts": {
+                  "move": {
+                    "total": 28,
+                    "learned": 28
+                  },
+                  "shoot": {
+                    "total": 3,
+                    "learned": 3
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0
+              }
+            },
+            "opponent": {
+              "0-120": {
+                "counts": {
+                  "move": {
+                    "total": 16,
+                    "learned": 16
+                  },
+                  "shoot": {
+                    "total": 0,
+                    "learned": 0
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 0.0
+              },
+              "121-280": {
+                "counts": {
+                  "move": {
+                    "total": 33,
+                    "learned": 33
+                  },
+                  "shoot": {
+                    "total": 4,
+                    "learned": 4
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0
+              },
+              "281-400": {
+                "counts": {
+                  "move": {
+                    "total": 28,
+                    "learned": 28
+                  },
+                  "shoot": {
+                    "total": 2,
+                    "learned": 2
+                  }
+                },
+                "learned_path_coverage": 1.0,
+                "move_path_coverage": 1.0,
+                "shoot_path_coverage": 1.0
+              }
+            }
+          },
+          "move_failures": {
+            "candidate": {
+              "0-120": {
+                "total_move_evals": 16,
+                "learned_success": 16,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 16,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              },
+              "121-280": {
+                "total_move_evals": 35,
+                "learned_success": 35,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 35,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              },
+              "281-400": {
+                "total_move_evals": 28,
+                "learned_success": 28,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 28,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              }
+            },
+            "opponent": {
+              "0-120": {
+                "total_move_evals": 16,
+                "learned_success": 16,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 16,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              },
+              "121-280": {
+                "total_move_evals": 33,
+                "learned_success": 33,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 33,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              },
+              "281-400": {
+                "total_move_evals": 28,
+                "learned_success": 28,
+                "empty_route": 0,
+                "no_selection": 0,
+                "no_cities": 0,
+                "map_missing": 0,
+                "reachable_route_available": 28,
+                "reachable_route_unavailable": 0,
+                "empty_route_with_reachable_alternative": 0,
+                "empty_route_with_no_reachable_city": 0
+              }
+            }
+          },
+          "candidate_metrics": {
+            "paired_score": 0.5,
+            "candidate_leg_scores": [
+              {
+                "leg_index": 0,
+                "candidate_score": 0.0,
+                "opponent_score": 0.0
+              },
+              {
+                "leg_index": 1,
+                "candidate_score": 0.0,
+                "opponent_score": 0.0
+              }
+            ],
+            "move_total": 79,
+            "move_learned": 79,
+            "shoot_total": 6,
+            "shoot_learned": 6,
+            "move_path_coverage": 1.0,
+            "learned_path_coverage": 1.0,
+            "shoot_path_coverage": 1.0,
+            "empty_route_total": 0,
+            "empty_route_with_no_reachable_city_total": 0,
+            "empty_route_with_reachable_alternative_total": 0,
+            "reachable_route_available_total": 79,
+            "reachable_route_unavailable_total": 0,
+            "learned_success_total": 79,
+            "total_move_evals": 79,
+            "window_move_path_coverage": {
+              "0-120": 1.0,
+              "121-280": 1.0,
+              "281-400": 1.0
+            },
+            "window_learned_path_coverage": {
+              "0-120": 1.0,
+              "121-280": 1.0,
+              "281-400": 1.0
+            }
+          }
+        }
+      }
+    }
+  }
+}

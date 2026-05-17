@@ -1,0 +1,24 @@
+{
+  "event": "target_completed",
+  "ts": "2026-04-26T03:46:19.322558Z",
+  "completed_pairs": 36,
+  "heartbeat_ts": "2026-04-26T03:46:19.276839Z",
+  "health": "Rsl",
+  "scenario": "2120131194.json",
+  "map_id": 94,
+  "paired_score": 0.5,
+  "candidate_move_cov": 0.027163613392293114,
+  "candidate_learned_cov": 0.03508771929824561,
+  "candidate_shoot_cov": 1.0,
+  "opponent_move_cov": 0.025331724969843185,
+  "opponent_learned_cov": 0.032335329341317366,
+  "opponent_shoot_cov": 1.0,
+  "first_leg": {
+    "candidate": 0.0,
+    "opponent": 0.0
+  },
+  "second_leg": {
+    "candidate": 0.0,
+    "opponent": 0.0
+  }
+}

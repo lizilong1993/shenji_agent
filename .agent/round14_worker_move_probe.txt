@@ -1,0 +1,42 @@
+在 `/remote-home/lizilong/venvs/shenji/bin/python` 下做了真实只读 probe，backend 实测是 `train_env.TrainEnv`，配置为 red=candidate `ai/weights` + `challenger`，blue=incumbent `ai/weights_incumbent_rule` + `baseline`。3 个 scenario 都实测成功，`torch` 冷启动约 52.7s，但不是 blocker。
+
+**实测成功**
+- `2120531121.json`
+  - 推断 `map_id=212`
+  - `max_steps=40`
+  - candidate `move_path_coverage=0.04294478527607362`
+  - candidate `counts.move={"total":163,"learned":7}`
+  - candidate `trace_samples` 可见 learned Move 已落地，但 `empty_route` 仍明显存在。样本：
+    - `{"obj_id":0,"candidate_id":2749,"used_learned":true}`
+    - `{"obj_id":1,"reason":"empty_route","used_learned":false}`
+    - `{"obj_id":2,"reason":"empty_route","used_learned":false}`
+    - `{"obj_id":400,"candidate_id":2749,"used_learned":true}`
+    - `{"obj_id":401,"reason":"empty_route","used_learned":false}`
+  - 结论：不是全空路，但 `empty_route` 仍很多，coverage 还很低。
+
+- `2120511121.json`
+  - 推断 `map_id=212`
+  - `max_steps=40`
+  - candidate `move_path_coverage=1.0`
+  - candidate `counts.move={"total":4,"learned":4}`
+  - candidate `trace_samples` 全是 learned Move，未见 `reason=empty_route`。样本：
+    - `{"obj_id":500,"candidate_id":4838,"used_learned":true}`
+    - `{"obj_id":501,"candidate_id":4838,"used_learned":true}`
+    - `{"obj_id":600,"candidate_id":4838,"used_learned":true}`
+    - `{"obj_id":601,"candidate_id":4838,"used_learned":true}`
+  - 结论：learned Move 明确落地，probe 内未见 `empty_route`。
+
+- `2230531221.json`
+  - 推断 `map_id=221`
+  - `max_steps=40`
+  - candidate `move_path_coverage=1.0`
+  - candidate `counts.move={"total":12,"learned":12}`
+  - candidate `trace_samples` 全是 learned Move，未见 `reason=empty_route`。样本：
+    - `{"obj_id":0,"candidate_id":4838,"used_learned":true}`
+    - `{"obj_id":1,"candidate_id":4838,"used_learned":true}`
+    - `{"obj_id":500,"candidate_id":4838,"used_learned":true}`
+    - `{"obj_id":601,"candidate_id":4838,"used_learned":true}`
+  - 结论：learned Move 明确落地，probe 内未见 `empty_route`。
+
+**无法实测**
+- 无。3 个 scenario 都已用真实 env 成功跑通。

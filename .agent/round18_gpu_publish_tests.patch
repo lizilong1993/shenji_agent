@@ -1,0 +1,150 @@
+--- a/tests/test_mainline_contract.py
++++ b/tests/test_mainline_contract.py
+@@ -8,6 +8,7 @@
+ import types
+ import unittest
+ from pathlib import Path
++from unittest import mock
+ 
+ 
+ REPO_ROOT = Path(__file__).resolve().parents[1]
+@@ -228,6 +229,115 @@
+ 
+         configured = _configure_torch_cpu_inference_threads(fake_import)
+         self.assertEqual(configured, {"num_threads": 1, "num_interop_threads": 1})
++
++    def test_learned_policy_configure_moves_models_to_cuda_when_available(self) -> None:
++        from ai import policy as policy_module
++
++        class DummyModel:
++            def __init__(self) -> None:
++                self.devices: list[str] = []
++
++            def to(self, device: str) -> "DummyModel":
++                self.devices.append(str(device))
++                return self
++
++        with tempfile.TemporaryDirectory() as tmp:
++            artifacts = Path(tmp)
++            (artifacts / "model_manifest.json").write_text(
++                json.dumps({"history_len": 4, "intent_lstm": "intent.pt", "situation_gcn": "situation.pt"}),
++                encoding="utf-8",
++            )
++            (artifacts / "intent.pt").write_bytes(b"intent")
++            (artifacts / "situation.pt").write_bytes(b"situation")
++            intent_model = DummyModel()
++            situation_model = DummyModel()
++            with (
++                mock.patch.object(policy_module.torch.cuda, "is_available", return_value=True),
++                mock.patch.object(policy_module.torch, "load", side_effect=[{"model_state": {}}, {"model_state": {}}]),
++                mock.patch.object(policy_module.LearnedPolicy, "_load_intent_model", return_value=intent_model),
++                mock.patch.object(policy_module.LearnedPolicy, "_load_situation_model", return_value=situation_model),
++            ):
++                learned = policy_module.LearnedPolicy()
++                learned.configure(0, str(artifacts), "challenger")
++
++        self.assertEqual(learned.device, "cuda")
++        self.assertEqual(intent_model.devices, ["cuda"])
++        self.assertEqual(situation_model.devices, ["cuda"])
++        self.assertEqual(learned.get_diagnostics()["device"], "cuda")
++        self.assertTrue(learned.has_models())
++
++    def test_learned_policy_configure_keeps_cpu_fallback_without_cuda(self) -> None:
++        from ai import policy as policy_module
++
++        class DummyModel:
++            def __init__(self) -> None:
++                self.devices: list[str] = []
++
++            def to(self, device: str) -> "DummyModel":
++                self.devices.append(str(device))
++                return self
++
++        with tempfile.TemporaryDirectory() as tmp:
++            artifacts = Path(tmp)
++            (artifacts / "model_manifest.json").write_text(
++                json.dumps({"history_len": 4, "intent_lstm": "intent.pt", "situation_gcn": "situation.pt"}),
++                encoding="utf-8",
++            )
++            (artifacts / "intent.pt").write_bytes(b"intent")
++            (artifacts / "situation.pt").write_bytes(b"situation")
++            intent_model = DummyModel()
++            situation_model = DummyModel()
++            with (
++                mock.patch.object(policy_module.torch.cuda, "is_available", return_value=False),
++                mock.patch.object(policy_module.torch, "load", side_effect=[{"model_state": {}}, {"model_state": {}}]),
++                mock.patch.object(policy_module.LearnedPolicy, "_load_intent_model", return_value=intent_model),
++                mock.patch.object(policy_module.LearnedPolicy, "_load_situation_model", return_value=situation_model),
++            ):
++                learned = policy_module.LearnedPolicy()
++                learned.configure(0, str(artifacts), "challenger")
++
++        self.assertEqual(learned.device, "cpu")
++        self.assertEqual(intent_model.devices, ["cpu"])
++        self.assertEqual(situation_model.devices, ["cpu"])
++        self.assertEqual(learned.get_diagnostics()["device"], "cpu")
++        self.assertTrue(learned.has_models())
++
++    def test_learned_policy_configure_allows_explicit_cpu_override_with_cuda_visible(self) -> None:
++        from ai import policy as policy_module
++
++        class DummyModel:
++            def __init__(self) -> None:
++                self.devices: list[str] = []
++
++            def to(self, device: str) -> "DummyModel":
++                self.devices.append(str(device))
++                return self
++
++        with tempfile.TemporaryDirectory() as tmp:
++            artifacts = Path(tmp)
++            (artifacts / "model_manifest.json").write_text(
++                json.dumps({"history_len": 4, "intent_lstm": "intent.pt", "situation_gcn": "situation.pt"}),
++                encoding="utf-8",
++            )
++            (artifacts / "intent.pt").write_bytes(b"intent")
++            (artifacts / "situation.pt").write_bytes(b"situation")
++            intent_model = DummyModel()
++            situation_model = DummyModel()
++            with (
++                mock.patch.dict(policy_module.os.environ, {"SHENJI_POLICY_DEVICE": "cpu"}, clear=False),
++                mock.patch.object(policy_module.torch.cuda, "is_available", return_value=True),
++                mock.patch.object(policy_module.torch, "load", side_effect=[{"model_state": {}}, {"model_state": {}}]),
++                mock.patch.object(policy_module.LearnedPolicy, "_load_intent_model", return_value=intent_model),
++                mock.patch.object(policy_module.LearnedPolicy, "_load_situation_model", return_value=situation_model),
++            ):
++                learned = policy_module.LearnedPolicy()
++                learned.configure(0, str(artifacts), "challenger")
++
++        self.assertEqual(learned.device, "cpu")
++        self.assertEqual(learned.get_diagnostics()["requested_device"], "cpu")
++        self.assertEqual(intent_model.devices, ["cpu"])
++        self.assertEqual(situation_model.devices, ["cpu"])
++        self.assertTrue(learned.has_models())
+ 
+     def test_weapon_lock_ignores_invalid_cur_hex(self) -> None:
+         from ai.agent import ActionType, Agent, Map
+@@ -292,6 +402,7 @@
+         merged = _merge_policy_stats(
+             {
+                 "policy_profile": "incumbent",
++                "device": "cuda",
+                 "loaded_from": "/tmp/strongest",
+                 "intent_model_loaded": True,
+                 "situation_model_loaded": True,
+@@ -306,6 +417,7 @@
+             },
+             {
+                 "policy_profile": "incumbent",
++                "device": "cuda",
+                 "loaded_from": "/tmp/strongest",
+                 "intent_model_loaded": True,
+                 "situation_model_loaded": True,
+@@ -320,6 +432,7 @@
+             },
+         )
+         self.assertEqual(merged["policy_profiles"], ["incumbent"])
++        self.assertEqual(merged["inference_devices"], ["cuda"])
+         self.assertEqual(merged["loaded_from_dirs"], ["/tmp/strongest"])
+         self.assertEqual(merged["intent_model_loaded_count"], 2)
+         self.assertEqual(merged["situation_model_loaded_count"], 2)

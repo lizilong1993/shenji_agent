@@ -1,0 +1,13 @@
+/remote-home/lizilong/venvs/shenji/bin/python scripts/launch_detached_compare.py \
+  --cwd /remote-home/lizilong/shenji_agent \
+  --pid-file /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.pid \
+  --stdout-log /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.stdout.log \
+  --stderr-log /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.stderr.log \
+  --status-file /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.status.json \
+  --metadata-file /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.metadata.json \
+  --launcher-log /remote-home/lizilong/shenji_agent/.agent/round18_compare_20260425_040546.stderr.log.launcher.log \
+  -- \
+  /remote-home/lizilong/venvs/shenji/bin/python -m training.selfplay \
+    --config configs/selfplay_sota_stop.yaml \
+    --candidate ai/weights \
+    --incumbent artifacts/best_agent/weights

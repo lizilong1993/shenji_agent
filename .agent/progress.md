@@ -108,3 +108,69 @@
 - 本轮轻量验证：
   - `python -m compileall ai training scripts tests`：通过
   - `python -m unittest tests.test_mainline_contract -v`：10 项通过
+
+## Paper Draft Task 2026-05-11
+
+- 已读取项目 `AGENTS.md` 与 `.agent/context.md`。
+- 已尝试执行规则指定 bootstrap，结果：指定脚本不存在，未产生本轮成功 bootstrap 记录。
+- 已确认当前目录不是 Git 仓库，本轮无法提交 commit。
+- 已确认 PaperOrchestra junction 目标缺失；已改用 `.orchestra/skills/20-ml-paper-writing`。
+- 已确认独立 nature skill 不存在；已读取 `scientific-writing` 作为 Nature/Science 风格参考。
+- 已复制 NeurIPS 本地模板文件到 `paper/`：
+  - `paper/neurips.sty`
+  - `paper/extra_pkgs.tex`
+  - `paper/Makefile`
+- 下一步：写入 `paper/main.tex`、`paper/references.bib`、`paper/source_evidence.md`、`paper/README.md` 并编译验证。
+
+## Paper Draft Task Verification 2026-05-11
+
+- 已写入论文产物：
+  - `paper/main.tex`
+  - `paper/references.bib`
+  - `paper/source_evidence.md`
+  - `paper/README.md`
+  - `paper/figures/system_architecture.tex`
+  - `paper/figures/promotion_gate.tex`
+  - `paper/main.pdf`
+- 引用验证：
+  - DOI/arXiv BibTeX 已写入 `paper/references.bib`
+  - `paper/main.blg` 显示 `You've used 8 entries` 且 `warning$ -- 0`
+- 编译验证：
+  - `latexmk -pdf -interaction=nonstopmode main.tex`：失败，原因是本机 TeX Live `runscript.tlu` wrapper 内部错误：`attempt to concatenate a nil value`
+  - 手动链路 `pdflatex -> bibtex -> pdflatex -> pdflatex`：通过，生成 `paper/main.pdf`
+  - `paper/main.log` 未发现 undefined citations、undefined references 或 LaTeX fatal error
+- 治理收尾：
+  - `complete-task` 指定脚本仍缺失，无法记录 workflow candidate
+  - 当前目录不是 Git 仓库，无法执行 commit
+
+## AI Reviewer Integration 2026-05-11
+
+- 已补项目根 `AGENTS.md` 最小治理骨架；`.agent/context.md` 已存在。
+- 已读取 `AGENTS.md` 与 `.agent/context.md`。
+- 已尝试执行规则指定 bootstrap：
+  - `C:\Users\lizilong\.codex\automations\weekly-skill-trigger-optimization\codex-runtime-ops.ps1`
+  - 结果：脚本路径不存在，未产生本轮成功 bootstrap 记录。
+- 已安装外部 Draft Detective：
+  - 路径：`C:\Users\lizilong\Desktop\WHUAI\tools\draft-detective`
+  - git head：`9292652`
+- 已新增 Shenji 适配层：
+  - `configs/ai_reviewer.yaml`
+  - `scripts/run_ai_reviewer.py`
+  - `references.bib`
+  - `reports/ai_reviewer/*`
+- 本地验证：
+  - `python -m compileall scripts`：通过
+  - `python scripts\run_ai_reviewer.py --dry-run --config configs\ai_reviewer.yaml`：通过，生成 40 条 claim，Draft Detective 存在
+  - `python scripts\run_ai_reviewer.py --config configs\ai_reviewer.yaml`：通过，最新 league 为 `experiments/shenji_agent/league_20260501_170204`
+  - 输出统计：supported=2，partially_supported=23，unsupported=0，unverifiable=15
+- 远程同步/验证：
+  - 已成功同步：`AGENTS.md`、`references.bib`、`configs/ai_reviewer.yaml`、`scripts/run_ai_reviewer.py`
+  - 未能同步：远程 `.agent/context.md`、`.agent/progress.md`、`.agent/findings.md` 归 `root:root`，当前 SSH 用户无覆盖权限
+  - 未能写入默认远程输出：远程 `reports/` 归 `root:root`，当前 SSH 用户无法创建 `reports/ai_reviewer`
+  - 已用覆盖输出目录验证远程脚本：`/remote-home/lizilong/venvs/shenji/bin/python scripts/run_ai_reviewer.py --dry-run --config configs/ai_reviewer.yaml --output-dir .agent/ai_reviewer_remote_probe`：通过，生成 40 条 claim，unsupported=0，unverifiable=15
+  - 远程 Draft Detective 状态为未安装；按计划远程不默认安装 Draft Detective
+- 外部工具最小验证：
+  - `uv --version`：`uv 0.9.22`
+  - Draft Detective `README.md`、`pyproject.toml`、`docker-compose.yml` 存在
+  - 未执行真实 LLM 审稿；原因：未配置 Draft Detective 运行时服务/API key，本轮只验证外部仓库安装与本地证据审稿适配器。
+- 当前目录不是 Git 仓库，无法执行 `git commit`。

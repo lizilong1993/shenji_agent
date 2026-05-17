@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/remote-home/lizilong/venvs/shenji/bin/python",
+    "-m",
+    "training.selfplay",
+    "--config",
+    "configs/selfplay_sota_stop.yaml",
+    "--candidate",
+    "ai/weights",
+    "--incumbent",
+    "artifacts/best_agent/weights"
+  ],
+  "ended_at": "2026-04-25T11:49:40.766768Z",
+  "exit_code": 0,
+  "pid": 3026266,
+  "return_code": 0,
+  "signal_name": null,
+  "signal_number": null,
+  "started_at": "2026-04-25T04:07:10.279309Z"
+}

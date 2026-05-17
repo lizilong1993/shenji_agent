@@ -64,3 +64,61 @@
 - 未验证：
   - 修正 incumbent profile / strongest snapshot 合同后，candidate-vs-strongest learned arena 的真实胜率。
   - 在真实 strongest learned incumbent 下，`move_path_coverage = 0.0` 是否仍然存在。
+
+## Paper Draft Evidence 2026-05-11
+
+### 已验证
+
+- 当前本地目录不是 Git 仓库：`git status --short --branch` 返回 `fatal: not a git repository`。
+- `paper-orchestra` junction 存在，但目标 `SKILL.md` 缺失；可读的论文写作入口是 `.orchestra/skills/20-ml-paper-writing/SKILL.md`。
+- 可读 NeurIPS 模板来自 `.orchestra/skills/20-ml-paper-writing/templates/neurips2025/`。
+- `program.md` 明确项目没有 protocol-matched public leaderboard，因此论文不能声称公开 SOTA。
+- 正式结果目录 `experiments/shenji_agent/league_20260501_170204` 包含：
+  - `summary.md`
+  - `rating.json`
+  - `promotion.json`
+  - `participants.json`
+  - `exploitability.json`
+- 正式结果显示：
+  - `overall.point_estimate = 0.87`
+  - `overall.ci95[0] = 0.800000011920929`
+  - `complex.point_estimate = 0.8181818181818182`
+  - `complex.ci95[0] = 0.6363636255264282`
+  - `learned_path_coverage = 0.37277940409832777`
+  - `move_path_coverage = 0.3366836301950806`
+  - `shoot_path_coverage = 1.0`
+  - `accepted = true`
+  - `max_exploiter_win_rate = 0.25`
+  - `battle_phase_entered = true`
+  - `selected_move_shoot_occupy_actions = 94682`
+- `participants.json` 显示 candidate 使用 `CurrentAI/challenger/ai/weights`，incumbent 使用 `IncumbentAI/baseline/ai/weights_incumbent_rule`，且后端是 `train_env.TrainEnv`。
+- `ai/models.py` 中可见 LSTM 意图模型、GraphSAGE-style situation model、tactical scorer。
+- `ai/policy.py` 中可见模型加载、feature normalizer、policy diagnostics、move/shoot coverage 统计和 objective scoring diagnostics。
+
+### 未验证/阻塞
+
+- 本地 `training/` 目录当前只有 `cache/`，`scripts/` 和 `tests/` 为空；`reports/experiment_results.md` 提到的训练/评估脚本与 `139 passed` 不能在当前本地树复跑。
+- 指定 bootstrap/complete-task 脚本缺失，无法按治理规则记录本轮 lifecycle。
+- 当前任务无法做 Git commit，因为当前目录不是 Git 仓库。
+
+## AI Reviewer Evidence 2026-05-11
+
+### 已验证
+
+- Draft Detective 已作为外部项目放在 `C:\Users\lizilong\Desktop\WHUAI\tools\draft-detective`，没有复制进 Shenji 仓库。
+- Draft Detective 本地 git head 为 `9292652`，且存在 `README.md`、`pyproject.toml`、`docker-compose.yml`。
+- `scripts/run_ai_reviewer.py` 使用标准库完成：
+  - 读取 `configs/ai_reviewer.yaml`
+  - 发现最新 `experiments/shenji_agent/league_*`
+  - 检查 `rating.json`、`promotion.json`、`exploitability.json`、`participants.json`、`map_list.json`、`summary.md`
+  - 输出 claim JSONL、unsupported/unverifiable 清单、TSV 证据矩阵和 Draft Detective 输入包
+- `experiments/shenji_agent/league_20260501_170204/map_list.json` 是 dict，正式 map 项在 `items` 字段，数量为 100；脚本已兼容顶层 list 与 `items` dict 两种形态。
+- 本轮生成的 `reports/ai_reviewer/review_summary.md` 明确 `LLM review executed: False`，避免把本地规则审查冒充为 Draft Detective LLM 审稿。
+- 远程 `/remote-home/lizilong/shenji_agent/reports` 归 `root:root`，当前 SSH 用户不能创建 `reports/ai_reviewer`；脚本新增 `--output-dir` 后可写入 `.agent/ai_reviewer_remote_probe` 完成远程 dry-run。
+- 远程 `/remote-home/lizilong/shenji_agent/.agent/context.md`、`findings.md`、`progress.md` 归 `root:root`，当前 SSH 用户不能覆盖；`.agent/` 目录本身可新建子目录。
+
+### 未验证/阻塞
+
+- 未运行 Draft Detective 官方 `uv run pytest` 或服务端真实审稿；该项目依赖较重且需要运行时/API 配置，本轮验证范围限于外部仓库安装面和 Shenji 本地适配器。
+- 规则指定 bootstrap/complete-task 脚本路径缺失，不能写入本轮 lifecycle 状态。
+- 当前目录不是 Git 仓库，不能提交 commit。

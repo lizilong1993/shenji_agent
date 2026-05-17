@@ -1,0 +1,27 @@
+{
+  "command": [
+    "/remote-home/lizilong/venvs/shenji/bin/python",
+    "-u",
+    ".agent/round18_probe_fix_20260425_161832/probe_worktree_wrapper.py",
+    "--participants",
+    ".agent/round18_probe_fix_20260425_161832/participants_worktree.json",
+    "--output-dir",
+    ".agent/round18_probe_fix_20260425_161832/probe_output",
+    "--max-steps",
+    "400"
+  ],
+  "compare_pgid": 3039625,
+  "compare_pid": 3039625,
+  "compare_sid": 3039625,
+  "cwd": "/remote-home/lizilong/shenji_agent",
+  "launcher_pgid": 3039624,
+  "launcher_pid": 3039624,
+  "launcher_sid": 3039624,
+  "metadata_file": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_fix_20260425_161832/probe.metadata.json",
+  "pid_file": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_fix_20260425_161832/probe.pid",
+  "started_at": "2026-04-25T16:29:16.512076Z",
+  "status_file": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_fix_20260425_161832/probe.status.json",
+  "stderr_log": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_fix_20260425_161832/probe.stderr.log",
+  "stdin_target": "/dev/null",
+  "stdout_log": "/remote-home/lizilong/shenji_agent/.agent/round18_probe_fix_20260425_161832/probe.stdout.log"
+}
