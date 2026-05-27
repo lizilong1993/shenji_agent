@@ -1,0 +1,359 @@
+{
+  "phase": "v3g_sdk_candidate_generation_diagnostic",
+  "classification": "SDK_CANDIDATE_LABEL_MISNOMER",
+  "method": "Static code analysis of agent.py, policy.py, SDK documentation (observation_note.json, observation_example.json), and V3F diagnostic aggregator (run_v3f_route_reliability_evaluation.py)",
+
+  "executive_summary": "The diagnostic label 'no_valid_move_candidate' is a misnomer. For Move actions, the SDK valid_actions entry is always null (a binary availability flag, not a candidate list). The check `missing_move_candidate = not candidate` is always True for Move. The label fires only after A* route planning to ALL cities with ALL move types has failed AND fallback neighbor search has also failed. The true root cause is 'A* route planner cannot find path to any city, and no fallback hex brings the operator closer to the nearest city.' This is a route planning failure, not a candidate generation failure.",
+
+  "paths": {
+    "A_sdk_to_valid_actions_to_move_candidates": {
+      "description": "How the SDK provides Move action availability to the agent",
+      "entries": [
+        {
+          "step": 1,
+          "location": "ai/agent.py:625",
+          "code": "valid_actions = observation.get('valid_actions', {})",
+          "description": "Extract valid_actions from SDK observation dictionary. The SDK TrainEnv (compiled .so) generates this structure."
+        },
+        {
+          "step": 2,
+          "location": "ai/agent.py:654-660",
+          "code": "for obj_id, action_map in valid_actions.items():\n    for action_type in self.priority:\n        if action_type not in action_map: continue\n        action = self._generate_action(obj_id, action_type, action_map[action_type])",
+          "description": "Agent iterates over operators and priority-ordered action types. For each operator, it checks if the action type key is present in the SDK's action_map and calls _generate_action with the candidate value."
+        },
+        {
+          "step": 3,
+          "location": "land_wargame_sdk/docs/observation_note.json:94",
+          "code": "\"1-机动\": null",
+          "description": "SDK documentation confirms Move type valid_actions value is null (Python None). Not a list -- a binary flag."
+        },
+        {
+          "step": 4,
+          "location": "land_wargame_sdk/docs/observation_example.json:2550",
+          "code": "\"14231\": {\"1\": null, \"6\": [...], \"11\": null}",
+          "description": "SDK observation example shows Move (type 1) has null value. Actions with null: Move(1), Occupy(5), RemoveKeep(7), StopMove(10), WeaponLock(11), WeaponUnFold(12), CancelJMPlan(13). Actions with list: Shoot(2), GetOn(3), GetOff(4), ChangeState(6), JMPlan(8), GuideShoot(9)."
+        },
+        {
+          "step": 5,
+          "location": "ai/agent.py:755",
+          "code": "missing_move_candidate = not candidate",
+          "description": "For Move, candidate is None (from SDK null). not None == True. This check is ALWAYS True for Move actions, making it semantically meaningless -- it conflates 'SDK returned empty list' with 'SDK uses null for this action type.'"
+        },
+        {
+          "step": 6,
+          "location": "ai/agent.py:844-851",
+          "code": "\"route_failure_reason\": \"no_valid_move_candidate\" if missing_move_candidate else \"empty_route\"",
+          "description": "Because missing_move_candidate is always True for Move, the failure reason is ALWAYS 'no_valid_move_candidate' in this code path. The 'empty_route' branch here is dead code for Move actions."
+        }
+      ],
+      "finding": "The SDK Move valid_actions value is null (None) -- a binary availability indicator, not a candidate list. The agent code treats None as 'empty candidate' via `not candidate`, but this is incorrect for Move. The SDK never provides Move target candidates.",
+      "separable": false,
+      "currently_recorded_as": "no_valid_move_candidate"
+    },
+    "B_policy_candidate_filtering": {
+      "description": "How the policy filters/selects among move destinations",
+      "entries": [
+        {
+          "step": 1,
+          "location": "ai/agent.py:756",
+          "code": "cities = self.observation.get('cities', [])",
+          "description": "Move destinations come from observation cities, NOT from SDK candidates. This is entirely separate from the valid_actions candidate parameter."
+        },
+        {
+          "step": 2,
+          "location": "ai/agent.py:776-787",
+          "code": "for try_move_type in all_move_types:\n    for city in cities:\n        route = self.map.gen_move_route(..., try_move_type)\n        if route: ...",
+          "description": "Route planner (A*) is called for EVERY city with EVERY move type. Only cities with non-empty routes are retained."
+        },
+        {
+          "step": 3,
+          "location": "ai/agent.py:863-868",
+          "code": "selected_city, trace = self.policy.choose_city(bop, [city for city, _ in reachable_city_routes], ...)",
+          "description": "Policy receive ONLY the subset of cities that have A* routes. It scores each city and selects the best."
+        },
+        {
+          "step": 4,
+          "location": "ai/policy.py:668-761",
+          "code": "def choose_city(self, operator, cities, observation, tactical_map):\n    if not self.has_models():\n        return None, None\n    ...score each city...\n    if best is None: return None, None\n    return best[1], best[2]",
+          "description": "choose_city() returns None only if no models are loaded (has_models() is False). It does NOT filter candidates to empty -- it scores all provided cities and returns the best one. Returning None is a 'no decision' signal, not an 'all candidates filtered out' signal."
+        }
+      ],
+      "finding": "The policy CANNOT filter SDK candidates to empty for Move. The policy scores cities from the observation (not SDK candidates) and always returns a selection if models are loaded. No candidate filtering path exists in the Move branch.",
+      "separable": true,
+      "currently_recorded_as": "Not applicable -- policy does not filter Move candidates"
+    },
+    "C_route_planner_invocation": {
+      "description": "When and how Map.gen_move_route is called",
+      "entries": [
+        {
+          "step": 1,
+          "location": "ai/agent.py:117-149",
+          "code": "def gen_move_route(self, begin, end, mode):\n    ...Dijkstra/A* over cost map...\n    if end in came_from: ...return path...\n    return []",
+          "description": "A* pathfinding over move-cost map. Returns empty list when: begin/end invalid, mode out of range, begin==end, or no path exists."
+        },
+        {
+          "step": 2,
+          "location": "ai/agent.py:782",
+          "code": "route = self.map.gen_move_route(bop['cur_hex'], city_id, try_move_type)",
+          "description": "Called for EACH city x EACH move type combination. Up to num_cities * 4 calls per Move action attempt."
+        },
+        {
+          "step": 3,
+          "location": "ai/agent.py:118-124",
+          "code": "if not self.is_valid(begin) or not self.is_valid(end) or not 0 <= mode < len(self.cost) or begin == end:\n    return []",
+          "description": "Early termination conditions for gen_move_route returning empty. Invalid hexes or unsupported move types."
+        },
+        {
+          "step": 4,
+          "location": "ai/agent.py:142-149",
+          "code": "path = []\nif end in came_from:\n    ...construct path...\nreturn path",
+          "description": "If A* exploration exhausts frontier without reaching end hex, end is not in came_from, and empty list is returned."
+        },
+        {
+          "step": 5,
+          "location": "ai/agent.py:796-811",
+          "code": "nearest_city = min(cities, key=lambda c: ...)\nfor n_hex in neighbors:\n    if dist < best_dist: fallback_hex = n_hex",
+          "description": "When route planner fails for ALL cities, fallback neighbor search is attempted. Finds nearest city and checks if any neighbor brings operator closer."
+        },
+        {
+          "step": 6,
+          "location": "ai/agent.py:837-862",
+          "code": "self.policy.record_move_route({\n    'route_failure_reason': 'no_valid_move_candidate',\n    'route_empty': True,\n    ...})",
+          "description": "Route planner failure + fallback failure both recorded under 'no_valid_move_candidate'. This is ALWAYS the label used because missing_move_candidate is always True."
+        },
+        {
+          "step": 7,
+          "location": "ai/agent.py:896-912",
+          "code": "route = route_by_city.get(best_city, [])\nif route:\n    ...success...\nrecord_move_route({'route_failure_reason': 'empty_route', 'route_empty': True})",
+          "description": "Defensive code path: fires if choose_city() returns a city but route lookup returns empty. Should not be reachable because route_by_city is built from the same reachable_city_routes."
+        }
+      ],
+      "finding": "The route planner (A*) IS called before any failure reason is recorded. 'no_valid_move_candidate' does NOT mean 'route planner never called' -- it means 'route planner failed for all cities AND fallback also failed.' The route planner invocation and its failure results are not separately recorded from the 'candidate empty' check.",
+      "separable": true,
+      "currently_recorded_as": "no_valid_move_candidate (conflated with SDK candidate check)"
+    },
+    "D_fallback_and_noop_paths": {
+      "description": "Fallback neighbor and no-op behavior",
+      "entries": [
+        {
+          "step": 1,
+          "location": "ai/agent.py:800-836",
+          "code": "if fallback_hex is not None:\n    simple_route = [fallback_hex]\n    record_move_route({'target_source': 'fallback_neighbor', 'route_empty': False, ...})",
+          "description": "Fallback neighbor success: recorded with distinct target_source, route_empty=False. Clearly separable from other outcomes."
+        },
+        {
+          "step": 2,
+          "location": "ai/agent.py:753-754",
+          "code": "if not bop or bop.get('sub_type') == 3:\n    return None",
+          "description": "No-op path for dead operators or UGVs (sub_type 3). Does NOT call record_move_route(). No route diagnostic recorded."
+        },
+        {
+          "step": 3,
+          "location": "ai/agent.py:764-771",
+          "code": "if is_on_city and city_flag != self.faction:\n    return None",
+          "description": "No-op for operators on their own faction city. No route diagnostic recorded -- correctly excluded from route metrics."
+        },
+        {
+          "step": 4,
+          "location": "ai/agent.py:854-861",
+          "code": "self.policy.note_action('move', False, {'reason': 'no_valid_move_candidate'})",
+          "description": "note_action() IS called for failures. This increments action_counts['move']['total'] and stores a trace sample."
+        },
+        {
+          "step": 5,
+          "location": "ai/policy.py:291-313",
+          "code": "def note_action(self, action_type, used_learned, trace):\n    self.action_counts[key]['total'] += 1\n    ...",
+          "description": "note_action() increments total action counts regardless of success/failure. Trace samples are capped at 12 (policy.py:306)."
+        }
+      ],
+      "finding": "Fallback neighbor is clearly separable via target_source field. No-op paths (UGV, on own city) correctly do not record route diagnostics. note_action() IS called for failures, so action_counts includes failed moves.",
+      "separable": true,
+      "currently_recorded_as": "fallback_neighbor (separable), no-op paths not recorded"
+    }
+  },
+
+  "key_metrics": {
+    "sdk_move_candidate_type": {
+      "value": "None/null",
+      "meaning": "SDK always returns null for Move type valid_actions. This is a binary availability flag, not a candidate list."
+    },
+    "missing_move_candidate_value": {
+      "value": "Always True for Move",
+      "meaning": "not candidate evaluates to True when candidate is None. Since SDK returns None for Move, this is always True."
+    },
+    "no_valid_move_candidate_trigger_condition": {
+      "condition": "A* route planner fails for ALL cities with ALL move types AND fallback neighbor search fails",
+      "recording": "agent.py:837-862"
+    },
+    "empty_route_trigger_condition": {
+      "condition": "choose_city() returns a city but route lookup returns empty (defensive code)",
+      "recording": "agent.py:896-912",
+      "reachable": "Likely unreachable -- route_by_city is built from the same reachable_city_routes passed to choose_city()"
+    },
+    "fallback_success_condition": {
+      "condition": "No A* route to any city, but a neighbor hex brings operator closer to nearest city",
+      "recording": "agent.py:812-836",
+      "distinct_label": "target_source: fallback_neighbor"
+    },
+    "noop_excluded_conditions": [
+      {
+        "condition": "Operator is UGV (sub_type == 3)",
+        "location": "agent.py:753-754",
+        "route_recorded": false
+      },
+      {
+        "condition": "Operator on own faction city",
+        "location": "agent.py:764-771",
+        "route_recorded": false
+      },
+      {
+        "condition": "No cities or no map loaded",
+        "location": "agent.py:757-758",
+        "route_recorded": false
+      }
+    ]
+  },
+
+  "distinctions": [
+    {
+      "question": "SDK candidate list empty BEFORE policy filtering?",
+      "answer": "Misleading. The SDK Move entry is None (null), not an empty list. This None is a binary 'action available' flag. The code treats None as 'empty' via `not candidate`.",
+      "separable_from_other_causes": "Yes, if we distinguish key presence from value type. Currently both cases produce the same diagnostic.",
+      "current_instrumentation": "no_valid_move_candidate (used for both)"
+    },
+    {
+      "question": "Policy filters candidates to empty?",
+      "answer": "No. Policy scores reachable cities from observation, not SDK candidates. Cannot filter candidates to empty.",
+      "separable_from_other_causes": "N/A",
+      "current_instrumentation": "N/A"
+    },
+    {
+      "question": "Route planner called but returns empty path?",
+      "answer": "Yes, this is the real failure mode. The A* planner is called for all cities x all move types, and may return empty for all combinations.",
+      "separable_from_other_causes": "Yes, with additional instrumentation. Currently recorded under the same 'no_valid_move_candidate' label as candidate unavailability.",
+      "current_instrumentation": "no_valid_move_candidate (conflated)"
+    },
+    {
+      "question": "Fallback selected due to no candidate?",
+      "answer": "Yes. Fallback is selected when no city is reachable. Clearly separable via target_source=fallback_neighbor.",
+      "separable_from_other_causes": "Yes, current diagnostics separate this.",
+      "current_instrumentation": "fallback_neighbor (distinct)"
+    },
+    {
+      "question": "Illegal/no-op selected?",
+      "answer": "Yes, several no-op paths exist. Most do not record route diagnostics. The complete failure path does record.",
+      "separable_from_other_causes": "Partially. Complete failure is recorded; other no-op paths are not recorded at all.",
+      "current_instrumentation": "no_valid_move_candidate (for complete failure only)"
+    },
+    {
+      "question": "Non-move actions incorrectly counted as route failures?",
+      "answer": "No. record_move_route() is only called from Move action branch.",
+      "separable_from_other_causes": "Yes, correctly excluded.",
+      "current_instrumentation": "N/A"
+    },
+    {
+      "question": "Deployment-phase actions contaminating route metrics?",
+      "answer": "No. Deployment phase (stage 1) generates only types 303/333 and returns before _generate_action.",
+      "separable_from_other_causes": "Yes, correctly excluded.",
+      "current_instrumentation": "N/A"
+    }
+  ],
+
+  "instrumentation_gaps": [
+    {
+      "id": "GAP_1",
+      "severity": "critical",
+      "description": "missing_move_candidate check is meaningless for Move. candidate is always None, so missing_move_candidate is always True.",
+      "impact": "no_valid_move_candidate label always used in failure path regardless of actual cause.",
+      "locations": ["ai/agent.py:755", "ai/agent.py:844", "ai/agent.py:851", "ai/agent.py:859"]
+    },
+    {
+      "id": "GAP_2",
+      "severity": "high",
+      "description": "Route planner failure mode is not separable from SDK candidate unavailability. Both recorded as no_valid_move_candidate.",
+      "impact": "Cannot distinguish 'SDK said operator could not move' from 'A* found no path to any city.'",
+      "locations": ["ai/agent.py:837-862"]
+    },
+    {
+      "id": "GAP_3",
+      "severity": "medium",
+      "description": "The empty_route label at agent.py:910 is likely dead code -- unreachable because route_by_city is derived from reachable_city_routes.",
+      "impact": "The empty_route diagnosis path cannot be triggered in practice, making the code misleading.",
+      "locations": ["ai/agent.py:896-912"]
+    },
+    {
+      "id": "GAP_4",
+      "severity": "medium",
+      "description": "No distinction between 'no path to ANY city' and 'path exists but policy chose not to act' (choose_city returns None).",
+      "impact": "Complete route planning failures and 'no decision' cases have same diagnostic label.",
+      "locations": ["ai/agent.py:837-862", "ai/agent.py:918"]
+    },
+    {
+      "id": "GAP_5",
+      "severity": "low",
+      "description": "Non-optimized rule-based Move path at agent.py:1031 uses same 'empty_route' label as unreachable defensive path at agent.py:910.",
+      "impact": "Potential naming conflict between two different code paths using same diagnostic string.",
+      "locations": ["ai/agent.py:1031"]
+    },
+    {
+      "id": "GAP_6",
+      "severity": "low",
+      "description": "trace_samples capped at 12 (policy.py:306), move_route_samples capped at 50 (policy.py:339). May miss representative samples in large games.",
+      "impact": "Trace data may not be representative for games with many move actions.",
+      "locations": ["ai/policy.py:306", "ai/policy.py:339"]
+    }
+  ],
+
+  "recommendations": [
+    {
+      "id": "REC_1",
+      "priority": "critical",
+      "action": "Add explicit SDK Move availability flag to route diagnostics",
+      "instrumentation": "Record 'sdk_move_key_present: true/false' to distinguish cases where SDK allows Move (key present) vs. SDK disallows Move (key absent). Currently both converged under no_valid_move_candidate.",
+      "v3g_evaluator": "Add field to move_route diagnostic: sdk_move_available=(ActionType.Move in action_map)"
+    },
+    {
+      "id": "REC_2",
+      "priority": "high",
+      "action": "Add route planner failure mode to route diagnostics",
+      "instrumentation": "Record 'route_planner_result: success | no_path_to_any_city | some_paths_but_not_selected' to capture WHY the planner failed. Replace the current monolithic no_valid_move_candidate with a structured failure reason.",
+      "v3g_evaluator": "Record: cities_attempted, cities_reachable, best_move_type_success, fallback_attempted, fallback_succeeded, failure_reason enum"
+    },
+    {
+      "id": "REC_3",
+      "priority": "high",
+      "action": "Rename no_valid_move_candidate to reflect actual semantics",
+      "instrumentation": "Current name implies 'SDK candidate generation failure' but actual meaning is 'route planning+fallback complete failure.' Rename to 'route_planning_complete_failure' or add explanatory field.",
+      "v3g_evaluator": "Add 'route_planning_failure_reason' with enum: no_path_to_any_city, fallback_failed, policy_no_selection, no_valid_move_candidate"
+    },
+    {
+      "id": "REC_4",
+      "priority": "medium",
+      "action": "Add fallback_failed as explicit failure reason",
+      "instrumentation": "Currently fallback_failed is implicit within no_valid_move_candidate. Add explicit 'fallback_no_closer_neighbor' reason.",
+      "v3g_evaluator": "Record fallback_hex_candidates and fallback_hex_distances in route diagnostics"
+    },
+    {
+      "id": "REC_5",
+      "priority": "low",
+      "action": "Increase trace sample caps for larger games",
+      "instrumentation": "Increase move_route_samples cap from 50 to 200, or implement periodic sampling.",
+      "v3g_evaluator": "Configurable sample cap parameter"
+    }
+  ],
+
+  "code_flow_aggregate_diagnostic": {
+    "source_of_route_empty_events": {
+      "v3f_claim": "100% of 15,641 empty route events attributed to no_valid_move_candidate",
+      "actual_root_cause": "A* route planner (Map.gen_move_route) fails to find a path from operator position to ANY city with ANY move type, AND the fallback neighbor search also fails to find a hex closer to the nearest city",
+      "misattribution_reason": "The diagnostic label no_valid_move_candidate is computed from `missing_move_candidate = not candidate` where `candidate` is always None for Move (SDK null convention). The check is structurally meaningless for Move actions.",
+      "whether_route_planner_was_called": "YES -- gen_move_route is called at agent.py:782 for every city x move type combination BEFORE the failure label is recorded"
+    },
+    "v3f_audit_reassessment": {
+      "existing_classification": "ROUTE_INSTRUMENTATION_CORRECT",
+      "need_revision": true,
+      "revision_reason": "The instrumentation IS correct in counting (move-only denominator, correct empty_route tally) but the SEMANTIC LABEL is misleading. What is called 'no_valid_move_candidate' is actually 'route_planning_complete_failure.' This impacts the ROOT CAUSE ANALYSIS done in V3F, not the instrumented counts themselves.",
+      "corrected_classification": "ROUTE_INSTRUMENTATION_COUNTS_CORRECT_BUT_LABEL_MISLEADING"
+    }
+  }
+}

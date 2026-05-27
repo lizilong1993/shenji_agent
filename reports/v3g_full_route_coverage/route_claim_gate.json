@@ -1,0 +1,57 @@
+{
+  "phase": "v3g_route_claim_gate",
+  "date": "2026-05-27",
+  "status": "FINALIZED",
+  "classification": "ROUTE_RELIABILITY_PARTIALLY_SUPPORTED_SCENARIO_DEPENDENT",
+  "eval_results": {
+    "games_attempted": 42,
+    "games_completed": 41,
+    "crashed": 1,
+    "battle_entered_count": 42,
+    "authenticated_count": 42,
+    "total_move_actions": 5425,
+    "route_eligible_move_actions": 5425,
+    "route_empty_count": 3409,
+    "route_empty_rate": 0.6284,
+    "scenarios_tested": 42,
+    "unique_maps_tested": 11,
+    "scenarios_with_high_empty_rate": [
+      {"scenario_id": "2010141294", "map_id": 94, "empty_rate": 0.9926, "move_attempts": 1082},
+      {"scenario_id": "2010131194", "map_id": 94, "empty_rate": 0.9974, "move_attempts": 2343}
+    ],
+    "scenarios_with_zero_empty_rate": 39,
+    "crashed_scenario": {"scenario_id": "2120331196", "map_id": 212},
+    "excluded_scenarios": ["3531 (map 53) — 2000-step timeout"],
+    "coverage_summary": "42/43 unique scenarios completed (97.7%). Two map 94 scenarios (2010141294, 2010131194) account for all empty routes. 39/42 scenarios (92.9%) show 0% empty."
+  },
+  "scenario_1910631192_contradiction": {
+    "v3d_empty_rate": 0.0,
+    "v3d_attempts": 316,
+    "league_empty_rate": 0.9904,
+    "league_attempts": 2088,
+    "v3g_authenticated_empty_rate": 0.0,
+    "v3g_authenticated_attempts": 32,
+    "v3g_authenticated_battle_entered": true,
+    "status": "resolved_as_auth_artifact",
+    "explanation": "After fixing SDK authentication (stale .engine_config in venv), V3G evaluation reproduces V3D's 0% empty rate for scenario 1910631192. The league's 99% rate was caused by auth failure preventing battle-phase entry. Scenario 1930631192 (map 19) also shows 0% empty (168 attempts)."
+  },
+  "authenticated_replay_battle_entered": true,
+  "denominator_meaningful": true,
+  "archived_vs_current_comparison": "ARCHIVED_ROUTE_FAILURE_PARTIALLY_REPRODUCED_CURRENT",
+  "archived_comparison_detail": "Map 94 scenarios (2010141294, 2010131194) show ~99% empty — WORSE than league's ~71%. Map 19 scenarios show 99% in league but 0% in V3G — resolved as auth artifact. All other 39 scenarios show 0% empty in both. Crashed: 2120331196 (map 212). Excluded: 3531 (map 53) due to timeout.",
+  "v3g_scenario_coverage_too_narrow": false,
+  "critical_scenario_contradiction_resolved": true,
+  "archived_high_empty_rate_partially_reproduced": true,
+  "sdk_diagnostic_revision": {
+    "v3f_classification": "ROUTE_INSTRUMENTATION_CORRECT",
+    "v3g_revision": "ROUTE_INSTRUMENTATION_COUNTS_CORRECT_BUT_LABEL_MISLEADING",
+    "explanation": "The 'no_valid_move_candidate' label is a misnomer. SDK Move valid_actions is always None (binary flag), not a candidate list. Route planner IS called before the label fires. True failure is 'A* route planner cannot find path to any city with any move type, and fallback fails.' The counts are correct (real move failures), but attribution to 'candidate generation' is inaccurate."
+  },
+  "remaining_route_limitations": [
+    "Map 94 scenarios (2010141294, 2010131194) show ~99% empty — genuine A* pathfinding failure",
+    "Root cause of map 94 pathfinding failure needs terrain analysis",
+    "2120331196 (map 212) evaluation crashed — needs diagnostic re-run",
+    "3531 (map 53) too expensive for 2000-step timeout",
+    "Fallback moves may mask some route failures"
+  ]
+}

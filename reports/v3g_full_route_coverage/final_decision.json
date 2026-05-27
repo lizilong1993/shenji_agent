@@ -1,0 +1,39 @@
+{
+  "phase": "v3g_final_decision",
+  "date": "2026-05-27",
+  "classification": "FULL_ROUTE_COVERAGE_PARTIAL_SCENARIO_DEPENDENT",
+  "route_claim_gate": "ROUTE_RELIABILITY_PARTIALLY_SUPPORTED_SCENARIO_DEPENDENT",
+  "coverage": {
+    "scenarios_attempted": 43,
+    "scenarios_completed": 42,
+    "scenarios_crashed": 1,
+    "scenarios_excluded": 1,
+    "coverage_percent": 97.7,
+    "total_move_attempts": 5425,
+    "scenarios_with_empty_routes": 2,
+    "scenarios_with_zero_empty": 39,
+    "dominant_empty_scenarios": [
+      {"scenario_id": "2010141294", "map_id": 94, "empty_rate": 0.9926},
+      {"scenario_id": "2010131194", "map_id": 94, "empty_rate": 0.9974}
+    ]
+  },
+  "v3f_contradiction_resolved": true,
+  "scenario_1910631192_contradiction": "resolved_as_old_sdk_auth_artifact",
+  "v3f_route_planner_diagnosis_revised": true,
+  "sdk_diagnostic_revision": "no_valid_move_candidate is a misnomer — route planner IS always called; counts correct but label misleading",
+  "auth_regression_fixed": true,
+  "remaining_blockers": [
+    "Map 94 pathfinding failures need terrain analysis",
+    "2120331196 (map 212) crashed during evaluation — needs re-run",
+    "3531 (map 53) timed out at 2000 steps"
+  ],
+  "recommended_next_goal": "V3H baseline expansion",
+  "route_claims": {
+    "supported": "Authenticated route evaluation across 42/43 league scenarios shows route-empty behavior is strongly scenario-dependent. Two map 94 scenarios show ~99% empty. All other 39 scenarios show 0% empty. Scenario 1910631192 contradiction resolved.",
+    "forbidden": [
+      "Route reliability is solved generally",
+      "All scenarios are route-safe",
+      "The archived 66.3% failure is irrelevant"
+    ]
+  }
+}

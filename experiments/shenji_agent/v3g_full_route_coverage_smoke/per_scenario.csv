@@ -1,0 +1,6 @@
+scenario_id,map_id,games,move_actions,route_eligible,route_empty,route_empty_rate,no_valid_candidate,route_planner_invoked,route_planner_empty,fallback_count,sdk_move_unavailable
+1531,53,1,16,16,0,0.0,0,16,0,0,2399
+2010211129,29,1,28,28,0,0.0,0,28,0,0,3012
+2030331196,96,1,63,63,0,0.0,0,63,0,0,20039
+211033019601,9601,1,18,18,0,0.0,0,18,0,0,1485
+2230531221,53,1,51,51,0,0.0,0,51,0,0,19836

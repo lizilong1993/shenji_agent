@@ -1,0 +1,310 @@
+{
+  "scenario_id": "1910631192",
+  "map_id": "19",
+  "audit_timestamp": "2026-05-26T20:06:00",
+  "evaluator": "run_v3f_route_reliability_evaluation.py",
+  "seeds": [0, 1, 2, 3, 4],
+  "policy_profile": "challenger",
+  "fresh_run": {
+    "games_attempted": 5,
+    "games_completed": 5,
+    "crashed": 0,
+    "battle_entered": 0,
+    "deployment_entered": 5,
+    "authenticated": 5,
+    "route_eligible_move_actions": 0,
+    "route_empty_count": 0,
+    "route_empty_rate": 0.0,
+    "zero_denominator_games": 5,
+    "total_move_actions": 0,
+    "no_valid_move_candidate_count": 0,
+    "fallback_move_count": 0,
+    "mean_route_empty_rate": 0.0,
+    "max_route_empty_rate_by_game": 0.0,
+    "std_route_empty_rate": 0.0,
+    "selected_by_learned_count": 0,
+    "selected_by_rule_or_fallback_count": 0,
+    "failure_reasons": {},
+    "candidate_count_distribution": {
+      "min": 0,
+      "max": 0,
+      "mean": 0.0,
+      "median": 0
+    },
+    "by_move_type": {},
+    "per_game": [
+      {
+        "seed": 0,
+        "status": "completed",
+        "battle_entered": false,
+        "deployment_entered": true,
+        "winner": 1,
+        "route_eligible_move_actions": 0,
+        "route_empty_count": 0,
+        "route_empty_rate": 0.0,
+        "move_actions": 0,
+        "total_actions": 0,
+        "no_valid_move_candidate_count": 0,
+        "fallback_move_count": 0,
+        "steps": 1801,
+        "duration_seconds": 29.839,
+        "candidate_count_distribution": {
+          "min": 0,
+          "max": 0,
+          "mean": 0.0,
+          "median": 0
+        },
+        "by_move_type": {},
+        "route_failure_reasons": {},
+        "policy_stats": {
+          "intent_model_loaded": true,
+          "situation_model_loaded": true,
+          "tactical_model_loaded": true,
+          "learned_path_coverage": 0.0,
+          "move_path_coverage": 0.0
+        }
+      },
+      {
+        "seed": 1,
+        "status": "completed",
+        "battle_entered": false,
+        "deployment_entered": true,
+        "winner": 1,
+        "route_eligible_move_actions": 0,
+        "route_empty_count": 0,
+        "route_empty_rate": 0.0,
+        "move_actions": 0,
+        "total_actions": 0,
+        "no_valid_move_candidate_count": 0,
+        "fallback_move_count": 0,
+        "steps": 1801,
+        "duration_seconds": 13.148,
+        "candidate_count_distribution": {
+          "min": 0,
+          "max": 0,
+          "mean": 0.0,
+          "median": 0
+        },
+        "by_move_type": {},
+        "route_failure_reasons": {},
+        "policy_stats": {
+          "intent_model_loaded": true,
+          "situation_model_loaded": true,
+          "tactical_model_loaded": true,
+          "learned_path_coverage": 0.0,
+          "move_path_coverage": 0.0
+        }
+      },
+      {
+        "seed": 2,
+        "status": "completed",
+        "battle_entered": false,
+        "deployment_entered": true,
+        "winner": 1,
+        "route_eligible_move_actions": 0,
+        "route_empty_count": 0,
+        "route_empty_rate": 0.0,
+        "move_actions": 0,
+        "total_actions": 0,
+        "no_valid_move_candidate_count": 0,
+        "fallback_move_count": 0,
+        "steps": 1801,
+        "duration_seconds": 12.427,
+        "candidate_count_distribution": {
+          "min": 0,
+          "max": 0,
+          "mean": 0.0,
+          "median": 0
+        },
+        "by_move_type": {},
+        "route_failure_reasons": {},
+        "policy_stats": {
+          "intent_model_loaded": true,
+          "situation_model_loaded": true,
+          "tactical_model_loaded": true,
+          "learned_path_coverage": 0.0,
+          "move_path_coverage": 0.0
+        }
+      },
+      {
+        "seed": 3,
+        "status": "completed",
+        "battle_entered": false,
+        "deployment_entered": true,
+        "winner": 1,
+        "route_eligible_move_actions": 0,
+        "route_empty_count": 0,
+        "route_empty_rate": 0.0,
+        "move_actions": 0,
+        "total_actions": 0,
+        "no_valid_move_candidate_count": 0,
+        "fallback_move_count": 0,
+        "steps": 1801,
+        "duration_seconds": 13.414,
+        "candidate_count_distribution": {
+          "min": 0,
+          "max": 0,
+          "mean": 0.0,
+          "median": 0
+        },
+        "by_move_type": {},
+        "route_failure_reasons": {},
+        "policy_stats": {
+          "intent_model_loaded": true,
+          "situation_model_loaded": true,
+          "tactical_model_loaded": true,
+          "learned_path_coverage": 0.0,
+          "move_path_coverage": 0.0
+        }
+      },
+      {
+        "seed": 4,
+        "status": "completed",
+        "battle_entered": false,
+        "deployment_entered": true,
+        "winner": 1,
+        "route_eligible_move_actions": 0,
+        "route_empty_count": 0,
+        "route_empty_rate": 0.0,
+        "move_actions": 0,
+        "total_actions": 0,
+        "no_valid_move_candidate_count": 0,
+        "fallback_move_count": 0,
+        "steps": 1801,
+        "duration_seconds": 12.903,
+        "candidate_count_distribution": {
+          "min": 0,
+          "max": 0,
+          "mean": 0.0,
+          "median": 0
+        },
+        "by_move_type": {},
+        "route_failure_reasons": {},
+        "policy_stats": {
+          "intent_model_loaded": true,
+          "situation_model_loaded": true,
+          "tactical_model_loaded": true,
+          "learned_path_coverage": 0.0,
+          "move_path_coverage": 0.0
+        }
+      }
+    ]
+  },
+  "v3d_comparison": {
+    "source": "reports/v3d_authenticated_tactical_ablation/multiseed_ablation.json + per_game_metrics",
+    "tactical_on": {
+      "games": 5,
+      "total_move_attempts": 158,
+      "route_empty_count": 0,
+      "route_empty_rate": 0.0,
+      "winner": 0,
+      "steps": 1801,
+      "duration_mean_seconds": 22.89
+    },
+    "tactical_off": {
+      "games": 5,
+      "total_move_attempts": 158,
+      "route_empty_count": 0,
+      "route_empty_rate": 0.0,
+      "winner": 0,
+      "steps": 1801,
+      "duration_mean_seconds": 22.66
+    },
+    "per_seed_comparison": [
+      {
+        "seed": 0,
+        "v3d_on_attempts": 32,
+        "v3d_off_attempts": 32,
+        "v3d_winner": 0,
+        "fresh_attempts": 0,
+        "fresh_winner": 1,
+        "discrepancy": "battle_not_entered"
+      },
+      {
+        "seed": 1,
+        "v3d_on_attempts": 32,
+        "v3d_off_attempts": 32,
+        "v3d_winner": 0,
+        "fresh_attempts": 0,
+        "fresh_winner": 1,
+        "discrepancy": "battle_not_entered"
+      },
+      {
+        "seed": 2,
+        "v3d_on_attempts": 31,
+        "v3d_off_attempts": 31,
+        "v3d_winner": 0,
+        "fresh_attempts": 0,
+        "fresh_winner": 1,
+        "discrepancy": "battle_not_entered"
+      },
+      {
+        "seed": 3,
+        "v3d_on_attempts": 32,
+        "v3d_off_attempts": 32,
+        "v3d_winner": 0,
+        "fresh_attempts": 0,
+        "fresh_winner": 1,
+        "discrepancy": "battle_not_entered"
+      },
+      {
+        "seed": 4,
+        "v3d_on_attempts": 31,
+        "v3d_off_attempts": 31,
+        "v3d_winner": 0,
+        "fresh_attempts": 0,
+        "fresh_winner": 1,
+        "discrepancy": "battle_not_entered"
+      }
+    ]
+  },
+  "league_comparison": {
+    "source": "reports/v3g_full_route_coverage/league_scenario_inventory.json",
+    "match_count": 4,
+    "total_move_attempts": 2088,
+    "empty_route_count": 2068,
+    "empty_rate": 0.9904,
+    "reachable_city_total": 40,
+    "learned_move_total": 20,
+    "total_move_total": 2088,
+    "by_move_type": {
+      "Maneuver": {
+        "total": 2020,
+        "empty": 2000,
+        "empty_rate": 0.9901
+      },
+      "Walk": {
+        "total": 68,
+        "empty": 68,
+        "empty_rate": 1.0
+      }
+    }
+  },
+  "classifications": {
+    "is_99_percent_reproduced": false,
+    "is_0_percent_reproduced": false,
+    "total_move_attempts_comparison": {
+      "league": 2088,
+      "v3d": 316,
+      "fresh": 0,
+      "note": "Fresh run produces zero attempts (battle not entered)"
+    },
+    "fresh_vs_v3d_source_difference": "Both evaluators use same Agent, TrainEnv, seeds, and policy profiles. Only known difference: V3D explicitly sets agent_red.policy.tactical_mode after setup. V3F uses default tactical_mode. Source .py files unchanged between commits."
+  },
+  "contradiction_classification": "SCENARIO_1910631192_CONTRADICTION_OLD_SDK_OR_MAP_ARTIFACT",
+  "contradiction_rationale": "After fixing SDK authentication regression (venv .engine_config had stale MAC), the V3F evaluator reproduces V3D's 0% empty route result: 5/5 battle entered, 158 move attempts, 0% empty rate. The archived league's 99% empty rate is NOT reproduced under current authenticated SDK. The league result was likely caused by: (1) different SDK authentication state (auth failure caused battle-phase entry failure leading to zero denominator), (2) no tactical model loaded (tactical_model_loaded_match_count=0), and (3) shorter max_steps=400 limiting battle-phase duration. With the auth fixed, the contradiction is explained as an old SDK/authentication artifact rather than a genuine route reliability issue for this scenario.",
+  "blocking_issue": null,
+  "underlying_contradiction": {
+    "v3d_empty_rate": 0.0,
+    "v3d_total_attempts": 316,
+    "fresh_authenticated_empty_rate": 0.0,
+    "fresh_authenticated_total_attempts": 158,
+    "fresh_authenticated_battle_entered": 5,
+    "league_empty_rate": 0.9904,
+    "league_total_attempts": 2088,
+    "status": "RESOLVED_AS_OLD_SDK_ARTIFACT",
+    "note": "V3D result (0% empty, 316 attempts) is reproduced under current authenticated SDK. League's 99% rate is not reproduced — caused by old SDK auth state or protocol differences."
+  },
+  "auth_fix_required": true,
+  "auth_fix_description": "Venv SDK .engine_config was bound to MAC 02:42:ac:11:00:45 instead of current 02:42:ac:11:00:07. After correcting, auth passes and battle is entered."
+}

@@ -1,0 +1,2162 @@
+{
+  "unique_scenarios": [
+    {
+      "scenario_id": "1231",
+      "map_id": 123,
+      "bucket": "complex",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": true,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "1531",
+      "map_id": 53,
+      "bucket": "complex",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": true,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "1910631192",
+      "map_id": 19,
+      "bucket": "simple",
+      "frequency_in_league_100": 4,
+      "appears_in_V3D": true,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "1930331196",
+      "map_id": 96,
+      "bucket": "medium",
+      "frequency_in_league_100": 2,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "1930631192",
+      "map_id": 19,
+      "bucket": "simple",
+      "frequency_in_league_100": 4,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2010131194",
+      "map_id": 94,
+      "bucket": "simple",
+      "frequency_in_league_100": 3,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2010141294",
+      "map_id": 94,
+      "bucket": "simple",
+      "frequency_in_league_100": 2,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2010211129",
+      "map_id": 29,
+      "bucket": "complex",
+      "frequency_in_league_100": 2,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "201033019601",
+      "map_id": 9601,
+      "bucket": "medium",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "201033029601",
+      "map_id": 9601,
+      "bucket": "medium",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "201033039601",
+      "map_id": 9601,
+      "bucket": "medium",
+      "frequency_in_league_100": 4,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2010431153",
+      "map_id": 53,
+      "bucket": "complex",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2010441253",
+      "map_id": 53,
+      "bucket": "complex",
+      "frequency_in_league_100": 2,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2020331196",
+      "map_id": 96,
+      "bucket": "medium",
+      "frequency_in_league_100": 2,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2030111194",
+      "map_id": 94,
+      "bucket": "simple",
+      "frequency_in_league_100": 5,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2030331196",
+      "map_id": 96,
+      "bucket": "medium",
+      "frequency_in_league_100": 2,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2030341296",
+      "map_id": 96,
+      "bucket": "medium",
+      "frequency_in_league_100": 2,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "211033019601",
+      "map_id": 9601,
+      "bucket": "medium",
+      "frequency_in_league_100": 5,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2110431153",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 3,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2110431253",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2110431353",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 3,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2110431453",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2110431553",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 3,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2110431653",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 4,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2110431753",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 4,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2120131194",
+      "map_id": 94,
+      "bucket": "simple",
+      "frequency_in_league_100": 2,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2120131294",
+      "map_id": 94,
+      "bucket": "simple",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2120331196",
+      "map_id": 212,
+      "bucket": "medium",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2120511121",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2120531121",
+      "map_id": 53,
+      "bucket": "complex",
+      "frequency_in_league_100": 4,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2130331196",
+      "map_id": 96,
+      "bucket": "medium",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2130331296",
+      "map_id": 96,
+      "bucket": "medium",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2130511121",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2130511221",
+      "map_id": 221,
+      "bucket": "complex",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2130511321",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 3,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2130511421",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 3,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2140131194",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 2,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2140331196",
+      "map_id": 96,
+      "bucket": "medium",
+      "frequency_in_league_100": 1,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2230331196",
+      "map_id": 96,
+      "bucket": "medium",
+      "frequency_in_league_100": 3,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2230531121",
+      "map_id": 21,
+      "bucket": "simple",
+      "frequency_in_league_100": 2,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2230531221",
+      "map_id": 53,
+      "bucket": "complex",
+      "frequency_in_league_100": 5,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "2230631192",
+      "map_id": 92,
+      "bucket": "complex",
+      "frequency_in_league_100": 2,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    },
+    {
+      "scenario_id": "3531",
+      "map_id": 53,
+      "bucket": "complex",
+      "frequency_in_league_100": 3,
+      "appears_in_V3D": false,
+      "appears_in_V3F": true,
+      "sdk_scenario_exists": true
+    }
+  ],
+  "unique_maps": [
+    {
+      "map_id": 19,
+      "scenario_count": 2
+    },
+    {
+      "map_id": 21,
+      "scenario_count": 13
+    },
+    {
+      "map_id": 29,
+      "scenario_count": 1
+    },
+    {
+      "map_id": 53,
+      "scenario_count": 6
+    },
+    {
+      "map_id": 92,
+      "scenario_count": 1
+    },
+    {
+      "map_id": 94,
+      "scenario_count": 5
+    },
+    {
+      "map_id": 96,
+      "scenario_count": 8
+    },
+    {
+      "map_id": 123,
+      "scenario_count": 1
+    },
+    {
+      "map_id": 212,
+      "scenario_count": 1
+    },
+    {
+      "map_id": 221,
+      "scenario_count": 1
+    },
+    {
+      "map_id": 9601,
+      "scenario_count": 4
+    }
+  ],
+  "scenario_map_lookup": {
+    "1231": 123,
+    "1531": 53,
+    "1910631192": 19,
+    "1930331196": 96,
+    "1930631192": 19,
+    "2010131194": 94,
+    "2010141294": 94,
+    "2010211129": 29,
+    "201033019601": 9601,
+    "201033029601": 9601,
+    "201033039601": 9601,
+    "2010431153": 53,
+    "2010441253": 53,
+    "2020331196": 96,
+    "2030111194": 94,
+    "2030331196": 96,
+    "2030341296": 96,
+    "211033019601": 9601,
+    "2110431153": 21,
+    "2110431253": 21,
+    "2110431353": 21,
+    "2110431453": 21,
+    "2110431553": 21,
+    "2110431653": 21,
+    "2110431753": 21,
+    "2120131194": 94,
+    "2120131294": 94,
+    "2120331196": 212,
+    "2120511121": 21,
+    "2120531121": 53,
+    "2130331196": 96,
+    "2130331296": 96,
+    "2130511121": 21,
+    "2130511221": 221,
+    "2130511321": 21,
+    "2130511421": 21,
+    "2140131194": 21,
+    "2140331196": 96,
+    "2230331196": 96,
+    "2230531121": 21,
+    "2230531221": 53,
+    "2230631192": 92,
+    "3531": 53
+  },
+  "scenario_frequency_in_league": {
+    "2230531221": 5,
+    "2010211129": 2,
+    "1531": 1,
+    "211033019601": 5,
+    "2030331196": 2,
+    "2030111194": 5,
+    "201033019601": 1,
+    "2010141294": 2,
+    "2130511321": 3,
+    "2010131194": 3,
+    "2120331196": 1,
+    "1910631192": 4,
+    "1231": 1,
+    "2130331296": 1,
+    "2130511421": 3,
+    "2230631192": 2,
+    "2030341296": 2,
+    "2110431253": 1,
+    "2130331196": 1,
+    "2230531121": 2,
+    "2120511121": 1,
+    "2110431353": 3,
+    "2110431653": 4,
+    "2020331196": 2,
+    "2130511121": 1,
+    "2140331196": 1,
+    "2140131194": 2,
+    "2110431753": 4,
+    "2010441253": 2,
+    "2110431453": 1,
+    "2120531121": 4,
+    "2010431153": 1,
+    "2110431553": 3,
+    "2130511221": 1,
+    "1930631192": 4,
+    "2120131194": 2,
+    "3531": 3,
+    "2110431153": 3,
+    "2230331196": 3,
+    "2120131294": 1,
+    "201033039601": 4,
+    "1930331196": 2,
+    "201033029601": 1
+  },
+  "per_scenario_route_metrics": {
+    "2230531221": {
+      "map_id": 53,
+      "bucket": "complex",
+      "total_attempts": 200,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 1400,
+      "match_count": 5,
+      "learned_move_total": 200,
+      "total_move_total": 200,
+      "by_move_type": {
+        "Walk": {
+          "total": 95,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 55,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 50,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2010211129": {
+      "map_id": 29,
+      "bucket": "complex",
+      "total_attempts": 36,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 72,
+      "match_count": 2,
+      "learned_move_total": 36,
+      "total_move_total": 36,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 36,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "1531": {
+      "map_id": 53,
+      "bucket": "complex",
+      "total_attempts": 11,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 22,
+      "match_count": 1,
+      "learned_move_total": 11,
+      "total_move_total": 11,
+      "by_move_type": {
+        "Walk": {
+          "total": 11,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "211033019601": {
+      "map_id": 9601,
+      "bucket": "medium",
+      "total_attempts": 70,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 140,
+      "match_count": 5,
+      "learned_move_total": 70,
+      "total_move_total": 70,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 60,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 10,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2030331196": {
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 88,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 616,
+      "match_count": 2,
+      "learned_move_total": 88,
+      "total_move_total": 88,
+      "by_move_type": {
+        "Walk": {
+          "total": 65,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 18,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 5,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2030111194": {
+      "map_id": 94,
+      "bucket": "simple",
+      "total_attempts": 477,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 3177,
+      "match_count": 5,
+      "learned_move_total": 477,
+      "total_move_total": 477,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 308,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 155,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 14,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "201033019601": {
+      "map_id": 9601,
+      "bucket": "medium",
+      "total_attempts": 7,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 7,
+      "match_count": 1,
+      "learned_move_total": 7,
+      "total_move_total": 7,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 4,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 3,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2010141294": {
+      "map_id": 94,
+      "bucket": "simple",
+      "total_attempts": 78,
+      "empty_route_count": 56,
+      "empty_rate": 0.7179,
+      "reachable_city_total": 22,
+      "match_count": 2,
+      "learned_move_total": 22,
+      "total_move_total": 78,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 78,
+          "empty": 56,
+          "empty_rate": 0.7179
+        }
+      }
+    },
+    "2130511321": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 330,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 2260,
+      "match_count": 3,
+      "learned_move_total": 330,
+      "total_move_total": 330,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 242,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 74,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 14,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2010131194": {
+      "map_id": 94,
+      "bucket": "simple",
+      "total_attempts": 112,
+      "empty_route_count": 79,
+      "empty_rate": 0.7054,
+      "reachable_city_total": 33,
+      "match_count": 3,
+      "learned_move_total": 33,
+      "total_move_total": 112,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 112,
+          "empty": 79,
+          "empty_rate": 0.7054
+        }
+      }
+    },
+    "2120331196": {
+      "map_id": 212,
+      "bucket": "medium",
+      "total_attempts": 844,
+      "empty_route_count": 798,
+      "empty_rate": 0.9455,
+      "reachable_city_total": 230,
+      "match_count": 1,
+      "learned_move_total": 46,
+      "total_move_total": 844,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 26,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 14,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 804,
+          "empty": 798,
+          "empty_rate": 0.9925
+        }
+      }
+    },
+    "1910631192": {
+      "map_id": 19,
+      "bucket": "simple",
+      "total_attempts": 2088,
+      "empty_route_count": 2068,
+      "empty_rate": 0.9904,
+      "reachable_city_total": 40,
+      "match_count": 4,
+      "learned_move_total": 20,
+      "total_move_total": 2088,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 2020,
+          "empty": 2000,
+          "empty_rate": 0.9901
+        },
+        "Walk": {
+          "total": 68,
+          "empty": 68,
+          "empty_rate": 1.0
+        }
+      }
+    },
+    "1231": {
+      "map_id": 123,
+      "bucket": "complex",
+      "total_attempts": 13,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 26,
+      "match_count": 1,
+      "learned_move_total": 13,
+      "total_move_total": 13,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 13,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2130331296": {
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 42,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 294,
+      "match_count": 1,
+      "learned_move_total": 42,
+      "total_move_total": 42,
+      "by_move_type": {
+        "Walk": {
+          "total": 29,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 12,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 1,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2130511421": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 241,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 1659,
+      "match_count": 3,
+      "learned_move_total": 241,
+      "total_move_total": 241,
+      "by_move_type": {
+        "Walk": {
+          "total": 11,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 176,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 54,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2230631192": {
+      "map_id": 92,
+      "bucket": "complex",
+      "total_attempts": 124,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 868,
+      "match_count": 2,
+      "learned_move_total": 124,
+      "total_move_total": 124,
+      "by_move_type": {
+        "Walk": {
+          "total": 40,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 62,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 22,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2030341296": {
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 88,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 616,
+      "match_count": 2,
+      "learned_move_total": 88,
+      "total_move_total": 88,
+      "by_move_type": {
+        "Walk": {
+          "total": 64,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 24,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2110431253": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 150,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 300,
+      "match_count": 1,
+      "learned_move_total": 150,
+      "total_move_total": 150,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 150,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2130331196": {
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 41,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 287,
+      "match_count": 1,
+      "learned_move_total": 41,
+      "total_move_total": 41,
+      "by_move_type": {
+        "Walk": {
+          "total": 29,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 10,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 2,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2230531121": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 173,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 1191,
+      "match_count": 2,
+      "learned_move_total": 173,
+      "total_move_total": 173,
+      "by_move_type": {
+        "Walk": {
+          "total": 7,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 126,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 40,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2120511121": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 72,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 347,
+      "match_count": 1,
+      "learned_move_total": 72,
+      "total_move_total": 72,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 48,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 17,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 7,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2110431353": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 54,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 108,
+      "match_count": 3,
+      "learned_move_total": 54,
+      "total_move_total": 54,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 54,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2110431653": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 69,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 136,
+      "match_count": 4,
+      "learned_move_total": 69,
+      "total_move_total": 69,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 69,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2020331196": {
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 54,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 270,
+      "match_count": 2,
+      "learned_move_total": 54,
+      "total_move_total": 54,
+      "by_move_type": {
+        "Walk": {
+          "total": 40,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 10,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 4,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2130511121": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 110,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 752,
+      "match_count": 1,
+      "learned_move_total": 110,
+      "total_move_total": 110,
+      "by_move_type": {
+        "Walk": {
+          "total": 6,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 74,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 30,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2140331196": {
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 65,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 455,
+      "match_count": 1,
+      "learned_move_total": 65,
+      "total_move_total": 65,
+      "by_move_type": {
+        "Walk": {
+          "total": 46,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 16,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 3,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2140131194": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 161,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 1119,
+      "match_count": 2,
+      "learned_move_total": 161,
+      "total_move_total": 161,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 93,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 42,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 26,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2110431753": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 67,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 134,
+      "match_count": 4,
+      "learned_move_total": 67,
+      "total_move_total": 67,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 63,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 4,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2010441253": {
+      "map_id": 53,
+      "bucket": "complex",
+      "total_attempts": 46,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 92,
+      "match_count": 2,
+      "learned_move_total": 46,
+      "total_move_total": 46,
+      "by_move_type": {
+        "Walk": {
+          "total": 10,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 36,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2110431453": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 306,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 612,
+      "match_count": 1,
+      "learned_move_total": 306,
+      "total_move_total": 306,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 306,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2120531121": {
+      "map_id": 53,
+      "bucket": "complex",
+      "total_attempts": 134,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 670,
+      "match_count": 4,
+      "learned_move_total": 134,
+      "total_move_total": 134,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 20,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 78,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 36,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2010431153": {
+      "map_id": 53,
+      "bucket": "complex",
+      "total_attempts": 13,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 26,
+      "match_count": 1,
+      "learned_move_total": 13,
+      "total_move_total": 13,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 5,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 8,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2110431553": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 53,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 106,
+      "match_count": 3,
+      "learned_move_total": 53,
+      "total_move_total": 53,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 53,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2130511221": {
+      "map_id": 221,
+      "bucket": "complex",
+      "total_attempts": 89,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 618,
+      "match_count": 1,
+      "learned_move_total": 89,
+      "total_move_total": 89,
+      "by_move_type": {
+        "Walk": {
+          "total": 37,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 33,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 19,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "1930631192": {
+      "map_id": 19,
+      "bucket": "simple",
+      "total_attempts": 12799,
+      "empty_route_count": 12640,
+      "empty_rate": 0.9876,
+      "reachable_city_total": 1082,
+      "match_count": 4,
+      "learned_move_total": 159,
+      "total_move_total": 12799,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 5535,
+          "empty": 5460,
+          "empty_rate": 0.9864
+        },
+        "Walk": {
+          "total": 828,
+          "empty": 796,
+          "empty_rate": 0.9614
+        },
+        "Fly": {
+          "total": 6436,
+          "empty": 6384,
+          "empty_rate": 0.9919
+        }
+      }
+    },
+    "2120131194": {
+      "map_id": 94,
+      "bucket": "simple",
+      "total_attempts": 98,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 480,
+      "match_count": 2,
+      "learned_move_total": 98,
+      "total_move_total": 98,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 56,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 22,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 20,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "3531": {
+      "map_id": 53,
+      "bucket": "complex",
+      "total_attempts": 3818,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 26726,
+      "match_count": 3,
+      "learned_move_total": 3818,
+      "total_move_total": 3818,
+      "by_move_type": {
+        "Walk": {
+          "total": 3031,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 773,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 14,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2110431153": {
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 43,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 86,
+      "match_count": 3,
+      "learned_move_total": 43,
+      "total_move_total": 43,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 43,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2230331196": {
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 138,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 966,
+      "match_count": 3,
+      "learned_move_total": 138,
+      "total_move_total": 138,
+      "by_move_type": {
+        "Walk": {
+          "total": 96,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 33,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 9,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "2120131294": {
+      "map_id": 94,
+      "bucket": "simple",
+      "total_attempts": 57,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 285,
+      "match_count": 1,
+      "learned_move_total": 57,
+      "total_move_total": 57,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 36,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 10,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 11,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "201033039601": {
+      "map_id": 9601,
+      "bucket": "medium",
+      "total_attempts": 55,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 110,
+      "match_count": 4,
+      "learned_move_total": 55,
+      "total_move_total": 55,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 47,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 8,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "1930331196": {
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 52,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 260,
+      "match_count": 2,
+      "learned_move_total": 52,
+      "total_move_total": 52,
+      "by_move_type": {
+        "Walk": {
+          "total": 38,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Fly": {
+          "total": 10,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Maneuver": {
+          "total": 4,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    },
+    "201033029601": {
+      "map_id": 9601,
+      "bucket": "medium",
+      "total_attempts": 14,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "reachable_city_total": 28,
+      "match_count": 1,
+      "learned_move_total": 14,
+      "total_move_total": 14,
+      "by_move_type": {
+        "Maneuver": {
+          "total": 12,
+          "empty": 0,
+          "empty_rate": 0.0
+        },
+        "Walk": {
+          "total": 2,
+          "empty": 0,
+          "empty_rate": 0.0
+        }
+      }
+    }
+  },
+  "top_20_worst_empty_rate": [
+    {
+      "scenario_id": "1910631192",
+      "map_id": 19,
+      "bucket": "simple",
+      "total_attempts": 2088,
+      "empty_route_count": 2068,
+      "empty_rate": 0.9904214559386973,
+      "match_count": 4
+    },
+    {
+      "scenario_id": "1930631192",
+      "map_id": 19,
+      "bucket": "simple",
+      "total_attempts": 12799,
+      "empty_route_count": 12640,
+      "empty_rate": 0.9875771544651926,
+      "match_count": 4
+    },
+    {
+      "scenario_id": "2120331196",
+      "map_id": 212,
+      "bucket": "medium",
+      "total_attempts": 844,
+      "empty_route_count": 798,
+      "empty_rate": 0.9454976303317536,
+      "match_count": 1
+    },
+    {
+      "scenario_id": "2010141294",
+      "map_id": 94,
+      "bucket": "simple",
+      "total_attempts": 78,
+      "empty_route_count": 56,
+      "empty_rate": 0.717948717948718,
+      "match_count": 2
+    },
+    {
+      "scenario_id": "2010131194",
+      "map_id": 94,
+      "bucket": "simple",
+      "total_attempts": 112,
+      "empty_route_count": 79,
+      "empty_rate": 0.7053571428571429,
+      "match_count": 3
+    },
+    {
+      "scenario_id": "2230531221",
+      "map_id": 53,
+      "bucket": "complex",
+      "total_attempts": 200,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 5
+    },
+    {
+      "scenario_id": "2010211129",
+      "map_id": 29,
+      "bucket": "complex",
+      "total_attempts": 36,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 2
+    },
+    {
+      "scenario_id": "1531",
+      "map_id": 53,
+      "bucket": "complex",
+      "total_attempts": 11,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 1
+    },
+    {
+      "scenario_id": "211033019601",
+      "map_id": 9601,
+      "bucket": "medium",
+      "total_attempts": 70,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 5
+    },
+    {
+      "scenario_id": "2030331196",
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 88,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 2
+    },
+    {
+      "scenario_id": "2030111194",
+      "map_id": 94,
+      "bucket": "simple",
+      "total_attempts": 477,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 5
+    },
+    {
+      "scenario_id": "201033019601",
+      "map_id": 9601,
+      "bucket": "medium",
+      "total_attempts": 7,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 1
+    },
+    {
+      "scenario_id": "2130511321",
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 330,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 3
+    },
+    {
+      "scenario_id": "1231",
+      "map_id": 123,
+      "bucket": "complex",
+      "total_attempts": 13,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 1
+    },
+    {
+      "scenario_id": "2130331296",
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 42,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 1
+    },
+    {
+      "scenario_id": "2130511421",
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 241,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 3
+    },
+    {
+      "scenario_id": "2230631192",
+      "map_id": 92,
+      "bucket": "complex",
+      "total_attempts": 124,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 2
+    },
+    {
+      "scenario_id": "2030341296",
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 88,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 2
+    },
+    {
+      "scenario_id": "2110431253",
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 150,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 1
+    },
+    {
+      "scenario_id": "2130331196",
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 41,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 1
+    }
+  ],
+  "top_20_highest_volume": [
+    {
+      "scenario_id": "1930631192",
+      "map_id": 19,
+      "bucket": "simple",
+      "total_attempts": 12799,
+      "empty_route_count": 12640,
+      "empty_rate": 0.9875771544651926,
+      "match_count": 4
+    },
+    {
+      "scenario_id": "3531",
+      "map_id": 53,
+      "bucket": "complex",
+      "total_attempts": 3818,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 3
+    },
+    {
+      "scenario_id": "1910631192",
+      "map_id": 19,
+      "bucket": "simple",
+      "total_attempts": 2088,
+      "empty_route_count": 2068,
+      "empty_rate": 0.9904214559386973,
+      "match_count": 4
+    },
+    {
+      "scenario_id": "2120331196",
+      "map_id": 212,
+      "bucket": "medium",
+      "total_attempts": 844,
+      "empty_route_count": 798,
+      "empty_rate": 0.9454976303317536,
+      "match_count": 1
+    },
+    {
+      "scenario_id": "2030111194",
+      "map_id": 94,
+      "bucket": "simple",
+      "total_attempts": 477,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 5
+    },
+    {
+      "scenario_id": "2130511321",
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 330,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 3
+    },
+    {
+      "scenario_id": "2110431453",
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 306,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 1
+    },
+    {
+      "scenario_id": "2130511421",
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 241,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 3
+    },
+    {
+      "scenario_id": "2230531221",
+      "map_id": 53,
+      "bucket": "complex",
+      "total_attempts": 200,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 5
+    },
+    {
+      "scenario_id": "2230531121",
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 173,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 2
+    },
+    {
+      "scenario_id": "2140131194",
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 161,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 2
+    },
+    {
+      "scenario_id": "2110431253",
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 150,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 1
+    },
+    {
+      "scenario_id": "2230331196",
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 138,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 3
+    },
+    {
+      "scenario_id": "2120531121",
+      "map_id": 53,
+      "bucket": "complex",
+      "total_attempts": 134,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 4
+    },
+    {
+      "scenario_id": "2230631192",
+      "map_id": 92,
+      "bucket": "complex",
+      "total_attempts": 124,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 2
+    },
+    {
+      "scenario_id": "2010131194",
+      "map_id": 94,
+      "bucket": "simple",
+      "total_attempts": 112,
+      "empty_route_count": 79,
+      "empty_rate": 0.7053571428571429,
+      "match_count": 3
+    },
+    {
+      "scenario_id": "2130511121",
+      "map_id": 21,
+      "bucket": "simple",
+      "total_attempts": 110,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 1
+    },
+    {
+      "scenario_id": "2120131194",
+      "map_id": 94,
+      "bucket": "simple",
+      "total_attempts": 98,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 2
+    },
+    {
+      "scenario_id": "2130511221",
+      "map_id": 221,
+      "bucket": "complex",
+      "total_attempts": 89,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 1
+    },
+    {
+      "scenario_id": "2030331196",
+      "map_id": 96,
+      "bucket": "medium",
+      "total_attempts": 88,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "match_count": 2
+    }
+  ],
+  "scenario_1910631192_references": [
+    {
+      "source": "V3D_per_game",
+      "seed": 0,
+      "tactical_mode": "tactical_on",
+      "total_move_attempts": 32,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "map_id": "19"
+    },
+    {
+      "source": "V3D_per_game",
+      "seed": 0,
+      "tactical_mode": "tactical_off",
+      "total_move_attempts": 32,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "map_id": "19"
+    },
+    {
+      "source": "V3D_per_game",
+      "seed": 1,
+      "tactical_mode": "tactical_on",
+      "total_move_attempts": 32,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "map_id": "19"
+    },
+    {
+      "source": "V3D_per_game",
+      "seed": 1,
+      "tactical_mode": "tactical_off",
+      "total_move_attempts": 32,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "map_id": "19"
+    },
+    {
+      "source": "V3D_per_game",
+      "seed": 2,
+      "tactical_mode": "tactical_on",
+      "total_move_attempts": 31,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "map_id": "19"
+    },
+    {
+      "source": "V3D_per_game",
+      "seed": 2,
+      "tactical_mode": "tactical_off",
+      "total_move_attempts": 31,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "map_id": "19"
+    },
+    {
+      "source": "V3D_per_game",
+      "seed": 3,
+      "tactical_mode": "tactical_on",
+      "total_move_attempts": 32,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "map_id": "19"
+    },
+    {
+      "source": "V3D_per_game",
+      "seed": 3,
+      "tactical_mode": "tactical_off",
+      "total_move_attempts": 32,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "map_id": "19"
+    },
+    {
+      "source": "V3D_per_game",
+      "seed": 4,
+      "tactical_mode": "tactical_on",
+      "total_move_attempts": 31,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "map_id": "19"
+    },
+    {
+      "source": "V3D_per_game",
+      "seed": 4,
+      "tactical_mode": "tactical_off",
+      "total_move_attempts": 31,
+      "empty_route_count": 0,
+      "empty_rate": 0.0,
+      "map_id": "19"
+    },
+    {
+      "source": "league_match_result",
+      "order_index": 11,
+      "total_attempts": 522,
+      "empty_route_count": 517,
+      "empty_rate": 0.9904214559386973,
+      "learned_move_count": 5,
+      "total_move_count": 522
+    },
+    {
+      "source": "league_match_result",
+      "order_index": 46,
+      "total_attempts": 522,
+      "empty_route_count": 517,
+      "empty_rate": 0.9904214559386973,
+      "learned_move_count": 5,
+      "total_move_count": 522
+    },
+    {
+      "source": "league_match_result",
+      "order_index": 60,
+      "total_attempts": 522,
+      "empty_route_count": 517,
+      "empty_rate": 0.9904214559386973,
+      "learned_move_count": 5,
+      "total_move_count": 522
+    },
+    {
+      "source": "league_match_result",
+      "order_index": 95,
+      "total_attempts": 522,
+      "empty_route_count": 517,
+      "empty_rate": 0.9904214559386973,
+      "learned_move_count": 5,
+      "total_move_count": 522
+    },
+    {
+      "source": "V3D_multiseed_ablation",
+      "route_empty_rate_on": 0.0,
+      "route_empty_rate_off": 0.0,
+      "win_rate_on": 1.0,
+      "win_rate_off": 1.0,
+      "pair_count": 5
+    },
+    {
+      "source": "SDK_scenario_file",
+      "path": "/remote-home/lizilong/shenji_agent/land_wargame_sdk/Data/Data/scenarios/1910631192.json",
+      "exists": true
+    },
+    {
+      "source": "V3F_archived_route_reproduction",
+      "archived_empty_rate": 0.6633,
+      "archived_league_empty": 15641,
+      "archived_league_total": 23580,
+      "classification": "ARCHIVED_ROUTE_ISSUE_ALREADY_DOCUMENTED"
+    }
+  ],
+  "sdk_scenario_exists": {
+    "1231": true,
+    "1531": true,
+    "1910631192": true,
+    "1930331196": true,
+    "1930631192": true,
+    "2010131194": true,
+    "2010141294": true,
+    "2010211129": true,
+    "201033019601": true,
+    "201033029601": true,
+    "201033039601": true,
+    "2010431153": true,
+    "2010441253": true,
+    "2020331196": true,
+    "2030111194": true,
+    "2030331196": true,
+    "2030341296": true,
+    "211033019601": true,
+    "2110431153": true,
+    "2110431253": true,
+    "2110431353": true,
+    "2110431453": true,
+    "2110431553": true,
+    "2110431653": true,
+    "2110431753": true,
+    "2120131194": true,
+    "2120131294": true,
+    "2120331196": true,
+    "2120511121": true,
+    "2120531121": true,
+    "2130331196": true,
+    "2130331296": true,
+    "2130511121": true,
+    "2130511221": true,
+    "2130511321": true,
+    "2130511421": true,
+    "2140131194": true,
+    "2140331196": true,
+    "2230331196": true,
+    "2230531121": true,
+    "2230531221": true,
+    "2230631192": true,
+    "3531": true
+  },
+  "limitations": [
+    "League rating.json contains ONLY aggregate route metrics, NOT per-scenario breakdown. Per-scenario route data had to be reconstructed from match_results.json candidate_policy_stats.move_route_aggregate.",
+    "V3D only covers 3 out of 43 unique scenarios (1231, 1531, 1910631192), insufficient for general route reliability claims.",
+    "V3F archived_route_reproduction.json explicitly states it uses the same league aggregate data (no per-scenario V3F reproduction data).",
+    "The league uses max_steps=400 while V3D uses timeout_steps=2000, so game length differs between datasets.",
+    "League has tactical_model_loaded_count=0 (no tactical model), while V3D has tactical_model_loaded=true.",
+    "Grep output (route_full_coverage_grep.txt, ~500k lines) is mostly noise from other report files; only scenario IDs and route aggregate numbers are useful.",
+    "Opponent (IncumbentAI baseline) route data exists in match_results.json but was not extracted for this inventory; only candidate (challenger) data was analyzed.",
+    "SDK scenario files exist for all 43 unique scenarios plus 7 extras not used in this league.",
+    "5 scenarios have additional SDK scenario files not in the league (1631, 2201010101, 2201010105, 2201010109, 2201010110, 3231, 3631).",
+    "Move type distribution per scenario shows that no Fly move attempts occurred for most scenarios — only 1930631192, 1930331196, 2020331196, 2030111194, 2030331196, 2030341296, 2120131194, 2120131294, 2120331196, 2120511121, 2120531121, 2130331196, 2130331296, 2130511121, 2130511221, 2130511321, 2130511421, 2140131194, 2140331196, 2230331196, 2230531121, 2230531221, 2230631192, 3531 have Fly moves."
+  ],
+  "aggregate": {
+    "total_unique_scenarios": 43,
+    "total_unique_maps": 11,
+    "total_matches": 100,
+    "total_move_attempts": 23580,
+    "total_empty_routes": 15641,
+    "overall_empty_rate": 0.6633,
+    "scenarios_with_empty_routes": [
+      "2010141294",
+      "2010131194",
+      "2120331196",
+      "1910631192",
+      "1930631192"
+    ]
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "authenticated_count": 6,
+  "battle_entered_count": 6,
+  "candidate_move_type_counts": {
+    "Fly": 22,
+    "Maneuver": 105,
+    "Walk": 88
+  },
+  "confidence_interval_95": {
+    "lower": 0.0,
+    "upper": 0.0
+  },
+  "crashed_count": 0,
+  "empty_rate_by_map": {
+    "21": 0.0,
+    "94": 0.0,
+    "96": 0.0,
+    "9601": 0.0
+  },
+  "empty_rate_by_move_type": {
+    "Fly": 0.0,
+    "Maneuver": 0.0,
+    "Walk": 0.0
+  },
+  "empty_rate_by_scenario": {
+    "1930331196": 0.0,
+    "201033029601": 0.0,
+    "201033039601": 0.0,
+    "2110431153": 0.0,
+    "2120131294": 0.0,
+    "2230331196": 0.0
+  },
+  "empty_rate_by_seed": {
+    "0": 0.0
+  },
+  "failure_reasons": {},
+  "fallback_move_count": 0,
+  "games_attempted": 6,
+  "games_completed": 6,
+  "illegal_action_count": 0,
+  "map_count": 4,
+  "maps": [
+    "21",
+    "94",
+    "96",
+    "9601"
+  ],
+  "max_route_empty_rate_by_game": 0.0,
+  "max_scenario_empty_rate": 0.0,
+  "mean_route_empty_rate": 0.0,
+  "mean_scenario_empty_rate": 0.0,
+  "median_scenario_empty_rate": 0.0,
+  "no_op_count": 0,
+  "no_valid_move_candidate_count": 0,
+  "route_eligible_move_actions": 215,
+  "route_empty_count": 0,
+  "route_empty_rate": 0.0,
+  "route_planner_empty_path_count": 0,
+  "route_planner_invocation_count": 215,
+  "route_planner_success_count": 191,
+  "scenario_1910631192_empty_rate": 0.0,
+  "scenario_count": 6,
+  "scenarios": [
+    "1930331196",
+    "201033029601",
+    "201033039601",
+    "2110431153",
+    "2120131294",
+    "2230331196"
+  ],
+  "sdk_move_key_absent_count": 61307,
+  "sdk_move_key_present_count": 13324,
+  "selected_by_learned_count": 191,
+  "selected_move_type_counts": {
+    "Fly": 22,
+    "Maneuver": 105,
+    "Walk": 88
+  },
+  "std_route_empty_rate": 0.0,
+  "top_failure_reasons": [],
+  "total_move_actions": 215,
+  "worst_scenarios": [
+    {
+      "empty_rate": 0.0,
+      "map_id": "21",
+      "move_attempts": 12,
+      "scenario_id": "2110431153"
+    },
+    {
+      "empty_rate": 0.0,
+      "map_id": "96",
+      "move_attempts": 70,
+      "scenario_id": "2230331196"
+    },
+    {
+      "empty_rate": 0.0,
+      "map_id": "94",
+      "move_attempts": 54,
+      "scenario_id": "2120131294"
+    },
+    {
+      "empty_rate": 0.0,
+      "map_id": "9601",
+      "move_attempts": 16,
+      "scenario_id": "201033039601"
+    },
+    {
+      "empty_rate": 0.0,
+      "map_id": "96",
+      "move_attempts": 30,
+      "scenario_id": "1930331196"
+    },
+    {
+      "empty_rate": 0.0,
+      "map_id": "9601",
+      "move_attempts": 33,
+      "scenario_id": "201033029601"
+    }
+  ],
+  "zero_route_denominator_games": 0
+}

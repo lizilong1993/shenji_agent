@@ -1,0 +1,113 @@
+{
+  "authenticated_count": 5,
+  "battle_entered_count": 5,
+  "candidate_move_type_counts": {
+    "Fly": 26,
+    "Maneuver": 90,
+    "Walk": 60
+  },
+  "confidence_interval_95": {
+    "lower": 0.0,
+    "upper": 0.0
+  },
+  "crashed_count": 0,
+  "empty_rate_by_map": {
+    "29": 0.0,
+    "53": 0.0,
+    "96": 0.0,
+    "9601": 0.0
+  },
+  "empty_rate_by_move_type": {
+    "Fly": 0.0,
+    "Maneuver": 0.0,
+    "Walk": 0.0
+  },
+  "empty_rate_by_scenario": {
+    "1531": 0.0,
+    "2010211129": 0.0,
+    "2030331196": 0.0,
+    "211033019601": 0.0,
+    "2230531221": 0.0
+  },
+  "empty_rate_by_seed": {
+    "0": 0.0
+  },
+  "failure_reasons": {},
+  "fallback_move_count": 0,
+  "games_attempted": 5,
+  "games_completed": 5,
+  "illegal_action_count": 0,
+  "map_count": 4,
+  "maps": [
+    "29",
+    "53",
+    "96",
+    "9601"
+  ],
+  "max_route_empty_rate_by_game": 0.0,
+  "max_scenario_empty_rate": 0.0,
+  "mean_route_empty_rate": 0.0,
+  "mean_scenario_empty_rate": 0.0,
+  "median_scenario_empty_rate": 0.0,
+  "no_op_count": 0,
+  "no_valid_move_candidate_count": 0,
+  "route_eligible_move_actions": 176,
+  "route_empty_count": 0,
+  "route_empty_rate": 0.0,
+  "route_planner_empty_path_count": 0,
+  "route_planner_invocation_count": 176,
+  "route_planner_success_count": 162,
+  "scenario_1910631192_empty_rate": 0.0,
+  "scenario_count": 5,
+  "scenarios": [
+    "1531",
+    "2010211129",
+    "2030331196",
+    "211033019601",
+    "2230531221"
+  ],
+  "sdk_move_key_absent_count": 46771,
+  "sdk_move_key_present_count": 12748,
+  "selected_by_learned_count": 162,
+  "selected_move_type_counts": {
+    "Fly": 26,
+    "Maneuver": 90,
+    "Walk": 60
+  },
+  "std_route_empty_rate": 0.0,
+  "top_failure_reasons": [],
+  "total_move_actions": 176,
+  "worst_scenarios": [
+    {
+      "empty_rate": 0.0,
+      "map_id": "53",
+      "move_attempts": 51,
+      "scenario_id": "2230531221"
+    },
+    {
+      "empty_rate": 0.0,
+      "map_id": "29",
+      "move_attempts": 28,
+      "scenario_id": "2010211129"
+    },
+    {
+      "empty_rate": 0.0,
+      "map_id": "53",
+      "move_attempts": 16,
+      "scenario_id": "1531"
+    },
+    {
+      "empty_rate": 0.0,
+      "map_id": "9601",
+      "move_attempts": 18,
+      "scenario_id": "211033019601"
+    },
+    {
+      "empty_rate": 0.0,
+      "map_id": "96",
+      "move_attempts": 63,
+      "scenario_id": "2030331196"
+    }
+  ],
+  "zero_route_denominator_games": 0
+}

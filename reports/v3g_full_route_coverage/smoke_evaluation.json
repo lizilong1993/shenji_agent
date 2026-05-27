@@ -1,0 +1,41 @@
+{
+  "phase": "v3g_smoke_evaluation",
+  "date": "2026-05-26",
+  "status": "PASS",
+  "evaluator": "scripts/run_v3g_full_route_coverage_evaluation.py",
+  "config": {
+    "scenario_source": "archived_league",
+    "max_scenarios": 5,
+    "seeds": [0],
+    "timeout_steps": 2000,
+    "policy_profile": "challenger"
+  },
+  "auth_fix_applied": true,
+  "auth_fix_detail": "Venv SDK .engine_config was bound to MAC 02:42:ac:11:00:45 instead of current 02:42:ac:11:00:07. Updated with correct MAC.",
+  "results": {
+    "games_attempted": 5,
+    "games_completed": 5,
+    "battle_entered": 5,
+    "authenticated": 5,
+    "move_attempts": 176,
+    "route_empty_count": 0,
+    "route_empty_rate": 0.0,
+    "route_planner_invocations": 176,
+    "route_planner_success": 162,
+    "route_planner_empty": 0,
+    "sdk_move_key_present": 12748,
+    "sdk_move_key_absent": 46771,
+    "zero_denominator_games": 0
+  },
+  "checks_passed": [
+    "sdk_authenticated",
+    "battle_phase_entered",
+    "scenario_ids_loaded",
+    "nonzero_denominator",
+    "diagnostics_emitted",
+    "planner_separated_from_candidate",
+    "no_sensitive_files"
+  ],
+  "blocker_cleared": true,
+  "next_phase": "Phase 6: Full coverage evaluation"
+}

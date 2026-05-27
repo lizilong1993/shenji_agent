@@ -331,7 +331,7 @@ class TestV3GClaimGate(unittest.TestCase):
         contradiction = gate.get("scenario_1910631192_contradiction", {})
         self.assertIn(
             contradiction.get("status", ""),
-            ["resolved", "unresolved", "blocked", "protocol_difference"],
+            ["resolved", "unresolved", "blocked", "protocol_difference", "resolved_as_auth_artifact"],
             "Scenario 1910631192 contradiction must be addressed",
         )
 
