@@ -148,6 +148,31 @@ class Map:
             path.reverse()
         return path
 
+    def gen_move_route_bfs(self, begin: int, end: int) -> List[int]:
+        """BFS fallback: find a path ignoring cost, using only neighbor connectivity."""
+        if not self.is_valid(begin) or not self.is_valid(end) or begin == end:
+            return []
+        visited: Dict[int, Optional[int]] = {begin: None}
+        queue: List[int] = [begin]
+        head = 0
+        while head < len(queue):
+            cur = queue[head]
+            head += 1
+            if cur == end:
+                break
+            for neigh in self.get_neighbors(cur):
+                if neigh not in visited:
+                    visited[neigh] = cur
+                    queue.append(neigh)
+        path: List[int] = []
+        if end in visited:
+            cur = end
+            while cur != begin:
+                path.append(cur)
+                cur = visited[cur]
+            path.reverse()
+        return path
+
     def get_grid_distance(self, center: int, distance_start: int, distance_end: int) -> Set[int]:
         gridset: Set[int] = set()
         if not self.is_valid(center) or not 0 <= distance_start <= distance_end:
@@ -567,6 +592,15 @@ class Agent:
             self._reset_action_diagnostics()
             self.map = Map(setup_info["basic_data"], setup_info["cost_data"], setup_info.get("see_data"))
             self.map_data = self.map.get_map_data()
+            # B3 diagnostic: log cost_data coverage for route planning
+            cost_len = len(setup_info["cost_data"]) if setup_info.get("cost_data") else 0
+            move_type_names = {0: "Maneuver", 1: "March", 2: "Walk", 3: "Fly"}
+            covered = [move_type_names.get(i, str(i)) for i in range(min(cost_len, 4))]
+            missing = [move_type_names.get(i, str(i)) for i in range(cost_len, 4)]
+            self.logger.info(
+                "map cost_data: %d modes available=%s missing=%s",
+                cost_len, covered, missing,
+            )
             self.policy.configure(self.faction, self.policy_artifacts_dir, self.policy_profile)
             if self.use_ai_optimization and not self.policy.has_models():
                 self.logger.warning(
@@ -790,6 +824,25 @@ class Agent:
                 ]
                 if reachable_city_routes:
                     used_move_type = best_route_by_city[next(iter(best_route_by_city))][3]
+
+                if not reachable_city_routes:
+                    # B3 fix: try BFS fallback for each city before giving up
+                    for city in cities:
+                        city_hex = city.get("coord")
+                        if city_hex is None:
+                            continue
+                        city_id = int(city_hex)
+                        bfs_route = self.map.gen_move_route_bfs(bop["cur_hex"], city_id)
+                        if bfs_route:
+                            best_route_by_city[city_id] = (city, bfs_route, len(bfs_route), move_type)
+                    reachable_city_routes = [
+                        (rec[0], rec[1]) for rec in best_route_by_city.values()
+                    ]
+                    if reachable_city_routes:
+                        self.logger.info(
+                            "B3 BFS fallback rescued %d cities for obj %s (A* found 0)",
+                            len(reachable_city_routes), obj_id,
+                        )
 
                 if not reachable_city_routes:
                     nearest_city = min(

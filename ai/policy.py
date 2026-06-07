@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections import defaultdict, deque
 from pathlib import Path
@@ -8,21 +9,18 @@ from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
-from .artifacts import resolve_manifest_assets
 from .features import FEATURE_DIM, TACTICAL_FEATURE_DIM, action_feature_vector, build_feature_similarity_graph, operator_to_feature, operator_to_graph_feature
 
 try:
     import torch
 
-    from .models import GraphSituationModel, LegacyIntentModel, LegacySituationModel, MultiHorizonIntentionModel, TacticalScorer
+    from .models import GraphSituationModel, MultiHorizonIntentionModel, TacticalScorer
 
     TORCH_AVAILABLE = True
 except ImportError:  # pragma: no cover
     TORCH_AVAILABLE = False
     torch = None  # type: ignore[assignment]
     GraphSituationModel = None  # type: ignore[assignment]
-    LegacyIntentModel = None  # type: ignore[assignment]
-    LegacySituationModel = None  # type: ignore[assignment]
     MultiHorizonIntentionModel = None  # type: ignore[assignment]
     TacticalScorer = None  # type: ignore[assignment]
 
@@ -79,7 +77,6 @@ class LearnedPolicy:
         self.loaded_from: Optional[Path] = None
         self.manifest: Dict[str, Any] = {}
         self._observation_cache: Optional[Dict[str, Any]] = None
-        self.tactical_mode: str = "on"
         self._reset_diagnostics()
 
     def _reset_diagnostics(self) -> None:
@@ -115,14 +112,29 @@ class LearnedPolicy:
         self._reset_move_route_diagnostics()
 
     def _load_intent_model(self, payload: Dict[str, Any]) -> Any:
-        state = payload.get("model_state") or payload
-        hidden_dim = int(payload.get("hidden_dim") or state["lstm.weight_ih_l0"].shape[0] // 4)
-        # Detect old fc_intent checkpoints that cannot load into MultiHorizonIntentionModel
-        if any("fc_intent" in k for k in state):
-            model = LegacyIntentModel(
-                input_dim=int(payload.get("feature_dim", FEATURE_DIM)),
+        # Support both wrapped {"model_state": {...}, ...} and raw state_dict formats
+        if "model_state" in payload:
+            state_dict = payload["model_state"]
+        else:
+            state_dict = payload
+        # Infer hidden_dim from LSTM weight: shape [4*hidden, input_dim]
+        lstm_key = "lstm.weight_ih_l0"
+        if lstm_key in state_dict:
+            hidden_dim = state_dict[lstm_key].shape[0] // 4
+        else:
+            hidden_dim = int(payload.get("hidden_dim", 128))
+        # Detect model class by checking key patterns
+        has_head = any(k.startswith("head.") for k in state_dict)
+        has_fc_intent = "fc_intent.weight" in state_dict
+        if has_fc_intent and not has_head:
+            # Legacy IntentionLSTM checkpoint (fc_intent instead of head)
+            from .models import IntentionLSTM
+            input_dim = state_dict[lstm_key].shape[1] if lstm_key in state_dict else FEATURE_DIM
+            num_classes = state_dict["fc_intent.weight"].shape[0] if "fc_intent.weight" in state_dict else 4
+            model = IntentionLSTM(
+                input_dim=input_dim,
                 hidden_dim=hidden_dim,
-                output_classes=int(payload.get("num_classes", 7)),
+                num_classes=num_classes,
             )
         else:
             model = MultiHorizonIntentionModel(
@@ -131,27 +143,41 @@ class LearnedPolicy:
                 horizons=int(payload.get("horizons", 5)),
                 num_classes=int(payload.get("num_classes", 7)),
             )
-        model.load_state_dict(state)
+        model.load_state_dict(state_dict)
         model.eval()
         return model
 
     def _load_situation_model(self, payload: Dict[str, Any]) -> Any:
-        state = payload.get("model_state") or payload
-        # Detect old bare SituationGCN checkpoints (keys like sage1.linear.weight, no backbone. prefix)
-        is_bare = any(k.startswith("sage") or k.startswith("fc_") for k in state)
-        if is_bare:
-            hidden_dim = int(payload.get("hidden_dim") or state["sage1.linear.weight"].shape[0])
-            model = LegacySituationModel(
-                num_features=int(payload.get("input_dim", FEATURE_DIM)),
-                hidden_dim=hidden_dim,
-            )
+        # Support both wrapped {"model_state": {...}, ...} and raw state_dict formats
+        if "model_state" in payload:
+            state_dict = payload["model_state"]
         else:
-            hidden_dim = int(payload.get("hidden_dim") or state["backbone.sage1.linear.weight"].shape[0])
+            state_dict = payload
+        # Infer hidden_dim from first SAGE layer: shape [hidden, 2*input]
+        sage_key = None
+        for candidate_key in ("backbone.sage1.linear.weight", "sage1.linear.weight"):
+            if candidate_key in state_dict:
+                sage_key = candidate_key
+                break
+        if sage_key is not None:
+            hidden_dim = state_dict[sage_key].shape[0]
+        else:
+            hidden_dim = int(payload.get("hidden_dim", 64))
+        # Detect whether keys have "backbone." prefix
+        has_backbone_prefix = any(k.startswith("backbone.") for k in state_dict)
+        if not has_backbone_prefix and "sage1.linear.weight" in state_dict:
+            # Legacy SituationGCN checkpoint without backbone wrapper.
+            # Wrap into GraphSituationModel so inference can call .backbone(x, adj)
+            num_features = state_dict["sage1.linear.weight"].shape[1] // 2
+            model = GraphSituationModel(num_features=num_features, hidden_dim=hidden_dim)
+            wrapped_sd = {f"backbone.{k}": v for k, v in state_dict.items()}
+            model.load_state_dict(wrapped_sd)
+        else:
             model = GraphSituationModel(
                 num_features=int(payload.get("input_dim", FEATURE_DIM)),
                 hidden_dim=hidden_dim,
             )
-        model.load_state_dict(state)
+            model.load_state_dict(state_dict)
         model.eval()
         return model
 
@@ -214,10 +240,9 @@ class LearnedPolicy:
             self._load_situation_model(situation_state)
         )
 
-    def configure(self, faction: int, artifact_dir: Optional[str] = None, policy_profile: str = "challenger", tactical_mode: str = "on") -> None:
+    def configure(self, faction: int, artifact_dir: Optional[str] = None, policy_profile: str = "challenger") -> None:
         self.faction = faction
         self.policy_profile = policy_profile or "challenger"
-        self.tactical_mode = tactical_mode
         self.history_len = 8
         self.device = "cpu"
         self.requested_device = "auto"
@@ -248,15 +273,14 @@ class LearnedPolicy:
             self.history_len = int(payload.get("history_len", self.history_len))
             self.enemy_histories = defaultdict(lambda: deque(maxlen=self.history_len))
 
-            resolutions = resolve_manifest_assets(candidate_dir, payload)
-            intent_resolution = resolutions.get("intent_lstm") or resolutions.get("intent_model")
-            situation_resolution = resolutions.get("situation_gcn") or resolutions.get("situation_model")
-            if not intent_resolution or not situation_resolution:
+            intent_name = payload.get("intent_lstm") or payload.get("intent_model")
+            situation_name = payload.get("situation_gcn") or payload.get("situation_model")
+            if not intent_name or not situation_name:
                 continue
 
-            intent_path = intent_resolution.path
-            situation_path = situation_resolution.path
-            if not intent_resolution.exists or not situation_resolution.exists:
+            intent_path = candidate_dir / intent_name
+            situation_path = candidate_dir / situation_name
+            if not intent_path.exists() or not situation_path.exists():
                 continue
 
             try:
@@ -273,14 +297,30 @@ class LearnedPolicy:
             self._feature_normalizer = self._load_normalizer(candidate_dir)
 
             # Load tactical model if available
-            tactical_resolution = resolutions.get("tactical_model")
-            tactical_path = tactical_resolution.path if tactical_resolution else candidate_dir / "tactical_model.pt"
-            if tactical_resolution and tactical_resolution.exists:
+            tactical_name = payload.get("tactical_model") or "tactical_model.pt"
+            tactical_path = candidate_dir / tactical_name
+            if tactical_path.exists():
                 try:
                     tactical_state = torch.load(tactical_path, map_location="cpu")
                     self.tactical_model = self._move_to_device(self._load_tactical_model(tactical_state))
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logging.getLogger(__name__).warning(
+                        "tactical model file %s exists but failed to load: %s", tactical_path, exc
+                    )
+                    self.tactical_model = None
+            else:
+                logging.getLogger(__name__).warning(
+                    "tactical model file not found at %s; tactical_score will be 0", tactical_path
+                )
+
+            logging.getLogger(__name__).info(
+                "LearnedPolicy.configure: intent=%s situation=%s tactical=%s normalizer=%s loaded_from=%s",
+                self.intent_model is not None,
+                self.situation_model is not None,
+                self.tactical_model is not None,
+                bool(self._feature_normalizer),
+                self.loaded_from,
+            )
             return
 
     def reset(self) -> None:
@@ -369,12 +409,10 @@ class LearnedPolicy:
             )
         return {
             "policy_profile": self.policy_profile,
-            "tactical_mode": self.tactical_mode,
             "device": self.device,
             "requested_device": self.requested_device,
             "loaded_from": str(self.loaded_from) if self.loaded_from else None,
             "intent_model_loaded": self.intent_model is not None,
-            "intent_model_architecture": self.intent_model.__class__.__name__ if self.intent_model is not None else None,
             "situation_model_loaded": self.situation_model is not None,
             "tactical_model_loaded": self.tactical_model is not None,
             "normalizer_loaded": self.has_normalizer(),
@@ -475,14 +513,22 @@ class LearnedPolicy:
             history.insert(0, np.zeros_like(history[0]))
         tensor = self._move_to_device(torch.tensor(np.stack(history), dtype=torch.float32).unsqueeze(0))
         with _torch_inference_mode():
-            logits = self.intent_model(tensor)[0, 0]
+            output = self.intent_model(tensor)
+            # Handle both MultiHorizonIntentionModel [batch, horizons, classes]
+            # and legacy IntentionLSTM [batch, classes] output formats
+            if output.dim() == 3:
+                logits = output[0, 0]  # first batch, first horizon
+            else:
+                logits = output[0]  # first batch
         return torch.softmax(logits, dim=-1).detach().cpu().tolist()
 
     def predict_intent(self, enemy_id: int) -> Dict[str, Any]:
         distribution = self._intent_distribution(enemy_id)
         if distribution is None:
             return {"top_direction": 0, "confidence": 0.0, "distribution": [1.0] + [0.0] * 6}
-        top_direction = max(range(len(distribution)), key=distribution.__getitem__)
+        # Clamp to valid direction range (0..len(_DIRECTION_STEPS)-1)
+        max_direction = len(_DIRECTION_STEPS) - 1
+        top_direction = min(max(range(len(distribution)), key=distribution.__getitem__), max_direction)
         confidence = float(distribution[top_direction])
         return {
             "top_direction": top_direction,
@@ -578,11 +624,7 @@ class LearnedPolicy:
         city: Optional[Dict[str, Any]] = None,
     ) -> float:
         """Evaluate action quality using the tactical model (BCE logit, higher = better)."""
-        if self.tactical_mode == "off":
-            return 0.0
         if self.tactical_model is None:
-            if self.tactical_mode == "missing_fail_closed":
-                raise RuntimeError("tactical_mode=missing_fail_closed but tactical_model is not loaded")
             return 0.0
         features = action_feature_vector(operator, candidate, target_operator=target_operator, city=city)
         tensor = self._move_to_device(torch.tensor(features, dtype=torch.float32).unsqueeze(0))
