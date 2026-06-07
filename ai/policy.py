@@ -207,7 +207,14 @@ class LearnedPolicy:
         return {}
 
     def has_models(self) -> bool:
-        return self.intent_model is not None and self.situation_model is not None
+        abl = getattr(self, "ablation_mode", "full")
+        if abl == "full":
+            return self.intent_model is not None and self.situation_model is not None
+        if abl == "no_intent":
+            return self.situation_model is not None
+        if abl == "no_situation":
+            return self.intent_model is not None
+        return False  # rule_only
 
     def has_tactical(self) -> bool:
         return self.tactical_model is not None
