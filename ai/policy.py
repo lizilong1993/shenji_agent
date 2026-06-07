@@ -42,6 +42,14 @@ _DIRECTION_STEPS = [
 ]
 
 
+
+ABLATION_MODES = {
+    "full": {"intent": True, "situation": True, "tactical": True, "objective": True},
+    "no_intent": {"intent": False, "situation": True, "tactical": True, "objective": True},
+    "no_situation": {"intent": True, "situation": False, "tactical": True, "objective": True},
+    "rule_only": {"intent": False, "situation": False, "tactical": False, "objective": False},
+}
+
 def _hex_to_axial(pos: int) -> Tuple[int, int]:
     row, col = divmod(pos, 100)
     q = col - (row - (row & 1)) // 2
@@ -240,7 +248,7 @@ class LearnedPolicy:
             self._load_situation_model(situation_state)
         )
 
-    def configure(self, faction: int, artifact_dir: Optional[str] = None, policy_profile: str = "challenger") -> None:
+    def configure(self, faction: int, artifact_dir: Optional[str] = None, policy_profile: str = "challenger", *, ablation_mode: str = "full") -> None:
         self.faction = faction
         self.policy_profile = policy_profile or "challenger"
         self.history_len = 8
@@ -257,6 +265,7 @@ class LearnedPolicy:
         self.enemy_histories = defaultdict(lambda: deque(maxlen=self.history_len))
         self._reset_diagnostics()
         if not TORCH_AVAILABLE or self.policy_profile == "baseline":
+            self.ablation_mode = ablation_mode
             return
         self.device = self._resolve_device()
 
@@ -321,6 +330,33 @@ class LearnedPolicy:
                 bool(self._feature_normalizer),
                 self.loaded_from,
             )
+
+            # --- Ablation mode enforcement ---
+            if ablation_mode != "full":
+                _abl = ABLATION_MODES.get(ablation_mode, ABLATION_MODES["full"])
+                _abl_disabled = []
+                if not _abl["intent"]:
+                    if self.intent_model is not None:
+                        _abl_disabled.append("intent")
+                    self.intent_model = None
+                if not _abl["situation"]:
+                    if self.situation_model is not None:
+                        _abl_disabled.append("situation")
+                    self.situation_model = None
+                if not _abl["tactical"]:
+                    if self.tactical_model is not None:
+                        _abl_disabled.append("tactical")
+                    self.tactical_model = None
+                if not _abl["objective"]:
+                    _abl_disabled.append("objective")
+                    self.objective_weight = 0.0
+                self.ablation_mode = ablation_mode
+                logging.getLogger(__name__).info(
+                    "LearnedPolicy [ABLATION]: mode=%s disabled=%s",
+                    ablation_mode, _abl_disabled or "none",
+                )
+            else:
+                self.ablation_mode = "full"
             return
 
     def reset(self) -> None:

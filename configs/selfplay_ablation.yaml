@@ -1,0 +1,33 @@
+# Ablation study configuration for Shenji Agent.
+#
+# Based on selfplay_sota_stop.yaml but with reduced match count and step limit
+# for faster iteration during ablation experiments.
+#
+# Usage:
+#   python -m ablation_selfplay_patch \
+#       --config configs/selfplay_ablation.yaml \
+#       --candidate ai/weights \
+#       --incumbent ai/weights_incumbent_rule \
+#       --ablation-mode full
+
+seed: 42
+output_root: experiments/shenji_agent
+league_dir: league
+paired_matches: 50
+max_steps: 200
+candidate_artifacts: ai/weights
+incumbent_artifacts: ai/weights_incumbent_rule
+candidate_profile: challenger
+incumbent_profile: baseline
+promotion_gate:
+  overall_point_estimate_min: 0.60
+  overall_ci_lower_min: 0.55
+  complex_point_estimate_min: 0.60
+  complex_ci_lower_min: 0.55
+  min_learned_path_coverage: 0.30
+  min_move_path_coverage: 0.20
+  min_shoot_path_coverage: 0.20
+  elo_delta_lower_min: 35.0
+  max_bucket_regression: 0.03
+  max_exploiter_win_rate: 0.45
+  consecutive_windows: 2

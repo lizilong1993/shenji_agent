@@ -632,8 +632,8 @@ def _run_single(
     state = env.setup(env_info)
     red = red_profile["agent_class"](log_level=_AGENT_RUNTIME_LOG_LEVEL)
     blue = blue_profile["agent_class"](log_level=_AGENT_RUNTIME_LOG_LEVEL)
-    red.setup({**shared, "seat": 1, "faction": 0, "role": 1, "user_name": red_profile["user_name"], "policy_profile": red_profile["profile"], "policy_artifacts_dir": red_profile["artifacts"], "state": state})
-    blue.setup({**shared, "seat": 11, "faction": 1, "role": 1, "user_name": blue_profile["user_name"], "policy_profile": blue_profile["profile"], "policy_artifacts_dir": blue_profile["artifacts"], "state": state})
+    red.setup({**shared, "seat": 1, "faction": 0, "role": 1, "user_name": red_profile["user_name"], "policy_profile": red_profile["profile"], "ablation_mode": red_profile.get("ablation_mode", "full"), "policy_artifacts_dir": red_profile["artifacts"], "state": state})
+    blue.setup({**shared, "seat": 11, "faction": 1, "role": 1, "user_name": blue_profile["user_name"], "policy_profile": blue_profile["profile"], "ablation_mode": blue_profile.get("ablation_mode", "full"), "policy_artifacts_dir": blue_profile["artifacts"], "state": state})
     done = False
     steps = 0
     objective_progress_turns: List[Dict[str, object]] = []
@@ -1627,6 +1627,9 @@ def main() -> None:
     parser.add_argument("--candidate-profile", default=None)
     parser.add_argument("--incumbent-profile", default=None)
     parser.add_argument("--allow-self-match-smoke", action="store_true")
+    parser.add_argument("--ablation-mode", default="full",
+                        choices=["full", "no_intent", "no_situation", "rule_only"],
+                        help="Ablation mode: selectively disable learned models")
     args = parser.parse_args()
 
     config = load_config(repo_root() / args.config)
@@ -1653,6 +1656,10 @@ def main() -> None:
         "baseline",
     )
     candidate_participant = _build_participant_spec(candidate_arg, candidate_profile, current_head_sha, "CurrentAI")
+    ablation_mode = getattr(args, "ablation_mode", "full")
+    if ablation_mode != "full":
+        candidate_participant["ablation_mode"] = ablation_mode
+        logging.getLogger(__name__).info("ablation mode active: %s", ablation_mode)
     incumbent_participant = _build_participant_spec(incumbent_arg, incumbent_profile, current_head_sha, "IncumbentAI")
     candidate_artifacts = _resolved_path_string(candidate_arg)
     opponent_artifacts = _resolved_path_string(incumbent_arg)
@@ -1852,7 +1859,7 @@ def main() -> None:
         profile_score_rates = []
         profile_draws = []
         profile_coverages = []
-        for scenario_path, map_id in scenarios_by_bucket.get("complex", [])[:4]:
+        for scenario_path, map_id in scenarios_by_bucket.get("complex", [])[:20]:
             candidate_red_score, exploiter_blue_score, candidate_red_stats, exploiter_blue_stats = _run_single(
                 scenario_path,
                 map_id,

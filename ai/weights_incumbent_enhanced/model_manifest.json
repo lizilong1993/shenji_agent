@@ -1,0 +1,10 @@
+{
+  "generated_at": "20260607_153000",
+  "history_len": 8,
+  "horizons": 5,
+  "intent_lstm": "intent_lstm.pt",
+  "situation_gcn": "situation_gcn.pt",
+  "snapshot_role": "enhanced_rule_baseline",
+  "policy_profile": "enhanced",
+  "note": "Enhanced rule-based baseline with smarter heuristics (B7)"
+}

@@ -601,8 +601,8 @@ class Agent:
                 "map cost_data: %d modes available=%s missing=%s",
                 cost_len, covered, missing,
             )
-            self.policy.configure(self.faction, self.policy_artifacts_dir, self.policy_profile)
-            if self.use_ai_optimization and not self.policy.has_models():
+            self.policy.configure(self.faction, self.policy_artifacts_dir, self.policy_profile, ablation_mode=setup_info.get("ablation_mode", "full"))
+            if self.use_ai_optimization and (not self.policy.has_models() or getattr(self.policy, "ablation_mode", "full") == "rule_only"):
                 self.logger.warning(
                     "learned policy requested but canonical intent+gcn artifacts unavailable, falling back to rules"
                 )
