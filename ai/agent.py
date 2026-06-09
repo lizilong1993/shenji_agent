@@ -845,14 +845,25 @@ class Agent:
                         )
 
                 if not reachable_city_routes:
-                    # === 3-level fallback when all routing fails ===
+                    # === BULLETPROOF 5-level fallback when all routing fails ===
                     cur_hex = int(bop.get("cur_hex", 0))
-                    neighbors = self.map.get_neighbors(cur_hex) if self.map else []
+                    raw_neighbors = self.map.get_neighbors(cur_hex) if self.map else []
+                    # Defensive: normalize neighbor types, filter invalid
+                    neighbors = []
+                    for _n in raw_neighbors:
+                        try:
+                            _nv = int(_n)
+                            if _nv >= 0 and self.map.is_valid(_nv):
+                                neighbors.append(_nv)
+                        except (TypeError, ValueError):
+                            pass
+
                     fallback_hex = None
                     fallback_city_id = None
                     fallback_source = "none"
+                    fallback_move_type = move_type
 
-                    # Level 1: Walk toward nearest city that is NOT current position
+                    # Level 1: Walk toward nearest city (use any move type that works)
                     sorted_cities = sorted(
                         [c for c in cities if c.get("coord") is not None and int(c["coord"]) != cur_hex],
                         key=lambda c: self.map.get_distance(cur_hex, int(c["coord"])),
@@ -863,40 +874,88 @@ class Agent:
                         if best_dist <= 0:
                             continue
                         for n_hex in neighbors:
-                            if n_hex < 0:
-                                continue
                             d = self.map.get_distance(n_hex, target_hex)
                             if 0 <= d < best_dist:
-                                fallback_hex = n_hex
-                                fallback_city_id = target_hex
-                                fallback_source = "walk_toward_city"
+                                # Try to get a valid route to this neighbor
+                                for try_mt in [move_type] + [m for m in [0, 1, 2, 3] if m != move_type]:
+                                    step_route = self.map.gen_move_route(cur_hex, n_hex, try_mt) if self.map else []
+                                    if step_route:
+                                        fallback_hex = n_hex
+                                        fallback_city_id = target_hex
+                                        fallback_source = "walk_toward_city"
+                                        fallback_move_type = try_mt
+                                        break
+                                if fallback_hex is None:
+                                    # Use raw single-step even without A* validation
+                                    fallback_hex = n_hex
+                                    fallback_city_id = target_hex
+                                    fallback_source = "walk_toward_city_raw"
                                 break
                         if fallback_hex is not None:
                             break
 
-                    # Level 2: Walk to any neighbor not on a friendly city
-                    if fallback_hex is None and neighbors:
+                    # Level 2: Walk to any neighbor NOT on a friendly city
+                    if fallback_hex is None:
                         for n_hex in neighbors:
-                            if n_hex < 0:
-                                continue
                             on_friendly_city = any(
-                                c.get("coord") is not None
-                                and int(c["coord"]) == n_hex
-                                and int(c.get("flag", -1)) == self.faction
-                                for c in cities
+                                c.get("coord") is not None and int(c["coord"]) == n_hex
+                                and int(c.get("flag", -1)) == self.faction for c in cities
                             )
                             if not on_friendly_city:
-                                fallback_hex = n_hex
-                                fallback_source = "walk_to_non_city"
+                                for try_mt in [move_type] + [m for m in [0, 1, 2, 3] if m != move_type]:
+                                    step_route = self.map.gen_move_route(cur_hex, n_hex, try_mt) if self.map else []
+                                    if step_route:
+                                        fallback_hex = n_hex
+                                        fallback_source = "walk_to_non_city"
+                                        fallback_move_type = try_mt
+                                        break
+                                if fallback_hex is None:
+                                    fallback_hex = n_hex
+                                    fallback_source = "walk_to_non_city_raw"
                                 break
 
-                    # Level 3: Walk to ANY neighbor (last resort exploration)
-                    if fallback_hex is None and neighbors:
+                    # Level 3: Walk to ANY valid neighbor (last resort)
+                    if fallback_hex is None:
                         for n_hex in neighbors:
-                            if n_hex >= 0:
+                            for try_mt in [move_type] + [m for m in [0, 1, 2, 3] if m != move_type]:
+                                step_route = self.map.gen_move_route(cur_hex, n_hex, try_mt) if self.map else []
+                                if step_route:
+                                    fallback_hex = n_hex
+                                    fallback_source = "walk_any_neighbor"
+                                    fallback_move_type = try_mt
+                                    break
+                            if fallback_hex is None:
                                 fallback_hex = n_hex
-                                fallback_source = "walk_any_neighbor"
+                                fallback_source = "walk_any_neighbor_raw"
+                            break
+
+                    # Level 4: Brute force - check ALL hexes in distance-1 ring
+                    if fallback_hex is None and self.map:
+                        row, col = divmod(cur_hex, 100)
+                        for dr in [-1, 0, 1]:
+                            for dc in [-1, 0, 1]:
+                                if dr == 0 and dc == 0:
+                                    continue
+                                nr, nc = row + dr, col + dc
+                                if 0 <= nr < self.map.max_row and 0 <= nc < self.map.max_col:
+                                    candidate_hex = nr * 100 + nc
+                                    if candidate_hex != cur_hex:
+                                        for try_mt in [0, 1, 2, 3]:
+                                            step_route = self.map.gen_move_route(cur_hex, candidate_hex, try_mt)
+                                            if step_route:
+                                                fallback_hex = candidate_hex
+                                                fallback_source = "brute_force_ring"
+                                                fallback_move_type = try_mt
+                                                break
+                                    if fallback_hex is not None:
+                                        break
+                            if fallback_hex is not None:
                                 break
+
+                    # Level 5: Absolute last resort - use first valid neighbor with raw step
+                    if fallback_hex is None and neighbors:
+                        fallback_hex = neighbors[0]
+                        fallback_source = "absolute_last_resort"
 
                     if fallback_hex is not None:
                         simple_route = [fallback_hex]
@@ -904,8 +963,8 @@ class Agent:
                             "operator_id": obj_id,
                             "operator_type": bop.get("type"),
                             "current_hex": cur_hex,
-                            "move_type": move_type,
-                            "move_type_name": {0: "Maneuver", 1: "March", 2: "Walk", 3: "Fly"}.get(move_type, str(move_type)),
+                            "move_type": fallback_move_type,
+                            "move_type_name": {0: "Maneuver", 1: "March", 2: "Walk", 3: "Fly"}.get(fallback_move_type, str(fallback_move_type)),
                             "target_kind": "fallback",
                             "target_source": fallback_source,
                             "target_city_id": fallback_city_id,
@@ -916,6 +975,8 @@ class Agent:
                             "route_empty": False,
                             "route_failure_reason": "none",
                             "selected_by_learned": False,
+                            "neighbor_count": len(neighbors),
+                            "raw_neighbor_count": len(raw_neighbors),
                         })
                         self.policy.note_action(
                             "move",
@@ -939,6 +1000,8 @@ class Agent:
                         "route_empty": True,
                         "route_failure_reason": "no_valid_move_candidate" if missing_move_candidate else "empty_route",
                         "selected_by_learned": False,
+                        "neighbor_count": len(neighbors),
+                        "raw_neighbor_count": len(raw_neighbors),
                     })
                     self.policy.note_action(
                         "move",

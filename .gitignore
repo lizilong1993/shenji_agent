@@ -17,3 +17,4 @@ ai/weights/*.pt
 ai/weights/model_manifest.json
 __pycache__/
 *.pyc
+*.bak*
