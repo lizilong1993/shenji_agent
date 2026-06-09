@@ -845,34 +845,70 @@ class Agent:
                         )
 
                 if not reachable_city_routes:
-                    nearest_city = min(
-                        (city for city in cities if city.get("coord") is not None),
-                        key=lambda c: self.map.get_distance(bop["cur_hex"], int(c["coord"])),
-                        default=None,
-                    )
+                    # === 3-level fallback when all routing fails ===
+                    cur_hex = int(bop.get("cur_hex", 0))
+                    neighbors = self.map.get_neighbors(cur_hex) if self.map else []
                     fallback_hex = None
-                    if nearest_city is not None:
-                        target_city_hex = int(nearest_city["coord"])
-                        neighbors = self.map.get_neighbors(bop["cur_hex"])
-                        best_dist = self.map.get_distance(bop["cur_hex"], target_city_hex)
+                    fallback_city_id = None
+                    fallback_source = "none"
+
+                    # Level 1: Walk toward nearest city that is NOT current position
+                    sorted_cities = sorted(
+                        [c for c in cities if c.get("coord") is not None and int(c["coord"]) != cur_hex],
+                        key=lambda c: self.map.get_distance(cur_hex, int(c["coord"])),
+                    )
+                    for target_city in sorted_cities:
+                        target_hex = int(target_city["coord"])
+                        best_dist = self.map.get_distance(cur_hex, target_hex)
+                        if best_dist <= 0:
+                            continue
                         for n_hex in neighbors:
                             if n_hex < 0:
                                 continue
-                            dist = self.map.get_distance(n_hex, target_city_hex)
-                            if dist >= 0 and dist < best_dist:
-                                best_dist = dist
+                            d = self.map.get_distance(n_hex, target_hex)
+                            if 0 <= d < best_dist:
                                 fallback_hex = n_hex
+                                fallback_city_id = target_hex
+                                fallback_source = "walk_toward_city"
+                                break
+                        if fallback_hex is not None:
+                            break
+
+                    # Level 2: Walk to any neighbor not on a friendly city
+                    if fallback_hex is None and neighbors:
+                        for n_hex in neighbors:
+                            if n_hex < 0:
+                                continue
+                            on_friendly_city = any(
+                                c.get("coord") is not None
+                                and int(c["coord"]) == n_hex
+                                and int(c.get("flag", -1)) == self.faction
+                                for c in cities
+                            )
+                            if not on_friendly_city:
+                                fallback_hex = n_hex
+                                fallback_source = "walk_to_non_city"
+                                break
+
+                    # Level 3: Walk to ANY neighbor (last resort exploration)
+                    if fallback_hex is None and neighbors:
+                        for n_hex in neighbors:
+                            if n_hex >= 0:
+                                fallback_hex = n_hex
+                                fallback_source = "walk_any_neighbor"
+                                break
+
                     if fallback_hex is not None:
                         simple_route = [fallback_hex]
                         self.policy.record_move_route({
                             "operator_id": obj_id,
                             "operator_type": bop.get("type"),
-                            "current_hex": bop.get("cur_hex"),
+                            "current_hex": cur_hex,
                             "move_type": move_type,
                             "move_type_name": {0: "Maneuver", 1: "March", 2: "Walk", 3: "Fly"}.get(move_type, str(move_type)),
-                            "target_kind": "nearest_city_neighbor",
-                            "target_source": "fallback_neighbor",
-                            "target_city_id": int(nearest_city["coord"]),
+                            "target_kind": "fallback",
+                            "target_source": fallback_source,
+                            "target_city_id": fallback_city_id,
                             "target_hex": fallback_hex,
                             "reachable_city_count": 0,
                             "total_cities": len(cities),
@@ -884,13 +920,13 @@ class Agent:
                         self.policy.note_action(
                             "move",
                             False,
-                            {"obj_id": obj_id, "target_hex": fallback_hex, "reason": "fallback_neighbor"},
+                            {"obj_id": obj_id, "target_hex": fallback_hex, "reason": fallback_source},
                         )
                         return {"actor": self.seat, "obj_id": obj_id, "type": ActionType.Move, "move_path": simple_route}
                     self.policy.record_move_route({
                         "operator_id": obj_id,
                         "operator_type": bop.get("type"),
-                        "current_hex": bop.get("cur_hex"),
+                        "current_hex": cur_hex,
                         "move_type": move_type,
                         "move_type_name": {0: "Maneuver", 1: "March", 2: "Walk", 3: "Fly"}.get(move_type, str(move_type)),
                         "target_kind": "city",
