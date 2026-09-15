@@ -130,7 +130,9 @@ def main() -> int:
     ap.add_argument("--out", required=True, help="local output PNG path")
     ap.add_argument("--host", default=DEFAULT_HOST, help=f"ssh host alias (default {DEFAULT_HOST})")
     ap.add_argument("--tries", type=int, default=4)
-    ap.add_argument("--vtb", type=int, default=30000, help="virtual time budget in ms")
+    # 30000 fails often at 1600x900 (SwiftShader needs real time, not virtual
+    # time); 45000 has been reliable. The retry loop covers the rest.
+    ap.add_argument("--vtb", type=int, default=45000, help="virtual time budget in ms")
     ap.add_argument("--width", type=int, default=1600)
     ap.add_argument("--height", type=int, default=900)
     args = ap.parse_args()

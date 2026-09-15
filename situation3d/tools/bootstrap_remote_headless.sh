@@ -82,11 +82,18 @@ if [ ! -x "$CH" ]; then
   echo "Playwright browser cache is missing; install it first."
   exit 1
 fi
-LD_LIBRARY_PATH="$DST/usr/lib/x86_64-linux-gnu:$DST/lib/x86_64-linux-gnu:$DST/usr/lib" \
-  ldd "$CH" 2>&1 | grep "not found" && echo "ERROR: unresolved shared libraries above" && exit 1
+# `ldd | grep` inside an && chain would make `set -e` ambiguous, so capture the
+# result explicitly instead.
+MISSING=$(LD_LIBRARY_PATH="$DST/usr/lib/x86_64-linux-gnu:$DST/lib/x86_64-linux-gnu:$DST/usr/lib" \
+  ldd "$CH" 2>&1 | grep "not found" || true)
+if [ -n "$MISSING" ]; then
+  echo "ERROR: unresolved shared libraries:"
+  echo "$MISSING"
+  exit 1
+fi
 
-echo "libs     : $(find "$DST" -name '*.so*' | wc -l) files"
-echo "fonts    : $(find "$DST" -name '*.tt[cf]' -o -name '*.otf' | wc -l) files"
+echo "libs     : $(find "$DST" \( -name '*.so' -o -name '*.so.*' \) | wc -l) files"
+echo "fonts    : $(find "$DST" \( -name '*.ttf' -o -name '*.ttc' -o -name '*.otf' \) | wc -l) files"
 LD_LIBRARY_PATH="$DST/usr/lib/x86_64-linux-gnu:$DST/lib/x86_64-linux-gnu:$DST/usr/lib" \
   "$CH" --version
 echo "bootstrap OK"
