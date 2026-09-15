@@ -1,0 +1,10 @@
+# Third-party vendor bundle (45 MB unpacked). Pinned and fetched by
+# tools/fetch_cesium.sh instead of being committed.
+web/vendor/
+
+# Generated situation data. Deterministic output of
+# scripts/gen_demo_trajectory.py -- regenerate rather than commit.
+web/data/*.json
+
+# Local verification captures
+tools/shots/

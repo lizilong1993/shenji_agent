@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>三维战场态势生成系统</title>
+  <link rel="stylesheet" href="./vendor/cesium/Widgets/widgets.css">
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>三维战场态势生成系统</strong>
+      <span class="brand-sub" id="scenarioName">台海方向</span>
+    </div>
+    <nav class="topbar-actions">
+      <button id="btnLocate" type="button">位置信息</button>
+      <button id="btnSituation" type="button">态势输入</button>
+      <button id="btnRun" type="button" class="primary">态势自动推演</button>
+      <button id="btnExport" type="button">导出数据</button>
+    </nav>
+    <div class="status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">初始化中</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="panel panel-left">
+      <section class="panel-block">
+        <h2>图层</h2>
+        <label class="check"><input type="checkbox" id="layerTargets" checked> 可见目标</label>
+        <label class="check"><input type="checkbox" id="layerTracks" checked> 历史轨迹</label>
+        <label class="check"><input type="checkbox" id="layerRoutes" checked> 计划航路</label>
+        <label class="check"><input type="checkbox" id="layerHotspots" checked> 热点区域</label>
+        <label class="check"><input type="checkbox" id="layerLabels" checked> 目标标牌</label>
+      </section>
+
+      <section class="panel-block">
+        <h2>目标分类</h2>
+        <label class="check red"><input type="checkbox" id="filterRed" checked> 红方 <b id="countRed">0</b></label>
+        <label class="check blue"><input type="checkbox" id="filterBlue" checked> 蓝方 <b id="countBlue">0</b></label>
+        <label class="check"><input type="checkbox" id="filterSea" checked> 水面</label>
+        <label class="check"><input type="checkbox" id="filterAir" checked> 空中</label>
+      </section>
+
+      <section class="panel-block grow">
+        <h2>目标列表</h2>
+        <div id="targetList" class="target-list"></div>
+      </section>
+    </aside>
+
+    <section class="globe-wrap">
+      <div id="cesiumContainer"></div>
+      <div id="legend" class="legend">
+        <span><i class="swatch red"></i>红方</span>
+        <span><i class="swatch blue"></i>蓝方</span>
+        <span><i class="swatch line"></i>航迹</span>
+      </div>
+      <div id="hint" class="hint">滚轮缩放 · 拖拽旋转 · 点击目标查看详情</div>
+    </section>
+
+    <aside class="panel panel-right">
+      <section class="panel-block">
+        <h2>地理位置信息</h2>
+        <div class="kv"><span>经度</span><b id="geoLon">—</b></div>
+        <div class="kv"><span>纬度</span><b id="geoLat">—</b></div>
+        <div class="kv"><span>视高</span><b id="geoAlt">—</b></div>
+        <div class="kv"><span>区域</span><b id="geoRegion">台湾海峡</b></div>
+      </section>
+
+      <section class="panel-block grow">
+        <h2>热点区域</h2>
+        <table class="hotspot-table">
+          <thead><tr><th>#</th><th>名称</th><th>经纬度</th></tr></thead>
+          <tbody id="hotspotBody"></tbody>
+        </table>
+      </section>
+
+      <section class="panel-block">
+        <h2>本地控制</h2>
+        <div class="control-row">
+          <span>态势控制</span>
+          <button id="btnPlay" type="button" class="mini">▶ 播放</button>
+          <button id="btnReset" type="button" class="mini">⟲ 复位</button>
+        </div>
+        <div class="control-row">
+          <span>推演倍速</span>
+          <select id="speedSelect">
+            <option value="1">1×</option>
+            <option value="10">10×</option>
+            <option value="30" selected>30×</option>
+            <option value="60">60×</option>
+            <option value="120">120×</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <span>天气控制</span>
+          <button id="btnWeather" type="button" class="mini">海况</button>
+        </div>
+      </section>
+
+      <section class="panel-block">
+        <h2>模型开关</h2>
+        <label class="check"><input type="checkbox" id="modelTerrain"> 地形模型</label>
+        <label class="check"><input type="checkbox" id="modelWeather"> 气象模型</label>
+        <label class="check"><input type="checkbox" id="modelSensor"> 传感器</label>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="transport">
+    <div class="transport-left">
+      <button id="btnStepBack" type="button">◀</button>
+      <button id="btnStepFwd" type="button">▶</button>
+      <span id="tickLabel">0 / 0</span>
+    </div>
+    <input id="timeline" type="range" min="0" max="0" value="0" step="1">
+    <div class="transport-right">
+      <span id="clockLabel">—</span>
+    </div>
+  </footer>
+
+  <script src="./vendor/cesium/Cesium.js"></script>
+  <script src="./src/app.js"></script>
+</body>
+</html>
