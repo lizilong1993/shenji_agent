@@ -151,6 +151,49 @@
                           : provider;
   }
 
+  /**
+   * 全球底图：任意位置都有影像，避免把镜头拉远或平移出去后只剩底色。
+   *
+   * 只到 z6（约 0.7 km/px）——再往下铺满全球会多出上万张瓦片，而战区与热点另有
+   * 更高层级的图层覆盖。rectangle 取全球，这是唯一一个不限制范围的影像层。
+   */
+  function createGlobalImageryProvider() {
+    const m = manifest();
+    const provider = new Cesium.UrlTemplateImageryProvider({
+      url: IMAGERY_URL,
+      tilingScheme: new Cesium.WebMercatorTilingScheme(),
+      minimumLevel: 0,
+      maximumLevel: (m.imagery_global && m.imagery_global.max_zoom) || 6,
+      credit: 'Esri World Imagery (global)',
+    });
+    return attachCached(provider, IMAGERY_URL);
+  }
+
+  /**
+   * 热点区域高清影像：每个热点框一个 provider，限制在自己的 rectangle 内。
+   *
+   * 这些框里有三个（三亚 / 冲绳 / 关岛）完全在战区 bbox 之外，战区层覆盖不到，
+   * 必须靠这一层。层级从 0 起：在框内即使拉远也应该走这一层，而不是掉到全球层的 z6。
+   * 与战区层重叠的部分会因为 URL 相同而命中 TileCache 的内存缓存，代价很小。
+   */
+  function attachHotspotImagery(viewer, boxes, maxZoom) {
+    const m = manifest();
+    const top = maxZoom || (m.hotspot_imagery && m.hotspot_imagery.max_zoom) || 12;
+    const layers = [];
+    (boxes || []).forEach(function (box, i) {
+      const provider = attachCached(new Cesium.UrlTemplateImageryProvider({
+        url: IMAGERY_URL,
+        tilingScheme: new Cesium.WebMercatorTilingScheme(),
+        minimumLevel: 0,
+        maximumLevel: top,
+        rectangle: aoiRectangle(box),
+        credit: 'Esri World Imagery (hotspot ' + (i + 1) + ')',
+      }), IMAGERY_URL);
+      layers.push(viewer.imageryLayers.addImageryProvider(provider));
+    });
+    return layers;
+  }
+
   function createImageryProvider() {
     const m = manifest();
     const provider = new Cesium.UrlTemplateImageryProvider({
@@ -181,8 +224,11 @@
       const provider = attachCached(new Cesium.UrlTemplateImageryProvider({
         url: IMAGERY_URL,
         tilingScheme: new Cesium.WebMercatorTilingScheme(),
-        minimumLevel: m.urban_imagery.min_zoom || 12,
-        maximumLevel: m.urban_imagery.max_zoom || 14,
+        // 重点区域补到 z17（约 1.2 m/px，米级）；旧 manifest 只有 z12-14
+        minimumLevel: (m.urban_imagery_detail && m.urban_imagery_detail.min_zoom) ||
+                      m.urban_imagery.min_zoom || 12,
+        maximumLevel: (m.urban_imagery_detail && m.urban_imagery_detail.max_zoom) ||
+                      m.urban_imagery.max_zoom || 14,
         rectangle: aoiRectangle(aoi.bbox),
         credit: 'Esri World Imagery (urban detail)',
       }), IMAGERY_URL);
@@ -271,25 +317,50 @@
    * when the camera drops below the last downloaded level instead of leaving a
    * hole.
    */
-  function heightmapFor(x, y, level) {
-    const maxLevel = manifest().terrain.max_zoom || 10;
+  /**
+   * 高程的最大可用层级。地形现在是分级覆盖的：全球 z0-10，战区与热点补到 z12，
+   * 重点区域补到 z14。取其中最大者，再由 heightmapFor 逐级上溯决定实际用哪一级。
+   */
+  function terrainMaxLevel() {
+    const m = manifest();
+    return Math.max(
+      (m.terrain && m.terrain.max_zoom) || 10,
+      (m.theatre_terrain && m.theatre_terrain.max_zoom) || 0,
+      (m.hotspot_terrain && m.hotspot_terrain.max_zoom) || 0,
+      (m.urban_terrain && m.urban_terrain.max_zoom) || 0);
+  }
+
+  /**
+   * 构造高度图，**逐级上溯**直到找到一张真实存在的瓦片。
+   *
+   * 地形是分级覆盖的：重点区域有 z14，热点有 z12，别处只有 z10。如果只按
+   * "请求层级取不到就返回平地"，那么在覆盖范围之外放大时地形会**塌成平面**，
+   * 反而比粗层级更差。所以这里从目标层级一路向上找，用最近的有数据的祖先瓦片
+   * 降采样——这正是地形金字塔本身的行为。
+   */
+  async function heightmapFor(x, y, level) {
+    const maxLevel = terrainMaxLevel();
+    let lv = Math.min(level, maxLevel);
+    let tx = x;
+    let ty = y;
     if (level > maxLevel) {
       const shift = level - maxLevel;
-      const span = Math.pow(2, shift);
-      const ax = Math.floor(x / span);
-      const ay = Math.floor(y / span);
-      const frac = 1 / span;
-      const ox = (x - ax * span) * frac;
-      const oy = (y - ay * span) * frac;
-      return loadTerrainTile(maxLevel, ax, ay).then(function (src) {
-        if (!src) return new Float32Array(HEIGHTMAP_PX * HEIGHTMAP_PX);
-        return subSample(src, ox, oy, frac);
-      });
+      tx = x >> shift;
+      ty = y >> shift;
     }
-    return loadTerrainTile(level, x, y).then(function (src) {
-      if (!src) return new Float32Array(HEIGHTMAP_PX * HEIGHTMAP_PX);
-      return subSample(src, 0, 0, 1);
-    });
+
+    for (; lv >= 0; lv--) {
+      const src = await loadTerrainTile(lv, tx, ty);
+      if (src) {
+        const span = Math.pow(2, level - lv);       // 该瓦片跨越多少个 level 级瓦片
+        const ox = (x - tx * span) / span;
+        const oy = (y - ty * span) / span;
+        return subSample(src, ox, oy, 1 / span);
+      }
+      tx >>= 1;
+      ty >>= 1;
+    }
+    return new Float32Array(HEIGHTMAP_PX * HEIGHTMAP_PX);
   }
 
   function subSample(src, ox, oy, span) {
@@ -602,6 +673,9 @@
     instrument: instrument,
     newStats: newStats,
     createImageryProvider: createImageryProvider,
+    createGlobalImageryProvider: createGlobalImageryProvider,
+    attachHotspotImagery: attachHotspotImagery,
+    terrainMaxLevel: terrainMaxLevel,
     createOverviewImageryProvider: createOverviewImageryProvider,
     attachUrbanImagery: attachUrbanImagery,
     createTerrainProvider: createTerrainProvider,

@@ -62,6 +62,8 @@ const state = {
   urbanLayers: null,        // 城区 z12-z14 高清影像层（按相机高度挂载）
   urbanAoi: [],             // 城区 AOI 列表
   urbanEnabled: true,       // 城区高清影像是否启用（图层管理「底图」）
+  globalLayer: null,        // 全球底图层（z0-6）
+  hotspotLayers: [],        // 热点区域高清层（每框一个 provider）
   imageryStats: null,       // 底图瓦片请求统计（诊断用）
   inference: null,          // inference_frames，与 frames 逐帧对齐
 
@@ -303,13 +305,15 @@ function fmtDeg(v, pos, neg) {
 function initViewer() {
   // Cesium 1.107 起 Viewer 的 imageryProvider 选项被移除且静默忽略，
   // 必须用 baseLayer，否则球体只剩默认底色。下面的断言把静默退化变成显式失败。
+  // 影像分四级叠加，Cesium 的 imageryLayers 顺序是 index 0 在最底层，
+  // 所以按"粗 → 细"依次添加：
+  //   全球 z0-6（任意位置都有底图）→ 战区 z0-11 → 热点 z0-12 → 城区 z13-17
   state.imageryStats = OfflineAssets.newStats('imagery');
-  const imageryProvider = OfflineAssets.instrument(
-    OfflineAssets.createImageryProvider(), state.imageryStats);
-  state.imageryLayer = new Cesium.ImageryLayer(imageryProvider);
+  state.globalLayer = new Cesium.ImageryLayer(OfflineAssets.instrument(
+    OfflineAssets.createGlobalImageryProvider(), state.imageryStats));
 
   viewer = new Cesium.Viewer('cesiumContainer', {
-    baseLayer: state.imageryLayer,
+    baseLayer: state.globalLayer,
     terrainProvider: new Cesium.EllipsoidTerrainProvider(),
     baseLayerPicker: false,
     geocoder: false,
@@ -327,6 +331,15 @@ function initViewer() {
   if (viewer.imageryLayers.length === 0) {
     throw new Error('底图图层未创建：Cesium ' + Cesium.VERSION + ' 需要 baseLayer 选项');
   }
+
+  // 战区层：台海 AOI 到 z11
+  state.imageryLayer = viewer.imageryLayers.addImageryProvider(
+    OfflineAssets.instrument(OfflineAssets.createImageryProvider(), state.imageryStats));
+
+  // 热点层：每个热点框一个 provider，到 z12。三亚/冲绳/关岛完全在战区之外，
+  // 只能靠这一层；与战区重叠的部分因 URL 相同会命中 TileCache 内存缓存。
+  const hboxes = (OfflineAssets.manifest().hotspot_imagery || {}).boxes || [];
+  state.hotspotLayers = OfflineAssets.attachHotspotImagery(viewer, hboxes);
 
   // 完全离线：不触碰 Ion 资产，不使用 Bing/在线地形服务。
   viewer.scene.globe.enableLighting = false;
@@ -647,7 +660,7 @@ const LAYER_GROUPS = [
   { name: '目标图层', ids: ['layerTargets', 'layerLabels', 'layerTracks', 'modelSensor',
                             'layerTargetPanel', 'filterRed', 'filterBlue', 'filterSea',
                             'filterLand', 'filterAir'] },
-  { name: '底图', ids: ['modelImagery', 'modelUrbanImagery', 'modelTerrain',
+  { name: '底图', ids: ['modelImagery', 'modelHotspotImagery', 'modelUrbanImagery', 'modelTerrain',
                         'modelWsf3dOverlay', 'modelBuildings', 'modelWeather'] },
   { name: '地图组件', ids: ['compCompass', 'compScalebar', 'compViewpoint'] },
 ];
@@ -1539,10 +1552,20 @@ function syncUrbanImagery() {
 }
 
 function setImagery(on) {
+  // 「影像底图」管全球层 + 战区层；热点层与城区层各有自己的开关。
+  if (state.globalLayer) state.globalLayer.show = on;
   if (state.imageryLayer) state.imageryLayer.show = on;
   setSwitchNote(on
-    ? '影像底图已启用：离线 Esri World Imagery 瓦片（z0–z11）。'
+    ? '影像底图已启用：全球 z0–6 + 战区 z0–11（离线 Esri World Imagery）。'
     : '影像底图已关闭：球体仅显示几何与态势要素。');
+}
+
+function setHotspotImagery(on) {
+  (state.hotspotLayers || []).forEach(function (layer) { layer.show = !!on; });
+  const n = (state.hotspotLayers || []).length;
+  setSwitchNote(on
+    ? '热点区域高清影像已启用：' + n + ' 个热点框（z0–12，约 19 m/px）。'
+    : '热点区域高清影像已关闭。');
 }
 
 // --------------------------------------------------------------------------
@@ -2052,10 +2075,12 @@ function bindUI() {
     state.layers.targetPanel = v;
     if (!v) closeTargetPanel();
   });
+  bindCheck('modelHotspotImagery', setHotspotImagery);
+
   bindCheck('modelUrbanImagery', function (v) {
     state.urbanEnabled = v;
     syncUrbanImagery();
-    setSwitchNote(v ? '城区高清影像已启用（相机低于 200 km 时挂载 z12–z14）。'
+    setSwitchNote(v ? '城区高清影像已启用（相机低于 200 km 时挂载，z13–z17，最高约 1.2 m/px）。'
                     : '城区高清影像已关闭。');
   });
 
@@ -2391,14 +2416,16 @@ function main() {
     return Promise.all([loadBase(), loadCaseIndex()]);
   }).then(function (res) {
     applyBase(res[0]);
-    applyCaseIndependentHooks();
 
     const wanted = params.get('case');
     if (!wanted) {
       // 默认不加载任何态势：只保留底图 / 地形 / WSF3D / 地图组件。
+      // clearSituation 会把机位设回默认，所以它必须排在 ?cam= 之前，
+      // 否则取证用的 ?cam= 会被覆盖。
       clearSituation();
-      return null;
     }
+    applyCaseIndependentHooks();
+    if (!wanted) return null;
     const id = state.caseIndex.cases.some(function (c) { return c.id === wanted; })
       ? wanted : state.caseIndex.default;
     return loadCase(id);
