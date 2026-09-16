@@ -79,6 +79,15 @@ def knots_to_mps(knots: float) -> float:
     return knots * NM_IN_M / 3600.0
 
 
+def kmh_to_knots(kmh: float) -> float:
+    """Convert kilometres per hour to knots.
+
+    Ground units are specified in km/h because that is how they are quoted in
+    open sources, while the frame schema stores a single canonical speed unit.
+    """
+    return kmh * 1000.0 / NM_IN_M / 3600.0
+
+
 def sample_polyline(points: Sequence[Coord], distance_m: float) -> Tuple[Coord, float]:
     """Return the position at ``distance_m`` along a polyline and its true bearing.
 

@@ -11,14 +11,22 @@
   <header class="topbar">
     <div class="brand">
       <strong>三维战场态势生成系统</strong>
-      <span class="brand-sub" id="scenarioName">台海方向</span>
+      <span class="brand-sub" id="scenarioName">加载中…</span>
     </div>
+
     <nav class="topbar-actions">
+      <div class="menu">
+        <button id="menuCase" type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false">
+          演示案例 <span class="caret">▾</span>
+        </button>
+        <div id="menuCaseList" class="menu-list" role="menu"></div>
+      </div>
       <button id="btnLocate" type="button">位置信息</button>
       <button id="btnSituation" type="button">态势输入</button>
       <button id="btnRun" type="button" class="primary">态势自动推演</button>
       <button id="btnExport" type="button">导出数据</button>
     </nav>
+
     <div class="status">
       <span class="dot" id="statusDot"></span>
       <span id="statusText">初始化中</span>
@@ -40,24 +48,49 @@
         <h2>目标分类</h2>
         <label class="check red"><input type="checkbox" id="filterRed" checked> 红方 <b id="countRed">0</b></label>
         <label class="check blue"><input type="checkbox" id="filterBlue" checked> 蓝方 <b id="countBlue">0</b></label>
-        <label class="check"><input type="checkbox" id="filterSea" checked> 水面</label>
-        <label class="check"><input type="checkbox" id="filterAir" checked> 空中</label>
+        <div class="domain-row">
+          <label class="check"><input type="checkbox" id="filterSea" checked> 海上 <b id="countSea">0</b></label>
+          <label class="check"><input type="checkbox" id="filterLand" checked> 陆上 <b id="countLand">0</b></label>
+          <label class="check"><input type="checkbox" id="filterAir" checked> 空中 <b id="countAir">0</b></label>
+        </div>
       </section>
 
       <section class="panel-block grow">
-        <h2>目标列表</h2>
+        <h2>目标列表 <span class="hint-inline" id="targetCountHint"></span></h2>
         <div id="targetList" class="target-list"></div>
       </section>
     </aside>
 
     <section class="globe-wrap">
       <div id="cesiumContainer"></div>
+
+      <!-- 点击目标后在其右上角弹出的信息面板 -->
+      <div id="targetPanel" class="target-panel hidden" aria-live="polite">
+        <div class="tp-head">
+          <span class="tp-title" id="tpTitle">目标</span>
+          <button id="tpClose" type="button" class="tp-close" aria-label="关闭">×</button>
+        </div>
+        <div class="tp-body" id="tpBody"></div>
+      </div>
+
+      <div id="levelBanner" class="level-banner">
+        <span class="lb-label">区域级态势</span>
+        <span class="lb-value" id="levelValue">—</span>
+        <span class="lb-note" id="levelNote"></span>
+      </div>
+
       <div id="legend" class="legend">
         <span><i class="swatch red"></i>红方</span>
         <span><i class="swatch blue"></i>蓝方</span>
         <span><i class="swatch line"></i>航迹</span>
+        <span><i class="swatch hotspot"></i>热点区域</span>
       </div>
-      <div id="hint" class="hint">滚轮缩放 · 拖拽旋转 · 点击目标查看详情</div>
+
+      <div id="loadingBadge" class="loading-badge hidden">
+        <span class="lb-spinner"></span><span id="loadingText">正在加载瓦片…</span>
+      </div>
+
+      <div id="hint" class="hint">滚轮缩放 · 拖拽旋转 · 点击目标查看信息面板 · 点击热点区域联动地理位置信息</div>
     </section>
 
     <aside class="panel panel-right">
@@ -66,13 +99,15 @@
         <div class="kv"><span>经度</span><b id="geoLon">—</b></div>
         <div class="kv"><span>纬度</span><b id="geoLat">—</b></div>
         <div class="kv"><span>视高</span><b id="geoAlt">—</b></div>
-        <div class="kv"><span>区域</span><b id="geoRegion">台湾海峡</b></div>
+        <div class="kv"><span>区域</span><b id="geoRegion">—</b></div>
+        <div class="kv"><span>范围</span><b id="geoSpan">—</b></div>
+        <div class="kv"><span>区域态势</span><b id="geoLevel">—</b></div>
       </section>
 
       <section class="panel-block grow">
         <h2>热点区域</h2>
         <table class="hotspot-table">
-          <thead><tr><th>#</th><th>名称</th><th>经纬度</th></tr></thead>
+          <thead><tr><th>#</th><th>名称</th><th>经纬范围</th><th>态势</th></tr></thead>
           <tbody id="hotspotBody"></tbody>
         </table>
       </section>
@@ -96,15 +131,31 @@
         </div>
         <div class="control-row">
           <span>天气控制</span>
-          <button id="btnWeather" type="button" class="mini">海况</button>
+          <button id="btnWeather" type="button" class="mini">海况/能见度</button>
+        </div>
+      </section>
+
+      <section class="panel-block">
+        <h2>瓦片缓存</h2>
+        <div class="kv"><span>内存命中</span><b id="cacheMemory">—</b></div>
+        <div class="kv"><span>本地命中</span><b id="cacheDisk">—</b></div>
+        <div class="kv"><span>回服务器取</span><b id="cacheNetwork">—</b></div>
+        <div class="kv"><span>已存本地</span><b id="cacheStored">—</b></div>
+        <div class="control-row">
+          <span>浏览过的瓦片不再重复下载</span>
+          <button id="btnClearCache" type="button" class="mini">清空缓存</button>
         </div>
       </section>
 
       <section class="panel-block">
         <h2>模型开关</h2>
-        <label class="check"><input type="checkbox" id="modelTerrain"> 地形模型</label>
+        <label class="check"><input type="checkbox" id="modelTerrain"> 地形模型（DEM 高程）</label>
+        <label class="check"><input type="checkbox" id="modelWsf3dOverlay"> 建筑高度图层（WSF3D）</label>
+        <label class="check"><input type="checkbox" id="modelBuildings"> 建筑体块（WSF3D 三维）</label>
         <label class="check"><input type="checkbox" id="modelWeather"> 气象模型</label>
-        <label class="check"><input type="checkbox" id="modelSensor"> 传感器</label>
+        <label class="check"><input type="checkbox" id="modelSensor"> 传感器覆盖</label>
+        <label class="check"><input type="checkbox" id="modelImagery" checked> 影像底图</label>
+        <div class="switch-note" id="switchNote">各开关的生效状态会在此说明。</div>
       </section>
     </aside>
   </main>
@@ -122,6 +173,9 @@
   </footer>
 
   <script src="./vendor/cesium/Cesium.js"></script>
+  <script src="./src/tilecache.js"></script>
+  <script src="./src/symbology.js"></script>
+  <script src="./src/assets.js"></script>
   <script src="./src/app.js"></script>
 </body>
 </html>

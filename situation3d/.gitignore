@@ -6,5 +6,9 @@ web/vendor/
 # scripts/gen_demo_trajectory.py -- regenerate rather than commit.
 web/data/*.json
 
+# Offline tile set (~10k files, ~200 MB), rebuilt by tools/fetch_assets.py and
+# tools/fetch_urban_wsf3d.sh. Never commit this.
+web/tiles/
+
 # Local verification captures
 tools/shots/

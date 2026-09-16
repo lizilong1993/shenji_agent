@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>situation3d API probe</title>
+<style>
+  body { background:#fff; color:#111; font:16px/1.5 monospace; margin:0; padding:16px; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  pre { font-size:15px; white-space:pre-wrap; }
+  .ok { color:#0a7a2f; }
+  .bad { color:#b3261e; }
+</style>
+</head>
+<body>
+<h1>situation3d — Cesium 地形/影像 API 探针</h1>
+<pre id="out">running…</pre>
+
+<script src="./vendor/cesium/Cesium.js"></script>
+<script>
+'use strict';
+const lines = [];
+function log(s, cls) { lines.push((cls ? cls + '|' : '') + s); flush(); }
+function flush() {
+  document.getElementById('out').innerHTML = lines.map(function (l) {
+    const i = l.indexOf('|');
+    if (i > 0 && (l.slice(0, i) === 'ok' || l.slice(0, i) === 'bad')) {
+      return '<span class="' + l.slice(0, i) + '">' + l.slice(i + 1) + '</span>';
+    }
+    return l;
+  }).join('\n');
+}
+function safe(label, fn) {
+  try { const v = fn(); log('ok|PASS  ' + label + '  -> ' + v); return v; }
+  catch (e) { log('bad|FAIL  ' + label + '  -> ' + (e && e.message ? e.message : e)); return null; }
+}
+
+const C = window.Cesium;
+log('Cesium global: ' + (typeof C));
+if (!C) { flush(); throw new Error('no Cesium'); }
+log('Cesium.VERSION = ' + C.VERSION);
+log('');
+
+log('--- class presence ---');
+['CustomHeightmapTerrainProvider', 'HeightmapTerrainProvider', 'HeightmapTerrainData',
+ 'UrlTemplateImageryProvider', 'WebMercatorTilingScheme', 'EllipsoidTerrainProvider',
+ 'Primitive', 'GeometryInstance', 'PolygonGeometry', 'BoxGeometry', 'ImageryLayer',
+ 'SingleTileImageryProvider', 'ScreenSpaceEventHandler'].forEach(function (n) {
+  log((typeof C[n] === 'function' ? 'ok|PASS  ' : 'bad|FAIL  ') + n + ' = ' + typeof C[n]);
+});
+log('');
+
+log('--- terrain provider construction ---');
+const scheme = new C.WebMercatorTilingScheme();
+
+const hmp = safe('new HeightmapTerrainProvider({url, heightScale, heightOffset})', function () {
+  const p = new C.HeightmapTerrainProvider({
+    url: './tiles/terrain/{z}/{x}/{y}.png',
+    tilingScheme: scheme,
+    width: 256, height: 256,
+    heightScale: 1 / 256, heightOffset: -32768
+  });
+  return 'constructed; levelZeroError=' + p.getLevelMaximumGeometricError(0);
+});
+if (hmp) {
+  log('     heightmapWidth=' + hmp._heightmapWidth +
+      ' structure=' + JSON.stringify(hmp._heightmapStructure || null));
+}
+
+safe('new CustomHeightmapTerrainProvider({width:256,height:256})', function () {
+  const p = new C.CustomHeightmapTerrainProvider({
+    width: 256, height: 256,
+    tilingScheme: scheme,
+    callback: function (x, y, level) {
+      return new Float32Array(256 * 256);
+    }
+  });
+  return 'constructed; levelZeroError=' + p.getLevelMaximumGeometricError(0);
+});
+
+safe('new CustomHeightmapTerrainProvider({width:65,height:65})', function () {
+  const p = new C.CustomHeightmapTerrainProvider({
+    width: 65, height: 65,
+    tilingScheme: scheme,
+    callback: function (x, y, level) { return new Float32Array(65 * 65); }
+  });
+  return 'constructed';
+});
+log('');
+
+log('--- offline imagery tile reachability ---');
+function imgTest(url, label) {
+  return new Promise(function (resolve) {
+    const im = new Image();
+    im.onload = function () { log('ok|PASS  ' + label + ' ' + im.naturalWidth + 'x' + im.naturalHeight); resolve(); };
+    im.onerror = function () { log('bad|FAIL  ' + label + ' (load error)'); resolve(); };
+    im.src = url;
+  });
+}
+
+// Terrarium decode: height = (R*256 + G + B/256) - 32768
+function decodeTerrarium(url, label) {
+  return new Promise(function (resolve) {
+    const im = new Image();
+    im.onload = function () {
+      try {
+        const cv = document.createElement('canvas');
+        cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+        const ctx = cv.getContext('2d');
+        ctx.drawImage(im, 0, 0);
+        const d = ctx.getImageData(0, 0, cv.width, cv.height).data;
+        let mn = Infinity, mx = -Infinity, sum = 0, n = 0;
+        const samples = [];
+        for (let i = 0; i < d.length; i += 4 * 97) {
+          const h = (d[i] * 256 + d[i + 1] + d[i + 2] / 256) - 32768;
+          if (h < mn) mn = h;
+          if (h > mx) mx = h;
+          sum += h; n++;
+          if (samples.length < 6) samples.push(Math.round(h));
+        }
+        log('ok|PASS  ' + label + ' h(min/mean/max)=' + Math.round(mn) + '/' +
+            Math.round(sum / n) + '/' + Math.round(mx) + ' m  samples=' + samples.join(','));
+      } catch (e) { log('bad|FAIL  ' + label + ' decode: ' + e.message); }
+      resolve();
+    };
+    im.onerror = function () { log('bad|FAIL  ' + label + ' (load error)'); resolve(); };
+    im.src = url;
+  });
+}
+
+(async function () {
+  await imgTest('./tiles/imagery/0/0/0.jpg', 'imagery z0/0/0.jpg');
+  await imgTest('./tiles/imagery/8/214/110.jpg', 'imagery z8/214/110.jpg');
+  await imgTest('./tiles/imagery/11/1712/880.jpg', 'imagery z11/1712/880.jpg');
+  await decodeTerrarium('./tiles/terrain/0/0/0.png', 'terrain z0/0/0.png');
+  await decodeTerrarium('./tiles/terrain/8/214/110.png', 'terrain z8/214/110.png');
+  await imgTest('./tiles/wsf3d/buildingheight/10/854/434.png', 'wsf3d z10/854/434.png');
+
+  log('');
+  log('--- calibration file ---');
+  try {
+    const r = await fetch('./tiles/wsf3d/height_ramp.json');
+    log((r.ok ? 'ok|PASS  ' : 'bad|FAIL  ') + 'height_ramp.json HTTP ' + r.status);
+  } catch (e) { log('bad|FAIL  height_ramp.json ' + e.message); }
+
+  log('');
+  log('--- data files ---');
+  try {
+    const r = await fetch('./data/cases.json');
+    const j = await r.json();
+    log((r.ok ? 'ok|PASS  ' : 'bad|FAIL  ') + 'cases.json HTTP ' + r.status +
+        ' cases=' + (j.cases ? j.cases.length : '?'));
+  } catch (e) { log('bad|FAIL  cases.json ' + e.message); }
+
+  log('');
+  log('PROBE COMPLETE');
+})();
+</script>
+</body>
+</html>
