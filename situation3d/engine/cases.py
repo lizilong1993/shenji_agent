@@ -28,7 +28,7 @@ class DemoCase:
     camera: Dict[str, float] = field(default_factory=dict)
 
 
-_DEFAULT_CAMERA = {
+DEFAULT_CAMERA = {
     "lon": 119.60,
     "lat": 24.40,
     "height": 900000.0,
@@ -52,7 +52,7 @@ CASES: List[DemoCase] = [
             "中国 巴士海峡", "中国 三亚", "中国台湾省 台北", "中国台湾省 高雄",
             "日本 冲绳岛", "美国 关岛",
         ],
-        camera=dict(_DEFAULT_CAMERA),
+        camera=dict(DEFAULT_CAMERA),
     ),
     DemoCase(
         case_id="sea_convoy",

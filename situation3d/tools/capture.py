@@ -26,6 +26,7 @@ Usage:
     python capture.py --url "/?case=joint_full&tick=360" --out shots/tick360.png
     python capture.py --url "/?case=joint_full&follow=R01" --out shots/follow.png --tries 5
     python capture.py --url "/?components=0" --out shots/nocomp.png
+    python capture.py --url "/?case=joint_full&overview=1" --out shots/overview.png
 
 Note on URLs: once the empty-state change lands, `/` no longer loads a situation, so
 every capture that needs targets must carry `?case=<id>` explicitly.

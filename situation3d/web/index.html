@@ -17,12 +17,45 @@
     <nav class="topbar-actions">
       <div class="menu">
         <button id="menuCase" type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false">
-          演示案例 <span class="caret">▾</span>
+          态势案例 <span class="caret">▾</span>
         </button>
         <div id="menuCaseList" class="menu-list" role="menu"></div>
       </div>
-      <button id="btnLocate" type="button">位置信息</button>
-      <button id="btnSituation" type="button">态势输入</button>
+
+      <div class="menu">
+        <button id="menuLayers" type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false">
+          图层管理 <span class="caret">▾</span>
+        </button>
+        <div id="menuLayerList" class="menu-list menu-list-narrow" role="menu">
+          <button type="button" class="menu-item" data-layer-cmd="show">
+            <span class="mi-head">全部显示</span>
+            <span class="mi-sub">打开四大类下所有开关（目标跟随除外）</span>
+          </button>
+          <button type="button" class="menu-item" data-layer-cmd="hide">
+            <span class="mi-head">全部隐藏</span>
+            <span class="mi-sub">关闭四大类下所有开关（底图与地图组件保留）</span>
+          </button>
+          <div class="menu-sep"></div>
+          <button type="button" class="menu-item" data-layer-cmd="default">
+            <span class="mi-head">恢复默认</span>
+            <span class="mi-sub">回到首次打开时的图层状态</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="menu">
+        <button id="menuView" type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false">
+          视图 <span class="caret">▾</span>
+        </button>
+        <div id="menuViewList" class="menu-list menu-list-narrow" role="menu">
+          <button type="button" class="menu-item" id="btnLocate">
+            <span class="mi-head">复位视角</span>
+            <span class="mi-sub">回到案例默认机位，并解除热点锁定与目标跟随</span>
+          </button>
+        </div>
+      </div>
+
+      <button id="btnOverview" type="button" disabled title="鸟瞰图">鸟瞰图</button>
       <button id="btnRun" type="button" class="primary">态势自动推演</button>
       <button id="btnExport" type="button">导出数据</button>
     </nav>
@@ -35,31 +68,42 @@
 
   <main class="workspace">
     <aside class="panel panel-left">
-      <section class="panel-block">
-        <h2>图层</h2>
-        <label class="check"><input type="checkbox" id="layerTargets" checked> 可见目标</label>
-        <label class="check"><input type="checkbox" id="layerTracks" checked> 历史轨迹</label>
-        <label class="check"><input type="checkbox" id="layerRoutes" checked> 计划航路</label>
+      <details class="layer-group panel-block" open>
+        <summary>态势图层</summary>
         <label class="check"><input type="checkbox" id="layerHotspots" checked> 热点区域</label>
-        <label class="check"><input type="checkbox" id="layerLabels" checked> 目标标牌</label>
-      </section>
+        <label class="check"><input type="checkbox" id="layerRoutes" checked> 计划航路</label>
+        <label class="check"><input type="checkbox" id="layerLevelBanner" checked> 区域级态势横幅</label>
+        <label class="check"><input type="checkbox" id="layerOverview" checked> 鸟瞰图</label>
+      </details>
 
-      <section class="panel-block">
-        <h2>目标分类</h2>
-        <label class="check red"><input type="checkbox" id="filterRed" checked> 红方 <b id="countRed">0</b></label>
-        <label class="check blue"><input type="checkbox" id="filterBlue" checked> 蓝方 <b id="countBlue">0</b></label>
+      <details class="layer-group panel-block" open>
+        <summary>目标图层</summary>
+        <label class="check"><input type="checkbox" id="layerTargets" checked> 可见目标</label>
+        <label class="check"><input type="checkbox" id="layerLabels" checked> 目标标牌</label>
+        <label class="check"><input type="checkbox" id="layerTracks" checked> 历史轨迹</label>
+        <label class="check"><input type="checkbox" id="modelSensor"> 传感器覆盖</label>
+        <label class="check"><input type="checkbox" id="layerTargetPanel" checked> 目标元数据面板</label>
         <div class="domain-row">
+          <label class="check red"><input type="checkbox" id="filterRed" checked> 红方 <b id="countRed">0</b></label>
+          <label class="check blue"><input type="checkbox" id="filterBlue" checked> 蓝方 <b id="countBlue">0</b></label>
           <label class="check"><input type="checkbox" id="filterSea" checked> 海上 <b id="countSea">0</b></label>
           <label class="check"><input type="checkbox" id="filterLand" checked> 陆上 <b id="countLand">0</b></label>
           <label class="check"><input type="checkbox" id="filterAir" checked> 空中 <b id="countAir">0</b></label>
         </div>
-      </section>
-
-      <section class="panel-block">
-        <h2>目标跟随</h2>
-        <label class="check"><input type="checkbox" id="followTarget"> 开启后点击目标即跟随</label>
+        <label class="check"><input type="checkbox" id="followTarget"> 目标跟随</label>
         <div class="switch-note" id="followNote">开启后点击任一目标，相机以随航向旋转的追踪视角持续跟随；拖动地图即自动解除。</div>
-      </section>
+      </details>
+
+      <details class="layer-group panel-block" open>
+        <summary>底图</summary>
+        <label class="check"><input type="checkbox" id="modelImagery" checked> 影像底图</label>
+        <label class="check"><input type="checkbox" id="modelUrbanImagery" checked> 城区高清影像</label>
+        <label class="check"><input type="checkbox" id="modelTerrain"> 地形模型（DEM 高程）</label>
+        <label class="check"><input type="checkbox" id="modelWsf3dOverlay"> 建筑高度图层（WSF3D）</label>
+        <label class="check"><input type="checkbox" id="modelBuildings"> 建筑体块（WSF3D 三维）</label>
+        <label class="check"><input type="checkbox" id="modelWeather"> 气象模型</label>
+        <div class="switch-note" id="switchNote">各开关的生效状态会在此说明。</div>
+      </details>
 
       <details class="layer-group panel-block" open>
         <summary>地图组件</summary>
@@ -103,6 +147,15 @@
         <span class="lb-spinner"></span><span id="loadingText">正在加载瓦片…</span>
       </div>
 
+      <!-- 鸟瞰图：第二个 Cesium 2D 视图，显示真实地球缩略图并与主相机联动 -->
+      <div id="overviewWrap" class="overview-wrap hidden">
+        <div class="ov-head">
+          <span class="ov-title">鸟瞰图 · 台海</span>
+          <button id="ovHide" type="button" class="ov-btn" aria-label="隐藏">×</button>
+        </div>
+        <div id="overviewContainer" class="ov-canvas"></div>
+      </div>
+
       <!-- 地图组件：Cesium 1.145 无内置指南针与比例尺，三项均为自建 -->
       <div id="mapCompass" class="map-comp" title="点击复位正北（相机航向归零）">
         <svg viewBox="0 0 100 100" aria-hidden="true">
@@ -138,10 +191,9 @@
 
     <aside class="panel panel-right">
       <section class="panel-block">
-        <h2>地理位置信息</h2>
+        <h2>光标位置信息</h2>
         <div class="kv"><span>经度</span><b id="geoLon">—</b></div>
         <div class="kv"><span>纬度</span><b id="geoLat">—</b></div>
-        <div class="kv"><span>视高</span><b id="geoAlt">—</b></div>
         <div class="kv"><span>区域</span><b id="geoRegion">—</b></div>
         <div class="kv"><span>范围</span><b id="geoSpan">—</b></div>
         <div class="kv"><span>区域态势</span><b id="geoLevel">—</b></div>
@@ -172,33 +224,6 @@
             <option value="120">120×</option>
           </select>
         </div>
-        <div class="control-row">
-          <span>天气控制</span>
-          <button id="btnWeather" type="button" class="mini">海况/能见度</button>
-        </div>
-      </section>
-
-      <section class="panel-block">
-        <h2>瓦片缓存</h2>
-        <div class="kv"><span>内存命中</span><b id="cacheMemory">—</b></div>
-        <div class="kv"><span>本地命中</span><b id="cacheDisk">—</b></div>
-        <div class="kv"><span>回服务器取</span><b id="cacheNetwork">—</b></div>
-        <div class="kv"><span>已存本地</span><b id="cacheStored">—</b></div>
-        <div class="control-row">
-          <span>浏览过的瓦片不再重复下载</span>
-          <button id="btnClearCache" type="button" class="mini">清空缓存</button>
-        </div>
-      </section>
-
-      <section class="panel-block">
-        <h2>模型开关</h2>
-        <label class="check"><input type="checkbox" id="modelTerrain"> 地形模型（DEM 高程）</label>
-        <label class="check"><input type="checkbox" id="modelWsf3dOverlay"> 建筑高度图层（WSF3D）</label>
-        <label class="check"><input type="checkbox" id="modelBuildings"> 建筑体块（WSF3D 三维）</label>
-        <label class="check"><input type="checkbox" id="modelWeather"> 气象模型</label>
-        <label class="check"><input type="checkbox" id="modelSensor"> 传感器覆盖</label>
-        <label class="check"><input type="checkbox" id="modelImagery" checked> 影像底图</label>
-        <div class="switch-note" id="switchNote">各开关的生效状态会在此说明。</div>
       </section>
     </aside>
   </main>
@@ -219,6 +244,7 @@
   <script src="./src/tilecache.js"></script>
   <script src="./src/symbology.js"></script>
   <script src="./src/assets.js"></script>
+  <script src="./src/overview.js"></script>
   <script src="./src/app.js"></script>
 </body>
 </html>

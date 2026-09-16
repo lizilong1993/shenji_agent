@@ -38,7 +38,8 @@ const state = {
   playing: false,
   ticksPerSecond: 30,
   targets: {},              // id -> { def, entity, trail: [], lastTick, sensorEntity }
-  layers: { targets: true, tracks: true, routes: true, hotspots: true, labels: true },
+  layers: { targets: true, tracks: true, routes: true, hotspots: true, labels: true,
+            levelBanner: true, targetPanel: true, overview: true },
   filters: { red: true, blue: true, sea: true, land: true, air: true },
   selected: null,
   hotspotEntities: [],
@@ -60,6 +61,7 @@ const state = {
   lastError: null,          // 最近一次未捕获异常
   urbanLayers: null,        // 城区 z12-z14 高清影像层（按相机高度挂载）
   urbanAoi: [],             // 城区 AOI 列表
+  urbanEnabled: true,       // 城区高清影像是否启用（图层管理「底图」）
   imageryStats: null,       // 底图瓦片请求统计（诊断用）
   inference: null,          // inference_frames，与 frames 逐帧对齐
 
@@ -69,6 +71,10 @@ const state = {
 
   // 地图组件显隐（图层管理第四类）
   components: { compass: true, scalebar: true, viewpoint: true },
+
+  base: null,               // data/base.json：与案例无关的基础数据
+  baseCamera: null,         // 空态默认机位
+  baseRegion: null,         // 空态下标题栏显示的来源区域
 };
 
 let viewer = null;
@@ -76,13 +82,16 @@ let lastFrameMs = 0;
 let lastGeoRefresh = 0;
 let camChangedCount = 0;      // camera.changed 触发次数（诊断用）
 
+// base.json 缺失时的兜底机位（台海全景）
+const FALLBACK_CAMERA = { lon: 119.6, lat: 24.4, height: 900000, heading: 0, pitch: -75 };
+
 const dom = {};
 ['statusText', 'statusDot', 'scenarioName', 'targetList', 'hotspotBody',
- 'geoLon', 'geoLat', 'geoAlt', 'geoRegion', 'geoSpan', 'geoLevel',
+ 'geoLon', 'geoLat', 'geoRegion', 'geoSpan', 'geoLevel',
  'levelValue', 'levelNote', 'targetPanel', 'tpTitle', 'tpBody', 'tpClose',
- 'menuCase', 'menuCaseList', 'switchNote', 'tickLabel', 'timeline', 'clockLabel',
+ 'menuCase', 'menuCaseList', 'menuLayers', 'menuLayerList', 'menuView', 'menuViewList',
+ 'switchNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner', 'btnOverview',
  'countRed', 'countBlue', 'countSea', 'countLand', 'countAir', 'targetCountHint',
- 'cacheMemory', 'cacheDisk', 'cacheNetwork', 'cacheStored',
  'loadingBadge', 'loadingText',
  'mapCompass', 'compRose', 'mapViewpoint', 'mvLon', 'mvLat', 'mvAlt',
  'mapScalebar', 'sbBar', 'sbLabel', 'followTarget', 'followNote',
@@ -105,6 +114,12 @@ function setLoadingTiles(queued) {
   // 底图空闲时才让缓存开始预热：预热与当前视野的渲染共用同一批连接和 CPU，
   // 同时进行会把 Cesium 的影像请求挤掉，表现为底图一直画不出来。
   if (window.TileCache && TileCache.setIdle) TileCache.setIdle(queued === 0);
+
+  // 底图空闲后再创建鸟瞰图：启动期两个 WebGL 上下文会互抢连接与 CPU。
+  // 面板默认带 hidden，只有 Viewer 真正建好才显示，避免先出现一个白框。
+  if (queued === 0 && state.layers.overview && window.Overview) {
+    try { Overview.show(); } catch (e) { console.warn('[overview]', e.message); }
+  }
 
   if (!dom.loadingBadge) return;
   if (loadingSettleTimer) {
@@ -137,23 +152,6 @@ function humanBytes(n) {
  * 这个面板存在的意义是把缓存效果变成可见的数字：浏览过程中"回服务器取"
  * 基本不再增长，就说明浏览过的瓦片确实走了本地。
  */
-async function refreshCacheStats() {
-  if (!window.TileCache || !dom.cacheMemory) return;
-  try {
-    const s = await TileCache.snapshot();
-    dom.cacheMemory.textContent = s.memoryHits + ' 次命中 / ' + s.memory + ' 张在内存';
-    dom.cacheDisk.textContent = (s.disk === null ? '—' : s.disk + ' 张') +
-      '，已预热 ' + s.preloaded + ' 张';
-    dom.cacheNetwork.textContent = s.network + ' 次' +
-      (s.warming ? '（预热中 ' + s.warming + '）' : '') +
-      (s.errors ? '，失败 ' + s.errors : '');
-    dom.cacheStored.textContent = humanBytes(s.usageBytes) + ' / 上限 ' +
-      (s.disk === null ? '—' : s.diskLimit + ' 张') +
-      (s.persistent === false ? '（持久化不可用，仅内存）' : '');
-  } catch (e) {
-    // 缓存统计不可用不应影响主流程。
-  }
-}
 
 // --------------------------------------------------------------------------
 // 通用工具
@@ -167,6 +165,7 @@ async function refreshCacheStats() {
  */
 function renderDiagnostics() {
   if (params.get('diag') !== '1') return;
+  if (!viewer) return;      // manifest 未就绪时定时器已在跑
   let box = document.getElementById('diagBox');
   if (!box) {
     box = document.createElement('pre');
@@ -236,6 +235,10 @@ function renderDiagnostics() {
              '  suspend ' + state.follow.suspend +
              '  unlocked ' + viewer.camera.transform.equals(Cesium.Matrix4.IDENTITY));
   lines.push('camChanged      ' + camChangedCount + ' 次');
+  if (window.Overview) lines.push('overview        ' + Overview.debugInfo());
+  lines.push('base            ' + (state.base ? 'ok' : 'MISSING') +
+             '  baseCamera ' + (state.baseCamera ? 'ok' : '-') +
+             '  urbanAoi ' + (state.urbanAoi ? state.urbanAoi.length : 0));
   lines.push('components      compass ' + state.components.compass +
              '  scalebar ' + state.components.scalebar +
              '  viewpoint ' + state.components.viewpoint);
@@ -335,6 +338,8 @@ function initViewer() {
   // 关闭 Cesium 自带的双击跟踪与默认缩放行为，避免与信息面板抢事件。
   viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(
     Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+  if (window.Overview) Overview.init(viewer);
 }
 
 function flyTo(lon, lat, height, pitchDeg) {
@@ -405,7 +410,10 @@ function loadCase(caseId) {
 
       if (data.symbology) Symbology.setCatalog(data.symbology);
 
-  state.urbanAoi = data.urban_aoi || [];
+  // 城区 AOI 以 base.json 为准（与案例无关）；旧数据集里也带一份，作为回退。
+  if (!state.urbanAoi || !state.urbanAoi.length) {
+    state.urbanAoi = data.urban_aoi || [];
+  }
   syncUrbanImagery();
 
       dom.scenarioName.textContent = data.region + ' · ' + data.case_name;
@@ -423,6 +431,12 @@ function loadCase(caseId) {
       setTick(0);
       updateInferenceUi();
 
+      setTransportEnabled(true);
+      if (dom.followTarget) {
+        dom.followTarget.disabled = false;
+        dom.followTarget.title = '';
+      }
+      setFollowNote('开启后点击任一目标，相机以随航向旋转的追踪视角持续跟随；拖动地图即自动解除。');
       setStatus('就绪 · ' + data.targets.length + ' 个目标 · ' +
                 (data.frames.length - 1) + ' 帧 · ' + data.hotspots.length + ' 个热点区域', 'ok');
       setSwitchNote('已加载案例「' + data.case_name + '」。各开关的生效状态会在此说明。');
@@ -444,6 +458,95 @@ function teardownScene() {
     state.buildingsPrimitive = null;
   }
   state.buildingsAoi = -1;
+}
+
+// --------------------------------------------------------------------------
+// 与案例无关的基础数据（data/base.json）
+// --------------------------------------------------------------------------
+//
+// 空态（不加载任何态势）下前端仍需要两样东西：城区 AOI（生成 WSF3D 建筑体块）
+// 与军标目录（渲染符号）。它们原本只随案例数据集下发，所以提到这里单独加载。
+
+function loadBase() {
+  return fetch('./data/base.json', { cache: 'no-store' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .catch(function (e) {
+      // 缺失不阻塞启动：军标退回内置兜底，城区体块给出明确提示。
+      console.warn('[base] 基础数据加载失败：' + e.message);
+      return null;
+    });
+}
+
+function applyBase(base) {
+  state.base = base || null;
+  if (base && base.symbology) Symbology.setCatalog(base.symbology);
+  state.urbanAoi = (base && base.urban_aoi) || [];
+  state.baseCamera = (base && base.camera) || null;
+  state.baseRegion = (base && base.region) || '未加载态势';
+  syncUrbanImagery();
+}
+
+// --------------------------------------------------------------------------
+// 空态与态势生命周期
+// --------------------------------------------------------------------------
+
+/** 播放/步进/时间轴/导出在空态下无意义，统一在此开关。 */
+function setTransportEnabled(on) {
+  ['btnPlay', 'btnRun', 'btnReset', 'btnStepBack', 'btnStepFwd', 'btnExport'].forEach(function (id) {
+    const node = document.getElementById(id);
+    if (node) node.disabled = !on;
+  });
+  if (dom.timeline) dom.timeline.disabled = !on;
+}
+
+/**
+ * 回到空态：不加载任何态势，只保留底图 / 地形 / WSF3D / 地图组件。
+ *
+ * 幂等——启动时与「清除当前态势」共用同一条路径，避免两套清场逻辑漂移。
+ */
+function clearSituation() {
+  if (!viewer) return;
+  setPlaying(false);
+  if (state.buildingTimer) { clearTimeout(state.buildingTimer); state.buildingTimer = null; }
+  teardownScene();                     // 内含 detachFollow + 清空实体
+
+  state.data = null;
+  state.caseId = null;
+  state.inference = null;
+  state.tick = 0;
+  state.tickFloat = 0;
+  state.selected = null;
+  state.activeHotspot = -1;
+  state.geoPinned = false;
+  state.buildingsKey = null;
+  state.buildingsAoi = -1;
+
+  dom.scenarioName.textContent = state.baseRegion || '未加载态势';
+  document.title = '三维战场态势生成系统';
+
+  renderTargetList();
+  renderHotspotTable();
+  renderTransport();
+  updateInferenceUi();
+  clearHotspotSelection();
+  closeTargetPanel();
+  setTransportEnabled(false);
+
+  if (dom.followTarget) {
+    dom.followTarget.disabled = true;
+    dom.followTarget.checked = false;
+    dom.followTarget.title = '未加载态势';
+  }
+  setFollowNote('未加载态势，无法跟随。请先从「演示案例」选择案例。');
+
+  // 机位兜底：base.json 缺失时也要回到台海，否则会停在 Cesium 的默认视图
+  // （DEFAULT_VIEW_RECTANGLE 的中心在 82.5°W / 35°N，看起来像"相机飞走了"）。
+  applyCamera(state.baseCamera || FALLBACK_CAMERA);
+  setStatus('空态 · 未加载态势', 'ok');
+  setSwitchNote('未加载态势：底图 / 地形 / WSF3D / 地图组件仍可用。请从顶栏「演示案例」选择案例。');
 }
 
 // --------------------------------------------------------------------------
@@ -471,26 +574,121 @@ function renderCaseMenu() {
     item.addEventListener('click', function () {
       closeCaseMenu();
       if (c.id === state.caseId) return;
-      loadCase(c.id).catch(function (err) {
+      loadCase(c.id).then(function () { applyCaseHooks(); }).catch(function (err) {
         console.error(err);
         setStatus('案例加载失败: ' + err.message, 'err');
       });
     });
     list.appendChild(item);
   });
+
+  // 清除当前态势，回到空态（底图/地形/WSF3D/地图组件保留）
+  const sep = el('div', 'menu-sep');
+  list.appendChild(sep);
+  const clearItem = el('button', 'menu-item menu-item-quiet', '');
+  clearItem.type = 'button';
+  clearItem.setAttribute('role', 'menuitem');
+  clearItem.appendChild(el('span', 'mi-head', '清除当前态势'));
+  clearItem.appendChild(el('span', 'mi-sub', '回到空态：保留底图 / 地形 / WSF3D / 地图组件'));
+  clearItem.addEventListener('click', function () {
+    closeCaseMenu();
+    if (!state.data) return;
+    clearSituation();
+  });
+  list.appendChild(clearItem);
 }
 
-function openCaseMenu() {
-  dom.menuCaseList.classList.add('open');
-  dom.menuCase.setAttribute('aria-expanded', 'true');
-  Array.prototype.forEach.call(dom.menuCaseList.children, function (n) {
-    n.classList.toggle('active', n.dataset.caseId === state.caseId);
+const MENUS = [];
+
+/** 顶栏下拉菜单的通用开合。三个菜单互斥，点空白处全部收起。 */
+function bindMenu(buttonId, listId) {
+  const btn = document.getElementById(buttonId);
+  const list = document.getElementById(listId);
+  if (!btn || !list) return;
+  MENUS.push({ btn: btn, list: list });
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    const wasOpen = list.classList.contains('open');
+    closeAllMenus();
+    if (!wasOpen) {
+      list.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+    }
   });
 }
 
-function closeCaseMenu() {
-  dom.menuCaseList.classList.remove('open');
-  dom.menuCase.setAttribute('aria-expanded', 'false');
+function closeAllMenus() {
+  MENUS.forEach(function (m) {
+    m.list.classList.remove('open');
+    m.btn.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function openCaseMenu() {
+  closeAllMenus();
+  Array.prototype.forEach.call(dom.menuCaseList.children, function (n) {
+    n.classList.toggle('active', n.dataset.caseId === state.caseId);
+  });
+  dom.menuCaseList.classList.add('open');
+  dom.menuCase.setAttribute('aria-expanded', 'true');
+}
+
+function closeCaseMenu() { closeAllMenus(); }
+
+// --------------------------------------------------------------------------
+// 图层管理的批量操作
+// --------------------------------------------------------------------------
+//
+// 四大类下的全部开关。目标跟随是"模式开关"而不是图层，刻意不列入——把它一起
+// 关掉等于隐式解除跟随，语义混乱。
+
+const LAYER_GROUPS = [
+  { name: '态势图层', ids: ['layerHotspots', 'layerRoutes', 'layerLevelBanner'] },
+  { name: '目标图层', ids: ['layerTargets', 'layerLabels', 'layerTracks', 'modelSensor',
+                            'layerTargetPanel', 'filterRed', 'filterBlue', 'filterSea',
+                            'filterLand', 'filterAir'] },
+  { name: '底图', ids: ['modelImagery', 'modelUrbanImagery', 'modelTerrain',
+                        'modelWsf3dOverlay', 'modelBuildings', 'modelWeather'] },
+  { name: '地图组件', ids: ['compCompass', 'compScalebar', 'compViewpoint'] },
+];
+
+const LAYER_DEFAULTS = {};
+
+function captureLayerDefaults() {
+  LAYER_GROUPS.forEach(function (g) {
+    g.ids.forEach(function (id) {
+      const node = document.getElementById(id);
+      if (node) LAYER_DEFAULTS[id] = node.checked;
+    });
+  });
+}
+
+/** 以编程方式切换开关，并派发 change 事件复用既有 handler。 */
+function setSwitch(id, on) {
+  const node = document.getElementById(id);
+  if (!node || node.disabled || node.checked === on) return;
+  node.checked = on;
+  node.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
+ * cmd: 'show' 全开 | 'hide' 只关态势与目标图层 | 'default' 恢复默认。
+ *
+ * 「全部隐藏」刻意不关底图与地图组件——把底图关掉只会得到一片黑球，不是用户
+ * 想要的结果。
+ */
+function applyLayerCommand(cmd) {
+  const groups = cmd === 'hide'
+    ? LAYER_GROUPS.filter(function (g) { return g.name === '态势图层' || g.name === '目标图层'; })
+    : LAYER_GROUPS;
+  groups.forEach(function (g) {
+    g.ids.forEach(function (id) {
+      setSwitch(id, cmd === 'show' ? true : cmd === 'hide' ? false : !!LAYER_DEFAULTS[id]);
+    });
+  });
+  setStatus(cmd === 'show' ? '图层已全部显示'
+    : cmd === 'hide' ? '态势与目标图层已隐藏'
+    : '图层已恢复默认', 'ok');
 }
 
 // --------------------------------------------------------------------------
@@ -498,6 +696,9 @@ function closeCaseMenu() {
 // --------------------------------------------------------------------------
 
 function positionFor(id, tick) {
+  // 空态守卫放在最前面：这个函数被 Cesium 的 CallbackProperty 每帧求值，
+  // 一旦抛异常就是每帧一次未捕获错误，直接污染状态栏。
+  if (!state.data || !state.data.frames) return undefined;
   const frames = state.data.frames;
   const frame = frames[Math.max(0, Math.min(tick, frames.length - 1))];
   return frame.targets.find(function (t) { return t.id === id; });
@@ -756,8 +957,9 @@ function renderTargetList() {
   const counts = { red: 0, blue: 0, sea: 0, land: 0, air: 0 };
   let shown = 0;
   const inf = inferenceAt(state.tick);
+  const targets = (state.data && state.data.targets) || [];
 
-  state.data.targets.forEach(function (def) {
+  targets.forEach(function (def) {
     counts[def.affiliation]++;
     counts[def.domain]++;
     if (!isVisible(def)) return;
@@ -797,7 +999,11 @@ function renderTargetList() {
   dom.countSea.textContent = counts.sea;
   dom.countLand.textContent = counts.land;
   dom.countAir.textContent = counts.air;
-  dom.targetCountHint.textContent = shown + ' / ' + state.data.targets.length;
+  dom.targetCountHint.textContent = shown + ' / ' + targets.length;
+
+  if (!targets.length) {
+    host.appendChild(el('div', 'empty-state', '未加载态势。请从顶栏「演示案例」选择案例。'));
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -808,8 +1014,18 @@ function renderHotspotTable() {
   const body = dom.hotspotBody;
   body.innerHTML = '';
   state.hotspotRows = [];
+  const hotspots = (state.data && state.data.hotspots) || [];
 
-  state.data.hotspots.forEach(function (hs, i) {
+  if (!hotspots.length) {
+    const tr = el('tr', 'hotspot-row');
+    const td = el('td', 'hs-empty', '未加载态势');
+    td.colSpan = 4;
+    tr.appendChild(td);
+    body.appendChild(tr);
+    return;
+  }
+
+  hotspots.forEach(function (hs, i) {
     const tr = el('tr', 'hotspot-row');
     tr.dataset.index = String(i);
 
@@ -897,10 +1113,10 @@ function hotspotAt(lat, lon) {
  * 刚加载、或纯相机飞行）退回到视图中心的地面交点，避免面板一片"—"。
  */
 function updateGeoReadout() {
-  if (state.geoPinned || !state.data) return;
+  // 空态下没有热点可判，但相机经纬与视高照常刷新——否则一打开页面面板全是"—"。
+  if (state.geoPinned || !viewer) return;
 
-  const height = viewer.camera.positionCartographic.height;
-  dom.geoAlt.textContent = (height / 1000).toFixed(1) + ' km';
+  // 「视高」一行已移除：相机高度由地图组件「视点坐标」提供，这里只管光标落点。
 
   let carto = state.cursorCarto;
   if (!carto) {
@@ -917,7 +1133,7 @@ function updateGeoReadout() {
   dom.geoLon.textContent = fmtDeg(lon, 'E', 'W');
   dom.geoLat.textContent = fmtDeg(lat, 'N', 'S');
 
-  const idx = hotspotAt(lat, lon);
+  const idx = state.data ? hotspotAt(lat, lon) : -1;
   if (idx >= 0) {
     const hs = state.data.hotspots[idx];
     const b = hs.bbox;
@@ -930,7 +1146,7 @@ function updateGeoReadout() {
       dom.geoLevel.className = 'lv-cell ' + (LEVEL_CLASS[r[0]] || '');
     }
   } else {
-    dom.geoRegion.textContent = '不在热点区域内';
+    dom.geoRegion.textContent = state.data ? '不在热点区域内' : (state.baseRegion || '未加载态势');
     dom.geoSpan.textContent = '—';
     dom.geoLevel.textContent = '—';
     dom.geoLevel.className = 'lv-cell';
@@ -977,6 +1193,8 @@ function kvRow(label, value, extraClass) {
 }
 
 function renderTargetPanel(id) {
+  // 「目标元数据面板」开关关掉后，点击目标只做选中与高亮，不弹面板。
+  if (!state.layers.targetPanel) { dom.targetPanel.classList.add('hidden'); return; }
   const rec = state.targets[id];
   if (!rec) return;
   const def = rec.def;
@@ -1007,7 +1225,7 @@ function renderTargetPanel(id) {
     '<div class="tp-symbol-meta"><b>' + def.model + '</b><span>' + def.model_note + '</span>' +
     '<span>' + Symbology.iconLabel(def.icon) + ' · ' +
     (def.affiliation === 'red' ? '红方' : '蓝方') + ' · ' +
-    (state.data.symbology.domains[def.domain] || def.domain) + '</span></div></div>';
+    (Symbology.domainLabel(def.domain) || def.domain) + '</span></div></div>';
 
   html += '<div class="tp-section"><h4>目标要素</h4>';
   html += kvRow('目标 ID', def.id);
@@ -1038,7 +1256,7 @@ function renderTargetPanel(id) {
   if (group) {
     html += '<div class="tp-section"><h4>二级 · 编组级态势</h4>';
     html += kvRow('所属编组', (group.affiliation === 'red' ? '红方' : '蓝方') +
-      (state.data.symbology.domains[group.domain] || group.domain) + '编组（' + group.count + ' 个目标）');
+      (Symbology.domainLabel(group.domain) || group.domain) + '编组（' + group.count + ' 个目标）');
     html += kvRow('编队形态', group.posture_label + '（跨度 ' + group.spread_km + ' km）');
     html += kvRow('对方同域编组', group.opposing_key || '无');
     html += kvRow('最小距离', group.min_distance_km === null ? '—' : group.min_distance_km + ' km');
@@ -1133,13 +1351,51 @@ function setBuildings(on) {
   refreshBuildings();
 }
 
-function pickAoiForHotspot(index) {
-  const aois = state.data.urban_aoi || [];
+/** 屏幕中心射线打到地面的经纬；打不到时退回相机自身的地面投影。 */
+function cameraGroundCarto() {
+  const canvas = viewer.scene.canvas;
+  const ray = viewer.camera.getPickRay(
+    new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2));
+  const point = ray ? viewer.scene.globe.pick(ray, viewer.scene) : null;
+  return point ? Cesium.Cartographic.fromCartesian(point) : viewer.camera.positionCartographic;
+}
+
+/**
+ * 离相机地面点最近的城区 AOI。空态（没有热点）时用它选体块区域。
+ *
+ * 用 haversine 而不是 |Δlat|+|Δlon|：在纬度 25° 处 1° 经度的地面距离只有 1° 纬度的
+ * 约 91%，曼哈顿度量会把经度方向的差异算大。
+ */
+function nearestAoiToCamera() {
+  const aois = state.urbanAoi || [];
   if (!aois.length) return -1;
-  if (index < 0) return 0;
+  const g = cameraGroundCarto();
+  const clat = Cesium.Math.toDegrees(g.latitude);
+  const clon = Cesium.Math.toDegrees(g.longitude);
+  const cosLat = Math.cos(clat * Math.PI / 180);
+  const R = 6371000;
+
+  let best = -1;
+  let bestD = Infinity;
+  aois.forEach(function (aoi, i) {
+    const alat = (aoi.bbox[1] + aoi.bbox[3]) / 2;
+    const alon = (aoi.bbox[0] + aoi.bbox[2]) / 2;
+    const dy = (alat - clat) * Math.PI / 180 * R;
+    const dx = (alon - clon) * Math.PI / 180 * R * cosLat;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < bestD) { bestD = d; best = i; }
+  });
+  return bestD <= 200000 ? best : -1;   // AOI 边长约 13 km，200 km 外就不硬套
+}
+
+function pickAoiForHotspot(index) {
+  const aois = state.urbanAoi || [];
+  if (!aois.length) return -1;
+  // 空态没有热点，交给"离相机最近的 AOI"分支（见 refreshBuildings）
+  if (index < 0 || !state.data) return -1;
 
   const hs = state.data.hotspots[index];
-  if (!hs) return 0;
+  if (!hs) return -1;
   const clat = hs.center[0], clon = hs.center[1];
 
   let best = -1;
@@ -1162,10 +1418,12 @@ function pickAoiForHotspot(index) {
  */
 function refreshBuildings() {
   if (!dom.modelBuildings || !dom.modelBuildings.checked) return;
-  if (!state.ramp || !state.data) return;
+  // 不再依赖 state.data：空态下用"离相机最近的城区 AOI"生成体块。
+  if (!state.ramp) return;
 
-  const aois = state.data.urban_aoi || [];
-  const aoiIdx = pickAoiForHotspot(state.activeHotspot);
+  const aois = state.urbanAoi || [];
+  let aoiIdx = pickAoiForHotspot(state.activeHotspot);
+  if (aoiIdx < 0) aoiIdx = nearestAoiToCamera();
   if (aoiIdx < 0) {
     setSwitchNote('当前热点区域内没有预下载的高分辨率 WSF3D 城市区数据；' +
       '可选城市区：' + aois.map(function (a) { return a.name; }).join('、') + '。');
@@ -1221,7 +1479,7 @@ function swapBuildings(entry, aoiIdx, lod, ms) {
   state.buildingsKey = aoiIdx + ':' + lod;
   viewer.scene.primitives.add(entry.primitive);
 
-  const aoi = state.data.urban_aoi[aoiIdx];
+  const aoi = state.urbanAoi[aoiIdx];
   const st = entry.stats;
   setSwitchNote('建筑体块已显示：「' + aoi.name + '」LOD ' + st.lod +
     '（网格 ' + st.grid + '×' + st.grid + '，采样步长 ' + st.step + '），' +
@@ -1266,7 +1524,7 @@ const URBAN_IMAGERY_TRIGGER_M = 200000;
 function syncUrbanImagery() {
   if (!viewer || !state.urbanAoi || !state.urbanAoi.length) return;
   const height = viewer.camera.positionCartographic.height;
-  const want = height <= URBAN_IMAGERY_TRIGGER_M;
+  const want = state.urbanEnabled && height <= URBAN_IMAGERY_TRIGGER_M;
 
   if (want && !state.urbanLayers) {
     state.urbanLayers = OfflineAssets.attachUrbanImagery(viewer, state.urbanAoi);
@@ -1433,6 +1691,35 @@ const COMPONENT_NODES = {
   scalebar: 'mapScalebar',
   viewpoint: 'mapViewpoint',
 };
+
+// --------------------------------------------------------------------------
+// 鸟瞰图（第二个 Cesium 2D 视图，实现见 src/overview.js）
+// --------------------------------------------------------------------------
+
+/**
+ * 显示/隐藏鸟瞰图。
+ *
+ * 首次显示时才创建 Viewer（惰性），避免启动期与主视图抢那 6 条/域的连接。
+ * 隐藏只加 class 不销毁：瓦片已缓存，再次显示无需重载。
+ */
+function setOverview(on) {
+  state.layers.overview = !!on;
+  const box = document.getElementById('layerOverview');
+  if (box) box.checked = !!on;
+  const btn = dom.btnOverview;
+  if (btn) btn.classList.toggle('primary', !!on);
+
+  if (!on) { Overview.hide(); return; }
+  if (!window.Overview) return;
+  try {
+    Overview.show();
+    setSwitchNote('鸟瞰图已显示：真实地球缩略图，黄框为主相机当前视野。点击鸟瞰图可跳转主视角。');
+  } catch (e) {
+    state.layers.overview = false;
+    if (box) box.checked = false;
+    setSwitchNote('鸟瞰图不可用：' + e.message);
+  }
+}
 
 function setComponent(name, on) {
   state.components[name] = !!on;
@@ -1604,6 +1891,13 @@ window.Follow = {
 };
 
 function renderTransport() {
+  if (!state.data || !state.data.frames) {
+    dom.timeline.max = '0';
+    dom.timeline.value = '0';
+    dom.tickLabel.textContent = '— / —';
+    dom.clockLabel.textContent = '—';
+    return;
+  }
   const frames = state.data.frames;
   const frame = frames[Math.min(state.tick, frames.length - 1)];
   dom.timeline.max = String(frames.length - 1);
@@ -1616,6 +1910,7 @@ function renderTransport() {
 }
 
 function setTick(tick) {
+  if (!state.data || !state.data.frames) { state.tick = 0; state.tickFloat = 0; return; }
   const max = state.data.frames.length - 1;
   state.tick = Math.max(0, Math.min(max, Math.round(tick)));
   state.tickFloat = state.tick;
@@ -1630,6 +1925,8 @@ function setPlaying(on) {
 function loop(nowMs) {
   const dt = lastFrameMs ? (nowMs - lastFrameMs) / 1000 : 0;
   lastFrameMs = nowMs;
+
+  if (!viewer) { requestAnimationFrame(loop); return; }
 
   if (state.playing && state.data) {
     state.tickFloat += dt * state.ticksPerSecond;
@@ -1664,6 +1961,10 @@ function loop(nowMs) {
 // --------------------------------------------------------------------------
 
 function exportData() {
+  if (!state.data || !state.data.frames) {
+    setStatus('未加载态势，无可导出数据', 'err');
+    return;
+  }
   const frames = state.data.frames;
   const inf = inferenceAt(state.tick);
   const payload = {
@@ -1734,6 +2035,30 @@ function bindUI() {
   bindCheck('filterLand', function (v) { state.filters.land = v; refilter(); });
   bindCheck('filterAir', function (v) { state.filters.air = v; refilter(); });
 
+  bindCheck('layerOverview', setOverview);
+
+  if (dom.btnOverview) {
+    dom.btnOverview.disabled = false;
+    dom.btnOverview.addEventListener('click', function () { setOverview(!state.layers.overview); });
+  }
+  const ovHide = document.getElementById('ovHide');
+  if (ovHide) ovHide.addEventListener('click', function () { setOverview(false); });
+
+  bindCheck('layerLevelBanner', function (v) {
+    state.layers.levelBanner = v;
+    if (dom.levelBanner) dom.levelBanner.classList.toggle('hidden', !v);
+  });
+  bindCheck('layerTargetPanel', function (v) {
+    state.layers.targetPanel = v;
+    if (!v) closeTargetPanel();
+  });
+  bindCheck('modelUrbanImagery', function (v) {
+    state.urbanEnabled = v;
+    syncUrbanImagery();
+    setSwitchNote(v ? '城区高清影像已启用（相机低于 200 km 时挂载 z12–z14）。'
+                    : '城区高清影像已关闭。');
+  });
+
   bindCheck('compCompass', function (v) { setComponent('compass', v); });
   bindCheck('compScalebar', function (v) { setComponent('scalebar', v); });
   bindCheck('compViewpoint', function (v) { setComponent('viewpoint', v); });
@@ -1775,14 +2100,21 @@ function bindUI() {
   bindCheck('modelSensor', setSensors);
   bindCheck('modelImagery', setImagery);
 
-  dom.menuCase.addEventListener('click', function (e) {
-    e.stopPropagation();
-    if (dom.menuCaseList.classList.contains('open')) closeCaseMenu();
-    else openCaseMenu();
-  });
-  document.addEventListener('click', function (e) {
-    if (!dom.menuCaseList.contains(e.target) && e.target !== dom.menuCase) closeCaseMenu();
-  });
+  // 三个顶栏下拉菜单统一开合，互斥，点空白处收起。
+  bindMenu('menuCase', 'menuCaseList');
+  bindMenu('menuLayers', 'menuLayerList');
+  bindMenu('menuView', 'menuViewList');
+  if (dom.menuCase) dom.menuCase.addEventListener('click', function () { openCaseMenu(); });
+  document.addEventListener('click', function () { closeAllMenus(); });
+
+  // 图层管理批量操作
+  Array.prototype.forEach.call(
+    document.querySelectorAll('[data-layer-cmd]'), function (btn) {
+      btn.addEventListener('click', function () {
+        closeAllMenus();
+        applyLayerCommand(btn.dataset.layerCmd);
+      });
+    });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { closeCaseMenu(); closeTargetPanel(); }
   });
@@ -1824,29 +2156,14 @@ function bindUI() {
 
   document.getElementById('btnExport').addEventListener('click', exportData);
 
-  document.getElementById('btnClearCache').addEventListener('click', function () {
-    if (!window.TileCache) return;
-    TileCache.clear().then(function () {
-      setSwitchNote('瓦片缓存已清空，下次浏览会重新从服务器取。');
-      refreshCacheStats();
-    });
-  });
-
   // "位置信息"：回到光标跟随模式，同时把视角拉回案例默认机位。
   document.getElementById('btnLocate').addEventListener('click', function () {
     clearHotspotSelection();
-    if (state.data && state.data.camera) applyCamera(state.data.camera);
+    const cam = (state.data && state.data.camera) || state.baseCamera;
+    if (cam) applyCamera(cam);
   });
 
-  document.getElementById('btnSituation').addEventListener('click', function () {
-    dom.targetList.scrollTop = 0;
-  });
-
-  document.getElementById('btnWeather').addEventListener('click', function () {
-    const node = document.getElementById('modelWeather');
-    node.checked = !node.checked;
-    setWeather(node.checked);
-  });
+  captureLayerDefaults();
 
   bindPicking();
   bindFollowInput();
@@ -1854,6 +2171,14 @@ function bindUI() {
   // 跟随相机挂在 preRender：Scene.render 的顺序是 preUpdate → update →
   // preRender → draw，在这里改相机本帧生效。
   viewer.scene.preRender.addEventListener(function () { applyFollowFrame(false); });
+
+  // 兜底：底图瓦片队列可能长时间不归零（视野大、瓦片多），给鸟瞰图一个延时创建。
+  // 4 s 足以让主底图完成第一轮细化，不至于和它抢连接。
+  setTimeout(function () {
+    if (state.layers.overview && window.Overview && !Overview.isVisible()) {
+      try { Overview.show(); } catch (e) { console.warn('[overview]', e.message); }
+    }
+  }, 4000);
 
   // 地图组件统一刷新（10 Hz；比例尺内部压到约 3 Hz）
   setInterval(updateMapComponents, 100);
@@ -1872,6 +2197,7 @@ function bindUI() {
     updateGeoReadout();
     syncUrbanImagery();
     guardFollow();
+    if (window.Overview) Overview.onMainCameraChanged();
     // 相机高度跨过 LOD 阈值时才重建，且加一段防抖，避免飞行过程中反复触发。
     // 跟随期间相机每帧都在动，防抖会被反复重置而**永不执行**，所以直接跳过；
     // detachFollow() 收尾时会补一次 refreshBuildings()。
@@ -1909,8 +2235,15 @@ function bindPicking() {
 // --------------------------------------------------------------------------
 // URL 钩子（截图取证与深链）
 // --------------------------------------------------------------------------
+//
+// 拆成两半：与案例无关的（底图/组件/机位）在 clearSituation 之前就要生效，
+// 依赖案例数据的（跟随/热点/帧号）必须等数据加载完。顺序上无关钩子先跑，
+// 所以 ?cam= 与 ?follow= 同时出现时 follow 胜出。
 
-function applyUrlHooks() {
+function applyCaseIndependentHooks() {
+  // 鸟瞰图：?overview=0|1
+  if (params.has('overview')) setOverview(params.get('overview') !== '0');
+
   // 地图组件：?components=0|1 全关/全开；?components=a,b 白名单；?components=-a 排除
   if (params.has('components')) {
     const raw = params.get('components');
@@ -1940,20 +2273,6 @@ function applyUrlHooks() {
     if (box) box.checked = on;
   });
 
-  // 目标跟随：?follow=<目标ID>（需要案例数据，放在 applyUrlHooks 末尾即可——
-  // 此时 state.data 已就绪，而它内部会调 startFollow 立即生效）
-  if (params.has('follow')) {
-    const fid = params.get('follow');
-    if (state.targets[fid]) {
-      if (dom.followTarget) dom.followTarget.checked = true;
-      state.follow.enabled = true;
-      startFollow(fid);
-      // ?unfollow=1 立刻解除一次，用于验证 detachFollow 里的参考系解锁
-      // （camera.lookAt 会把 transform 锁在目标 ENU 上，必须显式还原成单位阵）。
-      if (params.get('unfollow') === '1') detachFollow('验证解除');
-    }
-  }
-
   if (params.get('imagery') === '0') {
     document.getElementById('modelImagery').checked = false;
     setImagery(false);
@@ -1978,10 +2297,6 @@ function applyUrlHooks() {
     document.getElementById('modelWeather').checked = true;
     setWeather(true);
   }
-  if (params.has('hotspot')) {
-    const i = Number(params.get('hotspot'));
-    if (Number.isFinite(i) && state.data.hotspots[i]) selectHotspot(i, true);
-  }
   if (params.get('buildings') === '1') {
     document.getElementById('modelBuildings').checked = true;
     // 建筑体块依赖色带标定，异步完成后才会出现。
@@ -1991,14 +2306,6 @@ function applyUrlHooks() {
     }).catch(function (e) {
       setSwitchNote('建筑体块不可用：' + e.message);
     });
-  }
-  if (params.has('panel')) {
-    const id = params.get('panel');
-    if (state.targets[id]) {
-      selectTarget(id, false);
-      const s = positionFor(id, state.tick);
-      if (s) flyTo(s.lon, s.lat, 120000);
-    }
   }
   // 诊断/取证用的机位钩子：?cam=lon,lat,height[,pitch]
   if (params.has('cam')) {
@@ -2013,6 +2320,34 @@ function applyUrlHooks() {
           roll: 0,
         },
       });
+    }
+  }
+}
+
+/** 依赖案例数据的钩子。必须在 loadCase 之后调用。 */
+function applyCaseHooks() {
+  // 目标跟随：?follow=<目标ID>。放在这里是因为它需要 state.targets 已建好。
+  if (params.has('follow')) {
+    const fid = params.get('follow');
+    if (state.targets[fid]) {
+      if (dom.followTarget) dom.followTarget.checked = true;
+      state.follow.enabled = true;
+      startFollow(fid);
+      // ?unfollow=1 立刻解除一次，用于验证 detachFollow 里的参考系解锁
+      // （camera.lookAt 会把 transform 锁在目标 ENU 上，必须显式还原成单位阵）。
+      if (params.get('unfollow') === '1') detachFollow('验证解除');
+    }
+  }
+  if (params.has('hotspot')) {
+    const i = Number(params.get('hotspot'));
+    if (state.data && Number.isFinite(i) && state.data.hotspots[i]) selectHotspot(i, true);
+  }
+  if (params.has('panel')) {
+    const id = params.get('panel');
+    if (state.targets[id]) {
+      selectTarget(id, false);
+      const s = positionFor(id, state.tick);
+      if (s) flyTo(s.lon, s.lat, 120000);
     }
   }
   if (params.has('tick')) {
@@ -2041,44 +2376,43 @@ function main() {
   OfflineAssets.loadManifest().then(function (m) {
     setStatus('初始化三维地球…（离线瓦片 ' + m.bbox.join('/') + '）');
     initViewer();
-    return continueStartup();
+    // bindUI 提前到这里：它注册的 tileLoadProgressEvent / camera.changed /
+    // preRender / ScreenSpaceEventHandler 都不依赖案例数据。放在 loadCase 之后
+    // 会让磁盘预热、城区影像挂载、地图组件与跟随驱动全部被推迟到案例加载完。
+    bindUI();
+
+    // 色带标定按需加载，缺失不影响其它功能。
+    OfflineAssets.loadHeightRamp().then(function (ramp) {
+      state.ramp = ramp;
+    }).catch(function () {
+      state.ramp = null;
+    });
+
+    return Promise.all([loadBase(), loadCaseIndex()]);
+  }).then(function (res) {
+    applyBase(res[0]);
+    applyCaseIndependentHooks();
+
+    const wanted = params.get('case');
+    if (!wanted) {
+      // 默认不加载任何态势：只保留底图 / 地形 / WSF3D / 地图组件。
+      clearSituation();
+      return null;
+    }
+    const id = state.caseIndex.cases.some(function (c) { return c.id === wanted; })
+      ? wanted : state.caseIndex.default;
+    return loadCase(id);
+  }).then(function () {
+    applyCaseHooks();
+    syncSelection();
+    updateGeoReadout();
   }).catch(function (err) {
     console.error(err);
-    setStatus('初始化失败: ' + err.message, 'err');
+    setStatus('启动失败: ' + err.message, 'err');
   });
 
   setInterval(renderDiagnostics, 500);
-  setInterval(refreshCacheStats, 1500);
-  setTimeout(refreshCacheStats, 300);
   requestAnimationFrame(loop);
-}
-
-function continueStartup() {
-
-  // 色带标定按需加载，缺失不影响其它功能。
-  OfflineAssets.loadHeightRamp().then(function (ramp) {
-    state.ramp = ramp;
-  }).catch(function () {
-    state.ramp = null;
-  });
-
-  loadCaseIndex()
-    .then(function (index) {
-      const wanted = params.get('case') || index.default;
-      return loadCase(index.cases.some(function (c) { return c.id === wanted; })
-        ? wanted : index.default);
-    })
-    .then(function () {
-      bindUI();
-      applyUrlHooks();
-      syncSelection();
-      updateGeoReadout();
-    })
-    .catch(function (err) {
-      console.error(err);
-      setStatus('启动失败: ' + err.message, 'err');
-    });
-
 }
 
 main();

@@ -26,6 +26,9 @@
 
   let AFFILIATIONS = Object.assign({}, FALLBACK_AFFILIATIONS);
   let ICONS = {};
+  // 域的中文名。放在这里而不是从 state.data.symbology 读，是为了让信息面板
+  // 不再依赖案例数据集——空态下同样要能渲染符号说明。
+  let DOMAINS = { sea: '水面', land: '陆上', air: '空中' };
 
   // 框体几何：矩形 36x24，居中略偏下，为域修饰符留出空间。
   const FRAME = { x: 14, y: 20, w: 36, h: 24 };
@@ -189,7 +192,12 @@
     if (!catalog) return;
     if (catalog.affiliations) AFFILIATIONS = catalog.affiliations;
     if (catalog.icons) ICONS = catalog.icons;
+    if (catalog.domains) DOMAINS = catalog.domains;
     cache.clear();
+  }
+
+  function domainLabel(domain) {
+    return DOMAINS[domain] || domain || '未知';
   }
 
   function iconLabel(icon) {
@@ -208,6 +216,7 @@
     setCatalog: setCatalog,
     iconLabel: iconLabel,
     iconAbbrev: iconAbbrev,
+    domainLabel: domainLabel,
     domainOf: domainOf,
     affiliationOf: affiliationOf,
   };

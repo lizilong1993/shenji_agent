@@ -192,6 +192,26 @@
     return layers;
   }
 
+  /**
+   * 鸟瞰图专用影像 provider。
+   *
+   * **不与主视图共用实例**：主视图的 provider 被 TileCache.attach 与 instrument
+   * 各包了一层，共用会让 2D 的请求与 404 计入主视图的 imageryStats，?diag=1 全部
+   * 失真；errorEvent 也是共享 Event，无法按 viewer 区分。这里只要 z0–z6，靠 HTTP
+   * 缓存（/tiles/ 已是 immutable）即可，不挂 TileCache。
+   */
+  function createOverviewImageryProvider() {
+    const m = manifest();
+    return new Cesium.UrlTemplateImageryProvider({
+      url: IMAGERY_URL,
+      tilingScheme: new Cesium.WebMercatorTilingScheme(),
+      minimumLevel: 0,
+      maximumLevel: 6,
+      rectangle: aoiRectangle(m.bbox),
+      credit: 'Esri World Imagery (overview)',
+    });
+  }
+
   // ------------------------------------------------------------------------
   // 地形高程
   // ------------------------------------------------------------------------
@@ -582,6 +602,7 @@
     instrument: instrument,
     newStats: newStats,
     createImageryProvider: createImageryProvider,
+    createOverviewImageryProvider: createOverviewImageryProvider,
     attachUrbanImagery: attachUrbanImagery,
     createTerrainProvider: createTerrainProvider,
     createWsf3dOverlayProvider: createWsf3dOverlayProvider,
