@@ -23,6 +23,26 @@
       </div>
 
       <div class="menu">
+        <button id="menuSituation" type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false">
+          态势 <span class="caret">▾</span>
+        </button>
+        <div id="menuSituationList" class="menu-list menu-list-narrow" role="menu">
+          <button type="button" class="menu-item" data-situation-cmd="input">
+            <span class="mi-head">态势输入</span>
+            <span class="mi-sub">框选或输入经纬度确定战场范围，添加目标与图层后生成双方态势</span>
+          </button>
+          <button type="button" class="menu-item" data-situation-cmd="manage">
+            <span class="mi-head">态势管理</span>
+            <span class="mi-sub">查看与编辑当前态势：战场范围、目标编成、图层</span>
+          </button>
+          <button type="button" class="menu-item" data-situation-cmd="download">
+            <span class="mi-head">态势数据下载</span>
+            <span class="mi-sub">导出当前帧 / 全帧 CSV / 态势定义</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="menu">
         <button id="menuLayers" type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false">
           图层管理 <span class="caret">▾</span>
         </button>
@@ -57,7 +77,6 @@
 
       <button id="btnOverview" type="button" disabled title="鸟瞰图">鸟瞰图</button>
       <button id="btnRun" type="button" class="primary">态势自动推演</button>
-      <button id="btnExport" type="button">导出数据</button>
     </nav>
 
     <div class="status">
@@ -151,7 +170,7 @@
       <!-- 鸟瞰图：第二个 Cesium 2D 视图，显示真实地球缩略图并与主相机联动 -->
       <div id="overviewWrap" class="overview-wrap hidden">
         <div class="ov-head">
-          <span class="ov-title">鸟瞰图 · 台海</span>
+          <span class="ov-title">鸟瞰图 · 与主图同视点</span>
           <button id="ovHide" type="button" class="ov-btn" aria-label="隐藏">×</button>
         </div>
         <div id="overviewContainer" class="ov-canvas"></div>
@@ -241,11 +260,28 @@
     </div>
   </footer>
 
+  <!-- 态势输入 / 管理 / 数据下载：三标签页模态框 -->
+  <div id="situationModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="态势">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <div class="modal-tabs" id="sitTabs">
+          <button type="button" class="modal-tab" data-sit-tab="input">态势输入</button>
+          <button type="button" class="modal-tab" data-sit-tab="manage">态势管理</button>
+          <button type="button" class="modal-tab" data-sit-tab="download">态势数据下载</button>
+        </div>
+        <button id="sitClose" type="button" class="modal-close" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body" id="sitBody"></div>
+    </div>
+  </div>
+
   <script src="./vendor/cesium/Cesium.js"></script>
   <script src="./src/tilecache.js"></script>
   <script src="./src/symbology.js"></script>
   <script src="./src/assets.js"></script>
   <script src="./src/overview.js"></script>
+  <script src="./src/situation.js"></script>
+  <script src="./src/situation.js"></script>
   <script src="./src/app.js"></script>
 </body>
 </html>

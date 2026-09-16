@@ -406,13 +406,24 @@ function loadCase(caseId) {
       if (!r.ok) throw new Error('态势数据加载失败: HTTP ' + r.status);
       return r.json();
     })
-    .then(function (data) {
+    .then(function (data) { return applySituationData(data, caseId); });
+}
+
+/**
+ * 把一份态势数据装载进场景。
+ *
+ * 从 loadCase 里拆出来，是为了让**前端生成的态势**（态势输入）走完全同一条管线：
+ * 取数据与装载数据分开，两条来源共用装载逻辑，就不会出现"案例能跑、自建态势
+ * 少初始化了某样东西"的偏差。
+ */
+function applySituationData(data, caseId) {
+  {
       if (!data.frames || !data.frames.length) throw new Error('态势数据为空');
 
       teardownScene();
 
       state.data = data;
-      state.caseId = caseId;
+      state.caseId = caseId || data.case_id || null;
       state.inference = data.inference_frames || null;
       state.tick = 0;
       state.tickFloat = 0;
@@ -452,9 +463,13 @@ function loadCase(caseId) {
       setFollowNote('开启后点击任一目标，相机以随航向旋转的追踪视角持续跟随；拖动地图即自动解除。');
       setStatus('就绪 · ' + data.targets.length + ' 个目标 · ' +
                 (data.frames.length - 1) + ' 帧 · ' + data.hotspots.length + ' 个热点区域', 'ok');
-      setSwitchNote('已加载案例「' + data.case_name + '」。各开关的生效状态会在此说明。');
+      setSwitchNote('已加载「' + data.case_name + '」。各开关的生效状态会在此说明。');
+      if (window.Overview && window.Overview.setCenter) {
+        const cam = data.camera || {};
+        if (isFinite(cam.lon) && isFinite(cam.lat)) Overview.setCenter(cam.lon, cam.lat);
+      }
       return data;
-    });
+  }
 }
 
 function teardownScene() {
@@ -1983,6 +1998,81 @@ function loop(nowMs) {
 // 导出
 // --------------------------------------------------------------------------
 
+/**
+ * 用当前的 state.data 重建实体与面板。
+ *
+ * 态势管理里增删目标后要调它：目标实体是按 data.targets 建的，改了数据必须重建，
+ * 但不需要重新取数据，也不该走 applySituationData（那会重置帧号与机位）。
+ */
+function reloadSituation() {
+  if (!state.data || !viewer) return;
+  detachFollow('态势已更新');
+  closeTargetPanel();
+  viewer.entities.removeAll();
+  state.targets = {};
+  state.hotspotEntities = [];
+  state.hotspotRows = [];
+  state.routeEntities = [];
+  state.selected = null;
+
+  createHotspots();
+  createRouteEntities();
+  createTargetEntities();
+  renderHotspotTable();
+  renderTargetList();
+  renderTransport();
+  updateInferenceUi();
+  setStatus('态势已更新 · ' + state.data.targets.length + ' 个目标', 'ok');
+}
+
+/** 全帧 CSV：逐帧逐目标展开，便于在表格软件里做轨迹分析。 */
+function exportCsv() {
+  if (!state.data || !state.data.frames) {
+    setStatus('未加载态势，无可导出数据', 'err');
+    return;
+  }
+  const d = state.data;
+  const ids = d.targets.map(function (t) { return t.id; });
+  const head = ['tick', 't_seconds'];
+  ids.forEach(function (id) {
+    head.push(id + '_lon', id + '_lat', id + '_alt', id + '_heading', id + '_speed_kn');
+  });
+  const rows = [head.join(',')];
+  d.frames.forEach(function (f) {
+    const byId = {};
+    f.targets.forEach(function (t) { byId[t.id] = t; });
+    const row = [f.tick, f.t_seconds];
+    ids.forEach(function (id) {
+      const t = byId[id];
+      row.push(t ? t.lon : '', t ? t.lat : '', t ? t.alt : '',
+               t ? t.heading : '', t ? t.speed_kn : '');
+    });
+    rows.push(row.join(','));
+  });
+  const blob = new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (d.case_id || 'situation') + '-frames.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+  setStatus('已导出全帧 CSV（' + (d.frames.length - 1) + ' 帧 × ' + ids.length + ' 目标）', 'ok');
+}
+
+// 态势模块（src/situation.js）拿不到本文件的闭包，用这个接口回调。
+window.SituationHost = {
+  state: state,
+  viewer: function () { return viewer; },
+  setStatus: setStatus,
+  applySituationData: applySituationData,
+  reload: reloadSituation,
+  clearSituation: clearSituation,
+  exportFrame: exportData,
+  exportCsv: exportCsv,
+};
+
 function exportData() {
   if (!state.data || !state.data.frames) {
     setStatus('未加载态势，无可导出数据', 'err');
@@ -2127,10 +2217,21 @@ function bindUI() {
 
   // 三个顶栏下拉菜单统一开合，互斥，点空白处收起。
   bindMenu('menuCase', 'menuCaseList');
+  bindMenu('menuSituation', 'menuSituationList');
   bindMenu('menuLayers', 'menuLayerList');
   bindMenu('menuView', 'menuViewList');
   if (dom.menuCase) dom.menuCase.addEventListener('click', function () { openCaseMenu(); });
   document.addEventListener('click', function () { closeAllMenus(); });
+
+  // 态势菜单：输入 / 管理 / 数据下载，三标签页共用一个模态框
+  Array.prototype.forEach.call(
+    document.querySelectorAll('[data-situation-cmd]'), function (btn) {
+      btn.addEventListener('click', function () {
+        closeAllMenus();
+        if (window.SituationPanel) SituationPanel.open(btn.dataset.situationCmd);
+      });
+    });
+  if (window.SituationPanel) SituationPanel.bind();
 
   // 图层管理批量操作
   Array.prototype.forEach.call(
@@ -2179,7 +2280,6 @@ function bindUI() {
     setPlaying(false); setTick(state.tick + 1); renderTargetList(); renderTransport(); updateInferenceUi();
   });
 
-  document.getElementById('btnExport').addEventListener('click', exportData);
 
   // "位置信息"：回到光标跟随模式，同时把视角拉回案例默认机位。
   document.getElementById('btnLocate').addEventListener('click', function () {
@@ -2266,6 +2366,16 @@ function bindPicking() {
 // 所以 ?cam= 与 ?follow= 同时出现时 follow 胜出。
 
 function applyCaseIndependentHooks() {
+  // 态势面板：?situation=input|manage|download（取证与深链用）
+  if (params.has('situation') && window.SituationPanel) {
+    SituationPanel.open(params.get('situation') || 'input');
+  }
+
+  // 态势面板：?situation=input|manage|download（取证与深链用）
+  if (params.has('situation') && window.SituationPanel) {
+    SituationPanel.open(params.get('situation') || 'input');
+  }
+
   // 鸟瞰图：?overview=0|1
   if (params.has('overview')) setOverview(params.get('overview') !== '0');
 

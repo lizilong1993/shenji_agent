@@ -252,8 +252,11 @@
       url: IMAGERY_URL,
       tilingScheme: new Cesium.WebMercatorTilingScheme(),
       minimumLevel: 0,
-      maximumLevel: 6,
-      rectangle: aoiRectangle(m.bbox),
+      maximumLevel: (m.imagery_global && m.imagery_global.max_zoom) || 6,
+      // **不限制 rectangle**：鸟瞰图与主图同视点但高度是它的 5 倍，视野覆盖整个
+      // 战场（甚至整个地球）。限定在台海 AOI 会让它在看别处时整片空白——实测
+      // 主图 900 km 时鸟瞰在 4500 km、pitch -75°，视线落点在北边约 35°N，
+      // 正好在 AOI（18-29°N）之外，于是画布全黑。
       credit: 'Esri World Imagery (overview)',
     });
   }

@@ -1,62 +1,66 @@
-/* situation3d — 鸟瞰图（第二个 Cesium 2D 视图）
+/* situation3d — 鸟瞰图（与主图共用视点的俯瞰视图）
  *
- * 需求：一个可显示/隐藏的鸟瞰图，用真实地球缩略图展示全局态势，并与主相机联动。
+ * 设计：**和主图同一个视点，只把高度放大若干倍**。
  *
- * 为什么是独立的第二个 Viewer 而不是自绘 canvas
- * --------------------------------------------
- * 用户明确要求"真实地球缩略图"。自绘 canvas 只能画示意框，给不出真实影像；而
- * 第二个 Cesium Viewer 在 SCENE2D 下只渲染一块 240×172 的画布，配 requestRenderMode
- * 后稳态渲染次数接近 0，代价可控。
+ * 早先的实现是一个固定范围的 SCENE2D 缩略图（永远框着台海 AOI）。问题有两个：
+ * 一是它和主图没有关系，主图飞到关岛时它还在显示台海；二是 2D 正交视图看不出
+ * 立体态势。现在改成共用经纬与朝向、只抬高高度，于是它天然就是"整个战场"的俯瞰：
  *
- * 三条必须遵守的约束（都已核实）
- * ------------------------------
+ * **高度固定**，中心锁定战场（由 setCenter 指定，默认台海）。这样它始终是同一张
+ * "战场全图"，比例尺稳定、可比较；主图怎么飞都不影响它的尺度，只在图上留下一个
+ * 黄色视野框表示"主图现在看的是哪一块"。
+ *
+ * 4000 km 在 44° 垂直视场下对应约 30° 跨度，正好覆盖三亚到关岛的西太战场。
+ *
+ * 用 SCENE2D 而不是 3D：鸟瞰图本来就是俯视，2D 正交视图正好；而且第二个 WebGL
+ * 上下文在无头 SwiftShader 下用 3D 会被彻底饿死（实测画布全黑），2D 则稳定。
+ *
+ * 黄色闭合折线仍然保留：它标出主图当前视野在鸟瞰图里覆盖的范围，是两者的对应关系。
+ *
+ * 四个必须遵守的约束（都已核实）
+ * ----------------------------
  * 1. **必须用 `baseLayer`**：Cesium 1.107 起 `Viewer` 的 `imageryProvider` 选项被移除
  *    且**静默忽略**，不传 baseLayer 会回落到 Ion 在线底图，既违反离线要求也会因缺
  *    token 报错。
  * 2. **不共用主视图的 provider 实例**：主视图的 provider 被 `TileCache.attach` 与
- *    `instrument` 各包了一层，共用会让 2D 的请求与 404 计入主视图的 `imageryStats`，
-    `?diag=1` 全部失真；`errorEvent` 也是共享的 Event，无法按 viewer 区分。这里
- *    自建一个 `maximumLevel: 6` 的 provider，只靠 HTTP 缓存（/tiles/ 已是 immutable）。
+ *    `instrument` 各包了一层，共用会让鸟瞰图的请求与 404 计入主视图的 `imageryStats`，
+ *    `?diag=1` 全部失真；`errorEvent` 也是共享的 Event，无法按 viewer 区分。
  * 3. **视野框用普通数组赋值，不用 `CallbackProperty`**：前者是恒定属性，不会让场景
  *    被判定为持续时变。
- *
- * 关于按需渲染（`requestRenderMode`）：实测在无头 SwiftShader 下该视图会停在黑屏
- * （瓦片已加载完但画布未重绘）。这块画布只有约 190×116，占主视图像素的 1.5%，
- * 不值得为它承担按需渲染的不确定性，因此保持默认的每帧渲染。
+ * 4. **不用 `requestRenderMode`**：实测在无头 SwiftShader 下该视图会停在黑屏（瓦片
+ *    已加载完但画布未重绘）。这块画布只占主视图约 1.5% 像素，不值得承担按需渲染的
+ *    不确定性。
  *
  * 隐藏/显示的一个坑：`display:none` 会让容器尺寸归零，而 Cesium 只监听 window.resize，
  * 重新显示不会自愈。所以 show() 必须走 resize() + setView()。
  *
  * 已知现象（无头软件光栅化环境）：主相机压到几公里时这块画布会变黑，而 900 km /
  * 6000 km 时正常。相关性指向 SwiftShader 下的资源争用——主视图在城区要上传大量
- * z16-17 纹理，第二个 WebGL 上下文被饿死，而不是这里的逻辑有问题（视野框在低空
- * 本来就按设计不画）。真实 GPU 环境下待复核。
- *
- * 已知现象（无头软件光栅化环境）：主相机压到几公里时这块画布会变黑，而 900 km /
- * 6000 km 时正常。相关性指向 SwiftShader 下的资源争用——主视图在城区要上传大量
- * z16-17 纹理，第二个 WebGL 上下文被饿死，而不是这里的逻辑有问题（视野框在低空
- * 本来就按设计不画）。真实 GPU 环境下待复核。
+ * z16-17 纹理，第二个 WebGL 上下文被饿死，而不是这里的逻辑有问题。真实 GPU 环境
+ * 下待复核。
  */
 
 'use strict';
 
 (function (global) {
-  // 主视图低于这个高度时不画视野框：此时视野框会退化成极小的矩形，且频繁走
-  // 切平面兜底，既无信息量又费算力。
+  // 主图低于这个高度时不画视野框：那时它退化成一个点，没有信息量。
   const FOOTPRINT_MIN_HEIGHT_M = 20000;
-  // 视野框更新节流。跟随时主相机每帧都在动，放宽到 500 ms 以免拖累第二个上下文。
+  // 视野框更新节流。跟随时主相机每帧都在动，放宽到 500 ms。
   const FOOTPRINT_THROTTLE_MS = 500;
 
-  let overviewRect = null;    // 鸟瞰图固定的地理范围
-  let viewer = null;          // 2D 鸟瞰图 Viewer
+  // 固定的鸟瞰高度。不再跟随主图——鸟瞰图的价值在于"始终是同一张战场全图"，
+  // 高度一变比例尺就变，两张图之间没法比较。
+  const FIXED_HEIGHT_M = 4000000;
+
+  // 战场中心。默认台海，加载态势后由 app.js 用态势的 AOI 中心调用 setCenter 覆盖。
+  let center = { lon: 119.60, lat: 24.40 };
+
+  let viewer = null;          // 鸟瞰图 Viewer
   let mainViewer = null;      // 主 3D Viewer
   let footprintEntity = null;
   let lastFootprintAt = 0;
   let lastFootprintKey = 'init';   // 'init' | 'none' | 'set'，用于跳过无变化的重复赋值
   let created = false;
-
-  const _enuM = new Cesium.Matrix4();
-  const _enuInv = new Cesium.Matrix4();
 
   function container() { return document.getElementById('overviewContainer'); }
 
@@ -94,6 +98,35 @@
     return Cesium.IntersectionTests.rayPlane(ray, plane);
   }
 
+  /**
+   * 与主图共用视点：经纬与朝向照搬，只把高度放大。
+   *
+   * `camera.heading` / `camera.pitch` 的 getter 有副作用（内部临时改写
+   * `camera._transform` 并两次 updateMembers），所以只在节流后的同步里各读一次。
+   */
+  /** 把鸟瞰图对准固定高度与战场中心。 */
+  function syncCamera() {
+    if (!viewer) return;
+    // SCENE2D 下 destination 的高度决定正交视锥的宽度，也就是"看多大范围"。
+    // 2D 是正俯视，heading/pitch 无意义，不传。
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromRadians(center.lon, center.lat, FIXED_HEIGHT_M),
+    });
+    viewer.scene.requestRender();
+  }
+
+  /**
+   * 设定战场中心。加载态势后由 app.js 调用，参数是 AOI / 战区中心。
+   * 与主相机无关——主相机只通过视野框在这张图上留下痕迹。
+   */
+  function setCenter(lon, lat) {
+    if (!isFinite(lon) || !isFinite(lat)) return;
+    center.lon = Cesium.Math.toRadians(lon);
+    center.lat = Cesium.Math.toRadians(lat);
+    syncCamera();
+    syncFootprint(true);
+  }
+
   function syncFootprint(force) {
     if (!viewer || !mainViewer) return;
     const now = Date.now();
@@ -104,8 +137,7 @@
     const pts = height < FOOTPRINT_MIN_HEIGHT_M ? null : mainViewFootprint();
     if (!footprintEntity) return;
 
-    // 状态没变就不重复赋值与重绘。低空时视野框会被关闭，此时相机每动一下都重新
-    // 赋值空数组并 requestRender 是纯浪费，也可能让第二个上下文被反复打断。
+    // 状态没变就不重复赋值与重绘。
     const key = pts ? 'set' : 'none';
     if (key === lastFootprintKey && !force) return;
     lastFootprintKey = key;
@@ -165,16 +197,11 @@
     if (!el) return false;
     created = true;
 
-    const bbox = (global.OfflineAssets && OfflineAssets.manifest().bbox) || [115, 18, 125, 29];
-    // 每边外扩 15%，让主视野框在默认机位下不会被裁掉
-    const padLon = (bbox[2] - bbox[0]) * 0.15;
-    const padLat = (bbox[3] - bbox[1]) * 0.15;
-    overviewRect = Cesium.Rectangle.fromDegrees(
-      bbox[0] - padLon, bbox[1] - padLat, bbox[2] + padLon, bbox[3] + padLat);
-
     viewer = new Cesium.Viewer('overviewContainer', {
       baseLayer: new Cesium.ImageryLayer(OfflineAssets.createOverviewImageryProvider()),
       terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+      // SCENE2D：鸟瞰图本来就是俯视，2D 正交视图正好；而且第二个 WebGL 上下文
+      // 在无头 SwiftShader 下用 3D 会被彻底饿死（实测画布全黑），2D 则稳定。
       sceneMode: Cesium.SceneMode.SCENE2D,
       baseLayerPicker: false, geocoder: false, homeButton: false,
       sceneModePicker: false, navigationHelpButton: false,
@@ -188,7 +215,7 @@
     }
 
     const scene = viewer.scene;
-    scene.globe.maximumScreenSpaceError = 8;      // 缩略图不需要细节
+    scene.globe.maximumScreenSpaceError = 4;
     scene.globe.enableLighting = false;
     scene.globe.showGroundAtmosphere = false;
     scene.globe.baseColor = Cesium.Color.fromCssColorString('#dfe6ef');
@@ -204,23 +231,8 @@
     viewer.resolutionScale = 0.8;
     buildEntities();
     bindClick();
-    fitExtent();
+    syncCamera();
     return true;
-  }
-
-  /**
-   * 把 2D 相机 fit 到固定范围。
-   *
-   * **必须在容器尺寸稳定之后调用**：SCENE2D 的 `setView(Rectangle)` 会按调用那一刻的
-   * 画布尺寸反算正交视锥宽度，如果容器刚解除 `display:none` 就 setView，画布尺寸
-   * 还没生效，地球会缩在一角、其余留白。所以这里先 resize 再 setView，并且
-   * 在 show() 里用一次 setTimeout(0) 补一次，确保布局已完成。
-   */
-  function fitExtent() {
-    if (!viewer || !overviewRect) return;
-    viewer.resize();
-    viewer.camera.setView({ destination: overviewRect });
-    viewer.scene.requestRender();
   }
 
   function show() {
@@ -230,10 +242,16 @@
     if (!created) ensure();
     if (!viewer) return;
     // display:none 会让容器尺寸归零，而 Cesium 只监听 window.resize，必须手动补
-    fitExtent();
+    viewer.resize();
+    syncCamera();
     syncFootprint(true);
-    // 布局可能还没落定，下一帧再 fit 一次
-    setTimeout(function () { fitExtent(); syncFootprint(true); }, 0);
+    // 布局可能还没落定，下一帧再对齐一次
+    setTimeout(function () {
+      if (!viewer) return;
+      viewer.resize();
+      syncCamera();
+      syncFootprint(true);
+    }, 0);
   }
 
   function hide() {
@@ -246,31 +264,40 @@
     return !!el && !el.classList.contains('hidden');
   }
 
-  /** 主相机移动后调用（由 app.js 的 camera.changed 驱动）。 */
+  /**
+   * 主相机移动后调用（由 app.js 的 camera.changed 驱动）。
+   *
+   * 只更新视野框——鸟瞰图的相机是固定的，不跟主图动。这样它才是一张稳定的
+   * 战场全图，而不是"主图的小号复制"。
+   */
   function onMainCameraChanged() {
     if (!viewer || !isVisible()) return;
     syncFootprint(false);
   }
 
-  /** 诊断读数：2D 视图是否建好、影像层是否在、画布尺寸是否正常。 */
+  /** 诊断读数。 */
   function debugInfo() {
     if (!viewer) return 'not created';
     const c = viewer.scene.canvas;
+    const h = viewer.camera.positionCartographic.height / 1000;
     return 'created  layers ' + viewer.imageryLayers.length +
            '  canvas ' + c.width + 'x' + c.height +
-           '  tilesLoaded ' + viewer.scene.globe.tilesLoaded +
+           '  fixedHeight ' + h.toFixed(0) + ' km' +
            '  visible ' + isVisible();
   }
 
   global.Overview = {
     init: function (main) { mainViewer = main; },
     debugInfo: debugInfo,
-    fitExtent: fitExtent,
     ensure: ensure,
     show: show,
     hide: hide,
     isVisible: isVisible,
     onMainCameraChanged: onMainCameraChanged,
-    resize: function () { if (viewer) { viewer.resize(); viewer.scene.requestRender(); } },
+    syncCamera: syncCamera,
+    setCenter: setCenter,
+    resize: function () {
+      if (viewer) { viewer.resize(); syncCamera(); }
+    },
   };
 })(window);
