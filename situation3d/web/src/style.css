@@ -517,3 +517,112 @@ select {
 #timeline { flex: 1 1 auto; }
 
 #tickLabel, #clockLabel { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+/* ---------------- 图层管理分组（可折叠） ---------------- */
+
+.layer-group > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: .4px;
+  list-style: none;
+}
+
+.layer-group > summary::-webkit-details-marker { display: none; }
+
+.layer-group > summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 10px;
+  margin-right: 4px;
+  transition: transform .12s ease;
+}
+
+.layer-group[open] > summary::before { transform: rotate(90deg); }
+.layer-group[open] > summary { margin-bottom: 6px; }
+
+/* ---------------- 地图组件（指南针 / 视点坐标 / 比例尺） ----------------
+ *
+ * Cesium 1.145 没有内置指南针与比例尺，三项均为自建叠加层。定位在中间
+ * 窗口左上竖向排布：左下已被图例与鸟瞰图占用，右上被目标信息面板占用。
+ * z-index 取 36，低于目标面板的 40；视点坐标与比例尺不接收鼠标事件。
+ */
+
+.map-comp {
+  position: absolute;
+  left: 12px;
+  top: 46px;
+  width: 84px;
+  height: 84px;
+  z-index: 36;
+  cursor: pointer;
+}
+
+.map-comp svg { display: block; width: 100%; height: 100%; }
+
+#compRose {
+  transform-origin: 50% 50%;
+  /* 10 Hz 更新，加过渡让转动看起来连续而不是一跳一跳 */
+  transition: transform .1s linear;
+}
+
+.map-viewpoint {
+  position: absolute;
+  left: 12px;
+  top: 138px;
+  min-width: 186px;
+  z-index: 36;
+  pointer-events: none;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .92);
+  font-size: 11px;
+}
+
+.mv-row { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; }
+.mv-row span { color: var(--text-dim); }
+.mv-row b { font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.map-scalebar {
+  position: absolute;
+  left: 12px;
+  top: 208px;
+  z-index: 36;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .92);
+  font-size: 11px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-bar {
+  height: 7px;
+  box-sizing: border-box;
+  border: 1px solid #4c5866;
+  border-top: none;
+  background: rgba(255, 255, 255, .6);
+  min-width: 24px;
+}
+
+.map-comp.hidden,
+.map-viewpoint.hidden,
+.map-scalebar.hidden { display: none; }
+
+@media (max-width: 1280px) {
+  .map-comp { width: 72px; height: 72px; }
+  .map-viewpoint { top: 126px; min-width: 166px; font-size: 10.5px; }
+  .map-scalebar { top: 188px; }
+}
+
+/* 极矮窗口优先保指南针与比例尺 */
+@media (max-height: 560px) {
+  .map-viewpoint { display: none; }
+}

@@ -62,11 +62,19 @@ const state = {
   urbanAoi: [],             // 城区 AOI 列表
   imageryStats: null,       // 底图瓦片请求统计（诊断用）
   inference: null,          // inference_frames，与 frames 逐帧对齐
+
+  // 目标跟随。enabled 是图层管理里的开关，id 是当前被跟随的目标；
+  // suspend 在用户按下鼠标时置位，让相机在拖拽期间完全交给用户。
+  follow: { enabled: false, id: null, suspend: false, press: null, last: null, notified: false },
+
+  // 地图组件显隐（图层管理第四类）
+  components: { compass: true, scalebar: true, viewpoint: true },
 };
 
 let viewer = null;
 let lastFrameMs = 0;
 let lastGeoRefresh = 0;
+let camChangedCount = 0;      // camera.changed 触发次数（诊断用）
 
 const dom = {};
 ['statusText', 'statusDot', 'scenarioName', 'targetList', 'hotspotBody',
@@ -76,6 +84,8 @@ const dom = {};
  'countRed', 'countBlue', 'countSea', 'countLand', 'countAir', 'targetCountHint',
  'cacheMemory', 'cacheDisk', 'cacheNetwork', 'cacheStored',
  'loadingBadge', 'loadingText',
+ 'mapCompass', 'compRose', 'mapViewpoint', 'mvLon', 'mvLat', 'mvAlt',
+ 'mapScalebar', 'sbBar', 'sbLabel', 'followTarget', 'followNote',
 ].forEach(function (id) { dom[id] = document.getElementById(id); });
 
 // --------------------------------------------------------------------------
@@ -218,6 +228,17 @@ function renderDiagnostics() {
                '  idle ' + tc.idleFlag);
     if (tc.lastError) lines.push('cache error     ' + String(tc.lastError).slice(0, 120));
   }
+  // 跟随与参考系状态。unlocked 必须是 true：camera.lookAt 会把 camera.transform
+  // 锁在目标 ENU 上，而 setView / flyTo 不会自动解锁，锁定状态下缩放与贴地钳制
+  // 会失效（可以穿到地面以下）。解除跟随必须让这一项回到 true。
+  lines.push('follow          ' + (state.follow.id || '-') +
+             '  enabled ' + state.follow.enabled +
+             '  suspend ' + state.follow.suspend +
+             '  unlocked ' + viewer.camera.transform.equals(Cesium.Matrix4.IDENTITY));
+  lines.push('camChanged      ' + camChangedCount + ' 次');
+  lines.push('components      compass ' + state.components.compass +
+             '  scalebar ' + state.components.scalebar +
+             '  viewpoint ' + state.components.viewpoint);
   if (state.lastError) lines.push('LAST ERROR      ' + String(state.lastError).slice(0, 140));
   box.textContent = lines.join('\n');
 }
@@ -317,6 +338,9 @@ function initViewer() {
 }
 
 function flyTo(lon, lat, height, pitchDeg) {
+  // 先解除跟随：camera.lookAt 会把 camera.transform 锁在目标 ENU 上，而
+  // setView / flyTo 不会自动解锁，orientation 会被按那个局部系解释。
+  detachFollow('视角跳转');
   viewer.camera.flyTo({
     destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
     orientation: { heading: 0, pitch: Cesium.Math.toRadians(pitchDeg === undefined ? -70 : pitchDeg), roll: 0 },
@@ -326,6 +350,7 @@ function flyTo(lon, lat, height, pitchDeg) {
 
 function applyCamera(camera) {
   if (!camera) return;
+  detachFollow('复位机位');
   viewer.camera.setView({
     destination: Cesium.Cartesian3.fromDegrees(camera.lon, camera.lat, camera.height),
     orientation: {
@@ -407,6 +432,7 @@ function loadCase(caseId) {
 
 function teardownScene() {
   if (!viewer) return;
+  detachFollow('态势已切换');
   closeTargetPanel();
   viewer.entities.removeAll();
   state.targets = {};
@@ -813,6 +839,7 @@ function renderHotspotTable() {
 function selectHotspot(index, fly) {
   const hs = state.data.hotspots[index];
   if (!hs) return;
+  detachFollow('热点区域跳转');
 
   state.activeHotspot = index;
   state.geoPinned = true;
@@ -927,7 +954,12 @@ function clearHotspotSelection() {
 function selectTarget(id, fly) {
   state.selected = id;
   const s = positionFor(id, state.tick);
-  if (fly && s) flyTo(s.lon, s.lat, 180000);
+  if (state.follow.enabled) {
+    // 跟随开启时，点击目标是"换一个跟随对象"，不能再走 flyTo —— 两者会互抢相机
+    startFollow(id);
+  } else if (fly && s) {
+    flyTo(s.lon, s.lat, 180000);
+  }
   syncSelection();
   renderTargetList();
   renderTargetPanel(id);
@@ -1259,6 +1291,318 @@ function setImagery(on) {
 // 时间轴
 // --------------------------------------------------------------------------
 
+// --------------------------------------------------------------------------
+// 地图组件：指南针 / 视点坐标 / 比例尺
+// --------------------------------------------------------------------------
+//
+// Cesium 1.145 没有内置指南针，也没有内置比例尺（内置 widget 只有
+// HomeButton / SceneModePicker / BaseLayerPicker / Geocoder /
+// NavigationHelpButton / Timeline / Animation / FullscreenButton / VRButton /
+// InfoBox / SelectionIndicator / ProjectionPicker / CreditDisplay），三项全部自建。
+//
+// 三项都与案例无关：只用 viewer 与 state.components，因此未加载态势时同样可用。
+
+const _enuM = new Cesium.Matrix4();
+const _enuInv = new Cesium.Matrix4();
+const _enuDir = new Cesium.Cartesian3();
+
+/**
+ * 相机朝向（弧度）。返回 heading 与 pitch，均在相机所在点的 ENU 局部系下。
+ *
+ * 不用 `camera.heading`：那个 getter 内部会临时改写 `camera._transform` 并调用
+ * 两次 `updateMembers`，10 Hz 高频读取有额外开销。这里用等价的自算实现。
+ */
+function cameraOrientation() {
+  const cam = viewer.camera;
+  Cesium.Transforms.eastNorthUpToFixedFrame(cam.positionWC, Cesium.Ellipsoid.WGS84, _enuM);
+  Cesium.Matrix4.inverse(_enuM, _enuInv);
+  // 方向是向量，必须用 multiplyByPointAsVector（ByPoint 会叠加平移分量）
+  Cesium.Matrix4.multiplyByPointAsVector(_enuInv, cam.directionWC, _enuDir);
+  Cesium.Cartesian3.normalize(_enuDir, _enuDir);
+  return {
+    headingRad: Math.atan2(_enuDir.x, _enuDir.y),   // ENU: x=东, y=北
+    pitchRad: Math.asin(Math.max(-1, Math.min(1, _enuDir.z))),
+  };
+}
+
+/**
+ * 指南针：盘面 N 指向屏幕上的北，顶端蓝色指标固定代表"屏幕上方 = 相机朝向"。
+ *
+ * 另一种语义"指针指向相机朝向"在这里没有信息量——屏幕上方本身就是相机朝向，
+ * 指针会恒指顶端。
+ */
+function updateCompass() {
+  if (!dom.compRose) return;
+  const deg = Cesium.Math.toDegrees(cameraOrientation().headingRad);
+  dom.compRose.style.transform = 'rotate(' + (-deg) + 'deg)';
+}
+
+/** 视点坐标：相机自身的经纬高。高度是椭球高（WGS84），不是海拔。 */
+function updateViewpoint() {
+  if (!dom.mvLon) return;
+  const c = viewer.camera.positionCartographic;
+  const lon = Cesium.Math.toDegrees(c.longitude);
+  const lat = Cesium.Math.toDegrees(c.latitude);
+  dom.mvLon.textContent = fmtDeg(lon, 'E', 'W');
+  dom.mvLat.textContent = fmtDeg(lat, 'N', 'S');
+  dom.mvAlt.textContent = c.height < 1000
+    ? c.height.toFixed(0) + ' m'
+    : (c.height / 1000).toFixed(c.height < 100000 ? 2 : 1) + ' km';
+  dom.mvAlt.title = '椭球高（WGS84 椭球面），非海拔';
+}
+
+/**
+ * 屏幕点对应的地面经纬。三级取点：
+ *   1. scene.globe.pick —— 只对**已渲染瓦片**求交，瓦片没加载完会返回 undefined
+ *   2. IntersectionTests.rayEllipsoid —— 解析求交，不依赖瓦片
+ *   3. 都没有则返回 null（由调用方兜底）
+ */
+function groundCartoAt(px, py) {
+  const ray = viewer.camera.getPickRay(new Cesium.Cartesian2(px, py));
+  if (!ray) return null;
+  const hit = viewer.scene.globe.pick(ray, viewer.scene);
+  if (hit) return Cesium.Cartographic.fromCartesian(hit);
+  const t = Cesium.IntersectionTests.rayEllipsoid(ray, Cesium.Ellipsoid.WGS84);
+  if (!t) return null;
+  return Cesium.Cartographic.fromCartesian(
+    Cesium.Ray.getPoint(ray, t.start, new Cesium.Cartesian3()));
+}
+
+const SCALE_PROBE_PX = 100;
+
+/**
+ * 比例尺：在**比例尺实际绘制处**取两个屏幕点量地面距离，换算每像素米数，
+ * 再按 1/2/5×10ⁿ 取整到人类友好的刻度。
+ *
+ * 取样点不能用屏幕中心：3D 倾斜视图下近端与远端的每像素米数可差数倍，
+ * 用中心值会让画在左上的横条与实际地面长度对不上。
+ * 探针跨度固定 100 px（与待求的 sbBar 宽度解耦），单趟即可算出结果。
+ */
+function updateScalebar() {
+  if (!dom.sbBar || !dom.sbLabel) return;
+  const canvas = viewer.scene.canvas;
+  const cr = canvas.getBoundingClientRect();
+  const br = dom.sbBar.getBoundingClientRect();
+  if (!cr.width || !br.width) return;
+
+  const x0 = br.left - cr.left;
+  const y = (br.top + br.bottom) / 2 - cr.top;
+  const a = groundCartoAt(x0, y);
+  const b = groundCartoAt(x0 + SCALE_PROBE_PX, y);
+
+  let mPerPx;
+  if (a && b) {
+    // 用测地线直接量测，不需要手工乘 cos(lat)：纬度效应已隐含在几何里。
+    mPerPx = new Cesium.EllipsoidGeodesic(a, b).surfaceDistance / SCALE_PROBE_PX;
+  } else {
+    // 兜底：视锥解析式。近似"垂直俯视 + 平地"。
+    const frustum = viewer.camera.frustum;
+    const h = canvas.clientHeight;
+    if (!frustum.fovy || !h) { dom.mapScalebar.classList.add('hidden'); return; }
+    mPerPx = 2 * viewer.camera.positionCartographic.height * Math.tan(frustum.fovy / 2) / h;
+  }
+  if (!isFinite(mPerPx) || mPerPx <= 0) return;
+
+  const raw = mPerPx * SCALE_PROBE_PX;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / pow;
+  const nice = n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10;
+  const meters = nice * pow;
+
+  dom.sbBar.style.width = Math.max(24, Math.round(meters / mPerPx)) + 'px';
+  dom.sbLabel.textContent = meters >= 1000
+    ? (meters / 1000).toFixed(meters % 1000 === 0 ? 0 : 1) + ' km'
+    : Math.round(meters) + ' m';
+}
+
+let compTick = 0;
+
+/** 统一刷新三个组件。全关时零开销。 */
+function updateMapComponents() {
+  if (!viewer || !state.components) return;
+  if (!state.components.compass && !state.components.viewpoint && !state.components.scalebar) return;
+  compTick++;
+  if (state.components.compass) updateCompass();
+  if (state.components.viewpoint) updateViewpoint();
+  // 比例尺每次要发 2 条射线，10 Hz 没必要，压到约 3 Hz
+  if (state.components.scalebar && compTick % 3 === 0) updateScalebar();
+}
+
+const COMPONENT_NODES = {
+  compass: 'mapCompass',
+  scalebar: 'mapScalebar',
+  viewpoint: 'mapViewpoint',
+};
+
+function setComponent(name, on) {
+  state.components[name] = !!on;
+  const node = document.getElementById(COMPONENT_NODES[name]);
+  if (node) node.classList.toggle('hidden', !on);
+  if (on && viewer) updateMapComponents();
+}
+
+// --------------------------------------------------------------------------
+// 目标跟随
+// --------------------------------------------------------------------------
+//
+// 用 camera.lookAt + HeadingPitchRange 逐帧驱动，不用 viewer.trackedEntity：
+// 后者的 entity.viewFrom **只在首帧生效**（跟踪中改视角必须解绑重绑），且 3D
+// 跟踪会强制 enableTilt = false，做不到"随航向旋转 + 俯仰可控"。
+//
+// HeadingPitchRange 的语义（由 1.145 源码 offsetFromHeadingPitchRange 推出）：
+//   offset_ENU = ( -r·cos p·sin h, -r·cos p·cos h, -r·sin p )
+//   ⇒ heading 是**相机视线方位角**，相机**位置**方位角 = heading + 180°。
+// 所以要让相机位于目标的右后上方：heading = 目标航向 - 偏角。
+
+const FOLLOW_VIEW = {
+  sea:  { range:  3500, pitchDeg: -22, rightDeg: 30 },   // 高于目标约 1.3 km
+  land: { range:  4000, pitchDeg: -30, rightDeg: 30 },   // 高于目标约 2.0 km，俯视阵地
+  air:  { range: 15000, pitchDeg: -18, rightDeg: 30 },   // 高于目标约 4.6 km
+};
+
+const _followHpr = new Cesium.HeadingPitchRange(0, 0, 0);
+
+function setFollowNote(text) {
+  if (dom.followNote) dom.followNote.textContent = text;
+}
+
+/** 被跟随目标是否仍然可跟随（存在、可见、有位置）。 */
+function followTargetUsable(id) {
+  const rec = state.targets[id];
+  if (!rec) return false;
+  if (!isVisible(rec.def)) return false;
+  return !!positionFor(id, state.tick);
+}
+
+/**
+ * 每帧更新跟随相机。挂在 scene.preRender 上，本帧生效。
+ *
+ * 目标静止（暂停、或已到航路终点）时直接返回：既省掉每帧的 lookAt，
+ * 也不再触发 camera.changed，避免无谓的级联刷新。
+ */
+function applyFollowFrame(force) {
+  const f = state.follow;
+  if (!f.enabled || !f.id || f.suspend || !viewer || !state.data) return;
+
+  const rec = state.targets[f.id];
+  const s = rec ? positionFor(f.id, state.tick) : null;
+  if (!rec || !s || !isVisible(rec.def)) { detachFollow('目标已隐藏'); return; }
+
+  if (s.reached_end && !f.notified) {
+    f.notified = true;
+    setStatus('目标 ' + f.id + ' 已到达航路终点，跟随保持', 'ok');
+  }
+
+  const pos = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
+  if (!force && f.last && Cesium.Cartesian3.distance(pos, f.last) < 0.5) return;
+  if (!f.last) f.last = new Cesium.Cartesian3();
+  Cesium.Cartesian3.clone(pos, f.last);
+
+  const v = FOLLOW_VIEW[rec.def.domain] || FOLLOW_VIEW.sea;
+  _followHpr.heading = Cesium.Math.toRadians((s.heading || 0) - v.rightDeg);
+  _followHpr.pitch = Cesium.Math.toRadians(v.pitchDeg);
+  _followHpr.range = v.range;
+  viewer.camera.lookAt(pos, _followHpr);
+}
+
+function startFollow(id) {
+  const f = state.follow;
+  if (!f.enabled || !state.targets[id] || !state.data) return;
+  f.id = id;
+  f.suspend = false;
+  f.press = null;
+  f.last = null;
+  f.notified = false;
+  viewer.camera.cancelFlight();      // 取消可能在飞的 flyTo，否则两者互相覆盖
+  applyFollowFrame(true);
+  setStatus('正在跟随 ' + id + ' · 拖动地图可解除', 'ok');
+  setFollowNote('正在跟随 ' + id + '。拖动地图或滚轮缩放即自动解除。');
+}
+
+/**
+ * 解除跟随。
+ *
+ * **必须** lookAtTransform(Matrix4.IDENTITY)：camera.lookAt 会把 camera.transform
+ * 设成目标 ENU 矩阵，ScreenSpaceCameraController 随即把 _globe 置 undefined、
+ * _ellipsoid 换成单位球 —— 缩放与贴地钳制失效、可以穿到地面以下。而
+ * setView / flyTo 自己**不会**解锁（它们保存并恢复原 transform），所以所有
+ * 视角跳转入口都要先经过这里，否则 orientation 会被按目标 ENU 解释。
+ */
+function detachFollow(reason) {
+  const f = state.follow;
+  const was = f.id;
+  f.id = null;
+  f.suspend = false;
+  f.press = null;
+  f.last = null;
+  f.notified = false;
+  f.enabled = false;
+  if (dom.followTarget) dom.followTarget.checked = false;
+  if (viewer) viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+  if (was) {
+    setStatus('已解除目标跟随（' + was + '）' + (reason ? '：' + reason : ''), 'ok');
+    setFollowNote('已解除跟随。勾选后可再次点击目标跟随。');
+    // 跟随期间 camera.changed 每帧触发，建筑体块的防抖被反复重置而从不执行；
+    // 解除后补一次，让当前机位下的体块 LOD 归位。
+    if (dom.modelBuildings && dom.modelBuildings.checked) refreshBuildings();
+  }
+}
+
+/** 过滤/显隐变化后检查跟随是否仍然成立。 */
+function guardFollow() {
+  if (state.follow.id && !followTargetUsable(state.follow.id)) {
+    detachFollow('目标已隐藏或过滤');
+  }
+}
+
+/**
+ * "拖动即解除"的检测。
+ *
+ * 判据：跟随代码只改相机状态、**从不派发 DOM 事件**，所以画布上任何
+ * pointer/wheel 事件都来自用户。不能用 camera.changed 或 moveStart/moveEnd——
+ * 它们内部会比较 camera.transform，而跟随每帧都在改 transform，会被持续触发。
+ *
+ * 按下即 suspend（拖拽第一像素起相机就归用户），抬起时若位移未超阈值则恢复
+ * 跟随，这样"点击另一个目标"不会被误判成拖动。
+ */
+const DRAG_THRESHOLD_PX = 4;
+
+function bindFollowInput() {
+  const canvas = viewer.scene.canvas;
+
+  canvas.addEventListener('pointerdown', function (e) {
+    if (!state.follow.id) return;
+    state.follow.press = { x: e.clientX, y: e.clientY };
+    state.follow.suspend = true;
+    // 不 stopPropagation：ScreenSpaceCameraController 仍需收到事件
+  }, true);
+
+  window.addEventListener('pointermove', function (e) {
+    const press = state.follow.press;
+    if (!press) return;
+    if (Math.abs(e.clientX - press.x) + Math.abs(e.clientY - press.y) < DRAG_THRESHOLD_PX) return;
+    state.follow.press = null;
+    detachFollow('拖动地图');
+  }, true);
+
+  window.addEventListener('pointerup', function () {
+    if (!state.follow.press) return;
+    state.follow.press = null;
+    state.follow.suspend = false;   // 未超阈值 ⇒ 是点击，恢复跟随
+  }, true);
+
+  canvas.addEventListener('wheel', function () {
+    detachFollow('滚轮缩放');
+  }, { capture: true, passive: true });
+}
+
+// 供 overview.js 等其他模块调用（它们拿不到本文件的闭包）
+window.Follow = {
+  start: startFollow,
+  detach: detachFollow,
+  isActive: function () { return !!state.follow.id; },
+};
+
 function renderTransport() {
   const frames = state.data.frames;
   const frame = frames[Math.min(state.tick, frames.length - 1)];
@@ -1377,18 +1721,52 @@ function bindUI() {
     if (node) node.addEventListener('change', function (e) { handler(e.target.checked); });
   };
 
-  bindCheck('layerTargets', function (v) { state.layers.targets = v; });
+  bindCheck('layerTargets', function (v) { state.layers.targets = v; guardFollow(); });
   bindCheck('layerTracks', function (v) { state.layers.tracks = v; });
   bindCheck('layerRoutes', function (v) { state.layers.routes = v; });
   bindCheck('layerHotspots', function (v) { state.layers.hotspots = v; });
   bindCheck('layerLabels', function (v) { state.layers.labels = v; });
 
-  const refilter = function () { renderTargetList(); };
+  const refilter = function () { renderTargetList(); guardFollow(); };
   bindCheck('filterRed', function (v) { state.filters.red = v; refilter(); });
   bindCheck('filterBlue', function (v) { state.filters.blue = v; refilter(); });
   bindCheck('filterSea', function (v) { state.filters.sea = v; refilter(); });
   bindCheck('filterLand', function (v) { state.filters.land = v; refilter(); });
   bindCheck('filterAir', function (v) { state.filters.air = v; refilter(); });
+
+  bindCheck('compCompass', function (v) { setComponent('compass', v); });
+  bindCheck('compScalebar', function (v) { setComponent('scalebar', v); });
+  bindCheck('compViewpoint', function (v) { setComponent('viewpoint', v); });
+
+  bindCheck('followTarget', function (v) {
+    state.follow.enabled = !!v;
+    if (!v) {
+      detachFollow('');
+    } else if (!state.data) {
+      state.follow.enabled = false;
+      dom.followTarget.checked = false;
+      setFollowNote('未加载态势，无法跟随。请先从「演示案例」选择案例。');
+    } else {
+      setFollowNote('已开启跟随：点击任一目标开始跟随，拖动地图即解除。');
+      setStatus('目标跟随已开启 · 点击目标开始跟随', 'ok');
+    }
+  });
+
+  // 指南针点击复位正北
+  if (dom.mapCompass) {
+    dom.mapCompass.addEventListener('click', function () {
+      detachFollow('复位正北');
+      const cam = viewer.camera;
+      const c = cam.positionCartographic;
+      const o = cameraOrientation();
+      // pitch 接近 ±90° 时 heading 无视觉意义，clamp 到可辨范围内
+      const pitch = Math.max(-Math.PI * 0.494, Math.min(-Math.PI / 36, o.pitchRad));
+      cam.setView({
+        destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, c.height),
+        orientation: { heading: 0, pitch: pitch, roll: 0 },
+      });
+    });
+  }
 
   bindCheck('modelTerrain', setTerrain);
   bindCheck('modelWsf3dOverlay', setWsf3dOverlay);
@@ -1471,6 +1849,15 @@ function bindUI() {
   });
 
   bindPicking();
+  bindFollowInput();
+
+  // 跟随相机挂在 preRender：Scene.render 的顺序是 preUpdate → update →
+  // preRender → draw，在这里改相机本帧生效。
+  viewer.scene.preRender.addEventListener(function () { applyFollowFrame(false); });
+
+  // 地图组件统一刷新（10 Hz；比例尺内部压到约 3 Hz）
+  setInterval(updateMapComponents, 100);
+  updateMapComponents();
 
   // 相机移动时也刷新一次读数（节流到 4 Hz），否则刚打开页面时面板全是"—"。
   let lastGeoUpdate = 0;
@@ -1478,13 +1865,17 @@ function bindUI() {
   viewer.scene.globe.tileLoadProgressEvent.addEventListener(setLoadingTiles);
 
   viewer.camera.changed.addEventListener(function () {
+    camChangedCount++;
     const now = Date.now();
     if (now - lastGeoUpdate < 250) return;
     lastGeoUpdate = now;
     updateGeoReadout();
     syncUrbanImagery();
+    guardFollow();
     // 相机高度跨过 LOD 阈值时才重建，且加一段防抖，避免飞行过程中反复触发。
-    if (dom.modelBuildings && dom.modelBuildings.checked) {
+    // 跟随期间相机每帧都在动，防抖会被反复重置而**永不执行**，所以直接跳过；
+    // detachFollow() 收尾时会补一次 refreshBuildings()。
+    if (!state.follow.id && dom.modelBuildings && dom.modelBuildings.checked) {
       if (state.buildingTimer) clearTimeout(state.buildingTimer);
       state.buildingTimer = setTimeout(refreshBuildings, 400);
     }
@@ -1520,6 +1911,49 @@ function bindPicking() {
 // --------------------------------------------------------------------------
 
 function applyUrlHooks() {
+  // 地图组件：?components=0|1 全关/全开；?components=a,b 白名单；?components=-a 排除
+  if (params.has('components')) {
+    const raw = params.get('components');
+    if (raw === '0') {
+      ['compass', 'scalebar', 'viewpoint'].forEach(function (n) { setComponent(n, false); });
+      if (dom.compCompass) dom.compCompass.checked = false;
+      if (dom.compScalebar) dom.compScalebar.checked = false;
+      if (dom.compViewpoint) dom.compViewpoint.checked = false;
+    } else if (raw === '1' || raw === '') {
+      ['compass', 'scalebar', 'viewpoint'].forEach(function (n) { setComponent(n, true); });
+    } else {
+      const parts = raw.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+      const exclude = parts.length && parts[0].charAt(0) === '-';
+      ['compass', 'scalebar', 'viewpoint'].forEach(function (n) {
+        const on = exclude ? parts.indexOf('-' + n) < 0 : parts.indexOf(n) >= 0;
+        setComponent(n, on);
+        const box = document.getElementById('comp' + n.charAt(0).toUpperCase() + n.slice(1));
+        if (box) box.checked = on;
+      });
+    }
+  }
+  [['compass', 'compass'], ['scalebar', 'scalebar'], ['viewpoint', 'viewpoint']].forEach(function (pair) {
+    if (!params.has(pair[0])) return;
+    const on = params.get(pair[0]) !== '0';
+    setComponent(pair[1], on);
+    const box = document.getElementById('comp' + pair[0].charAt(0).toUpperCase() + pair[0].slice(1));
+    if (box) box.checked = on;
+  });
+
+  // 目标跟随：?follow=<目标ID>（需要案例数据，放在 applyUrlHooks 末尾即可——
+  // 此时 state.data 已就绪，而它内部会调 startFollow 立即生效）
+  if (params.has('follow')) {
+    const fid = params.get('follow');
+    if (state.targets[fid]) {
+      if (dom.followTarget) dom.followTarget.checked = true;
+      state.follow.enabled = true;
+      startFollow(fid);
+      // ?unfollow=1 立刻解除一次，用于验证 detachFollow 里的参考系解锁
+      // （camera.lookAt 会把 transform 锁在目标 ENU 上，必须显式还原成单位阵）。
+      if (params.get('unfollow') === '1') detachFollow('验证解除');
+    }
+  }
+
   if (params.get('imagery') === '0') {
     document.getElementById('modelImagery').checked = false;
     setImagery(false);

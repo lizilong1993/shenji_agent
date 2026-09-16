@@ -1,129 +1,307 @@
-# situation3d — 三维态势生成系统
+# situation3d — 三维战场态势生成系统
 
-课题三子课题3 下一阶段系统。目标：把现有 wargame 二维仿真态势升级为**基于 Cesium 三维地球的真实世界态势生成系统**。
-
-## 目标口径（已与需求方确认）
-
-| 项 | 决策 |
-|---|---|
-| 三维引擎 | CesiumJS（Apache-2.0，成熟 + 开源） |
-| 推演内核 | **自研**：复现庙算陆战引擎语义 + 新增海空算子，面向真实 3D 地球与真实装备型号 |
-| 场景范围 | 台海为主 + 热点区域清单 |
-| 真实性口径 | 图像真实（MAR20 / ShipRSImageNet / SatSAM2）+ 态势仿真 |
-| 数据层 | PostgreSQL + PostGIS 存轨迹点，CZML 仅作派生输出 |
-
-## 目录结构
+自研三维推演引擎 + CesiumJS 前端。面向真实 WGS84 地理与真实装备型号，覆盖
+**海 / 陆 / 空**三域、**红 / 蓝**双方，具备**三级态势自动推理**与**军标可视化**，
+并且**完全离线运行**。
 
 ```
-situation3d/
-├── web/                       三维世界前端（CesiumJS）
-│   ├── index.html             页面骨架：顶栏 / 左侧图层树 / 中央地球 / 右侧信息 / 底部推演控制
-│   ├── src/
-│   │   ├── app.js             地球初始化、轨迹加载与时间轴驱动回放
-│   │   └── style.css          界面样式
-│   ├── data/                  生成的态势数据（gitignore，见下）
-│   └── vendor/cesium/         CesiumJS 1.145.0 预构建版（gitignore，由脚本获取）
-├── engine/
-│   ├── geo.py                 WGS84 大地测量：haversine / 方位角 / 球面插值 / 折线采样
-│   └── scenario.py            台海演示想定定义与逐帧轨迹生成
-├── scripts/
-│   └── gen_demo_trajectory.py 生成 web/data/demo_taiwan_strait.json
-├── server/
-│   └── serve.py               静态服务入口（无第三方依赖）
-└── tools/                     构建与取证工具
-    ├── fetch_cesium.sh        下载并展开 CesiumJS 1.145.0 到 web/vendor/
-    ├── bootstrap_remote_headless.sh  远程容器无头 Chromium 依赖补齐（一次性）
-    ├── remote_shot.sh         远程侧单次截图
-    └── capture.py             本地驱动：截图 + 像素校验 + 失败重试
+engine/     推演内核：地理计算、军标目录、想定与航路、三级态势推理、演示案例
+scripts/    生成前端所需的数据集（每案例一份）
+web/        CesiumJS 前端（离线瓦片、军标、推理面板、案例菜单）
+server/     零依赖静态服务（缓存策略 + gzip）
+tools/      资产抓取、色带标定、远程同步、无头取证
 ```
 
-## 首次准备
+---
 
-`web/vendor/` 与 `web/data/` 均不入库（45 MB 第三方 + 可确定性重建的数据）：
+## 1. 运行
 
 ```bash
-sh  situation3d/tools/fetch_cesium.sh                 # 取 CesiumJS
-python3 situation3d/scripts/gen_demo_trajectory.py    # 生成演示态势
+# 生成全部演示案例数据
+python3 situation3d/scripts/gen_demo_trajectory.py
+
+# 启动静态服务（默认 8848）
+sh situation3d/tools/restart_server.sh 8848
+# 浏览器打开 http://<host>:8848/
 ```
 
-## 启动方式
-
-在远程容器内（`/remote-home/lizilong/shenji_agent`）：
-
-```bash
-setsid nohup python3 situation3d/server/serve.py --port 8848 </dev/null >/tmp/s3d.log 2>&1 &
-```
-
-浏览器访问 `http://<server>:8848/`。
-
-支持两个确定性入口参数，供深链与自动取证使用：
+前端深链参数（同时用于截图取证）：
 
 | 参数 | 作用 |
 |---|---|
-| `?tick=360` | 首帧前跳转到指定帧（0 – 1439） |
-| `?autoplay=1` | 打开即开始播放 |
+| `?case=<id>` | 指定演示案例 |
+| `?tick=300` | 首帧前定位到某帧 |
+| `?autoplay=1` | 立即开始推演 |
+| `?panel=R01` | 打开指定目标的信息面板 |
+| `?hotspot=6` | 选中第 N 个热点区域 |
+| `?terrain=1` `?overlay=1` `?buildings=1` `?sensors=1` | 打开对应模型开关 |
+| `?cam=lon,lat,height[,pitch]` | 指定机位（诊断用） |
+| `?diag=1` | 左上角叠加运行时读数 |
+| `?cache=0` | 停用前端瓦片缓存（对照用） |
+| `?components=0\|1` | 地图组件全关 / 全开 |
+| `?components=a,b` / `?components=-a` | 地图组件白名单 / 排除 |
+| `?compass=0\|1` `?scalebar=0\|1` `?viewpoint=0\|1` | 单项地图组件开关 |
+| `?follow=<目标ID>` | 直接进入目标跟随 |
+| `?unfollow=1` | 跟随一次后立即解除（验证参考系解锁） |
 
-## 渲染取证
+---
 
-`tools/capture.py` 在本地驱动、在远程渲染。之所以不直接用 `--screenshot`：Cesium 的球体栅格化与瓦片解码消耗的是**真实时间**，而 `--virtual-time-budget` 计的是**虚拟时间**，同一预算在不同次运行中会分别产出"已渲染"与"未渲染"（球体全黑）两种结果。因此每次截图都用像素校验（视口中心 240×240 区域的亮度），未通过则重试。
+## 2. 演示案例
 
-```bash
-python3 situation3d/tools/capture.py --url "/?tick=360" --out tools/shots/tick_360.png
-```
+案例注册表在 `engine/cases.py`，新增案例只改一处，数据生成脚本自动跟进。
 
-远程容器若被重建，需先补齐无头 Chromium 的系统库与字体：
-
-```bash
-ssh <host> 'sh -s' < situation3d/tools/bootstrap_remote_headless.sh
-```
-
-> 该容器无 root、无系统 Chromium、无任何字体。缺字体时 Skia 会直接 abort
-> （`SkFontMgr_FontConfigInterface.cpp: Not implemented`），且中文标签全部显示为豆腐块。
-
-## 当前状态
-
-- **P0 环境基线** — 已完成（远程 git、分支策略、引擎数据字典）
-- **P1 三维世界骨架** — 已完成：三维地球加载台海区域、8 个热点、5 个目标、1440 帧轨迹回放，全部经截图取证
-- P2 海域域层与联合推演 — 未开始
-- P3 真实型号库与图像接入 — 未开始
-- P4 对接现有态势生成链路（LSTM / GCN） — 未开始
-- P5 热点区域与验收 — 未开始
-
-### P1 遗留问题
-
-**底图分辨率不足，不足以支撑"真实场景"验收。**
-
-CesiumJS 内置的 Natural Earth II 离线底图最高只到 z2，一级瓦片覆盖 45°×45°。
-台海视角约 6°×4°，即单张瓦片被放大约 7 倍：
-
-- z2 瓦片加载完成时（见 `tools/shots/tick_1439.png`）：海岸线、地形晕渲可辨，能看出陆/海/山地，
-  但没有真实卫星纹理，港口、城市、航道等目标级要素完全不可见。
-- 瓦片未就绪时（其余几张）：退化为陆/海大色块。
-
-需要决策底图来源，二选一（或组合）：
-
-| 方案 | 说明 | 代价 |
+| id | 名称 | 覆盖 |
 |---|---|---|
-| A. 离线预取高分辨率瓦片 | 只取台海 AOI，z0–z12 约数百张瓦片，落盘随仓库外置分发 | 需确认瓦片源授权；AOI 外无底图 |
-| B. 接入在线影像服务 | 画面质量最好，随取随用 | 依赖外网；离线/内网环境下不可用 |
+| `joint_full` | 联合态势演示（海陆空全要素） | 12 目标 / 10 热点 |
+| `sea_convoy` | 海上编队穿越与护航 | 7 目标 / 5 热点 |
+| `air_control` | 空中巡逻与预警指挥 | 6 目标 / 4 热点 |
+| `coastal_defense` | 沿海要地防空反导 | 7 目标 / 5 热点 |
 
-> 注：`tools/shots/` 下的截图由 `tools/capture.py` 生成，像素校验只判定"球体是否已渲染"，
-> 不判定影像 LOD。同一参数的多次捕获可能分别落在粗层级与 z2，属正常现象。
+红方：052D 驱逐舰、054A 护卫舰、903 补给舰、鹰击-62 岸舰导弹营、红旗-9B
+远程防空营、歼-16、空警-500。
+蓝方：成功级护卫舰、沱江级巡逻舰、爱国者-3 防空连、F-16V、E-2K。
 
-### 取证截图
+每个目标都带真实型号、军标图形键、传感器型号与探测距离、武器有效射程。
 
-| 文件 | 内容 |
-|---|---|
-| `tools/shots/verified_ticks.png` | tick 0 / 360 / 600 / 720 / 1200 / 1439 六时点对比 |
-| `tools/shots/tick_*.png` | 各时点原始截图（1600×900） |
+---
 
-## 数据说明
+## 3. 三级态势推理（`engine/inference.py`）
 
-`web/data/demo_taiwan_strait.json` 是**基于真实地理航路构造的仿真态势**，不是真实 AIS/ADS-B 记录。
-航路点取自台海真实地理位置（平潭、澎湖、高雄、厦门等），速度与高度取自真实装备量级。
-按已确认口径，态势数据为仿真生成，图像数据后续接入真实数据集。
+| 级别 | 回答的问题 | 主要输出 |
+|---|---|---|
+| L1 目标级 | 这个平台在做什么、被威胁到什么程度 | 状态、意图、威胁度 0–100、告警等级、最近对方目标、被探测数量 |
+| L2 编组级 | 红蓝双方编组之间是什么关系 | 编队形态、质心、跨度、与对方同域编组的最小距离、对抗关系 |
+| L3 区域级 | 每个热点区域内部是什么态势 | 态势等级 1–4、双方兵力数、主导方 |
 
-## 引擎数据基准
+**威胁度口径**（三项相加，逐项可查）：
 
-自研引擎复现陆战裁决语义的权威基准见
-[`../docs/wargame_engine_data_dictionary.md`](../docs/wargame_engine_data_dictionary.md)。
+```
+威胁度 = 装备权重(0–35) + 接近度(0–50) + 覆盖度(0–9)
+
+接近度 = 50 · exp(-2 · d / R_射程)      R 取最近对方目标的武器有效射程
+覆盖度 = Σ 3 · (1 - d / R_探测)          只计探测范围内的对方传感器
+```
+
+用**武器射程**而不是"影响半径"算接近度是关键：预警机的雷达看得远但没有武器，
+否则一架远处的预警机会把全场威胁度顶到"警告"。这一版之前就踩过这个坑。
+
+推理规则与阈值全部随数据集导出（`inference_model` 段），前端不复制一份口径。
+
+---
+
+## 4. 离线资产与 LOD
+
+### 4.1 资产族
+
+| 族 | 目录 | 层级 | 来源 |
+|---|---|---|---|
+| 影像底图 | `web/tiles/imagery/{z}/{x}/{y}.jpg` | z0–11（全域）+ z12–14（城区） | Esri World Imagery |
+| 高程 DEM | `web/tiles/terrain/{z}/{x}/{y}.png` | z0–10 | Mapzen / AWS（Terrarium 编码） |
+| 建筑高度 | `web/tiles/wsf3d/buildingheight/...` | z0–10（面）+ z13（城区） | DLR WSF3D v02 |
+
+`web/tiles/manifest.json` 记录**真实覆盖范围与层级区间**，前端 provider 的
+`rectangle` 直接取自这里。
+
+### 4.2 LOD 的关键一条：provider 必须声明真实覆盖范围
+
+底图只下载了台海 AOI。如果 provider 仍声明覆盖全球，Cesium 会为域外瓦片持续
+发请求、持续 404，并因此**卡在 z0–z1 不再细化**——实测一次加载发出 500 次重试、
+整幅底图退化成一片渐变。把 `rectangle` 设成 manifest 里的真实范围后，请求全部
+命中已下载瓦片，层级正常推进到 z7。
+
+### 4.3 其余 LOD 手段
+
+- **高程**：超过下载层级时复用祖先瓦片并降采样，不会出现空洞。
+- **城区高清影像**：相机高于 200 km 时不挂载 z12–14 图层，否则每个表面瓦片都
+  会去要一批用不上的瓦片；低于阈值再挂上，飞高时摘掉。
+- **建筑体块**：按相机高度分 4 档（粗网格/细网格、采样步长 8/4/2/1），已生成的
+  档位缓存复用，来回缩放不重算。
+- **解码缓存**：高程与 WSF3D 瓦片的解码结果都有 LRU 上限。
+
+### 4.4 资产管线
+
+```bash
+# 台海全域（影像 z0-11、高程 z0-10、WSF3D z0-10）
+python3 tools/fetch_assets.py all --bbox 115,18,125,29
+
+# 城区高清（影像 z12-14、WSF3D z13），城市区列表见 engine/scenario.py 的 URBAN_AOI
+sh tools/fetch_urban_wsf3d.sh
+
+# 归一化 manifest —— 必须最后跑
+python3 tools/finalize_manifest.py --bbox 115,18,125,29
+```
+
+**manifest 归属权是强制约定**：`bbox` / `imagery` / `terrain` / `wsf3d` 属于
+全域抓取，由 `finalize_manifest.py` 权威写入；`urban_*` 属于城区抓取。城区抓取
+一律带 `--no-manifest`，否则会把全域条目覆盖成一个城区的范围——那会让底图
+provider 只声明覆盖一座城市，现象是"地图坏了"，而不是"manifest 写错了"。
+
+---
+
+## 5. WSF3D 建筑高度还原
+
+DLR GeoService 返回的是**调色板 PNG**：黑色为无数据，蓝色渐变为建筑高度。
+直接当图层叠加会盖住底图（无数据是纯黑、不透明），所以：
+
+1. **叠加显示**用 `ImageryLayer.colorToAlpha` 把黑色扣掉。
+2. **三维体块**需要真实高度，做法是**实测标定**而不是猜：
+   `tools/calibrate_wsf3d.py` 对每个采样像元，取其**像元中心**的经纬度去问
+   WMS `GetFeatureInfo`，拿到真实的 `GRAY_INDEX`（米），与该像元的颜色配对，
+   最后输出**颜色→高度查表**（`height_ramp.json`）。
+   - 调色板是离散的，查表比在单个通道上做线性拟合准得多（线性拟合残差 6.8 m）。
+   - 必须在 z13 标定：z10 一个像元约 153 m，粗于 WSF3D 的 90 m 源，重采样会
+     把颜色和数值搅在一起。
+
+无数据值为 `-32767`，在栅格里渲染为纯黑。
+
+---
+
+## 6. 前端瓦片缓存
+
+`web/src/tilecache.js`。目标是"浏览过的瓦片不再重复向服务器取"，分两层：
+
+- **内存 LRU**：512 张已解码 canvas，渲染路径直接命中，不触发解码。
+- **IndexedDB**：原始字节，跨会话持久，上限 6000 条，按写入时间淘汰。
+
+### 6.1 设计原则：缓存永远不能挡住渲染
+
+第一版把缓存放在渲染路径上（`requestImage` 里 `await` 取图），结果很糟：只要
+取图链路任一环卡住（IndexedDB 打开、fetch、图片解码），Cesium 就会因为等这一张
+瓦片而**完全不渲染表面瓦片**，整幅底图变黑。实测现象是 `surface tiles 0`、
+`imagery requests 1`——一次请求把整条流水线堵死。
+
+现在分成两条互不影响的路径：
+
+```
+渲染路径（同步）  requestImage 只查内存 LRU，命中即返回；未命中交给 Cesium
+                  自己的加载器。全程没有 await。
+预热路径（异步）  后台取图、解码、写内存与 IndexedDB。慢/失败/卡住都只影响
+                  "下次能不能命中"，不影响这一次能不能画出来。
+```
+
+持久化命中靠**启动后把 IndexedDB 搬回内存**。但预热同样要讲纪律：
+
+- 只在底图空闲时进行（由 `globe.tileLoadProgressEvent` 归零驱动）；
+- 一次只搬 16 张，串行解码；
+- 预热取图并发上限 2。
+
+预热无节制地并发会占满浏览器每域 6 条连接，把 Cesium 自己的影像请求饿死——
+同样是"底图变黑、日志里什么错都没有"。
+
+### 6.2 另一层是 HTTP 缓存
+
+`server/serve.py` 对 `/tiles/` 与 `/vendor/` 返回
+`Cache-Control: public, max-age=604800, immutable` + `ETag`，源码文件保持
+`no-store`。案例 JSON 是几 MB 的重复文本，开 gzip 后约 470 KB（约 1/20）。
+服务端 accept backlog 调到 256：默认的 5 挡不住浏览器 6 条并发连接 + Cesium
+的批量瓦片请求，被丢弃的连接在页面里表现为 `Failed to fetch` 和底图降级。
+
+---
+
+## 7. 取证与验证
+
+```bash
+# 一张截图（本地驱动 + 远程渲染 + 校验 + 重试）
+python tools/capture.py --url "/?case=joint_full&tick=800" --out shots/x.png
+```
+
+`tools/capture.py` 有两道判据，因为截图会以两种不同方式出错：
+
+1. **有没有渲染** —— 中心区域亮度；空场景接近 4。
+2. **细化到不到位的层级** —— 瓦片还没细化完的地球仍然"亮"，只是把粗层级拉伸
+   铺满，看起来是一片渐变，平均亮度分辨不出来，但**边缘能量**可以：细化完成的
+   画面约 1.9，粗层级占位约 0.13。
+
+第二道判据是把 `--virtual-time-budget` 从"祈祷参数"变成可复现流程的关键。
+`--keep-failed` 会保留被拒绝的帧，便于直接看诊断浮层而不是只看到一个失败。
+
+---
+
+## 8. 目标跟随与地图组件
+
+### 8.1 地图组件（指南针 / 比例尺 / 视点坐标）
+
+**Cesium 1.145 没有内置指南针，也没有内置比例尺**（内置 widget 只有 HomeButton /
+SceneModePicker / BaseLayerPicker / Geocoder / NavigationHelpButton / Timeline /
+Animation / FullscreenButton / VRButton / InfoBox / SelectionIndicator /
+ProjectionPicker / CreditDisplay），三项全部自建，归在图层管理第四类「地图组件」下，
+默认显示，复选框控制加载与隐藏。
+
+- **指南针**：取"盘面 N 指向屏幕上的北"语义（"指针指向相机朝向"没有信息量——屏幕
+  上方本身就是相机朝向）。朝向**自算**而不用 `camera.heading`：那个 getter 内部会
+  临时改写 `camera._transform` 并两次 `updateMembers`，10 Hz 高频读取有额外开销。
+  点击复位正北（pitch 会先 clamp，否则接近 ±90° 时"点了没反应"）。
+- **比例尺**：取屏幕两点 → `getPickRay` + `globe.pick` → `EllipsoidGeodesic` →
+  按 1/2/5×10ⁿ 取整。**取样点必须在比例尺实际绘制处，不能用屏幕中心**——3D 倾斜
+  视图下近端与远端的每像素米数可差数倍。三级兜底：`globe.pick` **只对已渲染瓦片
+  求交**，未加载时返回 undefined → `IntersectionTests.rayEllipsoid` 解析求交 →
+  视锥解析式 → 全失败则隐藏。用测地线量测不需要手工 `cos(lat)` 校正。
+- **视点坐标**：`camera.positionCartographic`，即**相机自身**的经纬高（**椭球高**，
+  不是海拔）。与右侧「地理位置信息」面板分工不同——后者是**光标落点**。实测
+  900 km 机位下两者相差约 2.2° 纬度，证明确实是两个不同的量。
+
+### 8.2 目标跟随
+
+开关在图层管理里；开启后点击任一目标即以其为中心持续跟随。
+
+**用 `camera.lookAt` + `HeadingPitchRange` 逐帧驱动，不用 `viewer.trackedEntity`**：
+后者的 `entity.viewFrom` **只在首帧生效**（跟踪中改视角必须解绑重绑），且 3D 跟踪会
+强制 `enableTilt = false`，做不到"随航向旋转 + 俯仰可控"。
+
+**航向公式**（由 1.145 源码 `offsetFromHeadingPitchRange` 推出，实测已复核）：
+`offset_ENU = (−r·cos p·sin h, −r·cos p·cos h, −r·sin p)`，即 `heading` 是**相机视线
+方位角**，相机**位置**方位角 = `heading + 180°`。要让相机位于目标右后上方：
+`heading = 目标航向 − 30°`。
+
+实测复核（`?case=joint_full&tick=800&follow=R06`）：相机高度 13.15 km = 8500 +
+15000·sin18°；相机相对目标 Δ北 4.8 km、Δ东 13.4 km → 水平 14.2 km = 15000·cos18°，
+方位角 70.3°；R06 末段航向 279° → 公式预期 `279+180−30 = 69°`。**吻合。**
+
+视角参数按域分档（海 3.5 km/−22°、陆 4.0 km/−30°、空 15 km/−18°，均偏右 30°）。
+跟随相机挂在 `scene.preRender`（`Scene.render` 顺序为 preUpdate → update → preRender
+→ draw，在这里改相机本帧生效）。目标静止（暂停或到达航路终点）时跳过，既省掉每帧的
+`lookAt` 也不再刷 `camera.changed`。
+
+**三条必须遵守的纪律**：
+
+1. **`detachFollow()` 内必须 `camera.lookAtTransform(Matrix4.IDENTITY)`**。
+   `camera.lookAt` 会把 `camera.transform` 锁在目标 ENU 上，
+   `ScreenSpaceCameraController` 随即把 `_globe` 置 undefined、`_ellipsoid` 换成
+   单位球 → 缩放与贴地钳制失效、**可以穿到地面以下**。而 `setView` / `flyTo`
+   **自己不会解锁**（它们保存并恢复原 transform），所以所有视角跳转入口都要先经
+   `detachFollow()`。诊断浮层的 `unlocked` 项就是这一条的判据。
+2. **"拖动即解除"不能用 `camera.changed` 或 `moveStart/moveEnd`**——这两个事件的
+   判定会比较 `camera.transform`，而跟随每帧都在改它，会被跟随本身持续触发。改为在
+   canvas 上捕获 `pointerdown/move/up` + `wheel`，用 4 px 阈值区分"点击切换目标"与
+   "拖动解除"；按下即 `suspend`，让拖拽第一像素起相机就归用户。
+3. **跟随时 `camera.changed` 每帧触发，会把建筑体块的 400 ms 防抖反复重置而永不执行**。
+   改为 `if (state.follow.id) return;`，并在 `detachFollow()` 收尾时补一次
+   `refreshBuildings()`。
+
+### 8.3 一个真实 Bug 的根因（已修）
+
+页面加载后 Cesium 弹出 `An error occurred while rendering. Rendering has stopped. /
+TypeError: a.then is not a function`。
+
+根因：`web/src/tilecache.js` 的 `attach()` 在内存命中时**同步返回 `HTMLCanvasElement`**，
+而 Cesium 1.145 的 `ImageryLayer._requestImagery().doRequest()` 对 `requestImage()` 的
+返回值**直接调用 `.then()`**（只有 `defined()` 守卫，**没有** `Promise.resolve()` 包装）。
+canvas 没有 `.then` → 渲染循环内同步抛错 → CesiumWidget 判定渲染已停止。
+
+修复：命中分支 `return Promise.resolve(hit);`。
+
+---
+
+## 9. 已知限制
+
+- **城区高清影像目前只有台北**（`中国台湾省 台北`）。高雄、厦门、福州的
+  z12–14 影像与 z13 WSF3D 尚未下载完，切到这几个城市时城区图层为空。
+  补齐：`sh tools/fetch_urban_wsf3d.sh`。
+- **无头软件光栅化环境下底图细化很慢**，首次截图常需要重试。真实浏览器有 GPU
+  时明显更快。前端已加"正在加载瓦片…剩余 N"徽标把这段过程显式化。
+- **WSF3D 是 90 m 分辨率的城市体量**，不是单体建筑模型；三维体块表达的是街区
+  尺度的建筑高度分布。
+- 高程 z10 在城区尺度会被拉伸；底图 z11 在城区尺度同理，靠城区 z12–14 补。
+- **3D-GloBFP v4** 可作为 WSF3D 之外的建筑体量来源。当前的三维体块管线只依赖
+  "建筑高度栅格 + 颜色→高度标定表"两件事，替换数据源只需新增一个同构的抓取
+  与标定适配器，`web/src/assets.js` 不用改。

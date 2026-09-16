@@ -23,8 +23,17 @@ different ways.
    `--virtual-time-budget`.
 
 Usage:
-    python capture.py --url "/?tick=360" --out shots/tick360.png
-    python capture.py --url "/" --out shots/overview.png --tries 5 --vtb 40000
+    python capture.py --url "/?case=joint_full&tick=360" --out shots/tick360.png
+    python capture.py --url "/?case=joint_full&follow=R01" --out shots/follow.png --tries 5
+    python capture.py --url "/?components=0" --out shots/nocomp.png
+
+Note on URLs: once the empty-state change lands, `/` no longer loads a situation, so
+every capture that needs targets must carry `?case=<id>` explicitly.
+
+Caveat on low-altitude views: imagery is pre-downloaded to z11 across the theatre
+(z12-14 only over the urban AOIs), so a camera a few kilometres above open sea
+renders heavily stretched imagery and legitimately fails the edge-energy gate.
+Use `--keep-failed` to inspect the frame instead of chasing it.
 
 Requires: Pillow locally, ssh/scp access to the remote host, and
 bootstrap_remote_headless.sh already run on the remote.

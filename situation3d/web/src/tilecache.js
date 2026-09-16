@@ -482,7 +482,11 @@
       const hit = memoryGet(url);
       if (hit) {
         stats.memoryHits++;
-        return hit;
+        // 必须包成 Promise：Cesium 1.145 的 ImageryLayer._requestImagery().doRequest()
+        // 对 requestImage() 的返回值**直接调用 .then()**（只有 defined() 守卫，没有
+        // Promise.resolve() 包装）。同步返回 canvas 会让它在渲染循环内抛
+        // "a.then is not a function"，CesiumWidget 随即判定渲染已停止、整幅底图变黑。
+        return Promise.resolve(hit);
       }
 
       // 未命中：原生路径负责这一次的渲染，预热负责下一次的命中。

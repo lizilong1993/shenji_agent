@@ -55,6 +55,19 @@
         </div>
       </section>
 
+      <section class="panel-block">
+        <h2>目标跟随</h2>
+        <label class="check"><input type="checkbox" id="followTarget"> 开启后点击目标即跟随</label>
+        <div class="switch-note" id="followNote">开启后点击任一目标，相机以随航向旋转的追踪视角持续跟随；拖动地图即自动解除。</div>
+      </section>
+
+      <details class="layer-group panel-block" open>
+        <summary>地图组件</summary>
+        <label class="check"><input type="checkbox" id="compCompass" checked> 指南针</label>
+        <label class="check"><input type="checkbox" id="compScalebar" checked> 比例尺</label>
+        <label class="check"><input type="checkbox" id="compViewpoint" checked> 视点坐标</label>
+      </details>
+
       <section class="panel-block grow">
         <h2>目标列表 <span class="hint-inline" id="targetCountHint"></span></h2>
         <div id="targetList" class="target-list"></div>
@@ -88,6 +101,36 @@
 
       <div id="loadingBadge" class="loading-badge hidden">
         <span class="lb-spinner"></span><span id="loadingText">正在加载瓦片…</span>
+      </div>
+
+      <!-- 地图组件：Cesium 1.145 无内置指南针与比例尺，三项均为自建 -->
+      <div id="mapCompass" class="map-comp" title="点击复位正北（相机航向归零）">
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" fill="rgba(255,255,255,.92)" stroke="#b9c6d8"/>
+          <g id="compRose">
+            <line x1="50" y1="12" x2="50" y2="88" stroke="#c9d2de" stroke-width="1"/>
+            <line x1="12" y1="50" x2="88" y2="50" stroke="#c9d2de" stroke-width="1"/>
+            <path d="M50 8 L55 20 L45 20 Z" fill="#c8352c"/>
+            <path d="M50 92 L55 80 L45 80 Z" fill="#8a94a6"/>
+            <text x="50" y="31" text-anchor="middle" font-size="15" fill="#c8352c">N</text>
+            <text x="50" y="80" text-anchor="middle" font-size="12" fill="#6b7688">S</text>
+            <text x="81" y="55" text-anchor="middle" font-size="12" fill="#6b7688">E</text>
+            <text x="19" y="55" text-anchor="middle" font-size="12" fill="#6b7688">W</text>
+            <circle cx="50" cy="50" r="2.5" fill="#4c5866"/>
+          </g>
+          <path d="M50 1 L56 13 L44 13 Z" fill="#1668dc"/>
+        </svg>
+      </div>
+
+      <div id="mapViewpoint" class="map-viewpoint">
+        <div class="mv-row"><span>视点经度</span><b id="mvLon">—</b></div>
+        <div class="mv-row"><span>视点纬度</span><b id="mvLat">—</b></div>
+        <div class="mv-row"><span>视点高度</span><b id="mvAlt">—</b></div>
+      </div>
+
+      <div id="mapScalebar" class="map-scalebar">
+        <div class="sb-track"><div id="sbBar" class="sb-bar"></div></div>
+        <span id="sbLabel">—</span>
       </div>
 
       <div id="hint" class="hint">滚轮缩放 · 拖拽旋转 · 点击目标查看信息面板 · 点击热点区域联动地理位置信息</div>
