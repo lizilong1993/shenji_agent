@@ -26,6 +26,16 @@
  *
  * 隐藏/显示的一个坑：`display:none` 会让容器尺寸归零，而 Cesium 只监听 window.resize，
  * 重新显示不会自愈。所以 show() 必须走 resize() + setView()。
+ *
+ * 已知现象（无头软件光栅化环境）：主相机压到几公里时这块画布会变黑，而 900 km /
+ * 6000 km 时正常。相关性指向 SwiftShader 下的资源争用——主视图在城区要上传大量
+ * z16-17 纹理，第二个 WebGL 上下文被饿死，而不是这里的逻辑有问题（视野框在低空
+ * 本来就按设计不画）。真实 GPU 环境下待复核。
+ *
+ * 已知现象（无头软件光栅化环境）：主相机压到几公里时这块画布会变黑，而 900 km /
+ * 6000 km 时正常。相关性指向 SwiftShader 下的资源争用——主视图在城区要上传大量
+ * z16-17 纹理，第二个 WebGL 上下文被饿死，而不是这里的逻辑有问题（视野框在低空
+ * 本来就按设计不画）。真实 GPU 环境下待复核。
  */
 
 'use strict';
@@ -42,6 +52,7 @@
   let mainViewer = null;      // 主 3D Viewer
   let footprintEntity = null;
   let lastFootprintAt = 0;
+  let lastFootprintKey = 'init';   // 'init' | 'none' | 'set'，用于跳过无变化的重复赋值
   let created = false;
 
   const _enuM = new Cesium.Matrix4();
@@ -93,9 +104,19 @@
     const pts = height < FOOTPRINT_MIN_HEIGHT_M ? null : mainViewFootprint();
     if (!footprintEntity) return;
 
+    // 状态没变就不重复赋值与重绘。低空时视野框会被关闭，此时相机每动一下都重新
+    // 赋值空数组并 requestRender 是纯浪费，也可能让第二个上下文被反复打断。
+    const key = pts ? 'set' : 'none';
+    if (key === lastFootprintKey && !force) return;
+    lastFootprintKey = key;
+
     // 直接赋普通数组（ConstantProperty），不要用 CallbackProperty —— 见文件头第 3 条
-    footprintEntity.polyline.positions = pts || [];
-    footprintEntity.show = !!pts;
+    if (pts) {
+      footprintEntity.polyline.positions = pts;
+      footprintEntity.show = true;
+    } else {
+      footprintEntity.show = false;
+    }
     viewer.scene.requestRender();
   }
 
