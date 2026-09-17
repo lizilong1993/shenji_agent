@@ -95,7 +95,7 @@ const dom = {};
  'switchNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner', 'btnOverview',
  'countRed', 'countBlue', 'countSea', 'countLand', 'countAir', 'targetCountHint',
  'loadingBadge', 'loadingText',
- 'mapCompass', 'compRose', 'mapViewpoint', 'mvLon', 'mvLat', 'mvAlt',
+ 'mapCompass', 'compRose', 'mapViewpoint', 'mvLon', 'mvLat', 'mvAlt', 'modelPlaces', 'modelPlaces',
  'mapScalebar', 'sbBar', 'sbLabel', 'followTarget', 'followNote',
 ].forEach(function (id) { dom[id] = document.getElementById(id); });
 
@@ -238,6 +238,7 @@ function renderDiagnostics() {
              '  unlocked ' + viewer.camera.transform.equals(Cesium.Matrix4.IDENTITY));
   lines.push('camChanged      ' + camChangedCount + ' 次');
   if (window.Overview) lines.push('overview        ' + Overview.debugInfo());
+  if (window.Places) lines.push('places          ' + Places.debugInfo());
   lines.push('base            ' + (state.base ? 'ok' : 'MISSING') +
              '  baseCamera ' + (state.baseCamera ? 'ok' : '-') +
              '  urbanAoi ' + (state.urbanAoi ? state.urbanAoi.length : 0));
@@ -353,6 +354,7 @@ function initViewer() {
     Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
   if (window.Overview) Overview.init(viewer);
+  if (window.Places) Places.init(viewer);
 }
 
 function flyTo(lon, lat, height, pitchDeg) {
@@ -675,7 +677,8 @@ const LAYER_GROUPS = [
   { name: '目标图层', ids: ['layerTargets', 'layerLabels', 'layerTracks', 'modelSensor',
                             'layerTargetPanel', 'filterRed', 'filterBlue', 'filterSea',
                             'filterLand', 'filterAir'] },
-  { name: '底图', ids: ['modelImagery', 'modelHotspotImagery', 'modelUrbanImagery', 'modelTerrain',
+  { name: '底图', ids: ['modelImagery', 'modelHotspotImagery', 'modelUrbanImagery',
+                        'modelPlaces', 'modelTerrain',
                         'modelWsf3dOverlay', 'modelBuildings', 'modelWeather'] },
   { name: '地图组件', ids: ['compCompass', 'compScalebar', 'compViewpoint'] },
 ];
@@ -2165,6 +2168,18 @@ function bindUI() {
     state.layers.targetPanel = v;
     if (!v) closeTargetPanel();
   });
+  bindCheck('modelPlaces', function (v) {
+    if (window.Places) Places.setEnabled(v);
+    setSwitchNote(v ? '地名图层已启用：Natural Earth 离线地名，按相机高度分级显示并做屏幕空间去重。'
+                    : '地名图层已关闭。');
+  });
+  // HTML 里的 checked 只是初始显示，change 事件不会自动触发；而地名数据是懒加载的，
+  // 不显式初始化一次就会"默认勾选却什么都不显示"。
+  if (dom.modelPlaces && dom.modelPlaces.checked && window.Places) Places.setEnabled(true);
+  // HTML 里的 checked 只是初始显示，change 事件不会自动触发；而地名数据是懒加载的，
+  // 不显式初始化一次就会"默认勾选却什么都不显示"。
+  if (dom.modelPlaces && dom.modelPlaces.checked && window.Places) Places.setEnabled(true);
+
   bindCheck('modelHotspotImagery', setHotspotImagery);
 
   bindCheck('modelUrbanImagery', function (v) {
@@ -2323,6 +2338,7 @@ function bindUI() {
     syncUrbanImagery();
     guardFollow();
     if (window.Overview) Overview.onMainCameraChanged();
+    if (window.Places) Places.onCameraChanged(false);
     // 相机高度跨过 LOD 阈值时才重建，且加一段防抖，避免飞行过程中反复触发。
     // 跟随期间相机每帧都在动，防抖会被反复重置而**永不执行**，所以直接跳过；
     // detachFollow() 收尾时会补一次 refreshBuildings()。
@@ -2377,6 +2393,13 @@ function applyCaseIndependentHooks() {
   }
 
   // 鸟瞰图：?overview=0|1
+  if (params.has('places')) {
+    const on = params.get('places') !== '0';
+    const box = document.getElementById('modelPlaces');
+    if (box) box.checked = on;
+    if (window.Places) Places.setEnabled(on);
+  }
+
   if (params.has('overview')) setOverview(params.get('overview') !== '0');
 
   // 地图组件：?components=0|1 全关/全开；?components=a,b 白名单；?components=-a 排除

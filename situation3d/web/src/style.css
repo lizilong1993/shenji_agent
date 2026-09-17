@@ -812,6 +812,17 @@ select {
 
 .sit-actions { display: flex; gap: 8px; margin-top: 14px; }
 
+.sit-error {
+  padding: 10px 12px;
+  border: 1px solid #e0b4b4;
+  border-radius: 4px;
+  background: #fdf2f2;
+  color: #a33;
+  font-size: 12px;
+}
+
+.sit-error pre { margin: 8px 0 0; font-size: 11px; white-space: pre-wrap; color: #8a5a5a; }
+
 .sit-picking {
   outline: 2px dashed var(--accent);
   outline-offset: -2px;

@@ -380,9 +380,21 @@
         b.classList.toggle('active', b.dataset.sitTab === tab);
       });
     body.innerHTML = '';
-    if (tab === 'input') renderInput(body);
-    else if (tab === 'manage') renderManage(body);
-    else renderDownload(body);
+    // 面板渲染一旦抛异常，之前的表现是"整块内容静默变空"，极难定位。
+    // 这里兜住并把错误显示出来——面板渲染失败必须看得见。
+    try {
+      if (tab === 'input') renderInput(body);
+      else if (tab === 'manage') renderManage(body);
+      else renderDownload(body);
+    } catch (e) {
+      console.error('[situation] 面板渲染失败', e);
+      const box = el('div', 'sit-error');
+      box.appendChild(el('div', null, '面板渲染失败：' + e.message));
+      const pre = document.createElement('pre');
+      pre.textContent = String(e.stack || '').split('\n').slice(0, 4).join('\n');
+      box.appendChild(pre);
+      body.appendChild(box);
+    }
   }
 
   function section(parent, title) {
@@ -410,6 +422,14 @@
   // ---- 标签页 1：态势输入 ----
   function renderInput(body) {
     const d = ensureDraft();
+
+    // 数据来源一行：草稿是从当前态势派生的还是最小样例，一眼能看出来
+    const src = el('div', 'sit-hint');
+    const data = host().state.data;
+    src.textContent = '草稿来源：' + (data
+      ? '当前态势「' + data.case_name + '」（' + data.targets.length + ' 个目标）'
+      : '最小样例（当前未加载态势）') + ' · 草稿目标 ' + d.targets.length + ' 个';
+    body.appendChild(src);
 
     // 战场范围
     const s1 = section(body, '战场范围');
@@ -492,6 +512,7 @@
       del.type = 'button';
       del.addEventListener('click', function () { d.targets.splice(idx, 1); render(); });
       cell(del);
+      tb.appendChild(tr);          // ← 少了这一行，行就永远不会进表格
     });
     s3.appendChild(table);
 
