@@ -2,15 +2,33 @@
 """Deterministic screenshot capture for the situation3d web app.
 
 The web app runs on the remote container; this driver runs locally and only
-orchestrates. It exists because `--screenshot` alone gives no usable readiness
-signal: a capture may come back with the Cesium globe not yet rasterised
-(uniformly black), and the same `--virtual-time-budget` value produces both
-outcomes across runs. So every capture is validated by inspecting pixels, and
-invalid captures are retried.
+orchestrates.
 
-Validation: two independent checks, because a screenshot can be wrong in two
-different ways.
+**How the remote frame is taken changed, and it matters.** It used to run
+Chromium once with `--screenshot` + `--virtual-time-budget`, and validate the
+resulting pixels. That approach produced black frames for every camera height
+between roughly 12 km and 300 km -- three attempts at 20 km, 100 km and 300 km,
+all luma 3.3, while 900 km and 6 km always worked. The conclusion recorded at the
+time was "the app cannot render at those heights in a headless software
+rasteriser". That was wrong, and the DevTools protocol is what showed it:
 
+    at 20 km the page reports ~5 fps sustained, globe.tilesLoaded true,
+    no context loss, no page errors
+
+The page was rendering perfectly the whole time; the *capture* was broken.
+`--virtual-time-budget` fast-forwards the page's timers while tile decode and
+SwiftShader rasterisation consume real time, so with a few hundred more tiles in
+view at low altitude the budget expires long before the frame is complete --
+and `--screenshot` then composites a canvas that has not been drawn.
+
+So the frame is now taken over DevTools: navigate, wait until the globe stops
+fetching tiles (`settle`), settle a moment longer, then `Page.captureScreenshot`.
+No virtual time is involved. Measured after the change, first attempt each:
+
+    20 km   luma 73.3  edge 13.671      300 km  luma 83.0  edge 2.938
+    12 km   luma 81.5  edge  4.498        6 km  luma 96.4  edge 13.238
+
+Validation is still applied, because a screenshot can be wrong in two ways.
 1. **Rendered at all.** The globe fills the centre of the viewport, so a patch
    there must be brighter than the empty starfield. An unrendered globe sits
    near luma 4.
@@ -19,8 +37,6 @@ different ways.
    the surface -- and reads as a smooth gradient. Mean luma cannot tell that
    apart from a finished frame, but edge energy can: a refined view measures
    about 1.9 mean absolute gradient across the patch, a coarse one about 0.13.
-   This is what makes captures reproducible without guessing a
-   `--virtual-time-budget`.
 
 Usage:
     python capture.py --url "/?case=joint_full&tick=360" --out shots/tick360.png
@@ -28,18 +44,20 @@ Usage:
     python capture.py --url "/?components=0" --out shots/nocomp.png
     python capture.py --url "/?case=joint_full&overview=1" --out shots/overview.png
 
-Note on URLs: once the empty-state change lands, `/` no longer loads a situation, so
-every capture that needs targets must carry `?case=<id>` explicitly.
+Note on URLs: `/` no longer loads a situation, so every capture that needs
+targets must carry `?case=<id>` explicitly.
 
-Caveat on low-altitude views: imagery is pre-downloaded to z11 across the theatre
-(z12-14 only over the urban AOIs), so a camera a few kilometres above open sea
-renders heavily stretched imagery and legitimately fails the edge-energy gate.
-Use `--keep-failed` to inspect the frame instead of chasing it.
+Caveat on low-altitude views over open water: imagery is pre-downloaded to z11
+across the theatre (z12-17 only over the urban AOIs), so a camera a few
+kilometres above the sea renders heavily stretched imagery and can legitimately
+fail the edge-energy gate. Use `--keep-failed` to inspect the frame instead of
+chasing it.
 
 Requires: ssh/scp access to the remote host, and bootstrap_remote_headless.sh
 already run on the remote. Pillow is used for the pixel probe when installed;
 without it the same measurement is done by a standard-library PNG reader, so the
-driver also works on a bare Python with no packages.
+driver also works on a bare Python with no packages. The remote side reuses the
+DevTools client from `tools/inspect_remote.py`.
 """
 
 from __future__ import annotations
@@ -54,6 +72,9 @@ import zlib
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+# remote_shot.sh is kept for reference only: the plain `--screenshot` +
+# `--virtual-time-budget` path it implements is what produced black frames at low
+# altitude (see the module docstring). The live path goes through DevTools.
 REMOTE_SHOT = HERE / "remote_shot.sh"
 
 # The alias lives in ~/.ssh/config on the workstation. Override it with
@@ -236,6 +257,81 @@ def probe(png: Path) -> tuple[float, tuple[int, int, int], float]:
     return luma, mean, sharpness
 
 
+# Rendered remotely through the DevTools protocol. The remote side does the
+# waiting, because only it can see whether the globe has actually finished
+# fetching tiles; the local side only validates the pixels that come back.
+REMOTE_CDP = r'''
+import base64, json, os, random, shutil, signal, subprocess, sys, tempfile, time
+# Reuse the DevTools client from inspect_remote.py rather than shipping a second
+# copy: the waiting logic and the transport must not drift apart.
+sys.path.insert(0, os.environ.get("SITUATION3D_TOOLS",
+                                  "/remote-home/lizilong/shenji_agent/situation3d/tools"))
+import inspect_remote as ir
+
+url, out_path, timeout_ms, wait_ms, width, height = (
+    sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]),
+    int(sys.argv[5]), int(sys.argv[6]))
+
+port = 9300 + random.randint(0, 300)
+profile = tempfile.mkdtemp(prefix="situation3d-shot-")
+env = dict(os.environ)
+env["LD_LIBRARY_PATH"] = ":".join([
+    os.path.join(ir.CHROMEDEPS, "usr/lib/x86_64-linux-gnu"),
+    os.path.join(ir.CHROMEDEPS, "lib/x86_64-linux-gnu"),
+    os.path.join(ir.CHROMEDEPS, "usr/lib"),
+])
+env["FONTCONFIG_FILE"] = os.path.join(ir.CHROMEDEPS, "fonts.conf")
+env["FONTCONFIG_PATH"] = ir.CHROMEDEPS
+env["XDG_CONFIG_HOME"] = os.path.join(profile, "cfg")
+env["XDG_CACHE_HOME"] = os.path.join(profile, "cache")
+env.setdefault("HOME", "/remote-home/lizilong")
+os.makedirs(env["XDG_CONFIG_HOME"], exist_ok=True)
+os.makedirs(env["XDG_CACHE_HOME"], exist_ok=True)
+
+proc = subprocess.Popen([
+    ir.DEFAULT_CHROME, "--headless=new", "--no-sandbox", "--disable-dev-shm-usage",
+    "--disable-setuid-sandbox", "--disable-gpu-sandbox", "--enable-unsafe-swiftshader",
+    "--use-gl=angle", "--use-angle=swiftshader", "--font-render-hinting=none",
+    "--remote-debugging-port=%d" % port, "--user-data-dir=%s" % profile,
+    "--window-size=%d,%d" % (width, height), "--hide-scrollbars", "about:blank",
+], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+cdp = None
+try:
+    ir.wait_for_devtools(port, 40)
+    target = ir.first_page_target(port)
+    cdp = ir.DevTools(target["webSocketDebuggerUrl"])
+    cdp.call("Page.enable")
+    cdp.call("Runtime.enable")
+    cdp.call("Page.navigate", url=url)
+
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        if cdp.evaluate("!!(window.Cesium && window.SituationHost && "
+                        "window.SituationHost.viewer && window.SituationHost.viewer())"):
+            break
+        time.sleep(0.5)
+    ir.settle(cdp, timeout_ms)
+    time.sleep(max(0.0, wait_ms / 1000.0))
+    shot = cdp.call("Page.captureScreenshot", format="png")
+    with open(out_path, "wb") as fh:
+        fh.write(base64.b64decode(shot["data"]))
+    print("shot OK")
+finally:
+    if cdp is not None:
+        try:
+            cdp.close()
+        except Exception:
+            pass
+    try:
+        proc.send_signal(signal.SIGKILL)
+        proc.wait(timeout=10)
+    except Exception:
+        pass
+    shutil.rmtree(profile, ignore_errors=True)
+'''
+
+
 def capture(
     host: str,
     url_path: str,
@@ -247,10 +343,16 @@ def capture(
     keep_failed: bool = False,
 ) -> bool:
     # Ship the remote-side script each run so the two files cannot drift apart.
-    remote_script = "/tmp/situation3d_remote_shot.sh"
-    if not scp_to(host, REMOTE_SHOT, remote_script):
-        print("ERROR: could not upload remote_shot.sh")
-        return False
+    remote_script = f"/tmp/situation3d_cdp_shot_{os.getpid()}.py"
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as fh:
+        fh.write(REMOTE_CDP)
+        local_script = Path(fh.name)
+    try:
+        if not scp_to(host, local_script, remote_script):
+            print("ERROR: could not upload the remote capture script")
+            return False
+    finally:
+        local_script.unlink(missing_ok=True)
 
     url = f"http://127.0.0.1:8848{url_path}"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -258,7 +360,7 @@ def capture(
     last_tmp = None
     for attempt in range(1, tries + 1):
         remote_png = f"/tmp/situation3d_capture_{os.getpid()}.png"
-        cmd = f"sh {remote_script} '{url}' {remote_png} {vtb} {width} {height}"
+        cmd = f"python3 {remote_script} '{url}' {remote_png} {vtb} 4000 {width} {height}"
         res = ssh(host, cmd)
         if res.returncode != 0:
             print(f"  attempt {attempt}/{tries}: remote render failed: {res.stderr.strip()[:160]}")
@@ -311,9 +413,11 @@ def main() -> int:
     ap.add_argument("--out", required=True, help="local output PNG path")
     ap.add_argument("--host", default=DEFAULT_HOST, help=f"ssh host alias (default {DEFAULT_HOST})")
     ap.add_argument("--tries", type=int, default=4)
-    # 30000 fails often at 1600x900 (SwiftShader needs real time, not virtual
-    # time); 45000 has been reliable. The retry loop covers the rest.
-    ap.add_argument("--vtb", type=int, default=60000, help="virtual time budget in ms")
+    # Budget for waiting on the remote side until the globe stops fetching
+    # tiles. No longer a Chrome virtual-time budget -- see the module docstring
+    # for why that had to change.
+    ap.add_argument("--vtb", type=int, default=90000,
+                    help="ms to wait for the remote tile queue to drain")
     ap.add_argument("--min-sharpness", type=float, default=MIN_SHARPNESS,
                     help="minimum edge energy of the globe patch")
     # Diagnostic escape hatch: keep a frame that would normally be rejected so
