@@ -36,24 +36,37 @@ Caveat on low-altitude views: imagery is pre-downloaded to z11 across the theatr
 renders heavily stretched imagery and legitimately fails the edge-energy gate.
 Use `--keep-failed` to inspect the frame instead of chasing it.
 
-Requires: Pillow locally, ssh/scp access to the remote host, and
-bootstrap_remote_headless.sh already run on the remote.
+Requires: ssh/scp access to the remote host, and bootstrap_remote_headless.sh
+already run on the remote. Pillow is used for the pixel probe when installed;
+without it the same measurement is done by a standard-library PNG reader, so the
+driver also works on a bare Python with no packages.
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import struct
 import subprocess
 import sys
 import tempfile
+import zlib
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REMOTE_SHOT = HERE / "remote_shot.sh"
 
-DEFAULT_HOST = "server-10-254-1-155-user"
+# The alias lives in ~/.ssh/config on the workstation. Override it with
+# SITUATION3D_SSH_HOST when the checkout is driven from a machine that reaches
+# the container by IP instead (for example a WSL shell whose known_hosts has no
+# entry for it).
+DEFAULT_HOST = os.environ.get("SITUATION3D_SSH_HOST", "server-10-254-1-155-user")
 REMOTE_BASE = "/remote-home/lizilong/shenji_agent/situation3d/web"
+
+# Extra ssh/scp options, space separated, also from the environment. Needed
+# where the host is addressed by IP and the host key is not in known_hosts:
+#   SITUATION3D_SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+SSH_OPTS = os.environ.get("SITUATION3D_SSH_OPTS", "").split()
 
 # A patch this size at the image centre always falls inside the globe.
 PROBE_SIZE = 240
@@ -68,15 +81,110 @@ def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
 
 
 def ssh(host: str, command: str, timeout: int = 360) -> subprocess.CompletedProcess:
-    return run(["ssh", "-o", "ConnectTimeout=20", host, command], timeout=timeout)
+    return run(["ssh", "-o", "ConnectTimeout=20", *SSH_OPTS, host, command], timeout=timeout)
 
 
 def scp_from(host: str, remote: str, local: str, timeout: int = 180) -> bool:
-    return run(["scp", "-q", f"{host}:{remote}", local], timeout=timeout).returncode == 0
+    return run(["scp", "-q", *SSH_OPTS, f"{host}:{remote}", local],
+               timeout=timeout).returncode == 0
 
 
 def scp_to(host: str, local: Path, remote: str, timeout: int = 60) -> bool:
-    return run(["scp", "-q", str(local), f"{host}:{remote}"], timeout=timeout).returncode == 0
+    return run(["scp", "-q", *SSH_OPTS, str(local), f"{host}:{remote}"],
+               timeout=timeout).returncode == 0
+
+
+# --------------------------------------------------------------------------
+# PNG reading: Pillow when present, standard library otherwise
+# --------------------------------------------------------------------------
+#
+# The measurement only ever needs the centre patch of an 8-bit RGB screenshot,
+# so the standard-library path reads just the rows that overlap that patch --
+# unfiltering a whole 1600x900 PNG in pure Python costs seconds, a 240-row band
+# costs a fraction of that. Both paths must return identical numbers or the
+# thresholds below would mean different things depending on the interpreter.
+
+
+def _pixels_pil(png: Path) -> tuple[int, int, list[bytes]]:
+    from PIL import Image
+
+    with Image.open(png) as im:
+        rgb = im.convert("RGB")
+        w, h = rgb.size
+        data = list(rgb.get_flattened_data())
+    rows = [bytes(v for p in data[y * w:(y + 1) * w] for v in p) for y in range(h)]
+    return w, h, rows
+
+
+def _pixels_stdlib(png: Path) -> tuple[int, int, list[bytes]]:
+    """Decode an 8-bit PNG to rows of RGB bytes. No interlacing support."""
+    data = png.read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("not a png: %s" % png)
+    pos = 8
+    idat = bytearray()
+    width = height = depth = ctype = None
+    while pos < len(data):
+        (length,) = struct.unpack(">I", data[pos:pos + 4])
+        tag = data[pos + 4:pos + 8]
+        chunk = data[pos + 8:pos + 8 + length]
+        pos += 12 + length
+        if tag == b"IHDR":
+            width, height, depth, ctype, _comp, _filt, interlace = struct.unpack(
+                ">IIBBBBB", chunk[:13])
+            if interlace:
+                raise ValueError("interlaced PNG not supported")
+        elif tag == b"IDAT":
+            idat += chunk
+        elif tag == b"IEND":
+            break
+    if depth != 8 or ctype not in (2, 6):
+        raise ValueError("expected an 8-bit RGB/RGBA PNG, got depth=%s ctype=%s"
+                         % (depth, ctype))
+    channels = 3 if ctype == 2 else 4
+    raw = zlib.decompress(bytes(idat))
+    stride = width * channels
+    prev = bytearray(stride)
+    rows: list[bytes] = []
+    p = 0
+    for _y in range(height):
+        f = raw[p]
+        p += 1
+        line = bytearray(raw[p:p + stride])
+        p += stride
+        if f == 1:
+            for i in range(channels, stride):
+                line[i] = (line[i] + line[i - channels]) & 0xFF
+        elif f == 2:
+            for i in range(stride):
+                line[i] = (line[i] + prev[i]) & 0xFF
+        elif f == 3:
+            for i in range(channels, stride):
+                a = line[i - channels] if i >= channels else 0
+                line[i] = (line[i] + ((a + prev[i]) >> 1)) & 0xFF
+        elif f == 4:
+            for i in range(stride):
+                a = line[i - channels] if i >= channels else 0
+                b = prev[i]
+                c = prev[i - channels] if i >= channels else 0
+                pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
+                pr = a if (pa <= pb and pa <= pc) else (b if pb <= pc else c)
+                line[i] = (line[i] + pr) & 0xFF
+        elif f != 0:
+            raise ValueError("unknown PNG filter %d" % f)
+        prev = line
+        if channels == 3:
+            rows.append(bytes(line))
+        else:
+            rows.append(bytes(v for i in range(0, stride, 4) for v in line[i:i + 3]))
+    return width, height, rows
+
+
+def read_pixels(png: Path) -> tuple[int, int, list[bytes]]:
+    try:
+        return _pixels_pil(png)
+    except ImportError:
+        return _pixels_stdlib(png)
 
 
 def probe(png: Path) -> tuple[float, tuple[int, int, int], float]:
@@ -85,39 +193,46 @@ def probe(png: Path) -> tuple[float, tuple[int, int, int], float]:
     The patch is taken from the middle of the globe pane rather than the middle
     of the window, because the side panels occupy roughly a third of the width.
     """
-    from PIL import Image
+    w, h, rows = read_pixels(png)
+    # Globe pane: side panels are ~268 px and ~306 px wide at 1600 px.
+    left = 268
+    right = w - 306
+    top = 48
+    bottom = h - 42
+    cx = (left + right) // 2
+    cy = (top + bottom) // 2
+    half = PROBE_SIZE // 2
 
-    with Image.open(png) as im:
-        rgb = im.convert("RGB")
-        w, h = rgb.size
-        # Globe pane: side panels are ~268 px and ~306 px wide at 1600 px.
-        left = 268
-        right = w - 306
-        top = 48
-        bottom = h - 42
-        cx = (left + right) // 2
-        cy = (top + bottom) // 2
-        half = PROBE_SIZE // 2
-        patch = rgb.crop((cx - half, cy - half, cx + half, cy + half)).convert("L")
-        px = list(patch.get_flattened_data())
+    # Centre patch as a flat RGB bytearray (patch-local coordinates).
+    px = bytearray()
+    for y in range(cy - half, cy + half):
+        row = rows[y]
+        px += row[(cx - half) * 3:(cx + half) * 3]
 
-    n = len(px)
-    side = PROBE_SIZE
+    n = PROBE_SIZE
+    luma_sum = 0
+    chan = [0, 0, 0]
+    for i in range(0, len(px), 3):
+        r, g, b = px[i], px[i + 1], px[i + 2]
+        chan[0] += r
+        chan[1] += g
+        chan[2] += b
+        luma_sum += 0.2126 * r + 0.7152 * g + 0.0722 * b
+    count = n * n
+    mean = (chan[0] // count, chan[1] // count, chan[2] // count)
+    luma = luma_sum / count
+
     total = 0
     samples = 0
-    for y in range(side - 1):
-        row = y * side
-        for x in range(side - 1):
-            v = px[row + x]
-            total += abs(px[row + x + 1] - v) + abs(px[row + side + x] - v)
+    for y in range(n - 1):
+        row = y * n * 3
+        nxt = (y + 1) * n * 3
+        for x in range(n - 1):
+            i = row + x * 3
+            v = px[i]
+            total += abs(px[i + 3] - v) + abs(px[nxt + x * 3] - v)
             samples += 2
     sharpness = total / max(1, samples)
-
-    rgb_patch = Image.open(png).convert("RGB").crop(
-        (cx - half, cy - half, cx + half, cy + half))
-    rpx = list(rgb_patch.get_flattened_data())
-    mean = tuple(sum(p[i] for p in rpx) // n for i in range(3))
-    luma = 0.2126 * mean[0] + 0.7152 * mean[1] + 0.0722 * mean[2]
     return luma, mean, sharpness
 
 

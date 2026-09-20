@@ -31,6 +31,7 @@
   // 键与 Cesium 请求的瓦片会对不上。
   const IMAGERY_URL = './tiles/imagery/{z}/{x}/{y}.jpg';
   const WSF3D_URL = './tiles/wsf3d/{layer}/{z}/{x}/{y}.png';
+  const GH3D_URL = './tiles/gh3d/{layer}/{z}/{x}/{y}.png';
 
   // CustomHeightmapTerrainProvider 的高度图宽度/高度：文档要求 2^n+1，
   // 这样正好得到 2^n 个网格四边形。源瓦片是 256x256，解码后重采样到 257。
@@ -44,6 +45,8 @@
     terrain: { min_zoom: 0, max_zoom: 10 },
     wsf3d: { max_zoom: 10 },
     urban_imagery: { min_zoom: 12, max_zoom: 14 },
+    // 三维体块的高度栅格来源；见 blockSource()。缺省 wsf3d。
+    building_blocks: { source: 'wsf3d', layer: 'buildingheight' },
   };
 
   // 解码结果缓存上限（瓦片数）。一瓦片约 256 KB（Float32 高程）或 256 KB
@@ -433,9 +436,9 @@
 
   /** The colour-ramp calibration produced by tools/calibrate_wsf3d.py. */
   function loadHeightRamp() {
-    return fetch('./tiles/wsf3d/height_ramp.json', { cache: 'no-store' })
+    return fetch(rampUrl(), { cache: 'no-store' })
       .then(function (r) {
-        if (!r.ok) throw new Error('height_ramp.json HTTP ' + r.status);
+        if (!r.ok) throw new Error(rampUrl() + ' HTTP ' + r.status);
         return r.json();
       })
       .then(function (ramp) {
@@ -460,6 +463,8 @@
           return entries.length ? entries[best].h : 0;
         };
         ramp.isNoData = function (r, g, b) {
+          // WSF3D 的无数据是纯黑；3D-GloBFP 瓦片用调色板 index 0 且 tRNS=0，
+          // 浏览器解码后同样是 (0,0,0)，所以判据一致。
           return r === 0 && g === 0 && b === 0;
         };
         return ramp;
@@ -496,11 +501,38 @@
 
   const wsf3dTileCache = new Map();
 
+  /**
+   * 三维体块的高度栅格来源。
+   *
+   * 两个源同构（`<layer>/<z>/<x>/<y>.png` + 一张颜色→高度查表），所以切换只
+   * 需要换目录与查表文件：
+   *
+   *   wsf3d  DLR WSF3D，90 m 逐聚落平均高度，全球连续但对城市偏粗
+   *   gh3d   3D-GloBFP 逐建筑 Height 栅格化，17 m 像元取像元内最大高度，
+   *          天际线更真，但覆盖不均（中国大陆可用，台湾近乎为空）
+   *
+   * 由 manifest 的 `building_blocks.source` 选择，缺省保持 wsf3d，这样即使
+   * gh3d 瓦片没构建出来，体块也不会整块消失。
+   */
+  function blockSource() {
+    const cfg = manifest().building_blocks || {};
+    return {
+      dir: cfg.source === 'gh3d' ? './tiles/gh3d' : './tiles/wsf3d',
+      layer: cfg.layer || 'buildingheight',
+      ramp: cfg.ramp || (cfg.source === 'gh3d'
+        ? './tiles/gh3d/height_ramp_gh3d.json'
+        : './tiles/wsf3d/height_ramp.json'),
+    };
+  }
+
+  function rampUrl() { return blockSource().ramp; }
+
   function loadWsf3dTile(z, x, y) {
     const key = z + '/' + x + '/' + y;
     const hit = lruGet(wsf3dTileCache, key);
     if (hit !== undefined) return hit;
-    const promise = imageFromUrl('./tiles/wsf3d/buildingheight/' + key + '.png')
+    const src = blockSource();
+    const promise = imageFromUrl(src.dir + '/' + src.layer + '/' + key + '.png')
       .then(function (im) {
         decodeCtx.clearRect(0, 0, TILE_PX, TILE_PX);
         decodeCtx.drawImage(im, 0, 0, TILE_PX, TILE_PX);
