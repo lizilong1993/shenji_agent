@@ -268,6 +268,18 @@ window.addEventListener('unhandledrejection', function (e) {
   setStatus('运行错误: ' + state.lastError, 'err');
 });
 
+/**
+ * 复选框当前状态。
+ *
+ * 一律现取，不用 `dom.*` 缓存：那个缓存里的复选框引用实测会与文档脱钩
+ * （`isConnected === false`），于是"开关是开的"被读成"关的"，建筑体块一路静默
+ * 短路——不报错、没有任何提示，看起来就是"这个功能没做"。
+ */
+function checkboxOn(id) {
+  const node = document.getElementById(id);
+  return !!(node && node.checked);
+}
+
 function setStatus(text, kind) {
   dom.statusText.textContent = text;
   dom.statusDot.className = 'dot' + (kind ? ' ' + kind : '');
@@ -470,6 +482,11 @@ function applySituationData(data, caseId) {
         const cam = data.camera || {};
         if (isFinite(cam.lon) && isFinite(cam.lat)) Overview.setCenter(cam.lon, cam.lat);
       }
+      // 装载完态势后补一次建筑体块。refreshBuildings() 原本只挂在"选中热点 /
+      // 解除跟随 / 目标高度变化"上，于是一进页面就带 `?buildings=1`（或先开开关
+      // 再选案例）时体块不会出现——除非用户再去点一个热点。色带未就绪时
+      // `?buildings=1` 的回调会补这一次。
+      if (checkboxOn('modelBuildings') && state.ramp) refreshBuildings();
       return data;
   }
 }
@@ -1119,7 +1136,7 @@ function selectHotspot(index, fly) {
 
   // 建筑体块跟随当前热点：若该热点附近有预下载的高清 WSF3D 城市区，
   // 就切换到那个 AOI，否则提示用户。
-  if (dom.modelBuildings && dom.modelBuildings.checked) refreshBuildings();
+  if (checkboxOn('modelBuildings')) refreshBuildings();
 }
 
 /**
@@ -1448,7 +1465,11 @@ function pickAoiForHotspot(index) {
  * 已生成的组合留在 buildingsCache 里，来回缩放不会重复计算。
  */
 function refreshBuildings() {
-  if (!dom.modelBuildings || !dom.modelBuildings.checked) return;
+  // 开关状态**从 DOM 现取**。`dom.modelBuildings` 这个缓存引用实测会失效
+  // （isConnected 为 false），拿它判断"开关开没开"会把已经勾上的开关读成没勾，
+  // 于是整个体块功能静默不工作（现象：`?buildings=1` 完全没有体块，也不报错）。
+  const box = document.getElementById('modelBuildings');
+  if (!box || !box.checked) return;
   // 不再依赖 state.data：空态下用"离相机最近的城区 AOI"生成体块。
   if (!state.ramp) return;
 
@@ -1872,7 +1893,7 @@ function detachFollow(reason) {
     setFollowNote('已解除跟随。勾选后可再次点击目标跟随。');
     // 跟随期间 camera.changed 每帧触发，建筑体块的防抖被反复重置而从不执行；
     // 解除后补一次，让当前机位下的体块 LOD 归位。
-    if (dom.modelBuildings && dom.modelBuildings.checked) refreshBuildings();
+    if (checkboxOn('modelBuildings')) refreshBuildings();
   }
 }
 
@@ -2068,6 +2089,35 @@ function exportCsv() {
 window.SituationHost = {
   state: state,
   viewer: function () { return viewer; },
+  // 取证用：建筑体块的短路条件逐条报出来。`?buildings=1` 不生效时，
+  // "到底卡在哪个 return"光看结果猜不出来。
+  // 注意这里**从 DOM 现取**复选框，不用 dom 缓存：实测两者会不一致
+  // （DOM 上是 true、dom.modelBuildings.checked 是 false），拿缓存的引用去判断
+  // "开关开没开"会把已经打开的开关读成关的。
+  debugBuildings: function () {
+    const box = document.getElementById('modelBuildings');
+    const aoiIdx = nearestAoiToCamera();
+    return {
+      checked: !!(box && box.checked),
+      checkedViaDomCache: !!(dom.modelBuildings && dom.modelBuildings.checked),
+      cachedNodeIsLive: !!(dom.modelBuildings && dom.modelBuildings.isConnected),
+      rampLoaded: !!state.ramp,
+      rampSource: state.ramp ? String(state.ramp.source || '').slice(0, 60) : null,
+      buildingBusy: !!state.buildingBusy,
+      aoiCount: (state.urbanAoi || []).length,
+      activeHotspot: state.activeHotspot,
+      hasData: !!state.data,
+      nearestAoi: aoiIdx,
+      nearestAoiName: aoiIdx >= 0 ? state.urbanAoi[aoiIdx].name : null,
+      hotspotAoi: pickAoiForHotspot(state.activeHotspot),
+      cameraHeightKm: +(viewer.camera.positionCartographic.height / 1000).toFixed(2),
+      lod: OfflineAssets.lodForHeight(viewer.camera.positionCartographic.height),
+      buildingsKey: state.buildingsKey,
+      cacheKeys: Object.keys(state.buildingsCache || {}),
+      hasPrimitive: !!state.buildingsPrimitive,
+      switchNote: dom.switchNote ? dom.switchNote.textContent : null,
+    };
+  },
   setStatus: setStatus,
   applySituationData: applySituationData,
   reload: reloadSituation,
@@ -2342,7 +2392,7 @@ function bindUI() {
     // 相机高度跨过 LOD 阈值时才重建，且加一段防抖，避免飞行过程中反复触发。
     // 跟随期间相机每帧都在动，防抖会被反复重置而**永不执行**，所以直接跳过；
     // detachFollow() 收尾时会补一次 refreshBuildings()。
-    if (!state.follow.id && dom.modelBuildings && dom.modelBuildings.checked) {
+    if (!state.follow.id && checkboxOn('modelBuildings')) {
       if (state.buildingTimer) clearTimeout(state.buildingTimer);
       state.buildingTimer = setTimeout(refreshBuildings, 400);
     }
@@ -2457,13 +2507,6 @@ function applyCaseIndependentHooks() {
   }
   if (params.get('buildings') === '1') {
     document.getElementById('modelBuildings').checked = true;
-    // 建筑体块依赖色带标定，异步完成后才会出现。
-    OfflineAssets.loadHeightRamp().then(function (ramp) {
-      state.ramp = ramp;
-      refreshBuildings();
-    }).catch(function (e) {
-      setSwitchNote('建筑体块不可用：' + e.message);
-    });
   }
   // 诊断/取证用的机位钩子：?cam=lon,lat,height[,pitch]
   if (params.has('cam')) {
@@ -2479,6 +2522,18 @@ function applyCaseIndependentHooks() {
         },
       });
     }
+  }
+  // 建筑体块放最后：它按**当前机位**挑最近的城区 AOI 并按高度选 LOD，
+  // 所以必须在 ?cam= 之后跑。之前放在机位钩子之前，取证时选到的是默认机位
+  // 对应的城市，`?cam=` 定位到厦门却拿到台北的体块（或什么都不生成）。
+  // 色带标定是异步的，取到之后再生成一次。
+  if (params.get('buildings') === '1') {
+    OfflineAssets.loadHeightRamp().then(function (ramp) {
+      state.ramp = ramp;
+      refreshBuildings();
+    }).catch(function (e) {
+      setSwitchNote('建筑体块不可用：' + e.message);
+    });
   }
 }
 
