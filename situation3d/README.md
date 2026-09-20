@@ -485,13 +485,23 @@ python3 tools/fetch_places.py --bbox 108,18,146,36  # 只保留一个范围
 
 ### 9.5 鸟瞰图
 
-> **已知现象**：无头软件光栅化（SwiftShader）下，主相机压到几公里时会看到鸟瞰图画布
-> 变黑，而 900 km / 6000 km 时正常。相关性指向第二个 WebGL 上下文被主视图的
-> z16–17 纹理上传饿死，不是逻辑缺陷（低空本来就不画视野框）。真实 GPU 环境待复核。
-
-> **已知现象**：无头软件光栅化（SwiftShader）下，主相机压到几公里时会看到鸟瞰图画布
-> 变黑，而 900 km / 6000 km 时正常。相关性指向第二个 WebGL 上下文被主视图的
-> z16–17 纹理上传饿死，不是逻辑缺陷（低空本来就不画视野框）。真实 GPU 环境待复核。
+> **已知现象：无头 SwiftShader 下相机高度在约 20–300 km 区间时，主视图整幅变黑。**
+> 这不是鸟瞰图的问题——`?overview=0` 同样黑。同一 URL 只改高度实测（每次 3 次重试）：
+>
+> | 相机高度 | `?overview=1` | `?overview=0` |
+> |---|---|---|
+> | 900 km | ✅ luma 109、edge 0.672 | ✅ |
+> | 300 km | ❌ 3 次全黑（luma 3.3） | ❌ |
+> | 100 km | ❌ 全黑 / edge 0.045 | ❌ |
+> | 20 km | ❌ 全黑 / edge 0.029 | ❌ |
+> | 6 km（台北） | ✅ luma 99.4、edge 7.85（`?cam=121.57,25.03,6000,-45`，1 次通过） | — |
+>
+> 即"低空黑屏"不是鸟瞰图引入的，也与影像层级无关（6 km 时主力层级是 z13、局部
+> z14，而 20 km 时反而全黑）。**真实 GPU 环境仍待复核**：可用的 GPU 机器
+> （100.105.26.57 / 100.87.245.63）只有 `/dev/nvidia*`、**没有 `/dev/dri` 也没有
+> 装浏览器**，无法在上面跑 ANGLE/EGL，所以本次没能复核。
+>
+> 无头环境下验证请优先用 900 km 或 6 km 这类能出图的机位。
 
 `web/src/overview.js`。第二个 Cesium Viewer，`SCENE2D`，240×172，位于中间窗口左下角，
 显示真实地球缩略图（z0–z6），并用黄色闭合折线画出**主相机当前视野框**，随相机联动。
@@ -528,9 +538,9 @@ python3 tools/fetch_places.py --bbox 108,18,146,36  # 只保留一个范围
 - **WSF3D 是 90 m 分辨率的城市体量**，不是单体建筑模型；三维体块表达的是街区
   尺度的建筑高度分布。
 - 高程 z10 在城区尺度会被拉伸；底图 z11 在城区尺度同理，靠城区 z12–14 补。
-- **建筑体量的第二个数据源（3D-GloBFP）已打通构建管线**，见 §11。它不是 WSF3D
+- **建筑体量的第二个数据源（3D-GloBFP）已打通到端到端**，见 §11。它不是 WSF3D
   的平替，两个源各有短板：WSF3D 全球连续但粗，3D-GloBFP 逐建筑但覆盖不均
-  （中国大陆可用，台湾在数据集里近乎为空）。
+  （中国大陆可用，台湾在数据集里近乎为空）。当前 manifest 已切到 `gh3d`。
 
 ---
 
@@ -618,4 +628,45 @@ python3 tools/build_gh3d_tiles.py build --grid 2274 --zoom 13 --out web/tiles/gh
 ```
 
 下载缓存与目录在 `~/.cache/gh3d`（`GH3D_CACHE` 可覆盖）。
+
+### 11.4 前端切换与一个被量出来的静默 bug
+
+切换只需改 manifest：
+
+```json
+"building_blocks": { "source": "gh3d", "layer": "buildingheight",
+                     "ramp": "./tiles/gh3d/height_ramp_gh3d.json" }
+```
+
+`assets.js` 的 `blockSource()` 据此换目录与查表文件，缺省保持 `wsf3d`——这样即使
+gh3d 瓦片没构建出来，体块也不会整块消失。
+
+切过去之后发现体块**根本不出现**，而且不报错。用
+`window.SituationHost.debugBuildings()`（新增，把体块链路的每个短路条件逐条报出来）
+定位到三个原因：
+
+1. **`dom.modelBuildings` 这个 DOM 缓存引用与文档脱钩**：实测
+   `document.getElementById('modelBuildings').checked === true` 而
+   `dom.modelBuildings.checked === false`、`isConnected === false`，同时
+   `querySelectorAll('#modelBuildings').length === 1`（页面上只有一个）。
+   于是 `refreshBuildings()` 第一行的开关判断直接返回。改为 `checkboxOn(id)`
+   一律现取 DOM。
+2. **案例装载完不触发生成**：`refreshBuildings()` 只挂在"选中热点 / 解除跟随 /
+   相机高度变化"上，所以"一进页面就带 `?buildings=1`"或"先开开关再选案例"都不出
+   体块。在 `applySituationData()` 收尾补一次。
+3. **`?buildings=1` 排在 `?cam=` 之前**：体块按*当前机位*挑最近的城区 AOI，取证时
+   定位到厦门却按默认机位选城市。把体块钩子移到 `?cam=` 之后。
+
+修好后的实测（`?cam=118.09,24.48,12000,-40&buildings=1`）：
+
+```
+buildingsKey  "2:0"
+switchNote    建筑体块已显示：「中国 厦门」LOD far（网格 24×24，采样步长 8），
+              265 个体块，用时 223 ms。相机高度变化时会自动切换 LOD。
+rampSource    3D-GloBFP per-building vector rasterised to max height per cell
+```
+
+> 教训：**DOM 缓存引用会失效，判断"开关开没开"必须现取**；而"整个功能静默不工作"
+> 这类问题，靠看渲染结果是查不出来的——`debugBuildings()` 把短路条件摆出来之后
+> 一眼就定位到了。
 
