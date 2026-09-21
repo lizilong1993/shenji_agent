@@ -637,6 +637,8 @@ function renderCaseMenu() {
     const sub = el('span', 'mi-sub',
       c.target_count + ' 个目标 · ' + c.hotspot_count + ' 个热点区域');
     const desc = el('span', 'mi-desc', c.description);
+    // 描述在菜单里只显示一行（CSS 截断），完整文字放 title，hover 可看全。
+    if (c.description) item.title = c.name + '：' + c.description;
     item.appendChild(head);
     item.appendChild(sub);
     item.appendChild(desc);
@@ -1367,18 +1369,29 @@ function renderTargetPanel(id) {
 
 function setTerrain(on) {
   if (on) {
-    setSwitchNote('正在加载离线 DEM 高程（Terrarium，z0–z10）…');
+    setSwitchNote('正在加载离线 DEM 高程（Terrarium，z0–z12）…');
     const provider = OfflineAssets.createTerrainProvider();
     viewer.terrainProvider = provider;
     viewer.scene.globe.depthTestAgainstTerrain = true;
-    const done = function () {
-      state.terrainOn = true;
-      setSwitchNote('地形模型已启用：离线 Terrarium 高程，最高 z10（约 39 km/瓦片）。');
+    state.terrainOn = true;
+    // **不要用 provider.readyPromise**：这个 Cesium 构建里
+    // CustomHeightmapTerrainProvider 没有 readyPromise（和 Primitive 一样，
+    // 全文件只有 KTX2 转码器带这个名字）。原来写
+    // `provider.readyPromise.then(...)` 会直接抛
+    // "Cannot read properties of undefined (reading 'then')"，
+    // 被 change 事件冒泡成未捕获异常——**地形开关看起来点了没反应，还报错**。
+    // 改用轮询 provider.ready，对两种构建都成立。
+    setSwitchNote('地形模型已启用：离线 Terrarium 高程，最高 z12。');
+    const waitReady = function (tries) {
+      if (provider.ready) {
+        setSwitchNote('地形模型已启用：离线 Terrarium 高程，最高 z12（相机高度读数已按椭球高）。');
+        return;
+      }
+      if (tries <= 0) return;
+      setTimeout(function () { waitReady(tries - 1); }, 250);
     };
-    if (provider.ready) done();
-    else provider.readyPromise.then(done).catch(function (e) {
-      setSwitchNote('地形加载失败：' + e.message);
-    });
+    if (provider.ready) waitReady(0);
+    else waitReady(60);          // 最多等 15 s，等不到也保持可用状态
   } else {
     viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
     viewer.scene.globe.depthTestAgainstTerrain = false;
@@ -1405,6 +1418,13 @@ function setWsf3dOverlay(on) {
 function setBuildings(on) {
   if (!on) {
     if (state.buildingsPrimitive) state.buildingsPrimitive.show = false;
+    // **必须清掉 buildingsKey**。refreshBuildings 的开头是
+    //   if (key === state.buildingsKey && state.buildingsPrimitive) return;
+    // 用来避免重复生成；但关掉开关时只把 show 置 false、key 留着，重新打开就会
+    // 命中这个提前返回：体块已经被隐藏，却以为"当前组合已经生成好了"，
+    // 于是**关了再开就再也看不到体块**（实测 primitiveShow 一直是 false）。
+    // 清掉 key 后，重新打开会走缓存命中分支并重新显示。
+    state.buildingsKey = null;
     setSwitchNote('建筑体块已关闭。');
     return;
   }

@@ -112,7 +112,16 @@
         outlineColor: Cesium.Color.fromCssColorString('#ffffff').withAlpha(0.92),
         outlineWidth: 2.4,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        // **不要关掉深度测试**。原来这里是 Number.POSITIVE_INFINITY（即"永远画在
+        // 最前面"），后果是地名无视地球遮挡——地球背面的、被山体挡住的、被三维
+        // 建筑体块遮住的标签全都会浮在最上层，看起来就是"地名浮在最上面"。
+        // 去掉之后标签回归正常的深度排序，会被地形与体块正确遮挡。
+        //
+        // 但只靠 terrain 高度 + 默认深度测试会带来新问题：地形瓦片还没加载完时
+        // 锚点比地表低，标签会被地表"吞掉"而看不见。所以配一个 eyeOffset，
+        // 把标签整体沿视线方向抬起一点——它只改变绘制位置，不改变锚点的经纬度，
+        // 既保持贴地，又不会被提前截掉。
+        eyeOffset: new Cesium.Cartesian3(0, 0, -240),
         scaleByDistance: new Cesium.NearFarScalar(2.0e5, 1.0, 1.2e7, 0.75),
         show: false,
       }));

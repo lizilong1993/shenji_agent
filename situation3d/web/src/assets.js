@@ -225,19 +225,39 @@
   }
 
   /**
-   * 全球底图：任意位置都有影像，避免把镜头拉远或平移出去后只剩底色。
+   * 低层底图（原称"全球层"）：给拉远/平移出战区时留一层底，避免只剩球体底色。
    *
-   * 只到 z6（约 0.7 km/px）——再往下铺满全球会多出上万张瓦片，而战区与热点另有
-   * 更高层级的图层覆盖。rectangle 取全球，这是唯一一个不限制范围的影像层。
+   * **覆盖范围必须用实测值，不能声明全球。** 这批瓦片的名字叫"全球 z0-6"，但实际
+   * 只覆盖台海区域——实测各层瓦片数是 1/1/1/2/5/7/12/34/99/339/1242/4851（z0-z11），
+   * 是一条金字塔而不是全球。provider 不传 rectangle 就是全球，于是拉开视野后
+   * Cesium 会为域外请求瓦片，每个都 404（实测打开离线底图时
+   * `imagery/2/3/0.jpg`、`1/1/1.jpg`、`6/54/25.jpg` 一连串 404）。
+   *
+   * 真实范围由 tools/analyze_tile_coverage.py 扫描实际瓦片算出并写入
+   * `manifest.coverage.imagery.rectangle`，这里读它；拿不到时退回 bbox。
    */
+  function measuredRect(kind, fallbackBbox) {
+    const m = manifest();
+    const cov = m.coverage && m.coverage[kind];
+    if (cov) {
+      // 底图优先用 basemap_rectangle（取自最细两级，排除只服务热点的低层离群瓦片）；
+      // 拿不到就退回全部层级的并集。
+      const r = cov.basemap_rectangle || cov.rectangle;
+      if (Array.isArray(r) && r.length === 4) return aoiRectangle(r);
+    }
+    return fallbackBbox ? aoiRectangle(fallbackBbox) : undefined;
+  }
+
   function createGlobalImageryProvider() {
     const m = manifest();
     const provider = new Cesium.UrlTemplateImageryProvider({
       url: IMAGERY_URL,
       tilingScheme: new Cesium.WebMercatorTilingScheme(),
       minimumLevel: 0,
-      maximumLevel: (m.imagery_global && m.imagery_global.max_zoom) || 6,
-      credit: 'Esri World Imagery (global)',
+      maximumLevel: (m.coverage && m.coverage.imagery && m.coverage.imagery.zoom_max) ||
+                    (m.imagery_global && m.imagery_global.max_zoom) || 6,
+      rectangle: measuredRect('imagery', m.bbox),
+      credit: 'Esri World Imagery (low zoom)',
     });
     return attachCached(provider, IMAGERY_URL);
   }
@@ -414,7 +434,33 @@
    * 反而比粗层级更差。所以这里从目标层级一路向上找，用最近的有数据的祖先瓦片
    * 降采样——这正是地形金字塔本身的行为。
    */
+  /**
+   * 该瓦片是否落在实测的地形覆盖范围内。
+   *
+   * 不在范围内就直接返回平地、不发请求——地形瓦片集和影像一样是台海金字塔，
+   * 域外请求必然 404（实测 `tiles/terrain/1/0/0.png`、`1/0/1.png` 都是 404）。
+   * 用实测矩形短路，比让 Cesium 反复请求再失败干净。
+   */
+  function terrainTileCovered(x, y, level) {
+    const m = manifest();
+    const cov = m.coverage && m.coverage.terrain;
+    if (!cov || !Array.isArray(cov.rectangle) || cov.rectangle.length !== 4) return true;
+    if (level < (cov.zoom_min || 0) || level > (cov.zoom_max || 30)) return false;
+    const w = tileFracToLon(x, level);
+    const e = tileFracToLon(x + 1, level);
+    const n = tileFracToLat(y, level);
+    const s = tileFracToLat(y + 1, level);
+    const r = cov.rectangle;                      // [w, s, e, n]
+    return !(e < r[0] || w > r[2] || n < r[1] || s > r[3]);
+  }
+
+  /** 平地高度图（无数据时的兜底）。 */
+  function flatHeightmap() {
+    return new Float32Array(HEIGHTMAP_PX * HEIGHTMAP_PX);
+  }
+
   async function heightmapFor(x, y, level) {
+    if (!terrainTileCovered(x, y, level)) return flatHeightmap();
     const maxLevel = terrainMaxLevel();
     let lv = Math.min(level, maxLevel);
     let tx = x;

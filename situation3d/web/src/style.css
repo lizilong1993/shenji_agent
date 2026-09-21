@@ -127,7 +127,18 @@ body {
 
 .menu-item .mi-head { display: block; font-size: 13px; font-weight: 600; color: #eef3fa; }
 .menu-item .mi-sub { display: block; font-size: 11px; color: #8fa3bd; margin-top: 1px; }
-.menu-item .mi-desc { display: block; font-size: 11px; color: #a9b8cc; margin-top: 4px; line-height: 1.45; }
+/* 描述限制为一行并省略：案例描述有 70+ 字，整段铺开会让菜单变成一大片文字，
+   条目之间失去层次（截图里就是这样）。完整描述放到 title 里，hover 可看。 */
+.menu-item .mi-desc {
+  display: block;
+  font-size: 11px;
+  color: #a9b8cc;
+  margin-top: 4px;
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ---------------- workspace ---------------- */
 
@@ -147,6 +158,28 @@ body {
   border-right: 1px solid var(--border);
   overflow: hidden;
 }
+
+/* 左栏图层管理单独滚动：它内容最长，小屏上不给滚动条就会把目标列表挤出可视区。
+   只在这一块滚动（而不是整列滚动），目标列表才能固定留在下方。 */
+.layer-groups {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  /* 给滚动条留出位置，避免它压住复选框 */
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+.layer-groups::-webkit-scrollbar { width: 8px; }
+.layer-groups::-webkit-scrollbar-thumb {
+  background: #3a4c66;
+  border-radius: 4px;
+}
+.layer-groups::-webkit-scrollbar-thumb:hover { background: #53688a; }
+.layer-groups::-webkit-scrollbar-track { background: transparent; }
 
 .panel-right { border-right: none; border-left: 1px solid var(--border); flex: 0 0 306px; }
 

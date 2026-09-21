@@ -87,6 +87,10 @@
 
   <main class="workspace">
     <aside class="panel panel-left">
+      <!-- 图层管理独立滚动：它内容最长（四大类 + 说明文字），小屏上会把下面的
+           目标列表挤出可视区。整列滚动会让目标列表跟着一起滚，所以这里只让
+           图层管理这一块滚，目标列表固定在下方。 -->
+      <div class="layer-groups">
       <details class="layer-group panel-block" open>
         <summary>态势图层</summary>
         <label class="check"><input type="checkbox" id="layerHotspots" checked> 热点区域</label>
@@ -133,6 +137,7 @@
         <label class="check"><input type="checkbox" id="compScalebar" checked> 比例尺</label>
         <label class="check"><input type="checkbox" id="compViewpoint" checked> 视点坐标</label>
       </details>
+      </div>
 
       <section class="panel-block grow">
         <h2>目标列表 <span class="hint-inline" id="targetCountHint"></span></h2>
