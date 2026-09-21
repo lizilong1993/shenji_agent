@@ -68,6 +68,12 @@
   let enabled = true;
   let lastUpdateAt = 0;
   let lastKey = '';
+  let updating = false;    // update() 防重入
+  // 上一次 update 的账目（取证用：候选数 / 放下数 / 被裁掉数 / 重叠数 / 画布尺寸）
+  let lastStats = null;
+  // 上一次真正放下了几个标签。用来区分"算过但一个都放不下"和"算过且有结果"：
+  // 前者需要尽快重试（数据可能还没到位），后者才允许被跳过。
+  let lastPlaced = 0;
   const scratch = new Cesium.Cartesian3();
 
   function toWindow(scene, cartesian) {
@@ -144,7 +150,20 @@
    * 空间贪心去重。只改池对象的属性，不增删标签。
    */
   function update() {
-    if (!viewer || !collection || !enabled) return;
+    if (!viewer || !enabled || updating) return;
+    // 兜底建池：正常情况下 setEnabled 已经建好，但 update 可能被更早的路径调到。
+    ensureCollection();
+    if (!collection) return;
+    updating = true;
+    try {
+      updateInner();
+    } finally {
+      // 一定要复位：否则一次异常就让地名图层永久停止更新，且毫无提示。
+      updating = false;
+    }
+  }
+
+  function updateInner() {
     const scene = viewer.scene;
     const canvas = scene.canvas;
     const w = canvas.clientWidth;
@@ -163,13 +182,35 @@
 
     const placed = [];
     let used = 0;
+    let offScreen = 0;
+    let overlapped = 0;
+    const globe = scene.globe;
+    const carto = new Cesium.Cartographic();
 
     for (let i = 0; i < cand.length && used < MAX_LABELS; i++) {
       const p = cand[i];
-      const pos = Cesium.Cartesian3.fromDegrees(p.x, p.y, 0, undefined, scratch);
+      // 锚点高度取**地形表面**，不是椭球面（高度 0）。
+      //
+      // 地名在真实地理里的位置是"地面上的那一点"。地形打开后（本项目的
+      // CustomHeightmapTerrainProvider 会抬升地表），按椭球面高度放置的标签在
+      // 山地会**陷进山体或浮在山谷上方**，垂直方向上系统性地偏一个地形高。
+      //
+      // **必须先把该点自己的经纬度写进 carto**：`globe.getHeight()` 不传参时返回的
+      // 是**相机地面点**的地形高，不写就会把整层地名都按相机脚下的高度抬升。
+      carto.longitude = Cesium.Math.toRadians(p.x);
+      carto.latitude = Cesium.Math.toRadians(p.y);
+      carto.height = 0;
+      const gh = globe ? globe.getHeight(carto) : undefined;
+      const height = (gh === undefined || gh === null) ? 0 : gh;
+      // 投影用**独立对象**：scratch 是共享的，若位置与投影输出共用它，
+      // 上一次的投影结果会被下一次的 fromDegrees 覆盖掉。
+      const pos = Cesium.Cartesian3.fromDegrees(p.x, p.y, height);
       const win = toWindow(scene, pos);
-      if (!win) continue;
-      if (win.x < -40 || win.y < -20 || win.x > w + 40 || win.y > h + 20) continue;
+      if (!win) { offScreen++; continue; }
+      if (win.x < -40 || win.y < -20 || win.x > w + 40 || win.y > h + 20) {
+        offScreen++;
+        continue;
+      }
 
       const lw = labelWidth(p.n) + PAD_PX * 2;
       const lh = LINE_H_PX + PAD_PX * 2;
@@ -182,29 +223,47 @@
         const q = placed[k];
         if (x0 < q.x1 && x0 + lw > q.x0 && y0 < q.y1 && y0 + lh > q.y0) { hit = true; break; }
       }
-      if (hit) continue;
+      if (hit) { overlapped++; continue; }
       placed.push({ x0: x0, x1: x0 + lw, y0: y0, y1: y0 + lh });
 
       const lbl = pool[used++];
       lbl.text = p.n;
-      lbl.position = Cesium.Cartesian3.fromDegrees(p.x, p.y, 0);
+      // 标签本身也放在地形高度上：这样即使相机极度倾斜，标签锚点也与地面同高，
+      // 不会因为"贴图在地形上、标签在椭球上"而分离。
+      lbl.position = pos;
       lbl.show = true;
     }
 
     for (let i = used; i < pool.length; i++) pool[i].show = false;
+    lastPlaced = used;
+    lastStats = { candidates: cand.length, used: used, offScreen: offScreen,
+                  overlapped: overlapped, canvas: [w, h] };
   }
 
-  /** 相机移动后调用。节流，并在档位未变且位移很小时直接跳过。 */
+  /**
+   * 相机变动后调用。节流，并在"这一帧的标签布局与上一帧相同"时直接跳过。
+   *
+   * **key 必须包含相机朝向（heading / pitch），不只是位置与高度。**
+   * 标签的屏幕位置取决于完整的相机姿态：绕目标原地旋转（位置一米没动）时，地面
+   * 上每个点的屏幕坐标都会大幅平移。早期版本只把"位置 + 高度档位"放进 key，
+   * 于是旋转、俯仰、倾斜这些**不改变位置的**操作全部命中"key 没变 → 跳过重算"，
+   * 标签就留在上一帧的屏幕位置上不动——看起来就是"地图在转、地名钉在屏幕上"。
+   *
+   * 用世界坐标无法发现这个问题：标签本来就锚在真实经纬度上，旋转时世界坐标
+   * 本来就不该变。**屏幕坐标才是"显示在哪儿"**。
+   */
   function onCameraChanged(force) {
     if (!enabled || !loaded) return;
+    if (updating) return;   // 防重入：update() 里会做上千次投影，不能被打断
     const now = Date.now();
-    if (!force && now - lastUpdateAt < UPDATE_THROTTLE_MS) return;
 
-    const camHeight = viewer.camera.positionCartographic.height;
-    const rank = rankForHeight(camHeight);
-    // 档位变了必须重算；同档内也要按位移决定，否则平移时地名不跟着换
     const c = viewer.camera.positionCartographic;
-    const key = rank + '|' + Math.round(c.longitude * 200) + ',' + Math.round(c.latitude * 200);
+    const rank = rankForHeight(c.height);
+    const key = rank + '|' +
+      Math.round(c.longitude * 200) + ',' + Math.round(c.latitude * 200) + ',' +
+      Math.round(c.height / 100) + '|' +
+      Math.round(viewer.camera.heading * 114.6) + ',' +
+      Math.round(viewer.camera.pitch * 114.6);
     if (!force && key === lastKey) return;
 
     lastUpdateAt = now;
@@ -224,6 +283,10 @@
       ensureCollection();
       if (collection) collection.show = true;
       onCameraChanged(true);
+      // 兜底重试：首次 update 可能发生在相机/地形还没就位时（一个标签都放不下），
+      // 而那种情况下往往不会再有第二次 camera.changed。这里补两次延迟重试。
+      setTimeout(function () { if (enabled && lastPlaced === 0) onCameraChanged(true); }, 800);
+      setTimeout(function () { if (enabled && lastPlaced === 0) onCameraChanged(true); }, 2500);
     });
   }
 
@@ -237,11 +300,57 @@
       (pool.filter(function (l) { return l.show; }).length) + '  enabled ' + enabled;
   }
 
+  /**
+   * 取证用：把"为什么一个地名都没显示"的每个短路条件逐条报出来。
+   *
+   * 地名这条链路有五六处可以静默返回（数据没到、开关没开、池没建、画布尺寸为 0、
+   * 相机看着别处、投影落在屏幕外、被去重挡掉），只盯着"页面上没有字"是查不出来的。
+   */
+  function debugPlaces() {
+    const canvas = viewer && viewer.scene ? viewer.scene.canvas : null;
+    let camHeight = null;
+    if (viewer) camHeight = viewer.camera.positionCartographic.height;
+    const maxRank = camHeight === null ? null : rankForHeight(camHeight);
+    let candCount = 0;
+    if (all) {
+      for (let i = 0; i < all.length; i++) {
+        if (all[i].r > maxRank) break;
+        candCount++;
+      }
+    }
+    let sample = null;
+    if (all && all.length) {
+      const p = all[0];
+      const pos = Cesium.Cartesian3.fromDegrees(p.x, p.y, 0);
+      const win = toWindow(viewer.scene, pos);
+      sample = { name: p.n, lon: p.x, lat: p.y, rank: p.r, onScreen: !!win,
+                 win: win ? [Math.round(win.x), Math.round(win.y)] : null };
+    }
+    return {
+      loaded: loaded, total: all ? all.length : 0, enabled: enabled,
+      hasViewer: !!viewer, collection: !!collection,
+      poolSize: pool.length,
+      shown: pool.filter(function (l) { return l.show; }).length,
+      lastPlaced: lastPlaced, lastKey: lastKey, lastStats: lastStats,
+      updating: updating,
+      canvas: canvas ? [canvas.clientWidth, canvas.clientHeight] : null,
+      camHeightKm: camHeight === null ? null : Math.round(camHeight / 1000),
+      maxRank: maxRank, candidates: candCount,
+      firstPlaceSample: sample,
+      cameraLonLat: viewer ? [
+        +Cesium.Math.toDegrees(viewer.camera.positionCartographic.longitude).toFixed(2),
+        +Cesium.Math.toDegrees(viewer.camera.positionCartographic.latitude).toFixed(2),
+      ] : null,
+    };
+  }
+
   global.Places = {
     init: init,
     setEnabled: setEnabled,
     onCameraChanged: onCameraChanged,
     debugInfo: debugInfo,
+    debugPlaces: debugPlaces,
+    forceUpdate: function () { update(); },
     load: load,
   };
 })(window);

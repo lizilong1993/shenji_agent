@@ -55,6 +55,9 @@ const state = {
   buildingsKey: null,       // "aoiIdx:lodIdx"，当前已生成的体块组合
   buildingsCache: {},       // 已生成的体块，按组合缓存复用
   buildingBusy: false,
+  // 已 add 进场景、但几何还没 ready 的体块（隐藏状态）。见 refreshBuildings 里的
+  // waitReady 轮询：Primitive 必须先在场景里才会推进异步几何准备。
+  pendingPrimitive: null,
   buildingTimer: null,
   imageryLayer: null,
   cursorCarto: null,        // 光标处的地面点，用于"地理位置信息"读数
@@ -95,7 +98,8 @@ const dom = {};
  'switchNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner', 'btnOverview',
  'countRed', 'countBlue', 'countSea', 'countLand', 'countAir', 'targetCountHint',
  'loadingBadge', 'loadingText',
- 'mapCompass', 'compRose', 'mapViewpoint', 'mvLon', 'mvLat', 'mvAlt', 'modelPlaces', 'modelPlaces',
+ 'mapCompass', 'compRose', 'mapViewpoint', 'mvLon', 'mvLat', 'mvAlt', 'modelPlaces',
+ 'modelTianditu', 'modelImagery', 'modelTerrain', 'modelBuildings',
  'mapScalebar', 'sbBar', 'sbLabel', 'followTarget', 'followNote',
 ].forEach(function (id) { dom[id] = document.getElementById(id); });
 
@@ -318,15 +322,22 @@ function fmtDeg(v, pos, neg) {
 function initViewer() {
   // Cesium 1.107 起 Viewer 的 imageryProvider 选项被移除且静默忽略，
   // 必须用 baseLayer，否则球体只剩默认底色。下面的断言把静默退化变成显式失败。
-  // 影像分四级叠加，Cesium 的 imageryLayers 顺序是 index 0 在最底层，
-  // 所以按"粗 → 细"依次添加：
-  //   全球 z0-6（任意位置都有底图）→ 战区 z0-11 → 热点 z0-12 → 城区 z13-17
+  //
+  // 图层顺序（index 0 在最底层，Cesium 由下往上叠）：
+  //   [0] 天地图影像（在线，默认底图）
+  //   [1] 天地图中文注记（在线）
+  //   [2] 离线全球 z0-6  →  [3] 战区 z0-11  →  [4..] 热点 z0-12  →  城区 z13-17
+  // 天地图与"离线影像底图"是**两套互斥的底图方案**（都铺满视野，同时开会互相
+  // 遮挡），由 setTianditu/setImagery 互相对冲；热点/城区/专题层始终叠在最上面，
+  // 与用哪套底图无关。
   state.imageryStats = OfflineAssets.newStats('imagery');
-  state.globalLayer = new Cesium.ImageryLayer(OfflineAssets.instrument(
-    OfflineAssets.createGlobalImageryProvider(), state.imageryStats));
+  state.tiandituLayer = new Cesium.ImageryLayer(
+    OfflineAssets.createTiandituProvider('img', 'w'));
+  state.tiandituLabelLayer = new Cesium.ImageryLayer(
+    OfflineAssets.createTiandituLabelProvider('w'));
 
   viewer = new Cesium.Viewer('cesiumContainer', {
-    baseLayer: state.globalLayer,
+    baseLayer: state.tiandituLayer,
     terrainProvider: new Cesium.EllipsoidTerrainProvider(),
     baseLayerPicker: false,
     geocoder: false,
@@ -345,9 +356,21 @@ function initViewer() {
     throw new Error('底图图层未创建：Cesium ' + Cesium.VERSION + ' 需要 baseLayer 选项');
   }
 
+  // 注记层紧贴天地图影像之上（index 1）。
+  viewer.imageryLayers.add(state.tiandituLabelLayer);
+
+  // 离线全球层：默认关闭（天地图是默认底图），但**始终存在**，切回离线时只是
+  // 把 show 打开，不再重建 provider——避免重复初始化与重复请求。
+  // 反过来，离线底图是唯一"离线环境下一定有图"的图层，所以不能删。
+  state.globalLayer = viewer.imageryLayers.addImageryProvider(
+    OfflineAssets.instrument(OfflineAssets.createGlobalImageryProvider(),
+                             state.imageryStats));
+  state.globalLayer.show = false;
+
   // 战区层：台海 AOI 到 z11
   state.imageryLayer = viewer.imageryLayers.addImageryProvider(
     OfflineAssets.instrument(OfflineAssets.createImageryProvider(), state.imageryStats));
+  state.imageryLayer.show = false;
 
   // 热点层：每个热点框一个 provider，到 z12。三亚/冲绳/关岛完全在战区之外，
   // 只能靠这一层；与战区重叠的部分因 URL 相同会命中 TileCache 内存缓存。
@@ -694,7 +717,8 @@ const LAYER_GROUPS = [
   { name: '目标图层', ids: ['layerTargets', 'layerLabels', 'layerTracks', 'modelSensor',
                             'layerTargetPanel', 'filterRed', 'filterBlue', 'filterSea',
                             'filterLand', 'filterAir'] },
-  { name: '底图', ids: ['modelImagery', 'modelHotspotImagery', 'modelUrbanImagery',
+  { name: '底图', ids: ['modelTianditu', 'modelImagery', 'modelHotspotImagery',
+                        'modelUrbanImagery',
                         'modelPlaces', 'modelTerrain',
                         'modelWsf3dOverlay', 'modelBuildings', 'modelWeather'] },
   { name: '地图组件', ids: ['compCompass', 'compScalebar', 'compViewpoint'] },
@@ -1506,14 +1530,47 @@ function refreshBuildings() {
     zoom: aoi.zoom || 13,
     lod: lod,
   }).then(function (result) {
-    state.buildingBusy = false;
-    const ms = Date.now() - t0;
     if (!result.primitive) {
+      state.buildingBusy = false;
       setSwitchNote('「' + aoi.name + '」没有生成体块：' + JSON.stringify(result.stats));
       return;
     }
-    state.buildingsCache[key] = { primitive: result.primitive, stats: result.stats };
-    swapBuildings(state.buildingsCache[key], aoiIdx, lod, ms);
+    // **先入场景（隐藏）再等 ready，最后才显示。**
+    //
+    // Primitive 的异步几何准备（asynchronous: true）只会在它**参与渲染**时才推进：
+    // 实测把 265 个非凸挤出多边形留在场景外等 readyPromise，等 120 s 都不落地；
+    // 而 add 进场景后同一批几何 0.9–1.3 s 就绪。原先的 swapBuildings 是"构造 →
+    // await 完成 → 才 add"，于是永远等不到，`buildingBusy` 卡在 true，体块再也不
+    // 会生成——现象就是"开着建筑体块却什么都没有，也不报错"。
+    //
+    // 隐藏着 add 不会影响画面，ready 之后再显示，仍然满足"渲染切换不闪半成品"。
+    const prim = result.primitive;
+    prim.show = false;
+    viewer.scene.primitives.add(prim);
+    const ms = Date.now() - t0;
+    // 等 ready 用轮询而不是 readyPromise：**这个 Cesium 构建里 Primitive 没有
+    // readyPromise**（全文件只出现 4 次，都属于 KTX2 转码器；Primitive 用的是
+    // readyEvent）。之前写 `prim.readyPromise.then(...)` 直接抛
+    // "Cannot read properties of undefined (reading 'then')"，被 catch 吞成
+    // "建筑体块几何准备失败"，体块永远不显示。用 `prim.ready` 判断对两种构建都成立。
+    state.pendingPrimitive = prim;
+    const waitReady = function () {
+      if (prim.isDestroyed && prim.isDestroyed()) return;
+      if (!prim.ready) {
+        setTimeout(waitReady, 150);
+        return;
+      }
+      state.buildingBusy = false;
+      if (state.pendingPrimitive === prim) state.pendingPrimitive = null;
+      if (!checkboxOn('modelBuildings')) {
+        // 等待期间用户把开关关了：直接丢弃，别把图层留在场景里。
+        viewer.scene.primitives.remove(prim);
+        return;
+      }
+      state.buildingsCache[key] = { primitive: prim, stats: result.stats };
+      swapBuildings(state.buildingsCache[key], aoiIdx, lod, ms, true);
+    };
+    setTimeout(waitReady, 150);
   }).catch(function (e) {
     state.buildingBusy = false;
     console.error(e);
@@ -1521,15 +1578,24 @@ function refreshBuildings() {
   });
 }
 
-function swapBuildings(entry, aoiIdx, lod, ms) {
-  if (state.buildingsPrimitive) {
+/**
+ * @param {boolean} alreadyInScene 该 primitive 已经由调用方 add 进场景（并且是隐藏
+ *   状态）时为 true。默认 false，只用于缓存命中那条路径——缓存里的 primitive 已经
+ *   在场景里了，切换时要么保留、要么先移除再 add。
+ */
+function swapBuildings(entry, aoiIdx, lod, ms, alreadyInScene) {
+  if (state.buildingsPrimitive && state.buildingsPrimitive !== entry.primitive) {
     viewer.scene.primitives.remove(state.buildingsPrimitive);
     state.buildingsPrimitive = null;
   }
   state.buildingsPrimitive = entry.primitive;
   state.buildingsAoi = aoiIdx;
   state.buildingsKey = aoiIdx + ':' + lod;
-  viewer.scene.primitives.add(entry.primitive);
+  if (!alreadyInScene && viewer.scene.primitives.contains(entry.primitive) === false) {
+    viewer.scene.primitives.add(entry.primitive);
+  }
+  // ready 之后才显示：隐藏状态下 add 进来只是为了推进异步几何准备。
+  entry.primitive.show = true;
 
   const aoi = state.urbanAoi[aoiIdx];
   const st = entry.stats;
@@ -1591,12 +1657,40 @@ function syncUrbanImagery() {
 }
 
 function setImagery(on) {
-  // 「影像底图」管全球层 + 战区层；热点层与城区层各有自己的开关。
+  // 「影像底图（离线）」管全球层 + 战区层；热点层与城区层各有自己的开关。
+  // 打开离线底图就关掉天地图：两者都是铺满视野的底图，同时开只会互相遮挡，
+  // 而且在线/离线混着看，无法判断当前画面到底来自哪一套。
   if (state.globalLayer) state.globalLayer.show = on;
   if (state.imageryLayer) state.imageryLayer.show = on;
+  if (on) setTianditu(false);
   setSwitchNote(on
-    ? '影像底图已启用：全球 z0–6 + 战区 z0–11（离线 Esri World Imagery）。'
-    : '影像底图已关闭：球体仅显示几何与态势要素。');
+    ? '离线影像底图已启用：全球 z0–6 + 战区 z0–11（离线 Esri World Imagery），天地图已暂时关闭。'
+    : '离线影像底图已关闭。');
+}
+
+/**
+ * 天地图底图开关（默认开）。
+ *
+ * 天地图影像与它的中文注记是**两个 layer**：影像本身不含地名，不叠 `cva` 注记层
+ * 地图上一个字都没有。所以一个开关同时管这两层。
+ *
+ * 与离线底图互斥的理由同上：两套都铺满视野。但注意**天地图不可用时不应把画面
+ * 变成纯几何**——离线底图仍在，用户只是看不到在线影像而已。
+ */
+function setTianditu(on) {
+  const base = state.tiandituLayer;
+  const label = state.tiandituLabelLayer;
+  if (base) base.show = !!on;
+  if (label) label.show = !!on;
+  if (on && (state.globalLayer || state.imageryLayer)) {
+    if (state.globalLayer) state.globalLayer.show = false;
+    if (state.imageryLayer) state.imageryLayer.show = false;
+  }
+  const key = OfflineAssets.tiandituKey ? OfflineAssets.tiandituKey() : '';
+  setSwitchNote(on
+    ? '天地图已启用（在线影像 + 中文注记，key …' + String(key).slice(-6) +
+      '）。离线影像底图已暂时关闭，可在同组里切回。'
+    : '天地图已关闭。');
 }
 
 function setHotspotImagery(on) {
@@ -2279,6 +2373,11 @@ function bindUI() {
   bindCheck('modelWeather', setWeather);
   bindCheck('modelSensor', setSensors);
   bindCheck('modelImagery', setImagery);
+  bindCheck('modelTianditu', setTianditu);
+  // 天地图是默认底图：HTML 的 checked 只是初始显示，change 不会自动触发，
+  // 而 initViewer 里已经把它设成 baseLayer，所以这里不需要再调用一次；
+  // 但把提示文案写清楚，否则用户不知道当前底图是在线还是离线。
+  if (dom.modelTianditu && dom.modelTianditu.checked) setTianditu(true);
 
   // 三个顶栏下拉菜单统一开合，互斥，点空白处收起。
   bindMenu('menuCase', 'menuCaseList');
@@ -2608,8 +2707,10 @@ function main() {
     const wanted = params.get('case');
     if (!wanted) {
       // 默认不加载任何态势：只保留底图 / 地形 / WSF3D / 地图组件。
-      // clearSituation 会把机位设回默认，所以它必须排在 ?cam= 之前，
-      // 否则取证用的 ?cam= 会被覆盖。
+      // 注意顺序：clearSituation 里的 applyCamera(默认机位) 会覆盖 ?cam=，而
+      // applyCaseIndependentHooks（含 ?cam= 钩子）在它之后跑，所以空态下
+      // ?cam= 能生效。这两步的顺序不能调换——调换后空态机位永远是默认值，
+      // 取证时表现为"URL 里的坐标完全不起作用"（实测过：指定 121.57°E 却停在 2.1°E）。
       clearSituation();
     }
     applyCaseIndependentHooks();

@@ -154,6 +154,76 @@
                           : provider;
   }
 
+  // ------------------------------------------------------------------------
+  // 天地图（在线）
+  // ------------------------------------------------------------------------
+
+  /**
+   * 天地图 WMTS 服务。
+   *
+   * 与其它 provider 的关键差异：**这是在线服务，不经过 TileCache**。
+   * 其它图层都是离线瓦片（`./tiles/...`），走前端缓存是为了"浏览过的瓦片不再回
+   * 服务器"；天地图本来就必须联网，缓存它的字节只会占 IndexedDB 配额，还会让
+   * "离线可用"这条边界变得含糊。所以这里直接交给 Cesium 的加载器。
+   *
+   * 两套坐标：`w` 是 Web Mercator（与 Cesium 的 WebMercatorTilingScheme 一致），
+   * `c` 是经纬度直投（GeographicTilingScheme）。这里用 `w`。
+   *
+   * 影像服务本身是**不带注记**的纯底图，中文注记在 `cva`（矢量注记）里，必须叠一层，
+   * 否则地图上一个地名都没有。两者是不同 layer，由 createTiandituLabelProvider 提供。
+   */
+  const TIANDITU_BASE = 'http://t0.tianditu.gov.cn';
+  // 申请的 key。可用 `?tdtkey=` 覆盖，便于换 key 时不必改代码。
+  const TIANDITU_KEY_DEFAULT = '8af77812ad311e785fa7d8c0539da6d5';
+
+  function tiandituKey() {
+    try {
+      const q = new URLSearchParams(global.location.search);
+      return q.get('tdtkey') || TIANDITU_KEY_DEFAULT;
+    } catch (e) {
+      return TIANDITU_KEY_DEFAULT;
+    }
+  }
+
+  function tiandituUrl(layer, suffix, ext) {
+    return TIANDITU_BASE + '/' + layer + '_' + suffix + '/wmts' +
+      '?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
+      '&LAYER=' + layer + '&STYLE=default' +
+      '&TILEMATRIXSET=' + suffix + '&FORMAT=' + (ext || 'tiles') +
+      '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=' + tiandituKey();
+  }
+
+  /**
+   * @param {string} kind 'img' 影像 / 'vec' 矢量底图 / 'ter' 地形晕渲
+   * @param {string} suffix 'w' WebMercator / 'c' 经纬度
+   */
+  function createTiandituProvider(kind, suffix) {
+    const s = suffix || 'w';
+    const scheme = s === 'c' ? new Cesium.GeographicTilingScheme()
+                             : new Cesium.WebMercatorTilingScheme();
+    return new Cesium.UrlTemplateImageryProvider({
+      url: tiandituUrl(kind || 'img', s),
+      tilingScheme: scheme,
+      minimumLevel: 1,
+      maximumLevel: 18,
+      credit: '天地图（国家地理信息公共服务平台）',
+    });
+  }
+
+  /** 中文注记层：影像底图必须叠这一层才有地名。 */
+  function createTiandituLabelProvider(suffix) {
+    const s = suffix || 'w';
+    const scheme = s === 'c' ? new Cesium.GeographicTilingScheme()
+                             : new Cesium.WebMercatorTilingScheme();
+    return new Cesium.UrlTemplateImageryProvider({
+      url: tiandituUrl('cva', s),
+      tilingScheme: scheme,
+      minimumLevel: 1,
+      maximumLevel: 18,
+      credit: '天地图注记',
+    });
+  }
+
   /**
    * 全球底图：任意位置都有影像，避免把镜头拉远或平移出去后只剩底色。
    *
@@ -399,7 +469,7 @@
   }
 
   // ------------------------------------------------------------------------
-  // World Settlement Footprint 3D
+  // World Settlement Footprint 3D / 3D-GloBFP 建筑高度栅格
   // ------------------------------------------------------------------------
 
   /**
@@ -499,8 +569,6 @@
     return BUILDING_LOD.length - 1;
   }
 
-  const wsf3dTileCache = new Map();
-
   /**
    * 三维体块的高度栅格来源。
    *
@@ -527,6 +595,33 @@
 
   function rampUrl() { return blockSource().ramp; }
 
+  const wsf3dTileCache = new Map();
+
+  /**
+   * 高程瓦片 → Float32Array 高度。**按瓦片缓存**（LRU 48 片 ≈ 12 MB）。
+   *
+   * 加这层缓存的原因是实测出来的：同一个 AOI 反复生成体块（切 LOD、开关体块、
+   * 相机高度跨档）时，每片瓦片都要重新 `new Image()` + `drawImage` +
+   * `getImageData`，而 `getImageData` 在无头软件光栅化下是同步回读，16 片就要
+   * 约 5 s。缓存之后重复生成几乎是瞬时的。
+   */
+  const wsf3dHeightCache = new Map();
+  const WSF3D_CACHE_LIMIT = 48;
+
+  function decodeWsf3dTile(png) {
+    return Cesium.defined(png) ? (function () {
+      const out = new Float32Array(TILE_PX * TILE_PX);
+      for (let i = 0, p = 0; i < out.length; i++, p += 4) {
+        const r = png[p], g = png[p + 1], b = png[p + 2];
+        // (0,0,0) 是两种源的统一无数据表示：WSF3D 是黑色，gh3d 是 index 0 + tRNS。
+        out[i] = (r === 0 && g === 0 && b === 0)
+          ? 0
+          : (r * 256 + g + b / 256) - 32768;
+      }
+      return out;
+    })() : null;
+  }
+
   function loadWsf3dTile(z, x, y) {
     const key = z + '/' + x + '/' + y;
     const hit = lruGet(wsf3dTileCache, key);
@@ -541,6 +636,107 @@
       .catch(function () { return null; });
     lruSet(wsf3dTileCache, key, promise);
     return promise;
+  }
+
+  /** 解码并缓存单片瓦片的高度（按瓦片而非按请求缓存）。 */
+  const DECODE_CANVASES = 4;
+  const decodePool = [];
+  let decodePoolCursor = 0;
+
+  /**
+   * 取一块解码画布。
+   *
+   * 单块共享画布会把所有瓦片解码串行化：`drawImage` + `getImageData` 在无头软件
+   * 光栅化下每片要几百毫秒（同步回读），16 片就是 5 s 以上。用几块画布错开，
+   * 让浏览器把解码摊到多帧上。**每块画布同一时刻只被一个任务占用**，取用与归还
+   * 都在同一次同步执行里，不存在同一块画布被两个任务交叉使用的情况。
+   */
+  function acquireDecodeCanvas() {
+    for (let i = 0; i < DECODE_CANVASES; i++) {
+      const idx = (decodePoolCursor + i) % DECODE_CANVASES;
+      if (!decodePool[idx]) {
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = TILE_PX;
+        decodePool[idx] = { canvas: cv, busy: false };
+      }
+      if (!decodePool[idx].busy) {
+        decodePool[idx].busy = true;
+        decodePoolCursor = (idx + 1) % DECODE_CANVASES;
+        return decodePool[idx];
+      }
+    }
+    return null;   // 全忙：调用方回退到共享画布
+  }
+
+  function releaseDecodeCanvas(slot) {
+    if (slot) slot.busy = false;
+  }
+
+  function loadWsf3dHeights(z, x, y) {
+    const src = blockSource();
+    const key = src.dir + '/' + src.layer + '/' + z + '/' + x + '/' + y;
+    const hit = lruGet(wsf3dHeightCache, key);
+    if (hit !== undefined) return hit;
+    const promise = imageFromUrl(src.dir + '/' + src.layer + '/' + z + '/' + x + '/' + y + '.png')
+      .then(function (im) {
+        const slot = acquireDecodeCanvas();
+        const cv = slot ? slot.canvas : decodeCanvas;
+        const cx = slot ? cv.getContext('2d', { willReadFrequently: true }) : decodeCtx;
+        try {
+          cx.clearRect(0, 0, TILE_PX, TILE_PX);
+          cx.drawImage(im, 0, 0, TILE_PX, TILE_PX);
+          return decodeWsf3dTile(cx.getImageData(0, 0, TILE_PX, TILE_PX).data);
+        } finally {
+          releaseDecodeCanvas(slot);
+        }
+      })
+      .catch(function () { return null; });
+    while (wsf3dHeightCache.size >= WSF3D_CACHE_LIMIT) {
+      const oldest = wsf3dHeightCache.keys().next();
+      if (oldest.done) break;
+      wsf3dHeightCache.delete(oldest.value);
+    }
+    wsf3dHeightCache.set(key, promise);
+    return promise;
+  }
+
+  /**
+   * 体块高度 → 颜色。
+   *
+   * 用高度色带而不是"照抄栅格像元颜色"：栅格颜色本身也是高度色带（WSF3D 与
+   * 3D-GloBFP 的瓦片都是），直接取色时同一个色带的相邻色阶几乎看不出差别，
+   * **体块之间没有高度层次**，于是整片看起来像一块扁平的板。这里按高度重新
+   * 映射一次，低矮的偏冷、高的偏暖，相邻体块的层次肉眼可辨。
+   */
+  const BLOCK_RAMP = [
+    [0, 0x3f, 0x6b, 0x8a],
+    [10, 0x55, 0x8c, 0x9e],
+    [20, 0x7d, 0xa8, 0x8c],
+    [40, 0xb9, 0xc0, 0x84],
+    [70, 0xd8, 0xb0, 0x66],
+    [110, 0xd9, 0x8a, 0x55],
+    [180, 0xc2, 0x5b, 0x4e],
+    [300, 0x8f, 0x3a, 0x6b],
+  ];
+
+  function blockColour(height, alpha) {
+    const a = alpha === undefined ? 1.0 : alpha;
+    const top = BLOCK_RAMP[BLOCK_RAMP.length - 1];
+    if (height <= BLOCK_RAMP[0][0]) {
+      const c0 = BLOCK_RAMP[0];
+      return new Cesium.Color(c0[1] / 255, c0[2] / 255, c0[3] / 255, a);
+    }
+    for (let i = 0; i < BLOCK_RAMP.length - 1; i++) {
+      const lo = BLOCK_RAMP[i], hi = BLOCK_RAMP[i + 1];
+      if (height <= hi[0]) {
+        const t = (height - lo[0]) / (hi[0] - lo[0]);
+        return new Cesium.Color(
+          (lo[1] + (hi[1] - lo[1]) * t) / 255,
+          (lo[2] + (hi[2] - lo[2]) * t) / 255,
+          (lo[3] + (hi[3] - lo[3]) * t) / 255, a);
+      }
+    }
+    return new Cesium.Color(top[1] / 255, top[2] / 255, top[3] / 255, a);
   }
 
   function lonlatToTileFrac(lon, lat, z) {
@@ -569,9 +765,11 @@
    *
    * @param {object} opts
    *   bbox  [west, south, east, north]
-   *   ramp  calibration from loadHeightRamp()
+   *   ramp  calibration from loadHeightRamp()。**现在只作为"图层是否就绪"的门禁**：
+   *         颜色改由 blockColour(高度) 现算，不再读栅格像元颜色（见 blockColour 的
+   *         注释）。保留这个参数是为了让调用方的就绪判断与提示文案不必改动。
    *   lod   index into BUILDING_LOD
-   *   zoom  WSF3D tile zoom to read
+   *   zoom  建筑高度瓦片的 zoom
    * @returns {Promise<{primitive, stats}>}
    */
   async function buildBuildingBlocks(opts) {
@@ -596,7 +794,9 @@
     const jobs = [];
     for (let tx = tx0; tx <= tx1; tx++) {
       for (let ty = ty0; ty <= ty1; ty++) {
-        jobs.push(loadWsf3dTile(z, tx, ty).then(function (d) {
+        // loadWsf3dHeights 而不是 loadWsf3dTile：前者按瓦片缓存解码后的高度，
+        // 后者每次都重新 getImageData（无头软件光栅化下 16 片约 5 s）。
+        jobs.push(loadWsf3dHeights(z, tx, ty).then(function (d) {
           return { tx: tx, ty: ty, data: d };
         }));
       }
@@ -604,14 +804,14 @@
     const tiles = await Promise.all(jobs);
     const usable = tiles.filter(function (t) { return !!t.data; });
     if (!usable.length) {
-      return { primitive: null, stats: { reason: 'no WSF3D tiles at z' + z, blocks: 0, lod: lod.key } };
+      return { primitive: null, stats: { reason: 'no building-height tiles at z' + z, blocks: 0, lod: lod.key } };
     }
 
-    // 把 AOI 划成 grid x grid 个格子，逐格取落在其中的 WSF3D 像元的平均高度
-    // 与代表色。step 控制抽样密度：粗 LOD 少读像素，出图快得多。
+    // 把 AOI 划成 grid x grid 个格子，逐格取落在其中像元的**最大**高度。
+    // 取最大而不是平均：一个 CBD 格子里 1 栋 150 m 塔楼 + 20 栋 8 m 建筑，
+    // 平均值只有 15 m，塔楼会被抹掉，天际线就没了。
     const heights = new Float32Array(grid * grid);
     const counts = new Uint16Array(grid * grid);
-    const colours = new Array(grid * grid);
 
     usable.forEach(function (tile) {
       const d = tile.data;
@@ -626,14 +826,15 @@
           const fx = tile.tx + (px + 0.5) / TILE_PX;
           const lon = tileFracToLon(fx, z);
           if (lon < west || lon > east) continue;
-          const off = (py * TILE_PX + px) * 4;
-          const r = d[off], g = d[off + 1], b = d[off + 2];
-          if (ramp.isNoData(r, g, b)) continue;
+          // d 已经是"每像元高度（米）"，无数据为 0——解码在 loadWsf3dHeights 里
+          // 做过一次并被缓存，这里不再重复解码颜色。
+          const hm = d[py * TILE_PX + px];
+          if (!(hm > 0)) continue;
           const gx = Math.min(grid - 1, Math.floor((lon - west) / (east - west) * grid));
           const idx = gy * grid + gx;
-          heights[idx] += ramp.decode(r, g, b);
+          // 取本格内的**最大**高度：平均会把塔楼抹平（见上方注释）。
+          if (hm > heights[idx]) heights[idx] = hm;
           counts[idx] += 1;
-          if (!colours[idx]) colours[idx] = 'rgb(' + r + ',' + g + ',' + b + ')';
         }
       }
     });
@@ -648,7 +849,7 @@
         const idx = gy * grid + gx;
         const n = counts[idx];
         if (!n) continue;
-        const h = heights[idx] / n;
+        const h = heights[idx];
         if (h < minHeight) { skipped++; continue; }
         if (instances.length >= maxBlocks) { skipped++; continue; }
 
@@ -657,17 +858,20 @@
         const nn = north - gy * dLat;
         const ss = nn - dLat;
         const positions = Cesium.Cartesian3.fromDegreesArray([w, nn, e, nn, e, ss, w, ss]);
-        const colour = Cesium.Color.fromCssColorString(colours[idx] || '#8fa9c4');
+        // 高度色带：低矮偏冷、高的偏暖，相邻体块的层次肉眼可辨（见 BLOCK_RAMP）。
+        const colour = blockColour(h, 1.0);
 
         instances.push(new Cesium.GeometryInstance({
           geometry: new Cesium.PolygonGeometry({
             polygonHierarchy: new Cesium.PolygonHierarchy(positions),
             height: 0,
             extrudedHeight: h,
+            // 不透明体块：PER_INSTANCE_COLOR 的 vertexFormat 与下面 appearance
+            // 的 flat:false 必须配对，否则法线不在顶点格式里，光照无从计算。
             vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
           }),
           attributes: {
-            color: Cesium.ColorGeometryInstanceAttribute.fromColor(colour.withAlpha(0.92)),
+            color: Cesium.ColorGeometryInstanceAttribute.fromColor(colour),
           },
         }));
       }
@@ -679,12 +883,18 @@
 
     const primitive = new Cesium.Primitive({
       geometryInstances: instances,
+      // flat: false 是"看起来像立体"的关键。flat: true 让每个几何体的光照法线
+      // 恒等于屏幕法线，光照**完全不起作用**，所有面同色——不管挤出多高，读起来
+      // 都像一块贴在地面上的色板。改成 false 之后顶面与侧墙各自算法线，开
+      // globe.enableLighting（见 app.js）才有明暗，才有体积感。
       appearance: new Cesium.PerInstanceColorAppearance({
-        flat: true,
+        flat: false,
         translucent: false,
         closed: true,
       }),
+      // 体块是小而多的几何体，异步编译避免一次卡住；释放由 swapBuildings 负责。
       asynchronous: true,
+      allowPicking: false,
     });
 
     return {
@@ -709,6 +919,9 @@
     newStats: newStats,
     createImageryProvider: createImageryProvider,
     createGlobalImageryProvider: createGlobalImageryProvider,
+    createTiandituProvider: createTiandituProvider,
+    createTiandituLabelProvider: createTiandituLabelProvider,
+    tiandituKey: tiandituKey,
     attachHotspotImagery: attachHotspotImagery,
     terrainMaxLevel: terrainMaxLevel,
     createOverviewImageryProvider: createOverviewImageryProvider,
