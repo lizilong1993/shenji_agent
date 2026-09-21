@@ -240,22 +240,36 @@
     const m = manifest();
     const cov = m.coverage && m.coverage[kind];
     if (cov) {
-      // 底图优先用 basemap_rectangle（取自最细两级，排除只服务热点的低层离群瓦片）；
-      // 拿不到就退回全部层级的并集。
-      const r = cov.basemap_rectangle || cov.rectangle;
+      // 覆盖形态现在是"低层全球 + 高层区域"两段：
+      //   底图（低层）层用 global_rectangle（补过 z0-z6 全球瓦片后就是全球）
+      //   区域层用 region_rectangle
+      // 拿不到就退回 basemap / 全部并集 / bbox。
+      const r = cov.global_rectangle || cov.basemap_rectangle ||
+                cov.region_rectangle || cov.rectangle;
       if (Array.isArray(r) && r.length === 4) return aoiRectangle(r);
     }
     return fallbackBbox ? aoiRectangle(fallbackBbox) : undefined;
   }
 
+  /**
+   * 低层底图：z0 起、到"全球瓦片齐全的最高层级"为止（补过 z0-z6 全球后就是 z6）。
+   *
+   * 覆盖矩形来自 manifest.coverage.imagery.global_rectangle——补齐全全球瓦片后
+   * 它等于全球；在补之前它是台海区域。这样 provider 声明的范围始终与实际瓦片一致，
+   * 不会出现"声明全球却处处 404"。
+   */
   function createGlobalImageryProvider() {
     const m = manifest();
+    const cov = (m.coverage && m.coverage.imagery) || {};
     const provider = new Cesium.UrlTemplateImageryProvider({
       url: IMAGERY_URL,
       tilingScheme: new Cesium.WebMercatorTilingScheme(),
       minimumLevel: 0,
-      maximumLevel: (m.coverage && m.coverage.imagery && m.coverage.imagery.zoom_max) ||
-                    (m.imagery_global && m.imagery_global.max_zoom) || 6,
+      // 底图层只负责低层级；再往上交给战区/热点/城区层。设成 zoom_max(17)
+      // 会让它在覆盖之外的 z7+ 反复 404。
+      maximumLevel: (cov.global_max_zoom !== undefined && cov.global_max_zoom > 0)
+        ? cov.global_max_zoom
+        : ((m.imagery_global && m.imagery_global.max_zoom) || 6),
       rectangle: measuredRect('imagery', m.bbox),
       credit: 'Esri World Imagery (low zoom)',
     });
@@ -444,13 +458,15 @@
   function terrainTileCovered(x, y, level) {
     const m = manifest();
     const cov = m.coverage && m.coverage.terrain;
-    if (!cov || !Array.isArray(cov.rectangle) || cov.rectangle.length !== 4) return true;
-    if (level < (cov.zoom_min || 0) || level > (cov.zoom_max || 30)) return false;
+    if (!cov) return true;
+    const perZoom = cov.per_zoom && cov.per_zoom[String(level)];
+    if (!perZoom) return false;            // 这一级一张都没有 → 直接给平地，别发请求
+    const r = perZoom.regional_rectangle || perZoom.full_rectangle;
+    if (!Array.isArray(r) || r.length !== 4) return true;
     const w = tileFracToLon(x, level);
     const e = tileFracToLon(x + 1, level);
     const n = tileFracToLat(y, level);
     const s = tileFracToLat(y + 1, level);
-    const r = cov.rectangle;                      // [w, s, e, n]
     return !(e < r[0] || w > r[2] || n < r[1] || s > r[3]);
   }
 
@@ -460,7 +476,6 @@
   }
 
   async function heightmapFor(x, y, level) {
-    if (!terrainTileCovered(x, y, level)) return flatHeightmap();
     const maxLevel = terrainMaxLevel();
     let lv = Math.min(level, maxLevel);
     let tx = x;
@@ -471,18 +486,25 @@
       ty = y >> shift;
     }
 
+    // 逐级上溯，但**只对覆盖范围内的层级发请求**。
+    // 地形是"低层全球 + 高层区域"：台海之外在 z10 以上没有瓦片，
+    // 不加这层判断就会一路 404（每个失败请求还要等一次往返）。
+    // 上溯到有瓦片的祖先层级后降采样——这正是地形金字塔的行为，
+    // 既避免 404，也不会让台海之外的地形塌成平面（那里本来就有 z0-z6 的全球瓦片）。
     for (; lv >= 0; lv--) {
-      const src = await loadTerrainTile(lv, tx, ty);
-      if (src) {
-        const span = Math.pow(2, level - lv);       // 该瓦片跨越多少个 level 级瓦片
-        const ox = (x - tx * span) / span;
-        const oy = (y - ty * span) / span;
-        return subSample(src, ox, oy, 1 / span);
+      if (terrainTileCovered(tx, ty, lv)) {
+        const src = await loadTerrainTile(lv, tx, ty);
+        if (src) {
+          const span = Math.pow(2, level - lv);     // 该瓦片跨越多少个 level 级瓦片
+          const ox = (x - tx * span) / span;
+          const oy = (y - ty * span) / span;
+          return subSample(src, ox, oy, 1 / span);
+        }
       }
       tx >>= 1;
       ty >>= 1;
     }
-    return new Float32Array(HEIGHTMAP_PX * HEIGHTMAP_PX);
+    return flatHeightmap();
   }
 
   function subSample(src, ox, oy, span) {

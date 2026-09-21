@@ -96,8 +96,10 @@ body {
   top: 34px;
   left: 0;
   width: 380px;
+  max-width: min(380px, calc(100vw - 24px));
   max-height: 70vh;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 6px;
   border: 1px solid #33445c;
   border-radius: 6px;
@@ -112,6 +114,11 @@ body {
 .menu-item {
   display: block;
   width: 100%;
+  /* 撑宽防线：块级按钮在绝对定位的下拉里会被长文本按 min-content 撑开，
+     即使父级写了 width 也拦不住。这三条一起才能保证"一行省略号"真的生效。 */
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   text-align: left;
   padding: 8px 10px;
   border: 1px solid transparent;
@@ -120,6 +127,7 @@ body {
   color: #cfdaea;
   font-family: inherit;
   cursor: pointer;
+  overflow: hidden;
 }
 
 .menu-item:hover { background: #26364b; }

@@ -3,17 +3,18 @@
 
 为什么需要
 ----------
-"全球层 z0-6"这个名字来自抓取脚本的分级命名，但那批瓦片**只覆盖台海区域**——
-实测 z0-z11 的瓦片数是 1/1/1/2/5/7/12/34/99/339/1242/4851，是一条金字塔，不是全球。
-provider 若不声明 rectangle（=全球），Cesium 会为域外请求瓦片，
+地基层的 provider 如果不声明 rectangle（=全球），Cesium 会为域外请求瓦片，
 实测打开离线底图会看到 `imagery/2/3/0.jpg`、`1/1/1.jpg`、`6/54/25.jpg` 一连串 404。
 
-为什么不能直接用并集
---------------------
-低层级一个瓦片覆盖十几度，**个别离群瓦片就能把并集撑成全球**。实测 z6 里有
-`(56,25)`、`(57,29)` 两张（属于热点框，不在台海金字塔里），并集直接变成
-[-180,-85,180,85]。所以这里按"这一级里 x 列 / y 行出现的次数"过滤掉稀疏离群值，
-再算包围盒。
+为什么分两段
+------------
+补齐了 z0-z6 的全球瓦片之后，覆盖形态变成"**低层全球 + 高层区域**"：
+  z0-z6   全球有瓦片（补齐过）
+  z7+     只有台海与热点框（一条区域金字塔）
+所以不能只算一个矩形。这里对每一级分别算：
+  - `full_rectangle`：该级全部瓦片的并集（低层级是全球）
+  - `regional_rectangle`：剔除稀疏离群瓦片后的包围盒（高层级是区域）
+前端据此对低层级用全球矩形、对高层级用区域矩形。
 
 用法（远程容器）：
     python3 tools/analyze_tile_coverage.py --manifest web/tiles/manifest.json --write
@@ -27,7 +28,9 @@ import os
 import sys
 from collections import Counter
 
-MIN_SUPPORT = 3     # 一条 x 列 / y 行至少有这么多瓦片才算"主体覆盖"
+MIN_SUPPORT = 3
+
+WORLD = [-180.0, -85.051129, 180.0, 85.051129]
 
 
 def tile_to_lonlat(z, x, y):
@@ -39,53 +42,125 @@ def tile_to_lonlat(z, x, y):
     return west, south, east, north
 
 
-def tiles_at(root, z):
-    zdir = os.path.join(root, str(z))
-    out = []
-    if not os.path.isdir(zdir):
+def box_of(z, pairs):
+    if not pairs:
+        return None
+    w = min(tile_to_lonlat(z, x, y)[0] for x, y in pairs)
+    s = min(tile_to_lonlat(z, x, y)[1] for x, y in pairs)
+    e = max(tile_to_lonlat(z, x, y)[2] for x, y in pairs)
+    n = max(tile_to_lonlat(z, x, y)[3] for x, y in pairs)
+    return [round(w, 6), round(s, 6), round(e, 6), round(n, 6)]
+
+
+def regional_box_of(z, pairs):
+    """剔除稀疏离群瓦片后的包围盒。
+
+    低层级一个瓦片覆盖十几度，个别离群瓦片就能把并集撑成全球——实测 z6 里只有
+    两张的 (56,25)/(57,29)（属热点框）就会造成这个后果。所以按"这一级里 x 列 /
+    y 行出现的次数"过滤。
+    """
+    cx = Counter(x for x, _ in pairs)
+    cy = Counter(y for _, y in pairs)
+    xs = {x for x, n in cx.items() if n >= MIN_SUPPORT}
+    ys = {y for y, n in cy.items() if n >= MIN_SUPPORT}
+    keep = [(x, y) for x, y in pairs if x in xs and y in ys]
+    if not keep:
+        return None
+    return box_of(z, keep)
+
+
+def read_levels(root, ext):
+    out = {}
+    if not os.path.isdir(root):
         return out
-    for xname in os.listdir(zdir):
-        if not xname.isdigit():
+    for zname in os.listdir(root):
+        zdir = os.path.join(root, zname)
+        if not zname.isdigit() or not os.path.isdir(zdir):
             continue
-        xd = os.path.join(zdir, xname)
-        if not os.path.isdir(xd):
-            continue
-        for f in os.listdir(xd):
-            if f.endswith(EXT):
-                out.append((int(xname), int(f[: -len(EXT)])))
+        pairs = []
+        for xname in os.listdir(zdir):
+            if not xname.isdigit():
+                continue
+            xd = os.path.join(zdir, xname)
+            if not os.path.isdir(xd):
+                continue
+            for f in os.listdir(xd):
+                if f.endswith(ext):
+                    pairs.append((int(xname), int(f[: -len(ext)])))
+        if pairs:
+            out[int(zname)] = pairs
     return out
 
 
-def strict_box(z, pairs):
-    """过滤稀疏离群值后的包围盒；返回 None 表示这一级没有主体覆盖。"""
-    cx = Counter(x for x, _ in pairs)
-    cy = Counter(y for _, y in pairs)
-    xs = [x for x, n in cx.items() if n >= MIN_SUPPORT]
-    ys = [y for y, n in cy.items() if n >= MIN_SUPPORT]
-    if not xs or not ys:
+def analyse(root, ext, label):
+    levels = read_levels(root, ext)
+    if not levels:
         return None
-    keep = [(x, y) for x, y in pairs if x in set(xs) and y in set(ys)]
-    if not keep:
-        return None
-    w = min(tile_to_lonlat(z, x, y)[0] for x, y in keep)
-    s = min(tile_to_lonlat(z, x, y)[1] for x, y in keep)
-    e = max(tile_to_lonlat(z, x, y)[2] for x, y in keep)
-    n = max(tile_to_lonlat(z, x, y)[3] for x, y in keep)
-    return (w, s, e, n, len(keep), len(pairs))
+    per_zoom = {}
+    full = {}
+    regional = {}
+    for z, pairs in sorted(levels.items()):
+        fb = box_of(z, pairs)
+        rb = regional_box_of(z, pairs) or fb
+        per_zoom[str(z)] = {
+            "tiles": len(pairs),
+            "full_rectangle": fb,
+            "regional_rectangle": rb,
+            "full_is_world": fb == WORLD,
+        }
+        full[z] = fb
+        regional[z] = rb
 
+    ws = sorted(full)
+    zmax = ws[-1]
+    # 底基层：低层级全球、高层级区域 → 用两个矩形描述
+    global_max = 0
+    for z in ws:
+        if per_zoom[str(z)]["full_is_world"]:
+            global_max = z
+    region_min = global_max + 1
 
-def scan(root, ext):
-    global EXT
-    EXT = ext
-    per_z = {}
-    for zname in sorted(os.listdir(root), key=lambda v: int(v) if v.isdigit() else 0):
-        if not zname.isdigit():
-            continue
-        z = int(zname)
-        pairs = tiles_at(root, z)
-        if pairs:
-            per_z[z] = pairs
-    return per_z
+    reg_boxes = [regional[z] for z in ws if z >= region_min] or [regional[zmax]]
+    region_rect = [
+        round(min(b[0] for b in reg_boxes), 6),
+        round(min(b[1] for b in reg_boxes), 6),
+        round(max(b[2] for b in reg_boxes), 6),
+        round(max(b[3] for b in reg_boxes), 6),
+    ]
+    # 最细两级的范围：用于"底图只需要覆盖真实视野"的场景
+    detail = [z for z in ws if z >= max(region_min, zmax - 1)]
+    detail_boxes = [regional[z] for z in detail] or reg_boxes
+    detail_rect = [
+        round(min(b[0] for b in detail_boxes), 6),
+        round(min(b[1] for b in detail_boxes), 6),
+        round(max(b[2] for b in detail_boxes), 6),
+        round(max(b[3] for b in detail_boxes), 6),
+    ]
+
+    result = {
+        "zoom_min": ws[0],
+        "zoom_max": zmax,
+        "tiles": sum(len(p) for p in levels.values()),
+        "global_max_zoom": global_max,
+        "global_rectangle": WORLD if global_max else None,
+        "region_min_zoom": region_min if region_min <= zmax else None,
+        "region_rectangle": region_rect if region_min <= zmax else None,
+        "basemap_rectangle": detail_rect,
+        "basemap_from_zoom": detail,
+        "per_zoom": per_zoom,
+    }
+    print("== %s" % label)
+    print("   层级 z%s-z%s  共 %d 张" % (ws[0], zmax, result["tiles"]))
+    print("   全球层: z0-z%d（矩形全球）" % global_max)
+    if result["region_rectangle"]:
+        print("   区域层: z%d-z%d  矩形 %s" % (region_min, zmax, result["region_rectangle"]))
+    print("   底图矩形（取自 z%s）: %s" % (detail, detail_rect))
+    for z in ws:
+        v = per_zoom[str(z)]
+        print("     z%-2d n=%-5d full=%s%s regional=%s"
+              % (z, v["tiles"], "WORLD" if v["full_is_world"] else v["full_rectangle"],
+                 "" if v["full_is_world"] else "", v["regional_rectangle"]))
+    return result
 
 
 def main():
@@ -96,58 +171,10 @@ def main():
     args = ap.parse_args()
 
     results = {}
-    for name, sub, ext in (("imagery", "imagery", ".jpg"), ("terrain", "terrain", ".png")):
-        root = os.path.join(args.tiles, sub)
-        if not os.path.isdir(root):
-            continue
-        per_z = scan(root, ext)
-        boxes = {}
-        for z, pairs in per_z.items():
-            b = strict_box(z, pairs)
-            if b:
-                boxes[z] = b
-        if not boxes:
-            continue
-        w = min(b[0] for b in boxes.values())
-        s = min(b[1] for b in boxes.values())
-        e = max(b[2] for b in boxes.values())
-        n = max(b[3] for b in boxes.values())
-        # 底图矩形取**最细那两级**的范围，而不是全部层级的并集。
-        #
-        # 高层级才带热点框（关岛/冲绳/羽田），所以并集是 108.8–145°E；但 Cesium 会为
-        # 同一个地理位置跨层级请求瓦片，如果一个视野只落在 z11 的范围内，它请求的
-        # z0–z10 瓦片也就都落在这个范围内。用最细层级算矩形，可以把低层级那些
-        # 只服务热点的离群瓦片排除掉，同时不牺牲任何真实视野的覆盖。
-        detail_z = sorted(boxes)[-2:]
-        dw = min(boxes[z][0] for z in detail_z)
-        ds = min(boxes[z][1] for z in detail_z)
-        de = max(boxes[z][2] for z in detail_z)
-        dn = max(boxes[z][3] for z in detail_z)
-        total = sum(len(p) for p in per_z.values())
-        kept = sum(b[4] for b in boxes.values())
-        results[name] = {
-            "rectangle": [round(w, 6), round(s, 6), round(e, 6), round(n, 6)],
-            "basemap_rectangle": [round(dw, 6), round(ds, 6), round(de, 6), round(dn, 6)],
-            "basemap_from_zoom": detail_z,
-            "zoom_min": min(boxes),
-            "zoom_max": max(boxes),
-            "tiles": total,
-            "tiles_in_region": kept,
-            "per_zoom": {str(z): len(per_z[z]) for z in sorted(per_z)},
-        }
-        print("== %s" % name)
-        print("   全部层级并集 [%.4f, %.4f, %.4f, %.4f]  z%s-z%s"
-              % (w, s, e, n, min(boxes), max(boxes)))
-        print("   底图矩形（取自 z%s）[%.4f, %.4f, %.4f, %.4f]"
-              % (detail_z, dw, ds, de, dn))
-        print("   tiles %d, in-region %d" % (total, kept))
-        for z in sorted(boxes):
-            b = boxes[z]
-            print("   z%-2d kept %4d/%-4d  [%.3f,%.3f,%.3f,%.3f]"
-                  % (z, b[4], b[5], b[0], b[1], b[2], b[3]))
-        outliers = total - kept
-        if outliers:
-            print("   离群（不计入 range）: %d 张" % outliers)
+    for kind, sub, ext in (("imagery", "imagery", ".jpg"), ("terrain", "terrain", ".png")):
+        r = analyse(os.path.join(args.tiles, sub), ext, kind)
+        if r:
+            results[kind] = r
 
     if not args.write:
         print("\n（未写回；加 --write 生效）")
@@ -157,14 +184,17 @@ def main():
         man = json.load(fh)
     man["coverage"] = results
     man["coverage_note"] = (
-        "coverage.*.rectangle 由 tools/analyze_tile_coverage.py 从**实际瓦片**算出（并剔除"
-        "稀疏离群瓦片），不是抓取时的名义范围。影像层曾按'全球 z0-6'声明覆盖，但瓦片只覆盖"
-        "台海区域，声明全球会让域外请求全部 404。")
+        "coverage.* 由 tools/analyze_tile_coverage.py 从**实际瓦片**算出，"
+        "剔除稀疏离群瓦片，并把'低层全球 + 高层区域'两段分开描述。"
+        "底部 provider 曾按名义'全球 z0-6'声明覆盖，实际瓦片只覆盖台海，"
+        "导致域外请求全部 404。")
     with open(args.manifest, "w", encoding="utf-8") as fh:
         json.dump(man, fh, indent=2, ensure_ascii=False)
     print("\nmanifest 已更新")
     for k, v in results.items():
-        print("  %s: %s z%s-z%s" % (k, v["rectangle"], v["zoom_min"], v["zoom_max"]))
+        print("  %s: global z0-z%s, region z%s-z%s %s"
+              % (k, v["global_max_zoom"], v["region_min_zoom"], v["zoom_max"],
+                 v["region_rectangle"]))
     return 0
 
 

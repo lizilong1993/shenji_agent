@@ -358,7 +358,6 @@ function initViewer() {
 
   // 注记层紧贴天地图影像之上（index 1）。
   viewer.imageryLayers.add(state.tiandituLabelLayer);
-
   // 离线全球层：默认关闭（天地图是默认底图），但**始终存在**，切回离线时只是
   // 把 show 打开，不再重建 provider——避免重复初始化与重复请求。
   // 反过来，离线底图是唯一"离线环境下一定有图"的图层，所以不能删。
@@ -376,6 +375,15 @@ function initViewer() {
   // 只能靠这一层；与战区重叠的部分因 URL 相同会命中 TileCache 内存缓存。
   const hboxes = (OfflineAssets.manifest().hotspot_imagery || {}).boxes || [];
   state.hotspotLayers = OfflineAssets.attachHotspotImagery(viewer, hboxes);
+
+  // 关于注记层的次序：Cesium 的 imageryLayers 是**后加的叠在上面**，而热点/城区高清
+  // 影像比天地图影像更细，自然要放在天地图之上，也就必然盖住天地图的注记层。
+  // 用户对这个现象的原话是"热点区域等图层会遮盖地名图层，这是不符合逻辑的"——
+  // 栅格影像盖住注记确实不合逻辑，所以把天地图注记层抬到最上面。
+  // （我们自己的地名词典层是 Label 图元，与影像不在同一条管线里，不受此影响。）
+  if (state.tiandituLabelLayer && viewer.imageryLayers.raiseToTop) {
+    viewer.imageryLayers.raiseToTop(state.tiandituLabelLayer);
+  }
 
   // 完全离线：不触碰 Ion 资产，不使用 Bing/在线地形服务。
   viewer.scene.globe.enableLighting = false;
@@ -719,8 +727,8 @@ const LAYER_GROUPS = [
   { name: '目标图层', ids: ['layerTargets', 'layerLabels', 'layerTracks', 'modelSensor',
                             'layerTargetPanel', 'filterRed', 'filterBlue', 'filterSea',
                             'filterLand', 'filterAir'] },
-  { name: '底图', ids: ['modelTianditu', 'modelImagery', 'modelHotspotImagery',
-                        'modelUrbanImagery',
+  { name: '底图', ids: ['modelTianditu', 'modelTiandituLabel', 'modelImagery',
+                        'modelHotspotImagery', 'modelUrbanImagery',
                         'modelPlaces', 'modelTerrain',
                         'modelWsf3dOverlay', 'modelBuildings', 'modelWeather'] },
   { name: '地图组件', ids: ['compCompass', 'compScalebar', 'compViewpoint'] },
@@ -1678,30 +1686,45 @@ function syncUrbanImagery() {
 
 function setImagery(on) {
   // 「影像底图（离线）」管全球层 + 战区层；热点层与城区层各有自己的开关。
-  // 打开离线底图就关掉天地图：两者都是铺满视野的底图，同时开只会互相遮挡，
+  // 打开离线底图就关掉天地图影像：两者都是铺满视野的底图，同时开只会互相遮挡，
   // 而且在线/离线混着看，无法判断当前画面到底来自哪一套。
+  // 但**注记层不动**：注记是"文字覆盖"而不是底图，用户可能想看离线影像 + 天地图注记。
   if (state.globalLayer) state.globalLayer.show = on;
   if (state.imageryLayer) state.imageryLayer.show = on;
-  if (on) setTianditu(false);
+  if (on && state.tiandituLayer) state.tiandituLayer.show = false;
   setSwitchNote(on
-    ? '离线影像底图已启用：全球 z0–6 + 战区 z0–11（离线 Esri World Imagery），天地图已暂时关闭。'
+    ? '离线影像底图已启用：全球/战区层（离线 Esri World Imagery）。'
     : '离线影像底图已关闭。');
+}
+
+/**
+ * 天地图注记层开关。
+ *
+ * 单独一个开关的理由：注记层被 `raiseToTop` 抬到了所有影像之上，
+ * **它会盖住热点/城区的高清影像**。有些场景（例如要看城市细节）不想要注记，
+ * 所以给它独立的开关，默认开。天地图的影像底图与注记是分开的，用户可以
+ * 只要影像不要注记，也可以离线影像 + 天地图注记。
+ */
+function setTiandituLabel(on) {
+  if (state.tiandituLabelLayer) state.tiandituLabelLayer.show = !!on;
+  setSwitchNote(on ? '天地图注记已显示（置于所有影像层之上）。'
+                   : '天地图注记已隐藏。');
 }
 
 /**
  * 天地图底图开关（默认开）。
  *
  * 天地图影像与它的中文注记是**两个 layer**：影像本身不含地名，不叠 `cva` 注记层
- * 地图上一个字都没有。所以一个开关同时管这两层。
- *
- * 与离线底图互斥的理由同上：两套都铺满视野。但注意**天地图不可用时不应把画面
- * 变成纯几何**——离线底图仍在，用户只是看不到在线影像而已。
+ * 地图上一个字都没有。所以打开这个开关会同时打开注记；注记另有一个独立开关
+ * （setTiandituLabel）用来在需要时单独关掉。
  */
 function setTianditu(on) {
   const base = state.tiandituLayer;
   const label = state.tiandituLabelLayer;
   if (base) base.show = !!on;
-  if (label) label.show = !!on;
+  // 注记跟随影像一起开：不叠 cva 层，天地图上就一个字都没有，用户会以为地名层坏了。
+  // 但关闭影像时**不动注记**——用户可能就是想"离线影像 + 天地图注记"。
+  if (on && label) label.show = true;
   if (on && (state.globalLayer || state.imageryLayer)) {
     if (state.globalLayer) state.globalLayer.show = false;
     if (state.imageryLayer) state.imageryLayer.show = false;
@@ -1710,7 +1733,7 @@ function setTianditu(on) {
   setSwitchNote(on
     ? '天地图已启用（在线影像 + 中文注记，key …' + String(key).slice(-6) +
       '）。离线影像底图已暂时关闭，可在同组里切回。'
-    : '天地图已关闭。');
+    : '天地图影像已关闭（注记层保持当前状态）。');
 }
 
 function setHotspotImagery(on) {
@@ -2299,7 +2322,12 @@ function exportData() {
 function bindUI() {
   const bindCheck = function (id, handler) {
     const node = document.getElementById(id);
-    if (node) node.addEventListener('change', function (e) { handler(e.target.checked); });
+    if (!node) return;
+    // 顺手登记进 dom 缓存，省得新增开关时忘了往 dom 的 id 列表里补一行。
+    // （注意：判断开关状态一律用 checkboxOn() 现取 DOM，不要信这个缓存引用——
+    // 实测它会与文档脱钩。）
+    dom[id] = node;
+    node.addEventListener('change', function (e) { handler(e.target.checked); });
   };
 
   bindCheck('layerTargets', function (v) { state.layers.targets = v; guardFollow(); });
@@ -2394,6 +2422,7 @@ function bindUI() {
   bindCheck('modelSensor', setSensors);
   bindCheck('modelImagery', setImagery);
   bindCheck('modelTianditu', setTianditu);
+  bindCheck('modelTiandituLabel', setTiandituLabel);
   // 天地图是默认底图：HTML 的 checked 只是初始显示，change 不会自动触发，
   // 而 initViewer 里已经把它设成 baseLayer，所以这里不需要再调用一次；
   // 但把提示文案写清楚，否则用户不知道当前底图是在线还是离线。
