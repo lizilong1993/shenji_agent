@@ -60,6 +60,9 @@ const state = {
   pendingPrimitive: null,
   buildingTimer: null,
   imageryLayer: null,
+  // 最近一次 LayerRegistry.apply() 的结果（取证/数据健康面板用）。
+  // 图层句柄本身不由 state 持有——注册表才是唯一的顺序与归属来源。
+  lastLayerApply: null,
   cursorCarto: null,        // 光标处的地面点，用于"地理位置信息"读数
   lastError: null,          // 最近一次未捕获异常
   urbanLayers: null,        // 城区 z12-z14 高清影像层（按相机高度挂载）
@@ -376,14 +379,67 @@ function initViewer() {
   const hboxes = (OfflineAssets.manifest().hotspot_imagery || {}).boxes || [];
   state.hotspotLayers = OfflineAssets.attachHotspotImagery(viewer, hboxes);
 
-  // 关于注记层的次序：Cesium 的 imageryLayers 是**后加的叠在上面**，而热点/城区高清
-  // 影像比天地图影像更细，自然要放在天地图之上，也就必然盖住天地图的注记层。
-  // 用户对这个现象的原话是"热点区域等图层会遮盖地名图层，这是不符合逻辑的"——
-  // 栅格影像盖住注记确实不合逻辑，所以把天地图注记层抬到最上面。
-  // （我们自己的地名词典层是 Label 图元，与影像不在同一条管线里，不受此影响。）
-  if (state.tiandituLabelLayer && viewer.imageryLayers.raiseToTop) {
-    viewer.imageryLayers.raiseToTop(state.tiandituLabelLayer);
-  }
+  // ---- 图层注册表 ----------------------------------------------------------
+  // 到这里所有**常驻** imagery 层都已挂上（天地图影像/注记、离线全球/战区、
+  // 热点）。把顺序交给注册表声明，不再靠 add 的先后 + 事后 raiseToTop：
+  //
+  //   以前注记被热点/城区影像压住，是加了一次 `raiseToTop(tiandituLabelLayer)`
+  //   才救回来的——每加一个新影像层都要重新检查这一处。现在注记在 LAYERS 里
+  //   z=90，排在所有底图/高清影像之上，顺序由数据决定。
+  //
+  // 栈与栈之间 Cesium 没有统一 z 轴（见 layerRegistry.js 文件头），所以三个
+  // sink 分别写各自的栈：
+  //   imagery   → .show（顺序由 reorderImagery 按 z 重排 index）
+  //   primitive → .show（mesh 前后由深度缓冲决定，与 index 无关）
+  //   label     → Places.setEnabled（内部再做屏幕空间仲裁）
+  state.layerHealth = LayerRegistry.bind(viewer, {
+    imagery: function (id, want) {
+      // imagery.offline 是两级（全球 z0-6 + 战区 z7-11），都在槽位里，
+      // 由下面的通用分支统一翻，不需要特判。
+      // 热点层是**一层多实例**（每个热点框一个 provider 各自带 rectangle），
+      // 槽位里每个实例都登记了，同样交给通用分支。
+      const layers = LayerRegistry.layersOf(id);
+      if (layers && layers.length) {
+        layers.forEach(function (l) { l.show = !!want; });
+        return;
+      }
+      // 城区层按相机高度动态挂载，卸载后槽位为空，此时无事可做。
+    },
+    primitive: function (id, want) {
+      if (id === 'buildings.blocks') {
+        // 直接走内部实现：若改走 setBuildings 会再写一次 desired，形成回环。
+        applyBuildingsVisibility(want);
+      } else if (id === 'tiles.google3d') {
+        setOnlineTilesetVisible(want);
+      }
+    },
+    label: function (id, want) {
+      if (id === 'places.labels' && window.Places) Places.setEnabled(!!want);
+    },
+  });
+
+  // 常驻 imagery 槽位登记（动态层在挂载时登记，见 registerImagerySlot）。
+  registerImagerySlot('tianditu.base', state.tiandituLayer);
+  registerImagerySlot('tianditu.label', state.tiandituLabelLayer);
+  // 离线底图是**两级**：全球层 z0-6 + 战区层 z7-11，共用一个 imagery.offline 意图。
+  // 两个都要登记——只登记全球层的话，战区层会留在顺序之外，反而压到注记上面。
+  registerImagerySlot('imagery.offline', [state.globalLayer, state.imageryLayer]);
+  // 热点影像是**一层多实例**（每个热点框一个 provider），必须全部登记。
+  registerImagerySlot('hotspot.imagery', state.hotspotLayers);
+
+  // 初始意图：与 index.html 里各复选框的 checked 一致。HTML 的 checked 只是初始
+  // 显示，不会触发 change，所以必须在这里显式同步一次，否则注册表会以为全都关着。
+  LayerRegistry.setDesired('tianditu.base', checkboxOn('modelTianditu'));
+  LayerRegistry.setDesired('tianditu.label', checkboxOn('modelTiandituLabel'));
+  LayerRegistry.setDesired('imagery.offline', checkboxOn('modelImagery'));
+  LayerRegistry.setDesired('hotspot.imagery', checkboxOn('modelHotspotImagery'));
+  LayerRegistry.setDesired('wsf3d.overlay', checkboxOn('modelWsf3dOverlay'));
+  LayerRegistry.setDesired('buildings.blocks', checkboxOn('modelBuildings'));
+  LayerRegistry.setDesired('tiles.google3d', checkboxOn('modelBuildingsOnline'));
+  LayerRegistry.setDesired('places.labels', checkboxOn('modelPlaces'));
+  // 立刻应用一次：把 imagery 的 index 按 LAYERS 的 z 排好。这一步取代了以前那句
+  // raiseToTop(tiandituLabelLayer)——注记现在由 z=90 直接排到最上。
+  applyLayers();
 
   // 完全离线：不触碰 Ion 资产，不使用 Bing/在线地形服务。
   viewer.scene.globe.enableLighting = false;
@@ -1412,16 +1468,20 @@ function setTerrain(on) {
 }
 
 function setWsf3dOverlay(on) {
+  LayerRegistry.setDesired('wsf3d.overlay', !!on);
+  // 专题层是懒挂载的：挂上之后必须登记槽位，否则它在 imageryLayers 里是 add 到
+  // 末尾的，会直接落在天地图注记之上把它盖住（实测就是这样：注记在 index 15，
+  // 未登记的 WSF3D 层在 16）。登记 + applyLayers 之后会被排到注记之下。
+  if (on && !state.wsf3dOverlayLayer) {
+    state.wsf3dOverlayLayer = OfflineAssets.attachWsf3dOverlay(
+      viewer, 'buildingheight', 0.62);
+    registerImagerySlot('wsf3d.overlay', state.wsf3dOverlayLayer);
+  }
+  applyLayers();
   if (on) {
-    if (!state.wsf3dOverlayLayer) {
-      state.wsf3dOverlayLayer = OfflineAssets.attachWsf3dOverlay(
-        viewer, 'buildingheight', 0.62);
-    }
-    state.wsf3dOverlayLayer.show = true;
     setSwitchNote('建筑高度图层已启用：WSF3D v02 建筑高度（90 m），' +
-      '叠加于影像底图之上，黑色像元为无数据已剔除。');
-  } else if (state.wsf3dOverlayLayer) {
-    state.wsf3dOverlayLayer.show = false;
+      '叠加于影像底图之上、天地图注记之下，黑色像元为无数据已剔除。');
+  } else {
     setSwitchNote('建筑高度图层已关闭。');
   }
 }
@@ -1440,11 +1500,32 @@ function setBuildingsOnline(on) {
     setSwitchNote('在线三维实景模块未加载（src/buildings3d.js）。');
     return;
   }
+  LayerRegistry.setDesired('tiles.google3d', !!on);
   window.Buildings3D.setEnabled(on).then(function (info) {
-    syncBuildingsOnlineNote(info);
+    // 在线层不可用 → 把**本机**体块的意图打开，让注册表解算后自然落到体块上。
+    // 不在这里直接改场景：注册表才是唯一落地点。
     if (info.shouldFallback) {
-      fallBackToLocalBuildings(info);
-    } else if (info.live) {
+      const why = info.detail || '在线图层不可用';
+      const alreadyLocal = checkboxOn('modelBuildings');
+      LayerRegistry.setDesired('buildings.blocks', true);
+      LayerRegistry.setFeed('tiles.google3d',
+        info.phase === 'unconfigured' ? 'unsupported' : 'failed', why);
+      applyLayers();
+      syncBuildingsOnlineNote(info);
+      if (!alreadyLocal) {
+        const box = document.getElementById('modelBuildings');
+        if (box) box.checked = true;
+      }
+      setSwitchNote('在线三维实景不可用（' + why + '），' +
+        (alreadyLocal ? '已继续使用本机建筑体块。' : '已自动回落到本机建筑体块。'));
+      return;
+    }
+    if (info.live) {
+      LayerRegistry.setFeed('tiles.google3d', 'ok', info.detail);
+    }
+    applyLayers();
+    syncBuildingsOnlineNote(info);
+    if (info.live) {
       setSwitchNote('在线三维实景已开启（' + info.detail + '）。' +
         '注：该模式会隐藏本机 DEM，且瓦片无法离线缓存。');
     } else if (!info.enabled) {
@@ -1473,25 +1554,12 @@ function syncBuildingsOnlineNote(info) {
 }
 
 /**
- * 在线层不可用时退到本机离线体块。
+ * 建筑体块的**实际显隐**（注册表的 primitive sink 调它）。
  *
- * 只在"本机开关本来就没开"时动手，避免用户手动关掉的图层又被悄悄打开。
+ * 纯"把状态落到场景上"，不碰 desired——desired 由 setBuildings 写。
+ * 两者分开是为了避免回环：sink 若再调 setBuildings，就会又写一次 desired。
  */
-function fallBackToLocalBuildings(info) {
-  const why = info.detail || '在线图层不可用';
-  if (checkboxOn('modelBuildings')) {
-    setSwitchNote('在线三维实景不可用（' + why + '），已继续使用本机建筑体块。');
-    return;
-  }
-  setSwitchNote('在线三维实景不可用（' + why + '），已自动回落到本机建筑体块。');
-  const box = document.getElementById('modelBuildings');
-  if (box) box.checked = true;
-  // 直接调用而不是派发 change：派发会再走一遍 bindCheck，语义一样但多一层，
-  // 而这里已经确定要开，显式调用更好追。
-  setBuildings(true);
-}
-
-function setBuildings(on) {
+function applyBuildingsVisibility(on) {
   if (!on) {
     if (state.buildingsPrimitive) state.buildingsPrimitive.show = false;
     // **必须清掉 buildingsKey**。refreshBuildings 的开头是
@@ -1508,15 +1576,91 @@ function setBuildings(on) {
     setSwitchNote('建筑体块需要色带标定文件 tiles/wsf3d/height_ramp.json，正在加载…');
     OfflineAssets.loadHeightRamp().then(function (ramp) {
       state.ramp = ramp;
-      setBuildings(true);
+      // 色带到位后重新解算一次，sink 会再进来，此时 ramp 已有。
+      LayerRegistry.setFeed('buildings.blocks', 'ok', null);
+      refreshBuildings();
     }).catch(function (e) {
       setSwitchNote('建筑体块不可用：' + e.message +
         '（请先运行 tools/calibrate_wsf3d.py）');
-      document.getElementById('modelBuildings').checked = false;
+      LayerRegistry.setFeed('buildings.blocks', 'failed', e.message);
+      const box = document.getElementById('modelBuildings');
+      if (box) box.checked = false;
     });
     return;
   }
   refreshBuildings();
+}
+
+/**
+ * 建筑体块开关：只写「意图」，实际显隐交给注册表解算。
+ *
+ * 以前的写法是直接改场景（show / buildingsKey / 重建），于是"在线实景开着的时候
+ * 体块该不该显示"这类**跨图层**的判断只能散在各个 setter 里手工维护。现在意图与
+ * 落地分开，互斥规则集中在 layerRegistry.js。
+ */
+function setBuildings(on) {
+  LayerRegistry.setDesired('buildings.blocks', !!on);
+}
+
+/**
+ * 登记 imagery 槽位。**多实例层要把每个实例都登记进来**，只登记第 0 个会让其余
+ * 实例落在顺序范围之外、继续压在注记上面（这正是"注记被热点影像盖住"没被真正
+ * 修掉的原因）。接受单个 layer 或 layer 数组。
+ */
+function registerImagerySlot(id, layerOrLayers) {
+  if (!layerOrLayers) return layerOrLayers;
+  const arr = Array.isArray(layerOrLayers) ? layerOrLayers : [layerOrLayers];
+  arr.forEach(function (l) { if (l) LayerRegistry.addImagery(id, l); });
+  return layerOrLayers;
+}
+
+/** 在线实景 tileset 的显隐。mesh 层的前后由深度缓冲决定，这里只管 show。 */
+function setOnlineTilesetVisible(on) {
+  if (window.Buildings3D && Buildings3D.setVisible) Buildings3D.setVisible(!!on);
+}
+
+/**
+ * 解算并应用图层状态。**所有**意图变更都走这里，不要各自去改场景。
+ *
+ * 幂等，但不要在帧循环里无脑调：reorderImagery 会动 imageryLayers 的 index，
+ * 每帧动一次会让 Cesium 反复重建表面瓦片顺序。
+ */
+function applyLayers() {
+  var out = LayerRegistry.apply();
+  state.lastLayerApply = out;
+  syncLayerCheckboxes();
+  if (out.skipped && out.skipped.length) {
+    // 不静默：sink 缺失或抛异常都会在这里露出来。
+    console.warn('[layers] apply 跳过：', out.skipped);
+  }
+  return out;
+}
+
+/**
+ * 把仲裁结果同步回复选框。
+ *
+ * 互斥会**替用户关掉**一个层（例如打开离线底图会把天地图影像顶掉）。这时复选框
+ * 若还停在勾选状态，界面就在撒谎——用户看到天地图勾着、画面却是离线影像。
+ * 这里只改 .checked，**不派发 change**，否则会再走一遍 setDesired 造成回环。
+ */
+function syncLayerCheckboxes() {
+  LayerRegistry.status().forEach(function (s) {
+    if (!s.checkbox) return;
+    const box = document.getElementById(s.checkbox);
+    if (box && box.checked !== !!s.effective) box.checked = !!s.effective;
+  });
+}
+
+/** 图层顺序与状态的取证入口。 */
+function debugLayers() {
+  return {
+    registry: LayerRegistry.status(),
+    stacks: LayerRegistry._debug(),
+    lastApply: state.lastLayerApply,
+    imageryCount: viewer && viewer.imageryLayers ? viewer.imageryLayers.length : -1,
+    terrainDepthTest: viewer ? viewer.scene.globe.depthTestAgainstTerrain : null,
+    globeShow: viewer ? viewer.scene.globe.show : null,
+  };
 }
 
 /** 屏幕中心射线打到地面的经纬；打不到时退回相机自身的地面投影。 */
@@ -1742,6 +1886,12 @@ function syncUrbanImagery() {
 
   if (want && !state.urbanLayers) {
     state.urbanLayers = OfflineAssets.attachUrbanImagery(viewer, state.urbanAoi);
+    // 挂载后必须登记槽位并重排：新层是 add 到 imageryLayers 末尾的，不重排就会
+    // 落在天地图注记（z=90）之上，把注记重新盖住。
+    if (state.urbanLayers && state.urbanLayers.length) {
+      registerImagerySlot('urban.imagery', state.urbanLayers.map(function (r) { return r.layer; }));
+    }
+    applyLayers();
     return;
   }
   if (!want && state.urbanLayers) {
@@ -1749,17 +1899,19 @@ function syncUrbanImagery() {
       viewer.imageryLayers.remove(rec.layer, true);
     });
     state.urbanLayers = null;
+    LayerRegistry.dropImagery('urban.imagery');
+    applyLayers();
   }
 }
 
 function setImagery(on) {
   // 「影像底图（离线）」管全球层 + 战区层；热点层与城区层各有自己的开关。
-  // 打开离线底图就关掉天地图影像：两者都是铺满视野的底图，同时开只会互相遮挡，
-  // 而且在线/离线混着看，无法判断当前画面到底来自哪一套。
-  // 但**注记层不动**：注记是"文字覆盖"而不是底图，用户可能想看离线影像 + 天地图注记。
-  if (state.globalLayer) state.globalLayer.show = on;
-  if (state.imageryLayer) state.imageryLayer.show = on;
-  if (on && state.tiandituLayer) state.tiandituLayer.show = false;
+  // 与天地图的互斥**不再在这里手工对冲**：LAYERS 里 imagery.offline 与
+  // tianditu.base 互相列进 exclusives，由注册表解算谁让位。
+  // 注记层依旧不受影响——注记是"文字覆盖"而不是底图，用户可以要离线影像 +
+  // 天地图注记。
+  LayerRegistry.setDesired('imagery.offline', !!on);
+  applyLayers();
   setSwitchNote(on
     ? '离线影像底图已启用：全球/战区层（离线 Esri World Imagery）。'
     : '离线影像底图已关闭。');
@@ -1768,13 +1920,17 @@ function setImagery(on) {
 /**
  * 天地图注记层开关。
  *
- * 单独一个开关的理由：注记层被 `raiseToTop` 抬到了所有影像之上，
- * **它会盖住热点/城区的高清影像**。有些场景（例如要看城市细节）不想要注记，
- * 所以给它独立的开关，默认开。天地图的影像底图与注记是分开的，用户可以
- * 只要影像不要注记，也可以离线影像 + 天地图注记。
+ * 单独一个开关的理由：注记是**栅格**，会盖住热点/城区的高清影像（栅格叠栅格
+ * 没有"谁更重要"这回事，只有顺序）。有些场景（例如要看城市细节）不想要注记，
+ * 所以给它独立开关，默认开。
+ *
+ * 顺序上注记在 LAYERS 里是 z=90，排在所有底图/高清影像之上——这是它**应该**
+ * 在的位置（文字压在影像上才符合直觉）；以前是被热点影像盖住之后用一次
+ * raiseToTop 救回来的，现在由声明直接保证。
  */
 function setTiandituLabel(on) {
-  if (state.tiandituLabelLayer) state.tiandituLabelLayer.show = !!on;
+  LayerRegistry.setDesired('tianditu.label', !!on);
+  applyLayers();
   setSwitchNote(on ? '天地图注记已显示（置于所有影像层之上）。'
                    : '天地图注记已隐藏。');
 }
@@ -1787,16 +1943,11 @@ function setTiandituLabel(on) {
  * （setTiandituLabel）用来在需要时单独关掉。
  */
 function setTianditu(on) {
-  const base = state.tiandituLayer;
-  const label = state.tiandituLabelLayer;
-  if (base) base.show = !!on;
+  LayerRegistry.setDesired('tianditu.base', !!on);
   // 注记跟随影像一起开：不叠 cva 层，天地图上就一个字都没有，用户会以为地名层坏了。
   // 但关闭影像时**不动注记**——用户可能就是想"离线影像 + 天地图注记"。
-  if (on && label) label.show = true;
-  if (on && (state.globalLayer || state.imageryLayer)) {
-    if (state.globalLayer) state.globalLayer.show = false;
-    if (state.imageryLayer) state.imageryLayer.show = false;
-  }
+  if (on) LayerRegistry.setDesired('tianditu.label', true);
+  applyLayers();
   const key = OfflineAssets.tiandituKey ? OfflineAssets.tiandituKey() : '';
   setSwitchNote(on
     ? '天地图已启用（在线影像 + 中文注记，key …' + String(key).slice(-6) +
@@ -1805,7 +1956,8 @@ function setTianditu(on) {
 }
 
 function setHotspotImagery(on) {
-  (state.hotspotLayers || []).forEach(function (layer) { layer.show = !!on; });
+  LayerRegistry.setDesired('hotspot.imagery', !!on);
+  applyLayers();
   const n = (state.hotspotLayers || []).length;
   setSwitchNote(on
     ? '热点区域高清影像已启用：' + n + ' 个热点框（z0–12，约 19 m/px）。'
@@ -2331,6 +2483,10 @@ window.SituationHost = {
     };
   },
   setStatus: setStatus,
+  // 图层顺序取证：imagery 的真实 index 顺序 + 每个图层的意图/事实。
+  // 「哪个层压在哪个层上面」光看画面猜不出来，必须能读到 index。
+  debugLayers: debugLayers,
+  applyLayers: applyLayers,
   applySituationData: applySituationData,
   reload: reloadSituation,
   clearSituation: clearSituation,
@@ -2436,22 +2592,24 @@ function bindUI() {
     if (!v) closeTargetPanel();
   });
   bindCheck('modelPlaces', function (v) {
-    if (window.Places) Places.setEnabled(v);
+    LayerRegistry.setDesired('places.labels', !!v);
+    applyLayers();
     setSwitchNote(v ? '地名图层已启用：Natural Earth 离线地名，按相机高度分级显示并做屏幕空间去重。'
                     : '地名图层已关闭。');
   });
-  // HTML 里的 checked 只是初始显示，change 事件不会自动触发；而地名数据是懒加载的，
-  // 不显式初始化一次就会"默认勾选却什么都不显示"。
-  if (dom.modelPlaces && dom.modelPlaces.checked && window.Places) Places.setEnabled(true);
-  // HTML 里的 checked 只是初始显示，change 事件不会自动触发；而地名数据是懒加载的，
-  // 不显式初始化一次就会"默认勾选却什么都不显示"。
-  if (dom.modelPlaces && dom.modelPlaces.checked && window.Places) Places.setEnabled(true);
+  // 地名是懒加载的：初始 checked 不会触发 change，但 initViewer 里已经写过一次
+  // desired 并 apply 过（label sink → Places.setEnabled），这里不再重复调用。
+  // （原先这段相同代码写了两遍，属于历史重复，一并去掉。）
 
   bindCheck('modelHotspotImagery', setHotspotImagery);
 
   bindCheck('modelUrbanImagery', function (v) {
     state.urbanEnabled = v;
+    LayerRegistry.setDesired('urban.imagery', !!v);
+    // 城区层不是"改了 show 就完事"：它按相机高度动态挂载/卸载，所以要走
+    // syncUrbanImagery；里面挂载后会自动 apply，让新层排到注记之下。
     syncUrbanImagery();
+    applyLayers();
     setSwitchNote(v ? '城区高清影像已启用（相机低于 200 km 时挂载，z13–z17，最高约 1.2 m/px）。'
                     : '城区高清影像已关闭。');
   });

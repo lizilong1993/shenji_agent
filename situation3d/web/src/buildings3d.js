@@ -267,6 +267,23 @@
     }
   }
 
+  /**
+   * 只切换已建好 tileset 的显隐，不建也不拆。
+   *
+   * 与 setEnabled 的分工：setEnabled 管"要不要这个图层"（会联网建/拆 tileset），
+   * setVisible 管"此刻画不画"（纯 .show）。图层注册表的 primitive sink 用后者，
+   * 因为互斥解算每轮都会调一次，不能每次都去联网。
+   *
+   * 注意隐藏时不恢复 globe：globe 的开关跟着**图层是否存在**走，不是跟着某帧的
+   * show。否则来回切一次就会把地形闪出来又盖回去。
+   */
+  function setVisible(on) {
+    if (!state.tileset) return false;
+    state.tileset.show = !!on;
+    emit();
+    return true;
+  }
+
   function setEnabled(on) {
     state.enabled = !!on;
 
@@ -323,6 +340,7 @@
   window.Buildings3D = {
     init: init,
     setEnabled: setEnabled,
+    setVisible: setVisible,
     state: stateInfo,
     debug: debug,
     saveToken: saveToken,
