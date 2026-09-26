@@ -143,34 +143,6 @@
           <div class="switch-note" id="ionTokenNote">未配置。</div>
         </details>
         <label class="check"><input type="checkbox" id="modelPlaces" checked> 地名</label>
-        <label class="check"><input type="checkbox" id="modelSatellites"> 卫星过境（离线星历）</label>
-        <details class="layer-sub">
-          <summary>过境查询设置</summary>
-          <div class="switch-note">
-            以<strong>相机所在地面点</strong>为观测点，数据来自仓库内的离线 TLE 目录
-            （engine/data/tle/），运行期不联网。星历时效会如实显示。
-          </div>
-          <div class="sit-row">
-            <span>时间窗</span>
-            <select id="satHours">
-              <option value="3">3 小时</option>
-              <option value="6" selected>6 小时</option>
-              <option value="12">12 小时</option>
-              <option value="24">24 小时</option>
-            </select>
-          </div>
-          <div class="sit-row">
-            <span>最低仰角</span>
-            <select id="satMinElev">
-              <option value="0">0°</option>
-              <option value="10">10°</option>
-              <option value="15" selected>15°</option>
-              <option value="30">30°</option>
-            </select>
-          </div>
-          <button type="button" id="satRefresh" class="mini">按当前机位重新查询</button>
-          <div class="switch-note" id="satNote">未查询。</div>
-        </details>
         <label class="check"><input type="checkbox" id="modelWeather"> 气象模型</label>
         <div class="switch-note" id="switchNote">各开关的生效状态会在此说明。</div>
       </details>
@@ -344,7 +316,6 @@
   <script src="./src/renderGovernor.js"></script>
   <script src="./src/dataHealth.js"></script>
   <script src="./src/sceneDoc.js"></script>
-  <script src="./src/satellites.js"></script>
   <script src="./src/buildings3d.js"></script>
   <script src="./src/overview.js"></script>
   <script src="./src/places.js"></script>

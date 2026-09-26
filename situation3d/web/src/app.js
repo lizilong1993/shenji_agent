@@ -417,10 +417,6 @@ function initViewer() {
     },
     label: function (id, want) {
       if (id === 'places.labels' && window.Places) Places.setEnabled(!!want);
-      if (id === 'satellites.passes' && window.SatelliteLayer) {
-        // 过境查询要跑约 900 个目标的 SGP4，所以只在真正打开时才发请求。
-        SatelliteLayer.setEnabled(!!want);
-      }
     },
   });
 
@@ -443,7 +439,6 @@ function initViewer() {
   LayerRegistry.setDesired('buildings.blocks', checkboxOn('modelBuildings'));
   LayerRegistry.setDesired('tiles.google3d', checkboxOn('modelBuildingsOnline'));
   LayerRegistry.setDesired('places.labels', checkboxOn('modelPlaces'));
-  LayerRegistry.setDesired('satellites.passes', checkboxOn('modelSatellites'));
   // 立刻应用一次：把 imagery 的 index 按 LAYERS 的 z 排好。这一步取代了以前那句
   // raiseToTop(tiandituLabelLayer)——注记现在由 z=90 直接排到最上。
   applyLayers();
@@ -464,7 +459,6 @@ function initViewer() {
   // 在线三维实景只是登记 viewer，真正的联网在建 tileset 时才发生（见 bindUI），
   // 这样"没配置令牌"的部署不会在开页面时就发一次注定 401 的请求。
   if (window.Buildings3D) Buildings3D.init(viewer);
-  if (window.SatelliteLayer) SatelliteLayer.init(viewer);
 }
 
 function flyTo(lon, lat, height, pitchDeg) {
@@ -2774,12 +2768,6 @@ function bindUI() {
   bindCheck('modelImagery', setImagery);
   bindCheck('modelTianditu', setTianditu);
   bindCheck('modelTiandituLabel', setTiandituLabel);
-  // 卫星过境：只写意图，实际查询由注册表的 label sink 触发（要跑 900 个目标的
-  // SGP4，不能每帧或每次拖动都发请求）。
-  bindCheck('modelSatellites', function (v) {
-    LayerRegistry.setDesired('satellites.passes', !!v);
-    applyLayers();
-  });
   // 天地图是默认底图：HTML 的 checked 只是初始显示，change 不会自动触发，
   // 而 initViewer 里已经把它设成 baseLayer，所以这里不需要再调用一次；
   // 但把提示文案写清楚，否则用户不知道当前底图是在线还是离线。
@@ -2802,24 +2790,6 @@ function bindUI() {
 
   const shareBtn = document.getElementById('btnShareScene');
   if (shareBtn) shareBtn.addEventListener('click', function () { shareScene(); });
-
-  // 卫星过境：开关由注册表驱动（label sink），这里只管设置项与手动刷新。
-  const satRefresh = document.getElementById('satRefresh');
-  if (satRefresh && window.SatelliteLayer) {
-    satRefresh.addEventListener('click', function () { SatelliteLayer.refresh(); });
-  }
-  const satHours = document.getElementById('satHours');
-  if (satHours && window.SatelliteLayer) {
-    satHours.addEventListener('change', function () {
-      SatelliteLayer.setOption('hours', Number(satHours.value) || 6);
-    });
-  }
-  const satMinElev = document.getElementById('satMinElev');
-  if (satMinElev && window.SatelliteLayer) {
-    satMinElev.addEventListener('change', function () {
-      SatelliteLayer.setOption('minElev', Number(satMinElev.value) || 15);
-    });
-  }
 
   // ion 令牌输入：保存到服务端 web/data/ion.json（该文件被 gitignore）。
   // 输入框里的值**不回显**到任何提示里，保存成功后只报"已保存"。
