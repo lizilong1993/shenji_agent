@@ -2583,6 +2583,10 @@ window.SituationHost = {
   // 「哪个层压在哪个层上面」光看画面猜不出来，必须能读到 index。
   debugLayers: debugLayers,
   applyLayers: applyLayers,
+  // 场景文档/深链：取证与测试入口。
+  applySceneDoc: applySceneDoc,
+  shareScene: shareScene,
+  sceneProviders: applySceneProviders,
   /** 瓦片请求统计，给数据健康面板用（state 在闭包里，外面拿不到）。 */
   imageryStats: function () { return state.imageryStats; },
   /** 数据健康面板要用到的其它 state 片段。 */
@@ -2783,6 +2787,9 @@ function bindUI() {
       renderHealthPanel();
     });
   }
+
+  const shareBtn = document.getElementById('btnShareScene');
+  if (shareBtn) shareBtn.addEventListener('click', function () { shareScene(); });
 
   // ion 令牌输入：保存到服务端 web/data/ion.json（该文件被 gitignore）。
   // 输入框里的值**不回显**到任何提示里，保存成功后只报"已保存"。
@@ -3071,6 +3078,89 @@ function applyCaseIndependentHooks() {
   }
 }
 
+function applySceneProviders() {
+  // 图层意图的真相在注册表里，不在 URL 里——所以 capture 直接读注册表，
+  // 而不是回头去解析 ?scene=。defaults 用 HTML 的初始 checked，这样
+  // "与默认相同"的层不会进 URL，链接天然更短。
+  const defaults = {};
+  LayerRegistry.LAYERS.forEach(function (l) {
+    if (!l.checkbox) return;
+    const box = document.getElementById(l.checkbox);
+    if (box) defaults[l.id] = !!box.getAttribute('checked') || box.defaultChecked;
+  });
+  return {
+    layerStatus: function () { return LayerRegistry.status(); },
+    layerDefaults: defaults,
+    tick: state.tick,
+    caseId: state.caseId,
+  };
+}
+
+/**
+ * 从 ?scene= 还原整个场景。
+ *
+ * **必须在 applyCaseHooks() 之后调用**：clearSituation / applySituationData 会把机位
+ * 重置为默认值、把图层意图写回初始状态，先应用会被立刻覆盖掉。
+ */
+function applySceneDoc() {
+  if (!window.SceneDoc) return null;
+  const doc = SceneDoc.fromUrl();
+  if (!doc) return null;
+
+  const out = { applied: true, camera: false, layers: 0, tick: null, caseId: doc.c || null };
+
+  const cam = SceneDoc.saneCamera(doc.m);
+  if (cam && viewer) out.camera = SceneDoc.applyCamera(viewer, cam);
+
+  // 图层：只改"意图"，然后走一次统一的 apply，互斥与顺序仍由注册表解算。
+  const l = doc.l;
+  if (l && typeof l === 'object') {
+    Object.keys(l).forEach(function (id) {
+      if (!LayerRegistry.def(id)) return;      // 链接可能来自旧版本，忽略未知 id
+      LayerRegistry.setDesired(id, !!l[id]);
+      out.layers++;
+    });
+    applyLayers();
+    // 复选框要与意图一致：syncLayerCheckboxes 只同步"实际生效"的层，而这里
+    // 还要让用户看到自己没勾的层确实是没勾的（例如链接里关掉的在线实景）。
+    LayerRegistry.LAYERS.forEach(function (def2) {
+      if (!def2.checkbox) return;
+      const box = document.getElementById(def2.checkbox);
+      const r = LayerRegistry.runtime[def2.id];
+      if (box && r) box.checked = !!r.desired;
+    });
+  }
+
+  if (typeof doc.t === 'number' && doc.t >= 0) {
+    setTick(doc.t);
+    renderTransport();
+    updateInferenceUi();
+    out.tick = state.tick;
+  }
+
+  setStatus('已从链接还原场景（图层 ' + out.layers + ' 项'
+    + (out.tick === null ? '' : '，时间轴 #' + out.tick) + '）', 'ok');
+  markScene('applySceneDoc');
+  return out;
+}
+
+/** 把当前场景变成可分享链接并复制到剪贴板。 */
+function shareScene() {
+  if (!window.SceneDoc) { setStatus('场景文档模块未加载', 'err'); return null; }
+  const url = window.location.origin + SceneDoc.shareUrl(viewer, applySceneProviders());
+  const done = function () { setStatus('场景链接已复制到剪贴板', 'ok'); };
+  const fail = function () {
+    // 剪贴板不可用（非 https / 无权限）时退化成把链接显示出来让用户手抄。
+    setStatus('复制失败，链接：' + url, 'err');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done, fail);
+  } else {
+    fail();
+  }
+  return url;
+}
+
 /** 依赖案例数据的钩子。必须在 loadCase 之后调用。 */
 function applyCaseHooks() {
   // 目标跟随：?follow=<目标ID>。放在这里是因为它需要 state.targets 已建好。
@@ -3139,7 +3229,10 @@ function main() {
   }).then(function (res) {
     applyBase(res[0]);
 
-    const wanted = params.get('case');
+    // ?case= 优先；没有的话看 ?scene= 里带的案例 id——场景链接应当是自足的，
+    // 打开就能回到"当时那个案例的那一帧"，不需要用户再补一个 ?case=。
+    const sceneDoc = window.SceneDoc ? SceneDoc.fromUrl() : null;
+    const wanted = params.get('case') || (sceneDoc && sceneDoc.c) || null;
     if (!wanted) {
       // 默认不加载任何态势：只保留底图 / 地形 / WSF3D / 地图组件。
       // 注意顺序：clearSituation 里的 applyCamera(默认机位) 会覆盖 ?cam=，而
@@ -3155,6 +3248,8 @@ function main() {
     return loadCase(id);
   }).then(function () {
     applyCaseHooks();
+    // 场景还原放最后：它会覆盖机位与图层意图，必须在案例装载把它们重置之后跑。
+    state.sceneApplied = applySceneDoc();
     syncSelection();
     updateGeoReadout();
   }).catch(function (err) {
