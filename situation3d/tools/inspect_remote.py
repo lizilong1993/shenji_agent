@@ -408,6 +408,8 @@ def main() -> int:
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--eval", default=None,
                     help="extra JS expression to evaluate; result lands in report['eval']")
+    ap.add_argument("--eval-async", action="store_true",
+                    help="await the --eval expression (wrap in async IIFE)")
     ap.add_argument("--debug", action="store_true")
     args = ap.parse_args()
 
@@ -490,7 +492,14 @@ def main() -> int:
         # without editing this file and re-shipping it for every question.
         if args.eval:
             try:
-                report["eval"] = cdp.evaluate("(function(){ return (%s); })()" % args.eval)
+                # --eval-async wraps the expression in an async IIFE and awaits it,
+                # so a probe can wait for real frames/timers instead of only
+                # reading the state at one instant.
+                if args.eval_async:
+                    expr = "(async function(){ return await (%s); })()" % args.eval
+                else:
+                    expr = "(function(){ return (%s); })()" % args.eval
+                report["eval"] = cdp.evaluate(expr, await_promise=bool(args.eval_async))
                 report["evalOk"] = True
             except Exception as e:  # noqa: BLE001 - report the failure, keep going
                 report["evalError"] = "%s: %s" % (type(e).__name__, e)

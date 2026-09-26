@@ -535,6 +535,7 @@ function applySituationData(data, caseId) {
       state.activeHotspot = -1;
       state.geoPinned = false;
       state.buildingsAoi = -1;
+      markScene('applySituationData');
 
       if (data.symbology) Symbology.setCatalog(data.symbology);
 
@@ -660,6 +661,7 @@ function clearSituation() {
   state.geoPinned = false;
   state.buildingsKey = null;
   state.buildingsAoi = -1;
+  markScene('clearSituation');
 
   dom.scenarioName.textContent = state.baseRegion || '未加载态势';
   document.title = '三维战场态势生成系统';
@@ -988,6 +990,17 @@ function createHotspots() {
 // --------------------------------------------------------------------------
 // 逐帧更新
 // --------------------------------------------------------------------------
+
+/**
+ * 声明"目标/路线/热点的可见性需要重算"。
+ *
+ * 所有会改变 syncEntities 结果的地方都必须调它：时间轴、播放推进、数据装载、
+ * 图层与过滤开关、选中变化。漏一处 = "改了不生效、刷新才生效"，所以这里包一层
+ * 带名字的简写，调用点一眼能看出自己该不该调。
+ */
+function markScene(reason) {
+  if (window.RenderGovernor) RenderGovernor.mark(reason);
+}
 
 function syncEntities() {
   Object.keys(state.targets).forEach(function (id) {
@@ -1320,12 +1333,14 @@ function selectTarget(id, fly) {
   syncSelection();
   renderTargetList();
   renderTargetPanel(id);
+  markScene('selectTarget');
 }
 
 function closeTargetPanel() {
   state.selected = null;
   dom.targetPanel.classList.add('hidden');
   syncSelection();
+  markScene('closeTargetPanel');
 }
 
 function kvRow(label, value, extraClass) {
@@ -1657,6 +1672,8 @@ function debugLayers() {
     registry: LayerRegistry.status(),
     stacks: LayerRegistry._debug(),
     lastApply: state.lastLayerApply,
+    // 渲染调度：能看到"省掉了多少帧无意义重算"以及最近是谁触发的重算。
+    governor: window.RenderGovernor ? RenderGovernor.debug() : null,
     imageryCount: viewer && viewer.imageryLayers ? viewer.imageryLayers.length : -1,
     terrainDepthTest: viewer ? viewer.scene.globe.depthTestAgainstTerrain : null,
     globeShow: viewer ? viewer.scene.globe.show : null,
@@ -2333,6 +2350,7 @@ function setTick(tick) {
   const max = state.data.frames.length - 1;
   state.tick = Math.max(0, Math.min(max, Math.round(tick)));
   state.tickFloat = state.tick;
+  markScene('setTick');
 }
 
 function setPlaying(on) {
@@ -2360,10 +2378,12 @@ function loop(nowMs) {
       renderTargetList();
       renderTransport();
       updateInferenceUi();
+      // 播放推进也是一次状态变化：不标记的话画面会停在原地（只在拖动时间轴时更新）。
+      markScene('playback-tick');
     }
   }
 
-  syncEntities();
+  if (RenderGovernor.take()) syncEntities();
 
   // 相机静止时 camera.changed 不会再触发，而它第一次触发时场景可能尚未渲染
   // （globe.pick 返回 null），所以这里兜底按秒刷新一次。
@@ -2561,13 +2581,13 @@ function bindUI() {
     node.addEventListener('change', function (e) { handler(e.target.checked); });
   };
 
-  bindCheck('layerTargets', function (v) { state.layers.targets = v; guardFollow(); });
-  bindCheck('layerTracks', function (v) { state.layers.tracks = v; });
-  bindCheck('layerRoutes', function (v) { state.layers.routes = v; });
-  bindCheck('layerHotspots', function (v) { state.layers.hotspots = v; });
-  bindCheck('layerLabels', function (v) { state.layers.labels = v; });
+  bindCheck('layerTargets', function (v) { state.layers.targets = v; markScene('layerTargets'); guardFollow(); });
+  bindCheck('layerTracks', function (v) { state.layers.tracks = v; markScene('layerTracks'); });
+  bindCheck('layerRoutes', function (v) { state.layers.routes = v; markScene('layerRoutes'); });
+  bindCheck('layerHotspots', function (v) { state.layers.hotspots = v; markScene('layerHotspots'); });
+  bindCheck('layerLabels', function (v) { state.layers.labels = v; markScene('layerLabels'); });
 
-  const refilter = function () { renderTargetList(); guardFollow(); };
+  const refilter = function () { renderTargetList(); markScene('filter'); guardFollow(); };
   bindCheck('filterRed', function (v) { state.filters.red = v; refilter(); });
   bindCheck('filterBlue', function (v) { state.filters.blue = v; refilter(); });
   bindCheck('filterSea', function (v) { state.filters.sea = v; refilter(); });
