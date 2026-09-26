@@ -104,6 +104,10 @@
       id: 'places.labels', kind: 'label', z: 20,
       label: '地名', group: '底图', checkbox: 'modelPlaces',
     },
+    {
+      id: 'satellites.passes', kind: 'label', z: 40,
+      label: '卫星过境', group: '目标图层', checkbox: 'modelSatellites',
+    },
   ];
 
   var byId = {};

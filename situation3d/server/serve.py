@@ -43,6 +43,14 @@ except ImportError:  # pragma: no cover - python2 guard
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB_ROOT = os.path.join(os.path.dirname(HERE), "web")
 
+# The engine package lives beside `server/`, and this file is run as a script
+# (`python3 server/serve.py`), so the package root is not on sys.path by default.
+# `/api/satellites/*` needs `engine.satellites`, so add it explicitly rather than
+# relying on the caller's cwd.
+_PKG_ROOT = os.path.dirname(HERE)
+if _PKG_ROOT not in sys.path:
+    sys.path.insert(0, _PKG_ROOT)
+
 EXTRA_TYPES = {
     ".js": "application/javascript; charset=utf-8",
     ".mjs": "application/javascript; charset=utf-8",
@@ -216,7 +224,19 @@ class Handler(SimpleHTTPRequestHandler):
     def _is_loopback(addr):
         return addr in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
 
-    def _api_get(self, path):
+    @staticmethod
+    def _query(handler_path):
+        """Parse the query string of a request path into a dict."""
+        try:
+            from urllib.parse import urlparse, parse_qs
+        except ImportError:  # pragma: no cover - python2 guard
+            return {}
+        q = parse_qs(urlparse(handler_path).query)
+        # parse_qs returns lists; every parameter here is single-valued.
+        return {k: v[0] for k, v in q.items() if v}
+
+    def _api_get(self, path, query=None):
+        query = query or {}
         if path == "/api/ion/status":
             configured = read_ion_token() is not None
             self._send_json({
@@ -239,7 +259,81 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self._send_json({"token": token, "assetId": ION_ASSET_ID})
             return
+        if path == "/api/satellites/passes":
+            self._api_satellite_passes(query)
+            return
+        if path == "/api/satellites/groups":
+            import engine.satellites as satellites
+            self._send_json({"groups": satellites.available_groups()})
+            return
+        if path == "/api/health":
+            self._api_health()
+            return
         self._send_json({"error": "未知接口"}, 404)
+
+    def _api_satellite_passes(self, query):
+        """Overpass query against the offline TLE catalogue.
+
+        Parameters: lat, lon (required), hours, minElev, group (repeatable via
+        comma), step, limit. Runs SGP4 over ~900 objects, so the response is
+        cached briefly by the caller; see the note in engine/satellites.py.
+        """
+        import engine.satellites as satellites
+
+        def fnum(key, default, lo, hi):
+            try:
+                v = float(query.get(key, default))
+            except (TypeError, ValueError):
+                v = default
+            return max(lo, min(hi, v))
+
+        if "lat" not in query or "lon" not in query:
+            self._send_json({"error": "需要 lat 与 lon 参数"}, 400)
+            return
+        lat = fnum("lat", 0.0, -90.0, 90.0)
+        lon = fnum("lon", 0.0, -180.0, 180.0)
+        hours = fnum("hours", 12.0, 0.5, 72.0)
+        min_elev = fnum("minElev", 10.0, 0.0, 90.0)
+        step = fnum("step", 30.0, 5.0, 300.0)
+        limit = int(fnum("limit", 60, 1, 500))
+        groups = None
+        if query.get("group"):
+            groups = [g.strip() for g in query["group"].split(",") if g.strip()]
+
+        try:
+            result = satellites.find_passes(
+                lat, lon, groups=groups, hours=hours,
+                min_elevation_deg=min_elev, step_s=step)
+        except FileNotFoundError as e:
+            # The catalogue is committed, so this means a broken checkout.
+            self._send_json({"error": str(e)}, 503)
+            return
+        except Exception as e:  # noqa: BLE001 - never leave the client hanging
+            import traceback
+            traceback.print_exc()
+            self._send_json({"error": "过境计算失败：%s" % e}, 500)
+            return
+
+        result["passes"] = result["passes"][:limit]
+        result["pass_count"] = len(result["passes"])
+        self._send_json(result)
+
+    def _api_health(self):
+        """Cheap liveness/config probe for the front end and for scripts."""
+        import engine.satellites as satellites
+        groups = satellites.available_groups()
+        cat = {}
+        for g in groups:
+            try:
+                cat[g] = satellites.load_group(g)["count"]
+            except Exception:  # noqa: BLE001
+                cat[g] = None
+        self._send_json({
+            "ok": True,
+            "ion_configured": read_ion_token() is not None,
+            "tle_groups": cat,
+            "web_root": WEB_ROOT,
+        })
 
     def _api_post(self, path):
         if path != "/api/ion/token":
@@ -272,7 +366,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self._is_api_path():
             try:
-                self._api_get(self.path.split("?")[0])
+                self._api_get(self.path.split("?")[0], self._query(self.path))
             except Exception:  # noqa: BLE001 - never leave the client hanging
                 import traceback
                 traceback.print_exc()
