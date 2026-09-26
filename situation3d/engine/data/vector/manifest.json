@@ -1,0 +1,75 @@
+{
+  "bbox": [
+    115.0,
+    18.0,
+    125.0,
+    29.0
+  ],
+  "crs": "EPSG:4326",
+  "schema": "situation3d.vector.v1",
+  "types": {
+    "cables": {
+      "attribution": "TeleGeography submarine cable map",
+      "bytes": 67136,
+      "description": "TeleGeography 海底光缆走向，裁剪到战区范围。",
+      "features": 25,
+      "file": "cables.geojson",
+      "licence": "CC BY-NC-SA 3.0 (TeleGeography)",
+      "licence_url": "https://www.telegeography.com/",
+      "stats": {
+        "total": 25
+      },
+      "title": "海底光缆",
+      "updated_utc": "2026-09-26T03:56:13Z"
+    },
+    "military": {
+      "attribution": "© OpenStreetMap contributors",
+      "bytes": 378703,
+      "description": "OpenStreetMap 中标注 military=* 的设施点位，裁剪到战区范围。",
+      "features": 1861,
+      "file": "military.geojson",
+      "licence": "ODbL 1.0 (OpenStreetMap contributors)",
+      "licence_url": "https://www.openstreetmap.org/copyright",
+      "stats": {
+        "kinds": {
+          "abandoned": 1,
+          "academy": 11,
+          "airfield": 22,
+          "ammunition": 1,
+          "arsenal": 3,
+          "artillery_range": 1,
+          "barrack": 2,
+          "barracks": 246,
+          "base": 364,
+          "bunker": 497,
+          "cannon": 56,
+          "checkpoint": 102,
+          "danger_area": 3,
+          "depot": 4,
+          "fort": 3,
+          "gate": 1,
+          "hangar": 2,
+          "heritage": 2,
+          "hospital": 5,
+          "launchpad": 70,
+          "naval_academy": 1,
+          "naval_base": 6,
+          "obstacle_course": 26,
+          "office": 78,
+          "radar": 132,
+          "radio": 5,
+          "range": 92,
+          "road": 2,
+          "tank": 2,
+          "training": 3,
+          "training_area": 44,
+          "trench": 20,
+          "tunnel": 13,
+          "yes": 41
+        }
+      },
+      "title": "军事设施（OSM military=*）",
+      "updated_utc": "2026-09-26T03:56:13Z"
+    }
+  }
+}

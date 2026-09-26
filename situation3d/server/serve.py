@@ -196,7 +196,11 @@ class Handler(SimpleHTTPRequestHandler):
     # -- ion token API ---------------------------------------------------
 
     def _is_api_path(self):
-        return self.path.split("?")[0].startswith("/api/")
+        # `/wfs` is a public OGC endpoint rather than an app API, so it is called
+        # out separately: a stock GIS client points at it directly, and it would
+        # otherwise fall through to static file serving and 404.
+        p = self.path.split("?")[0]
+        return p.startswith("/api/") or p == "/wfs"
 
     def _send_json(self, obj, status=200):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -269,7 +273,92 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/health":
             self._api_health()
             return
+        if path == "/wfs":
+            self._wfs(query)
+            return
         self._send_json({"error": "未知接口"}, 404)
+
+    def _wfs(self, query):
+        """OGC WFS 2.0.0 over the offline vector datasets, GeoJSON out.
+
+        Lives at `/wfs` rather than under `/api/` so a stock GIS client can be
+        pointed at it directly. Parameters are the standard WFS ones
+        (service/version/request/typeNames/bbox/count/startIndex), with the WFS 1.1
+        `maxFeatures` accepted as an alias for `count`.
+        """
+        import engine.wfs as wfs
+
+        service = (query.get("service") or "WFS").upper()
+        request = (query.get("request") or "GetCapabilities").strip()
+        version = (query.get("version") or wfs.WFS_VERSION).strip()
+        type_names = query.get("typeNames") or query.get("typenames") or query.get("typeName")
+
+        def send_xml(text, status=200):
+            body = text.encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            # WFS responses are live-ish (datasets can be re-fetched), so do not
+            # let a proxy pin them.
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            try:
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                # Client navigated away mid-response; not an error worth a traceback.
+                pass
+
+        if service != "WFS":
+            send_xml(wfs.exception_report("only service=WFS is supported", "InvalidParameterValue"),
+                     400)
+            return
+        if version not in ("2.0.0", "2.0", "1.1.0", "1.0.0"):
+            send_xml(wfs.exception_report("unsupported version %r" % version,
+                                          "InvalidParameterValue"), 400)
+            return
+
+        req = request.lower()
+        try:
+            if req == "getcapabilities":
+                names = [t.strip() for t in type_names.split(",")] if type_names else None
+                send_xml(wfs.get_capabilities(
+                    base_url="http://%s/wfs" % (self.headers.get("Host") or "localhost"),
+                    type_names=names))
+                return
+            if req == "describefeaturetype":
+                if not type_names:
+                    send_xml(wfs.exception_report("DescribeFeatureType needs typeNames"), 400)
+                    return
+                send_xml(wfs.describe_feature_type(type_names.split(",")[0].strip()))
+                return
+            if req == "getfeature":
+                if not type_names:
+                    send_xml(wfs.exception_report("GetFeature needs typeNames"), 400)
+                    return
+                # One type per request: a merged multi-type response would have to
+                # invent a feature-type column, and the front end does not need it.
+                name = type_names.split(",")[0].strip()
+                result = wfs.get_feature(
+                    name,
+                    bbox_raw=query.get("bbox"),
+                    bbox_crs=query.get("bboxCrs"),
+                    count_raw=query.get("count"),
+                    max_features=query.get("maxFeatures"),
+                    start_index_raw=query.get("startIndex"),
+                    property_names=query.get("propertyName"),
+                )
+                self._send_json(result)
+                return
+            send_xml(wfs.exception_report("unsupported request %r" % request,
+                                          "OperationNotSupported"), 400)
+        except wfs.WfsError as e:
+            send_xml(wfs.exception_report(str(e)), 400)
+        except FileNotFoundError as e:
+            send_xml(wfs.exception_report(str(e), "NoApplicableCode"), 503)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            traceback.print_exc()
+            send_xml(wfs.exception_report("internal error: %s" % e, "NoApplicableCode"), 500)
 
     def _api_satellite_passes(self, query):
         """Overpass query against the offline TLE catalogue.
