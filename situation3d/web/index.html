@@ -126,7 +126,20 @@
         <label class="check"><input type="checkbox" id="modelUrbanImagery" checked> 城区高清影像（米级）</label>
         <label class="check"><input type="checkbox" id="modelTerrain"> 地形模型（DEM 高程）</label>
         <label class="check"><input type="checkbox" id="modelWsf3dOverlay"> 建筑高度图层（WSF3D）</label>
-        <label class="check"><input type="checkbox" id="modelBuildings"> 建筑体块（三维）</label>
+        <label class="check"><input type="checkbox" id="modelBuildingsOnline" checked> 在线三维实景建筑（Google 3D Tiles）</label>
+        <label class="check"><input type="checkbox" id="modelBuildings"> 建筑体块（三维，本机离线）</label>
+        <details class="layer-sub">
+          <summary>Cesium ion 令牌（在线三维实景用）</summary>
+          <div class="switch-note">
+            在线层<strong>必须联网</strong>，且 Google 不允许缓存或离线存储这些瓦片，
+            因此断网时会自动回落到下面的本机体块。
+          </div>
+          <label class="check" for="ionTokenInput">令牌</label>
+          <input type="password" id="ionTokenInput" class="token-input"
+                 placeholder="粘贴 Cesium ion access token" autocomplete="off" spellcheck="false">
+          <button type="button" id="ionTokenSave" class="mini">保存令牌</button>
+          <div class="switch-note" id="ionTokenNote">未配置。</div>
+        </details>
         <label class="check"><input type="checkbox" id="modelPlaces" checked> 地名</label>
         <label class="check"><input type="checkbox" id="modelWeather"> 气象模型</label>
         <div class="switch-note" id="switchNote">各开关的生效状态会在此说明。</div>
@@ -287,6 +300,7 @@
   <script src="./src/tilecache.js"></script>
   <script src="./src/symbology.js"></script>
   <script src="./src/assets.js"></script>
+  <script src="./src/buildings3d.js"></script>
   <script src="./src/overview.js"></script>
   <script src="./src/places.js"></script>
   <script src="./src/situation.js"></script>

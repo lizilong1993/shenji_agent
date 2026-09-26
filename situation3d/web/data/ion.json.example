@@ -1,0 +1,5 @@
+{
+  "_comment": "Template. Copy to web/data/ion.json and paste your own Cesium ion access token, or use the 保存令牌 button in 图层管理. The real ion.json is covered by the web/data/*.json ignore rule and must never be committed.",
+  "assetId": 2275207,
+  "token": ""
+}

@@ -406,6 +406,8 @@ def main() -> int:
     ap.add_argument("--height", type=int, default=900)
     ap.add_argument("--chrome", default=DEFAULT_CHROME)
     ap.add_argument("--keep", action="store_true")
+    ap.add_argument("--eval", default=None,
+                    help="extra JS expression to evaluate; result lands in report['eval']")
     ap.add_argument("--debug", action="store_true")
     args = ap.parse_args()
 
@@ -483,6 +485,16 @@ def main() -> int:
 
         report["settle"] = settle(cdp, args.timeout_ms)
         time.sleep(max(0, args.wait_ms) / 1000.0)
+        # --eval lets a caller assert on app state the fixed report does not
+        # cover (e.g. SituationHost.debugBuildings(), Buildings3D.debug())
+        # without editing this file and re-shipping it for every question.
+        if args.eval:
+            try:
+                report["eval"] = cdp.evaluate("(function(){ return (%s); })()" % args.eval)
+                report["evalOk"] = True
+            except Exception as e:  # noqa: BLE001 - report the failure, keep going
+                report["evalError"] = "%s: %s" % (type(e).__name__, e)
+                report["evalOk"] = False
         report.update(cdp.evaluate(REPORT_SOURCE))
 
         if args.shot:

@@ -618,17 +618,34 @@
    *
    * maxHeight 相机高度上限（米）；grid 每轴格数；step 像素采样步长。
    * 以 0.12°（约 13 km）的城区 AOI 为例：
-   *   grid 24  → 约 540 m 体块，远看只看轮廓
-   *   grid 48  → 约 270 m
+   *   grid 32  → 约 400 m 体块，远看只看轮廓
+   *   grid 64  → 约 200 m
    *   grid 96  → 约 135 m
    *   grid 144 → 约 90 m，与 WSF3D 原生分辨率相当
+   *
+   * 为什么 far/mid 要加密（改前是 grid 24 / 48）
+   * ------------------------------------------
+   * 相机在 150–400 km 时 AOI 只占屏幕几十个像素，格子再细渲染出来也挤在一起，
+   * 所以旧值看起来"够用"。但问题出在**反了**：远离时 maxHeight 把档位压到 far，
+   * 用户看到的是"一座城市只剩几十个方块"；而真要看清天际线时档位又跳得太晚。
+   * 实测 far 档在 AOI 里只有约 80 个块。加密 grid 并把高档位提前接管，远处才有
+   * 城市轮廓可言。
+   *
+   * 关键约束：grid 加密**必须**同步抬 maxBlocks。块数是按 gy/gx 行优先顺序填充的，
+   * 一旦撞上 maxBlocks 就 continue——那会从北/西侧开始整片丢失方块，比均匀稀疏
+   * 难看得多（一片地少东西、另一片满）。所以下表的 maxBlocks 按 grid² × 0.08 留量，
+   * 保证覆盖 300 km 尺度时不会静默截断。
+   *
+   * 条数增多会推高几何构建开销（Primitive 是 asynchronous 的，且结果按组合缓存），
+   * 但真机帧率必须在远程实测；若掉帧就回退 maxBlocks，而不是回退 grid。
    */
   const BUILDING_LOD = [
-    { key: 'far',   maxHeight: 400000, grid: 24,  step: 8, minHeight: 6, maxBlocks: 900 },
-    { key: 'mid',   maxHeight: 150000, grid: 48,  step: 4, minHeight: 5, maxBlocks: 2200 },
-    { key: 'near',  maxHeight: 60000,  grid: 96,  step: 2, minHeight: 4, maxBlocks: 5000 },
+    { key: 'far',   maxHeight: 400000,   grid: 64,  step: 2, minHeight: 6, maxBlocks: 5200 },
+    { key: 'mid',   maxHeight: 160000,   grid: 96,  step: 2, minHeight: 5, maxBlocks: 7000 },
+    { key: 'near',  maxHeight: 60000,    grid: 128, step: 2, minHeight: 4, maxBlocks: 9000 },
     { key: 'close', maxHeight: Infinity, grid: 144, step: 1, minHeight: 4, maxBlocks: 9000 },
   ];
+
 
   function lodForHeight(heightM) {
     for (let i = 0; i < BUILDING_LOD.length; i++) {
@@ -840,6 +857,41 @@
    *   zoom  建筑高度瓦片的 zoom
    * @returns {Promise<{primitive, stats}>}
    */
+  /**
+   * 在瓦片像素坐标系里取一个采样点的高度：取 2x2 邻域**最大**值。
+   *
+   * 为什么不双线性插值
+   * ------------------
+   * 双线性会把相邻像元加权平均，在建筑边缘处**造出**源数据里不存在的高度
+   * （一栋 8 m 的房子挨着 120 m 的塔楼，会插出 64 m 的中间值），凭空多出一圈
+   * 假建筑。取邻域最大值只从真实存在的像元里挑，不会无中生有；再叠加逐格取最大
+   * （见下方 heights 的说明）就能保住天际线里最高的那几栋。
+   *
+   * 对 far/mid 档（step>1）同样成立：跳着读的时候要的是"这一带最高的那栋"，
+   * 而不是把周围平均掉。
+   */
+  function heightAt(data, px, py) {
+    if (!data) return 0;
+    let best = data[py * TILE_PX + px];
+    const rowFree = py + 1 < TILE_PX;
+    const colFree = px + 1 < TILE_PX;
+    // 同一片瓦片内用下标偏移就是右邻/下邻。px+1 或 py+1 越界时不能读：那已经跨到
+    // 相邻瓦片，而这片瓦片的数组里没有下一片的数据，下标会绕回本片的另一端。
+    if (colFree) {
+      const v = data[py * TILE_PX + px + 1];
+      if (v > best) best = v;
+    }
+    if (rowFree) {
+      const v = data[(py + 1) * TILE_PX + px];
+      if (v > best) best = v;
+    }
+    if (rowFree && colFree) {
+      const v = data[(py + 1) * TILE_PX + px + 1];
+      if (v > best) best = v;
+    }
+    return best;
+  }
+
   async function buildBuildingBlocks(opts) {
     const bbox = opts.bbox;
     const ramp = opts.ramp;
@@ -896,7 +948,7 @@
           if (lon < west || lon > east) continue;
           // d 已经是"每像元高度（米）"，无数据为 0——解码在 loadWsf3dHeights 里
           // 做过一次并被缓存，这里不再重复解码颜色。
-          const hm = d[py * TILE_PX + px];
+          const hm = heightAt(tile.data, px, py);
           if (!(hm > 0)) continue;
           const gx = Math.min(grid - 1, Math.floor((lon - west) / (east - west) * grid));
           const idx = gy * grid + gx;

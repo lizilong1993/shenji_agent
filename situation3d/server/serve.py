@@ -25,9 +25,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
 import gzip
 import hashlib
 import io
+import json
 import os
 import sys
 import time
@@ -73,6 +75,96 @@ IMMUTABLE_MAX_AGE = 7 * 24 * 3600
 # instance state therefore has to live in class-level or module-level objects.
 _ETAG_CACHE = {}
 
+# --------------------------------------------------------------------------
+# Cesium ion token
+# --------------------------------------------------------------------------
+# The online 3D-reality layer (Google Photorealistic 3D Tiles, ion asset
+# 2275207) needs an ion access token. The token lives in web/data/ion.json,
+# which the repo's `web/data/*.json` ignore rule already covers, so it never
+# enters git. It is handed to the browser over these endpoints rather than
+# being written into a tracked html/js file.
+#
+# Note this layer is **online only**: ion reports the asset as
+# `archivable:false, exportable:false`, the tile URLs carry one-shot
+# `?session=` tokens, and the response headers say `Cache-Control: private`.
+# So nothing here is a caching proxy -- it only ships the credential.
+ION_ASSET_ID = 2275207
+ION_CONFIG_PATH = os.path.join(WEB_ROOT, "data", "ion.json")
+
+
+def _b64url_decode(seg):
+    """
+    Decode one base64url JWT segment. Standard library only (no `jwt` package).
+    """
+    seg = seg.replace("-", "+").replace("_", "/")
+    seg += "=" * (-len(seg) % 4)
+    return base64.b64decode(seg.encode("ascii"))
+
+
+def read_ion_token():
+    """Return the configured token, or None. Never raises."""
+    try:
+        with open(ION_CONFIG_PATH, "r") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    token = data.get("token") if isinstance(data, dict) else None
+    return token if isinstance(token, str) and token.strip() else None
+
+
+def write_ion_token(token):
+    """Persist the token. 0600 + best-effort directory: it is a credential."""
+    d = os.path.dirname(ION_CONFIG_PATH)
+    if not os.path.isdir(d):
+        os.makedirs(d)
+    tmp = ION_CONFIG_PATH + ".tmp"
+    # Beware umask: create with restrictive mode, then write.
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w") as fh:
+            json.dump({"token": token, "_comment":
+                       "Cesium ion access token for ion asset %d "
+                       "(Google Photorealistic 3D Tiles). Ignored by git." % ION_ASSET_ID,
+                       "assetId": ION_ASSET_ID}, fh, indent=2)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    os.replace(tmp, ION_CONFIG_PATH)
+    try:
+        os.chmod(ION_CONFIG_PATH, 0o600)
+    except OSError:
+        pass
+
+
+def validate_ion_token(token):
+    """Loose sanity check: shape, issuer, and not-expired.
+
+    Deliberately does not call the ion API -- this only guards against a typo
+    or an unrelated JWT being saved. The real check is ion answering 401 when
+    the layer tries to load.
+    """
+    if not isinstance(token, str):
+        return "令牌必须是字符串"
+    parts = token.strip().split(".")
+    if len(parts) != 3 or not all(parts):
+        return "不是合法的 JWT（应为三段，用点分隔）"
+    try:
+        payload = json.loads(_b64url_decode(parts[1]).decode("utf-8"))
+    except Exception:  # noqa: BLE001 - any decode failure means "not a JWT"
+        return "JWT 载荷无法解码"
+    if not isinstance(payload, dict):
+        return "JWT 载荷不是对象"
+    iss = str(payload.get("iss") or "")
+    if "cesium.com" not in iss:
+        return "这个 JWT 的签发者不是 Cesium ion（iss=%s）" % (iss or "缺失")
+    exp = payload.get("exp")
+    if isinstance(exp, (int, float)) and exp < time.time():
+        return "令牌已过期（exp=%d）" % int(exp)
+    return None
+
 
 class Handler(SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -92,6 +184,126 @@ class Handler(SimpleHTTPRequestHandler):
         if ext in EXTRA_TYPES:
             return EXTRA_TYPES[ext]
         return super().guess_type(path)
+
+    # -- ion token API ---------------------------------------------------
+
+    def _is_api_path(self):
+        return self.path.split("?")[0].startswith("/api/")
+
+    def _send_json(self, obj, status=200):
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        # HTTP/1.1 keep-alive: the body must be written to keep the socket
+        # framing valid, exactly like _send_head does for files.
+        self.wfile.write(body)
+
+    def _read_json_body(self):
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return None
+        if n <= 0 or n > 65536:
+            return None
+        try:
+            return json.loads(self.rfile.read(n).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return None
+
+    @staticmethod
+    def _is_loopback(addr):
+        return addr in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+
+    def _api_get(self, path):
+        if path == "/api/ion/status":
+            configured = read_ion_token() is not None
+            self._send_json({
+                "configured": configured,
+                "rail": "ion",
+                "assetId": ION_ASSET_ID,
+                # Telling the browser *whether* a token exists is fine; never
+                # send the value itself on the status endpoint.
+                "hint": ("已配置令牌" if configured
+                         else "未配置：在 图层管理 里填入 Cesium ion 令牌，"
+                              "或把令牌写进 web/data/ion.json"),
+            })
+            return
+        if path == "/api/ion/token":
+            token = read_ion_token()
+            if token is None:
+                # After the browser saves a token it has it in localStorage, so
+                # 404 here only means "server side has nothing", not "no token".
+                self._send_json({"error": "服务端未配置令牌"}, 404)
+                return
+            self._send_json({"token": token, "assetId": ION_ASSET_ID})
+            return
+        self._send_json({"error": "未知接口"}, 404)
+
+    def _api_post(self, path):
+        if path != "/api/ion/token":
+            self._send_json({"error": "未知接口"}, 404)
+            return
+        # The server binds 0.0.0.0, and this endpoint writes a credential, so
+        # do not accept writes from the network -- only from the operator on
+        # the box itself. Remote deployments seed web/data/ion.json instead.
+        if not self._is_loopback(self.client_address[0]):
+            self._send_json({
+                "error": "仅允许本机写入令牌；远程请直接写 web/data/ion.json",
+            }, 403)
+            return
+        body = self._read_json_body()
+        token = (body or {}).get("token") if isinstance(body, dict) else None
+        if not token:
+            self._send_json({"error": "请求体缺少 token 字段"}, 400)
+            return
+        why = validate_ion_token(token)
+        if why:
+            self._send_json({"error": why}, 400)
+            return
+        try:
+            write_ion_token(token.strip())
+        except OSError as e:
+            self._send_json({"error": "写入失败：%s" % e}, 500)
+            return
+        self._send_json({"ok": True, "assetId": ION_ASSET_ID})
+
+    def do_GET(self):
+        if self._is_api_path():
+            try:
+                self._api_get(self.path.split("?")[0])
+            except Exception:  # noqa: BLE001 - never leave the client hanging
+                import traceback
+                traceback.print_exc()
+                try:
+                    self._send_json({"error": "内部错误"}, 500)
+                except Exception:  # noqa: BLE001
+                    pass
+            return
+        # Everything else is a static file: let send_head do the work. This
+        # mirrors SimpleHTTPRequestHandler.do_GET exactly, minus a
+        # double-handled HEAD (HEAD is routed to send_head by the base class).
+        f = self.send_head()
+        if f:
+            try:
+                self.copyfile(f, self.wfile)
+            finally:
+                f.close()
+
+    def do_POST(self):
+        if self._is_api_path():
+            try:
+                self._api_post(self.path.split("?")[0])
+            except Exception:  # noqa: BLE001
+                import traceback
+                traceback.print_exc()
+                try:
+                    self._send_json({"error": "内部错误"}, 500)
+                except Exception:  # noqa: BLE001
+                    pass
+            return
+        self.send_error(405, "Method Not Allowed")
 
     # -- helpers ---------------------------------------------------------
 

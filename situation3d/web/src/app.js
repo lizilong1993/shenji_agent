@@ -398,6 +398,9 @@ function initViewer() {
 
   if (window.Overview) Overview.init(viewer);
   if (window.Places) Places.init(viewer);
+  // 在线三维实景只是登记 viewer，真正的联网在建 tileset 时才发生（见 bindUI），
+  // 这样"没配置令牌"的部署不会在开页面时就发一次注定 401 的请求。
+  if (window.Buildings3D) Buildings3D.init(viewer);
 }
 
 function flyTo(lon, lat, height, pitchDeg) {
@@ -1423,6 +1426,71 @@ function setWsf3dOverlay(on) {
   }
 }
 
+/**
+ * 在线三维实景（Google Photorealistic 3D Tiles）开关，带自动回落。
+ *
+ * 设计要点：这是**在线**图层，断网、没令牌、令牌过期都会失败。失败时不能让用户
+ * 对着一片空洞——本机的离线体块必须顶上，所以这里在失败路径上主动把
+ * `modelBuildings` 打开，并把"为什么回落到本机"写进提示。
+ *
+ * 两个图层是并列的，不是替换关系：用户可以只开本机、只开在线，或者都不开。
+ */
+function setBuildingsOnline(on) {
+  if (!window.Buildings3D) {
+    setSwitchNote('在线三维实景模块未加载（src/buildings3d.js）。');
+    return;
+  }
+  window.Buildings3D.setEnabled(on).then(function (info) {
+    syncBuildingsOnlineNote(info);
+    if (info.shouldFallback) {
+      fallBackToLocalBuildings(info);
+    } else if (info.live) {
+      setSwitchNote('在线三维实景已开启（' + info.detail + '）。' +
+        '注：该模式会隐藏本机 DEM，且瓦片无法离线缓存。');
+    } else if (!info.enabled) {
+      setSwitchNote('在线三维实景已关闭。');
+    }
+  }).catch(function (e) {
+    setSwitchNote('在线三维实景开启失败：' + (e && e.message ? e.message : e));
+  });
+}
+
+/** 把在线层状态同步到令牌输入框下方的提示，以及离线体块的可用性感知。 */
+function syncBuildingsOnlineNote(info) {
+  const note = document.getElementById('ionTokenNote');
+  if (!note) return;
+  const phaseText = {
+    idle: '未启用',
+    unconfigured: '未配置令牌',
+    loading: '正在连接…',
+    live: '已连接',
+    failed: '连接失败',
+  }[info.phase] || info.phase;
+  note.textContent = '状态：' + phaseText +
+    (info.detail ? '（' + info.detail + '）' : '');
+  const box = document.getElementById('ionTokenInput');
+  if (box) box.classList.toggle('bad', info.phase === 'failed');
+}
+
+/**
+ * 在线层不可用时退到本机离线体块。
+ *
+ * 只在"本机开关本来就没开"时动手，避免用户手动关掉的图层又被悄悄打开。
+ */
+function fallBackToLocalBuildings(info) {
+  const why = info.detail || '在线图层不可用';
+  if (checkboxOn('modelBuildings')) {
+    setSwitchNote('在线三维实景不可用（' + why + '），已继续使用本机建筑体块。');
+    return;
+  }
+  setSwitchNote('在线三维实景不可用（' + why + '），已自动回落到本机建筑体块。');
+  const box = document.getElementById('modelBuildings');
+  if (box) box.checked = true;
+  // 直接调用而不是派发 change：派发会再走一遍 bindCheck，语义一样但多一层，
+  // 而这里已经确定要开，显式调用更好追。
+  setBuildings(true);
+}
+
 function setBuildings(on) {
   if (!on) {
     if (state.buildingsPrimitive) state.buildingsPrimitive.show = false;
@@ -2253,6 +2321,13 @@ window.SituationHost = {
       cacheKeys: Object.keys(state.buildingsCache || {}),
       hasPrimitive: !!state.buildingsPrimitive,
       switchNote: dom.switchNote ? dom.switchNote.textContent : null,
+      // 在线实景那条链路（默认图层）的取证：断网/无令牌/令牌过期都只能从
+      // phase 与 detail 分辨，光看画面是"没有建筑"还是"建筑没加载出来"分不清。
+      online: window.Buildings3D ? Buildings3D.debug() : null,
+      onlineNote: (function () {
+        const n = document.getElementById('ionTokenNote');
+        return n ? n.textContent : null;
+      })(),
     };
   },
   setStatus: setStatus,
@@ -2418,6 +2493,7 @@ function bindUI() {
   bindCheck('modelTerrain', setTerrain);
   bindCheck('modelWsf3dOverlay', setWsf3dOverlay);
   bindCheck('modelBuildings', setBuildings);
+  bindCheck('modelBuildingsOnline', setBuildingsOnline);
   bindCheck('modelWeather', setWeather);
   bindCheck('modelSensor', setSensors);
   bindCheck('modelImagery', setImagery);
@@ -2427,6 +2503,36 @@ function bindUI() {
   // 而 initViewer 里已经把它设成 baseLayer，所以这里不需要再调用一次；
   // 但把提示文案写清楚，否则用户不知道当前底图是在线还是离线。
   if (dom.modelTianditu && dom.modelTianditu.checked) setTianditu(true);
+
+  // ion 令牌输入：保存到服务端 web/data/ion.json（该文件被 gitignore）。
+  // 输入框里的值**不回显**到任何提示里，保存成功后只报"已保存"。
+  const ionSave = document.getElementById('ionTokenSave');
+  const ionInput = document.getElementById('ionTokenInput');
+  if (ionSave && ionInput && window.Buildings3D) {
+    ionSave.addEventListener('click', function () {
+      const note = document.getElementById('ionTokenNote');
+      const v = (ionInput.value || '').trim();
+      if (note) note.textContent = '正在保存…';
+      window.Buildings3D.saveToken(v).then(function () {
+        ionInput.value = '';
+        ionInput.classList.remove('bad');
+        ionInput.classList.add('ok');
+        if (note) note.textContent = '令牌已保存。重开「在线三维实景建筑」即可生效。';
+        // 令牌换了以后旧的失败状态不该继续留着，否则会一直显示上一次的报错。
+        window.Buildings3D.forgetToken();
+        if (checkboxOn('modelBuildingsOnline')) setBuildingsOnline(true);
+      }).catch(function (e) {
+        ionInput.classList.remove('ok');
+        ionInput.classList.add('bad');
+        if (note) note.textContent = '保存失败：' + (e && e.message ? e.message : e);
+      });
+    });
+  }
+
+  // 在线实景是默认图层（index.html 里 checked）：HTML 的 checked 同样不会触发
+  // change，而它又不像天地图那样在 initViewer 里已经建好，所以必须显式跑一次。
+  // 提示文案由 setBuildingsOnline 的成功/回落分支负责写。
+  if (checkboxOn('modelBuildingsOnline')) setBuildingsOnline(true);
 
   // 三个顶栏下拉菜单统一开合，互斥，点空白处收起。
   bindMenu('menuCase', 'menuCaseList');

@@ -273,6 +273,59 @@ select {
   color: var(--text-dim);
 }
 
+/* ---------------- nested layer sub-panel (ion token) ---------------- */
+
+/* 图层管理里嵌在某一组内部的折叠块。.layer-group 的样式是按"顶层 details"
+   写的（>.summary），套到嵌套上要么不生效要么把缩进搞乱，所以单独给一套。 */
+.layer-sub {
+  margin: 4px 0 2px 2px;
+  padding-left: 6px;
+  border-left: 2px solid var(--border);
+}
+
+.layer-sub > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 2px 0;
+  user-select: none;
+}
+
+.layer-sub > summary::-webkit-details-marker { display: none; }
+
+.layer-sub > summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 11px;
+  transition: transform .12s ease;
+}
+
+.layer-sub[open] > summary::before { transform: rotate(90deg); }
+
+.layer-sub .switch-note { margin-top: 4px; border-top: none; }
+
+.token-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  height: 22px;
+  margin: 4px 0 6px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #fff;
+  color: var(--text);
+  font-size: 11px;
+  font-family: inherit;
+  /* 令牌很长，别让它把图层栏撑宽 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.token-input.ok { border-color: #3f9d63; }
+.token-input.bad { border-color: var(--red); }
+
 /* ---------------- target list ---------------- */
 
 .target-list { overflow-y: auto; flex: 1 1 auto; }
