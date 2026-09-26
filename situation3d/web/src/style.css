@@ -326,6 +326,50 @@ select {
 .token-input.ok { border-color: #3f9d63; }
 .token-input.bad { border-color: var(--red); }
 
+/* ---------------- 数据健康面板 ---------------- */
+
+.health-body {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.health-ok { color: #2f7d4f; }
+
+.health-item {
+  margin: 4px 0;
+  padding: 4px 6px;
+  border-left: 2px solid var(--red);
+  background: #fdf2f2;
+  border-radius: 2px;
+}
+
+.health-item b { color: var(--text); }
+
+.health-item .health-feed {
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+}
+
+.health-detail {
+  margin-top: 2px;
+  color: #8a4a4a;
+  word-break: break-word;
+}
+
+.health-meta {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px dashed var(--border);
+  color: var(--text-dim);
+  word-break: break-word;
+}
+
 /* ---------------- target list ---------------- */
 
 .target-list { overflow-y: auto; flex: 1 1 auto; }

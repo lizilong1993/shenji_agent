@@ -151,6 +151,15 @@
         <label class="check"><input type="checkbox" id="compScalebar" checked> 比例尺</label>
         <label class="check"><input type="checkbox" id="compViewpoint" checked> 视点坐标</label>
       </details>
+
+      <details class="layer-group panel-block" id="healthPanel">
+        <summary>数据健康 <span class="hint-inline" id="healthSummary">—</span></summary>
+        <div class="switch-note">
+          只列出<strong>「开关开着、实际没显示」</strong>的图层。全都正常时不打扰。
+        </div>
+        <div id="healthBody" class="health-body">尚未检查。</div>
+        <button type="button" id="healthRefresh" class="mini">重新检查</button>
+      </details>
       </div>
 
       <section class="panel-block grow">
@@ -302,6 +311,7 @@
   <script src="./src/assets.js"></script>
   <script src="./src/layerRegistry.js"></script>
   <script src="./src/renderGovernor.js"></script>
+  <script src="./src/dataHealth.js"></script>
   <script src="./src/buildings3d.js"></script>
   <script src="./src/overview.js"></script>
   <script src="./src/places.js"></script>

@@ -1650,7 +1650,19 @@ function applyLayers() {
     // 不静默：sink 缺失或抛异常都会在这里露出来。
     console.warn('[layers] apply 跳过：', out.skipped);
   }
+  // 图层一变就刷新健康面板。展开着的时候才真渲染，收起时只标脏，
+  // 避免每次点开关都白跑一遍 DOM 组装。
+  markHealthDirty();
   return out;
+}
+
+var healthDirty = true;
+
+/** 标脏并（在面板展开时）立刻重渲染。 */
+function markHealthDirty() {
+  healthDirty = true;
+  var el = document.getElementById('healthPanel');
+  if (el && el.open) renderHealthPanel();
 }
 
 /**
@@ -1666,6 +1678,57 @@ function syncLayerCheckboxes() {
     const box = document.getElementById(s.checkbox);
     if (box && box.checked !== !!s.effective) box.checked = !!s.effective;
   });
+}
+
+/**
+ * 渲染"数据健康"面板。
+ *
+ * 这个面板只回答一个问题：**"我以为开着的图层，到底有没有真的在显示"**。
+ * 所以正文只列 attention（想开但没生效）的条目，其余图层收在下面的计数里；
+ * 全部正常时给一行"全部正常"，不制造噪音。
+ */
+function renderHealthPanel() {
+  const body = document.getElementById('healthBody');
+  const sum = document.getElementById('healthSummary');
+  if (!body || !window.DataHealth) return;
+
+  const r = DataHealth.report();
+  if (sum) sum.textContent = r.healthy ? '全部正常' : (r.attention.length + ' 项待查');
+
+  const rows = [];
+  if (!r.attention.length) {
+    rows.push('<div class="health-ok">全部图层均按开关生效。</div>');
+  } else {
+    r.attention.forEach(function (a) {
+      rows.push('<div class="health-item"><b>' + a.label + '</b>' +
+        '<span class="health-feed">' + a.feed + '</span>' +
+        '<div class="health-detail">' + (a.detail || '已开但未生效') + '</div></div>');
+    });
+  }
+
+  // 摘要行：让"看起来正常但其实有问题"的数字浮出来（瓦片错误率、重叠丢弃率）。
+  const t = r.tiles || {};
+  const p = r.places || {};
+  const g = r.governor || {};
+  const bits = [];
+  if (t.totalRequests) {
+    bits.push('影像请求 ' + t.totalRequests + (t.totalErrors ? '（错误 ' + t.totalErrors + '）' : ''));
+  }
+  if (t.sources && t.sources[0] && t.sources[0].maxLevel >= 0) {
+    bits.push('影像层级 ' + t.sources[0].minLevel + '–' + t.sources[0].maxLevel);
+  }
+  if (p.loaded) bits.push('地名 ' + p.placed + '/' + p.candidates + '（重叠丢弃 ' + p.overlapped + '）');
+  if (r.buildings && r.buildings.buildingsStats) {
+    const bs = r.buildings.buildingsStats;
+    bits.push('体块 ' + bs.blocks + ' 个 / LOD ' + bs.lodKey);
+  }
+  if (g.skipRatio !== null && g.skipRatio !== undefined) {
+    bits.push('渲染跳过率 ' + (g.skipRatio * 100).toFixed(1) + '%');
+  }
+  if (r.viewport) bits.push('视高 ' + r.viewport.heightKm + ' km');
+  rows.push('<div class="health-meta">' + bits.join(' · ') + '</div>');
+
+  body.innerHTML = rows.join('');
 }
 
 /** 图层顺序与状态的取证入口。 */
@@ -2520,6 +2583,17 @@ window.SituationHost = {
   // 「哪个层压在哪个层上面」光看画面猜不出来，必须能读到 index。
   debugLayers: debugLayers,
   applyLayers: applyLayers,
+  /** 瓦片请求统计，给数据健康面板用（state 在闭包里，外面拿不到）。 */
+  imageryStats: function () { return state.imageryStats; },
+  /** 数据健康面板要用到的其它 state 片段。 */
+  urbanInfo: function () {
+    return {
+      enabled: state.urbanEnabled,
+      mounted: !!state.urbanLayers,
+      count: (state.urbanLayers || []).length,
+      aoiCount: (state.urbanAoi || []).length,
+    };
+  },
   applySituationData: applySituationData,
   reload: reloadSituation,
   clearSituation: clearSituation,
@@ -2694,6 +2768,21 @@ function bindUI() {
   // 而 initViewer 里已经把它设成 baseLayer，所以这里不需要再调用一次；
   // 但把提示文案写清楚，否则用户不知道当前底图是在线还是离线。
   if (dom.modelTianditu && dom.modelTianditu.checked) setTianditu(true);
+
+  // 数据健康面板：展开时才算、才渲染；点"重新检查"强制刷新。
+  const healthPanel = document.getElementById('healthPanel');
+  if (healthPanel) {
+    healthPanel.addEventListener('toggle', function () {
+      if (healthPanel.open && healthDirty) { renderHealthPanel(); healthDirty = false; }
+    });
+  }
+  const healthRefresh = document.getElementById('healthRefresh');
+  if (healthRefresh) {
+    healthRefresh.addEventListener('click', function () {
+      healthDirty = false;
+      renderHealthPanel();
+    });
+  }
 
   // ion 令牌输入：保存到服务端 web/data/ion.json（该文件被 gitignore）。
   // 输入框里的值**不回显**到任何提示里，保存成功后只报"已保存"。
