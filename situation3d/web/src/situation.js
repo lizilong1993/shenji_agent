@@ -385,6 +385,7 @@
     try {
       if (tab === 'input') renderInput(body);
       else if (tab === 'manage') renderManage(body);
+      else if (tab === 'brief') renderBrief(body);
       else renderDownload(body);
     } catch (e) {
       console.error('[situation] 面板渲染失败', e);
@@ -662,6 +663,76 @@
   }
 
   // ---- 标签页 3：态势数据下载 ----
+  /**
+   * 态势简报页。
+   *
+   * 简报是**引擎侧**生成的（engine/brief.py），随数据集一起下发，前端只负责呈现。
+   * 不在前端重算的理由：它要引用案例与目标定义，而且必须与画面上显示的等级出自
+   * 同一份推理输出——前端另算一遍迟早会和引擎的规则漂移。
+   */
+  function renderBrief(body) {
+    const h = host();
+    const data = h.state.data;
+    if (!data) {
+      const s = section(body, '态势简报');
+      s.appendChild(el('div', 'sit-hint',
+        '未加载态势。请先从顶栏「态势案例」选择一个案例，再回来看简报。'));
+      return;
+    }
+    const brief = data.brief;
+    if (!brief) {
+      const s = section(body, '态势简报');
+      s.appendChild(el('div', 'sit-hint',
+        '该数据集里没有简报字段。简报由 engine/brief.py 生成并随数据集下发，' +
+        '请重新运行 scripts/gen_demo_trajectory.py 生成数据。'));
+      return;
+    }
+    if (brief.empty) {
+      const s = section(body, '态势简报');
+      s.appendChild(el('div', 'sit-hint', brief.headline || '该态势没有可用帧。'));
+      return;
+    }
+
+    const head = section(body, brief.case_name || brief.case_id || '态势简报');
+    head.appendChild(el('div', 'brief-headline', brief.headline || ''));
+    const meta = el('div', 'sit-hint',
+      '峰值 ' + (brief.peak_level_label || '—') +
+      '（第 ' + brief.peak_frame + ' 帧' +
+      (brief.peak_clock ? '，' + brief.peak_clock : '') + '） · 结束 ' +
+      (brief.final_level_label || '—') + ' · 趋势 ' + (brief.trend || '—') +
+      ' · 共 ' + brief.frame_count + ' 帧');
+    head.appendChild(meta);
+
+    (brief.sections || []).forEach(function (sec) {
+      const s = section(body, sec.title || '');
+      (sec.lines || []).forEach(function (line) {
+        s.appendChild(el('div', 'brief-line', line));
+      });
+    });
+
+    // 原文可复制：给人贴进报告用，也是"简报到底说了什么"的最终依据。
+    const s = section(body, '原文');
+    const area = document.createElement('textarea');
+    area.className = 'brief-text';
+    area.readOnly = true;
+    area.value = brief.text || '';
+    s.appendChild(area);
+    const row = el('div', 'sit-row');
+    const copy = el('button', 'mini', '复制原文');
+    copy.type = 'button';
+    copy.addEventListener('click', function () {
+      area.select();
+      try {
+        if (document.execCommand) document.execCommand('copy');
+        setHint('简报原文已复制。');
+      } catch (e) {
+        setHint('复制失败，请手动选择文本。');
+      }
+    });
+    row.appendChild(copy);
+    s.appendChild(row);
+  }
+
   function renderDownload(body) {
     const h = host();
     const s = section(body, '下载');

@@ -370,6 +370,50 @@ select {
   word-break: break-word;
 }
 
+/* ---------------- 态势简报 ---------------- */
+
+.brief-headline {
+  margin: 4px 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.brief-line {
+  margin: 3px 0;
+  padding-left: 10px;
+  position: relative;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.brief-line::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: var(--text-dim);
+}
+
+/* 简报原文要能整体复制走，所以用可滚动只读文本域而不是 div */
+.brief-text {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 220px;
+  margin-top: 4px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #fbfcfe;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
 /* ---------------- target list ---------------- */
 
 .target-list { overflow-y: auto; flex: 1 1 auto; }

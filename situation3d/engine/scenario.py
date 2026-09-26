@@ -34,6 +34,9 @@ REGION = "中国 台湾海峡"
 # 12 simulated hours at 30 s per tick.
 TICK_SECONDS = 30.0
 TICK_COUNT = 1440
+# 态势的仿真起始时刻（UTC）。提到常量：数据集里要写它，态势简报也要用它把
+# "第 N 帧"换算成钟点，两处必须是同一个值，否则简报里会出现对不上的时间。
+START_TIME_UTC = "2026-09-15T00:00:00Z"
 
 # Real geographic reference points (WGS84), used as waypoint anchors.
 ANCHORS = {
@@ -683,6 +686,22 @@ def build_dataset(case=None) -> dict:
     if unknown:
         raise ValueError("targets reference icons missing from the catalogue: %s" % unknown)
 
+    # 态势简报：把逐帧的推理结果压成一份可读的叙述。
+    # 放在这里而不是前端算，是因为它依赖 case / targets 这些只有引擎侧才有的对象，
+    # 而且要保证"前端显示的等级"与"简报里的等级"出自同一份推理输出。
+    from . import brief as brief_mod
+    situation_brief = brief_mod.build_brief(
+        inferred["frames"],
+        targets=targets,
+        hotspot_names=case.hotspot_names,
+        model=inferred["model"],
+        start_utc=START_TIME_UTC,
+        tick_seconds=TICK_SECONDS,
+        case_id=case.case_id,
+        case_name=case.name,
+    )
+    situation_brief["text"] = brief_mod.render_text(situation_brief)
+
     return {
         "schema": "situation3d.trajectory.v2",
         "case_id": case.case_id,
@@ -698,7 +717,7 @@ def build_dataset(case=None) -> dict:
         ),
         "tick_seconds": TICK_SECONDS,
         "tick_count": TICK_COUNT,
-        "start_time_utc": "2026-09-15T00:00:00Z",
+        "start_time_utc": START_TIME_UTC,
         "camera": case.camera,
         "symbology": symbology.catalog(),
         "hotspots": [h for h in HOTSPOTS if h["name"] in set(case.hotspot_names)],
@@ -708,4 +727,5 @@ def build_dataset(case=None) -> dict:
         "inference_summary": inferred["summary"],
         "frames": frames,
         "inference_frames": inferred["frames"],
+        "brief": situation_brief,
     }
