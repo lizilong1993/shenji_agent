@@ -98,7 +98,7 @@ const FALLBACK_CAMERA = { lon: 119.6, lat: 24.4, height: 900000, heading: 0, pit
 const dom = {};
 ['statusText', 'statusDot', 'scenarioName', 'targetList', 'hotspotBody',
  'geoLon', 'geoLat', 'geoRegion', 'geoSpan', 'geoLevel',
- 'levelValue', 'levelNote', 'targetPanel', 'tpTitle', 'tpBody', 'tpClose',
+ 'levelValue', 'levelNote', 'levelIntent', 'targetPanel', 'tpTitle', 'tpBody', 'tpClose',
  'menuCase', 'menuCaseList', 'menuLayers', 'menuLayerList', 'menuView', 'menuViewList',
  'switchNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner', 'btnOverview',
  'countRed', 'countBlue', 'countSea', 'countLand', 'countAir', 'targetCountHint',
@@ -538,6 +538,8 @@ function applySituationData(data, caseId) {
       state.geoPinned = false;
       state.buildingsAoi = -1;
       markScene('applySituationData');
+      // 数据集自带本体的压缩形态，优先用它（离线可用），接口只是兜底。
+      if (window.IntentUi) IntentUi.adoptFromModel(state.data && state.data.inference_model);
 
       if (data.symbology) Symbology.setCatalog(data.symbology);
 
@@ -1054,6 +1056,28 @@ function inferenceAt(tick) {
   return state.inference[Math.max(0, Math.min(tick, state.inference.length - 1))];
 }
 
+/**
+ * 当前帧出现最多的主意图（全局）。横幅用它回答"战场上在打什么"。
+ *
+ * 只统计**主**意图：次要意图（本体标 secondary-only 的 FIRE_SUPPORT /
+ * TARGET_GUIDANCE）计入会把"火力支援"顶成主要活动，掩盖真实主任务。
+ */
+function regionIntentCounts(inf) {
+  const counts = {};
+  Object.keys(inf.targets).forEach(function (tid) {
+    const e = inf.targets[tid];
+    if (!e.primary_intent) return;
+    if (window.IntentUi && IntentUi.isSecondaryOnly(e.primary_intent)) return;
+    counts[e.primary_intent] = (counts[e.primary_intent] || 0) + 1;
+  });
+  return Object.keys(counts)
+    .map(function (c) {
+      return { code: c, zh: window.IntentUi ? IntentUi.nameZh(c) : c, n: counts[c] };
+    })
+    .sort(function (a, b) { return b.n - a.n; })
+    .slice(0, 3);
+}
+
 function updateInferenceUi() {
   const inf = inferenceAt(state.tick);
   if (!inf) {
@@ -1069,7 +1093,16 @@ function updateInferenceUi() {
     ' 平均威胁 ' + inf.overall.mean_threat + '，最高 ' + inf.overall.max_threat +
     '，对抗域 ' + inf.overall.engaged_pairs + ' 个。';
 
-  // 热点区域表格里的态势等级随之刷新。
+  // 区域级横幅补上"主导意图"：等级回答"多紧张"，意图回答"在打什么"，
+  // 两者并列才算把区域态势说全。
+  if (dom.levelIntent) {
+    const top = regionIntentCounts(inf);
+    dom.levelIntent.textContent = top.length
+      ? top.map(function (x) { return x.zh + ' ×' + x.n; }).join('、')
+      : '无带意图判定的目标';
+  }
+
+  // 热点区域表格里的态势等级与意图随之刷新。
   state.hotspotRows.forEach(function (row, i) {
     const r = inf.regions[i];
     if (!r) return;
@@ -1077,6 +1110,7 @@ function updateInferenceUi() {
     row.levelCell.className = 'lv-cell ' + (LEVEL_CLASS[r[0]] || '');
     row.levelCell.title = '红方 ' + r[1] + ' 个目标 / 蓝方 ' + r[2] + ' 个目标';
   });
+  renderHotspotIntents();
 
   if (state.geoPinned && state.activeHotspot >= 0) {
     const r = inf.regions[state.activeHotspot];
@@ -1100,6 +1134,43 @@ function codeLabel(section, code) {
   if (!model) return '';
   const table = model[section];
   return table ? (table[code] || '') : '';
+}
+
+/**
+ * 意图链路的取证入口。
+ *
+ * 「意图有没有生效」光看画面判断不了：面板可能显示的是旧字段、本体可能没加载、
+ * 当前帧可能整帧都是 UNKNOWN。这里把每个短路条件逐条报出来。
+ */
+function debugIntent() {
+  const inf = inferenceAt(state.tick);
+  const per = {};
+  if (inf) {
+    Object.keys(inf.targets).forEach(function (tid) {
+      const e = inf.targets[tid];
+      per[tid] = {
+        primary: e.primary_intent || null,
+        status: e.intent_status || null,
+        set: (e.intent_set || []).map(function (x) { return x.code; }),
+        missing: e.missing_evidence || [],
+      };
+    });
+  }
+  const summary = state.data && state.data.intent_summary;
+  return {
+    ontology: window.IntentUi ? IntentUi.debug() : null,
+    modelHasOntology: !!(state.data && state.data.inference_model
+      && state.data.inference_model.intent_ontology),
+    hasData: !!state.data,
+    tick: state.tick,
+    hasInferenceFrame: !!inf,
+    targetsThisFrame: per,
+    datasetRuleHits: summary ? summary.rule_hits : null,
+    datasetStatusCounts: summary ? summary.status_counts : null,
+    underivableCount: summary && summary.underivable ? summary.underivable.length : null,
+    panelHasIntentBlock: !!(dom.tpBody && dom.tpBody.querySelector
+      && dom.tpBody.querySelector('.tp-intent')),
+  };
 }
 
 // --------------------------------------------------------------------------
@@ -1175,7 +1246,7 @@ function renderHotspotTable() {
   if (!hotspots.length) {
     const tr = el('tr', 'hotspot-row');
     const td = el('td', 'hs-empty', '未加载态势');
-    td.colSpan = 4;
+    td.colSpan = 5;
     tr.appendChild(td);
     body.appendChild(tr);
     return;
@@ -1186,6 +1257,8 @@ function renderHotspotTable() {
     tr.dataset.index = String(i);
 
     const levelCell = el('td', 'lv-cell', '—');
+    // 主导意图列：区域级"这里在打什么"，与区域等级并列。
+    const intentCell = el('td', 'hs-intent', '—');
     tr.appendChild(el('td', 'hs-idx', String(i + 1)));
     tr.appendChild(el('td', 'hs-name', hs.name));
     // 经纬范围直接取自 bbox，与地图上绘制的矩形同源，不会再出现"显示范围与
@@ -1194,10 +1267,51 @@ function renderHotspotTable() {
       hs.bbox[0].toFixed(2) + '–' + hs.bbox[2].toFixed(2) + '°E<br>' +
       hs.bbox[1].toFixed(2) + '–' + hs.bbox[3].toFixed(2) + '°N'));
     tr.appendChild(levelCell);
+    tr.appendChild(intentCell);
 
     tr.addEventListener('click', function () { selectHotspot(i, true); });
     body.appendChild(tr);
-    state.hotspotRows.push({ row: tr, levelCell: levelCell, hotspot: hs });
+    state.hotspotRows.push({ row: tr, levelCell: levelCell, intentCell: intentCell, hotspot: hs });
+  });
+}
+
+/**
+ * 刷新热点表里的意图列。
+ *
+ * 区域级主导意图 = 该热点框内所有目标当前主意图的众数。逐帧调用，
+ * 与 `updateInferenceUi()` 同一时机（时间轴/播放推进）。
+ */
+function renderHotspotIntents() {
+  const inf = inferenceAt(state.tick);
+  if (!inf || !state.hotspotRows.length) return;
+  state.hotspotRows.forEach(function (rec, i) {
+    if (!rec.intentCell) return;
+    const region = state.data.hotspots[i];
+    const counts = {};
+    Object.keys(inf.targets).forEach(function (tid) {
+      const e = inf.targets[tid];
+      if (!e.primary_intent) return;
+      const def = state.targets[tid] && state.targets[tid].def;
+      if (!def || !region) return;
+      const s = positionFor(tid, state.tick);
+      if (!s) return;
+      if (s.lat < region.bbox[1] || s.lat > region.bbox[3] ||
+          s.lon < region.bbox[0] || s.lon > region.bbox[2]) return;
+      counts[e.primary_intent] = (counts[e.primary_intent] || 0) + 1;
+    });
+    const keys = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    if (!keys.length) {
+      rec.intentCell.textContent = '—';
+      rec.intentCell.title = '该区域内当前没有带意图判定的目标';
+      return;
+    }
+    const top = keys.slice(0, 2).map(function (k) {
+      return window.IntentUi ? IntentUi.nameZh(k) : k;
+    });
+    rec.intentCell.textContent = top.join(' / ');
+    rec.intentCell.title = keys.map(function (k) {
+      return (window.IntentUi ? IntentUi.nameZh(k) : k) + ' ×' + counts[k];
+    }).join('、');
   });
 }
 
@@ -1385,7 +1499,16 @@ function renderTargetPanel(id) {
     (def.affiliation === 'red' ? '红方' : '蓝方') + ' · ' +
     (Symbology.domainLabel(def.domain) || def.domain) + '</span></div></div>';
 
-  html += '<div class="tp-section"><h4>目标要素</h4>';
+  // 意图摘要**置顶**：ZHY 关注的是"这个目标在干什么"。以前意图只是「一级」里的
+  // 一行，要读完一堆属性才看到；现在它排在最前，一/二/三级明细仍在下方按原样给出
+  // （未删减，只是不再抢视线）。
+  if (window.IntentUi) {
+    html += IntentUi.renderIntentBlock(l1, def);
+  }
+
+  // 目标要素：保留但降为一个折叠区。意图摘要已经占了最上方，属性/一/二/三级明细
+  // 仍在原处、内容未删减，只是不再与意图抢第一眼。
+  html += '<details class="tp-fold" open><summary>目标要素</summary>';
   html += kvRow('目标 ID', def.id);
   html += kvRow('型号', def.model);
   html += kvRow('平台类别', def.platform_class + ' · ' + def.role);
@@ -1394,13 +1517,12 @@ function renderTargetPanel(id) {
   html += kvRow('高度', s ? s.alt.toFixed(0) + ' m' : '—');
   html += kvRow('航向 / 航速', s ? s.heading.toFixed(0) + '° / ' + s.speed_kn + ' ' + def.speed_unit : '—');
   html += kvRow('传感器', def.sensor_name + '（' + def.sensor_range_km.toFixed(0) + ' km）');
-  html += '</div>';
+  html += '</details>';
 
   if (l1) {
     const terms = l1.threat_terms;
-    html += '<div class="tp-section"><h4>一级 · 目标级态势</h4>';
+    html += '<details class="tp-fold" open><summary>一级 · 目标级态势</summary>';
     html += kvRow('状态', l1.state_label);
-    html += kvRow('意图', l1.intent_label);
     html += kvRow('威胁度', l1.threat + ' / 100', 'lv-' + (l1.alert + 1));
     html += kvRow('告警等级', l1.alert_label, 'lv-' + (l1.alert + 1));
     html += kvRow('最近对方目标',
@@ -1408,21 +1530,21 @@ function renderTargetPanel(id) {
     html += kvRow('被对方探测', l1.covered_by + ' 部传感器');
     html += '<div class="tp-reason">判定依据：装备权重 ' + terms.base +
       ' + 接近度 ' + terms.proximity + ' + 覆盖度 ' + terms.coverage + '</div>';
-    html += '</div>';
+    html += '</details>';
   }
 
   if (group) {
-    html += '<div class="tp-section"><h4>二级 · 编组级态势</h4>';
+    html += '<details class="tp-fold"><summary>二级 · 编组级态势</summary>';
     html += kvRow('所属编组', (group.affiliation === 'red' ? '红方' : '蓝方') +
       (Symbology.domainLabel(group.domain) || group.domain) + '编组（' + group.count + ' 个目标）');
     html += kvRow('编队形态', group.posture_label + '（跨度 ' + group.spread_km + ' km）');
     html += kvRow('对方同域编组', group.opposing_key || '无');
     html += kvRow('最小距离', group.min_distance_km === null ? '—' : group.min_distance_km + ' km');
     html += kvRow('对抗关系', group.relation_label, 'lv-' + (group.relation + 1));
-    html += '</div>';
+    html += '</details>';
   }
 
-  html += '<div class="tp-section"><h4>三级 · 区域级态势</h4>';
+  html += '<details class="tp-fold"><summary>三级 · 区域级态势</summary>';
   if (region && r3) {
     html += kvRow('所在区域', region.name);
     html += kvRow('区域等级', r3[0] + ' 级 · ' + levelLabel(r3[0]), 'lv-' + r3[0]);
@@ -1435,13 +1557,13 @@ function renderTargetPanel(id) {
     html += kvRow('全局态势', inf.overall.level + ' 级 · ' + inf.overall.level_label,
       'lv-' + inf.overall.level);
   }
-  html += '</div>';
+  html += '</details>';
 
-  html += '<div class="tp-section"><h4>装备参数</h4>';
+  html += '<details class="tp-fold"><summary>装备参数</summary>';
   Object.keys(def.attributes || {}).forEach(function (k) {
     html += kvRow(k, def.attributes[k]);
   });
-  html += '</div>';
+  html += '</details>';
 
   dom.tpBody.innerHTML = html;
   dom.targetPanel.classList.remove('hidden');
@@ -2582,6 +2704,8 @@ window.SituationHost = {
   // 图层顺序取证：imagery 的真实 index 顺序 + 每个图层的意图/事实。
   // 「哪个层压在哪个层上面」光看画面猜不出来，必须能读到 index。
   debugLayers: debugLayers,
+  // 意图链路取证：本体是否加载、当前帧每目标的意图集合与状态、判不出的原因。
+  debugIntent: debugIntent,
   applyLayers: applyLayers,
   // 场景文档/深链：取证与测试入口。
   applySceneDoc: applySceneDoc,

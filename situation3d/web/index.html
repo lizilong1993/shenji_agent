@@ -185,6 +185,7 @@
       <div id="levelBanner" class="level-banner">
         <span class="lb-label">区域级态势</span>
         <span class="lb-value" id="levelValue">—</span>
+        <span class="lb-intent" id="levelIntent">—</span>
         <span class="lb-note" id="levelNote"></span>
       </div>
 
@@ -254,7 +255,7 @@
       <section class="panel-block grow">
         <h2>热点区域</h2>
         <table class="hotspot-table">
-          <thead><tr><th>#</th><th>名称</th><th>经纬范围</th><th>态势</th></tr></thead>
+          <thead><tr><th>#</th><th>名称</th><th>经纬范围</th><th>态势</th><th>主导意图</th></tr></thead>
           <tbody id="hotspotBody"></tbody>
         </table>
       </section>
@@ -316,6 +317,7 @@
   <script src="./src/renderGovernor.js"></script>
   <script src="./src/dataHealth.js"></script>
   <script src="./src/sceneDoc.js"></script>
+  <script src="./src/intentUi.js"></script>
   <script src="./src/buildings3d.js"></script>
   <script src="./src/overview.js"></script>
   <script src="./src/places.js"></script>

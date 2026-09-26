@@ -681,10 +681,21 @@ def build_dataset(case=None) -> dict:
     frames = build_frames(targets)
     inferred = inference_mod.infer(frames, targets, case.hotspot_names)
 
+    # 战术意图判定（22 种本体口径）。在推理之后做，因为规则要用 L1/L2/L3 之外的
+    # 运动学与交互信息；结果**并入**推理帧的 targets，而不是替代它们——
+    # inference 原有的 intent/intent_label 字段保持不动，旧客户端与简报不受影响。
+    from . import intent as intent_mod
+    intent_result = intent_mod.derive(frames, targets)
+    intent_mod.merge_into_frames(inferred["frames"], intent_result)
+
     icons = [t.icon for t in targets]
     unknown = symbology.validate(icons)
     if unknown:
         raise ValueError("targets reference icons missing from the catalogue: %s" % unknown)
+
+    # 把本体的压缩形态并入 model 块：前端据此把 code 翻成中文名、按父类分组，
+    # 不必自己抄一份 22 条码表。
+    inferred["model"]["intent_ontology"] = intent_mod.ontology_summary()
 
     # 态势简报：把逐帧的推理结果压成一份可读的叙述。
     # 放在这里而不是前端算，是因为它依赖 case / targets 这些只有引擎侧才有的对象，
@@ -725,6 +736,7 @@ def build_dataset(case=None) -> dict:
         "targets": [t.to_dataset_entry() for t in targets],
         "inference_model": inferred["model"],
         "inference_summary": inferred["summary"],
+        "intent_summary": intent_result["summary"],
         "frames": frames,
         "inference_frames": inferred["frames"],
         "brief": situation_brief,

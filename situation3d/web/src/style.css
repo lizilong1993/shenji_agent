@@ -484,9 +484,13 @@ select {
 .hotspot-table tbody tr:hover { background: #f2f6fd; }
 .hotspot-table tbody tr.active { background: #e8f1ff; }
 .hotspot-table th:nth-child(1), .hotspot-table td:nth-child(1) { width: 7%; }
-.hotspot-table th:nth-child(2), .hotspot-table td:nth-child(2) { width: 33%; }
-.hotspot-table th:nth-child(3), .hotspot-table td:nth-child(3) { width: 42%; }
-.hotspot-table th:nth-child(4), .hotspot-table td:nth-child(4) { width: 18%; }
+.hotspot-table th:nth-child(2), .hotspot-table td:nth-child(2) { width: 26%; }
+.hotspot-table th:nth-child(3), .hotspot-table td:nth-child(3) { width: 34%; }
+.hotspot-table th:nth-child(4), .hotspot-table td:nth-child(4) { width: 14%; }
+.hotspot-table th:nth-child(5), .hotspot-table td:nth-child(5) { width: 19%; }
+
+/* 主导意图列：与"态势"列并列，一个说多紧张、一个说在打什么 */
+.hs-intent { line-height: 1.35; font-size: 10.5px; color: #12325c; }
 
 .hs-range { line-height: 1.35; white-space: nowrap; font-size: 10.5px; }
 .hs-name { line-height: 1.35; }
@@ -590,6 +594,15 @@ select {
 .level-banner .lb-value.lv2 { color: var(--lv2); }
 .level-banner .lb-value.lv3 { color: var(--lv3); }
 .level-banner .lb-value.lv4 { color: var(--lv4); }
+/* 主导意图：与等级并列。等级说"多紧张"，意图说"在打什么"，两者缺一都说不清区域态势。 */
+.level-banner .lb-intent {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #eaf1fb;
+  color: #12325c;
+  font-size: 11px;
+}
 .level-banner .lb-note { color: var(--text-dim); line-height: 1.45; }
 
 /* ---------------- 目标信息面板（中间窗口右上角） ---------------- */
@@ -655,6 +668,132 @@ select {
   color: var(--accent);
   letter-spacing: .4px;
 }
+
+/* ---------------- 意图摘要（战术意图 22 种本体口径） ----------------
+   类名一律 tpi-* 前缀：`.ti-head` / `.ti-name` / `.ti-threat` 等已被
+   目标列表条目（.target-item）占用，复用同名会互相污染样式。 */
+
+.tp-intent {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  background: #f3f7fd;
+  border-left: 3px solid var(--accent);
+}
+
+.tpi-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .4px;
+}
+
+.tpi-src { margin-left: auto; font-weight: 400; font-size: 10px; color: var(--text-dim); }
+
+.tpi-primary {
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #12325c;
+}
+
+.tpi-primary-none { color: var(--text-dim); font-size: 14px; }
+
+.tpi-sub { margin-top: 2px; font-size: 11px; color: var(--text-dim); }
+
+/* 判定状态徽章：刻意与威胁度的红橙黄绿分开——状态说的是"证据够不够"，
+   不是"危不危险"，同色会让人把"证据不足"读成"低威胁"。 */
+.tpi-badge {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  border: 1px solid;
+}
+.ist-bg { color: #5a6473; border-color: #c3ccd9; background: #eef1f5; }
+.ist-unknown { color: #7a6a3a; border-color: #d9cfa3; background: #faf6e8; }
+.ist-ambiguous { color: #7a4a6a; border-color: #d9b6cf; background: #fbf0f7; }
+.ist-ooo { color: #5a4a7a; border-color: #c2b6dd; background: #f2eefb; }
+
+.tpi-note { margin-top: 4px; font-size: 10.5px; color: #6b5a72; line-height: 1.45; }
+
+.tpi-set-title {
+  margin-top: 7px;
+  padding-top: 5px;
+  border-top: 1px dashed #cfdaea;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.tpi-group { margin-top: 3px; }
+.tpi-group-name { display: block; font-size: 10px; color: var(--text-dim); margin-bottom: 2px; }
+
+.tpi-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  margin: 0 3px 3px 0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #fff;
+  border: 1px solid #c8d6e8;
+  font-size: 11px;
+  color: #12325c;
+}
+
+/* 次要意图弱化但保留：本体标 secondary-only 的不能当主答案，但确实在发生。 */
+.tpi-chip-sec { opacity: .72; border-style: dashed; background: #fbfcfe; }
+.tpi-role { font-size: 9px; color: var(--text-dim); font-style: normal; }
+.tpi-approx { font-size: 10px; color: #b06a1f; font-style: normal; }
+
+.tpi-evidence { margin-top: 6px; }
+.tpi-evidence > summary {
+  cursor: pointer;
+  font-size: 10.5px;
+  color: var(--accent);
+  user-select: none;
+}
+.tpi-ev-item { margin-top: 4px; font-size: 11px; }
+.tpi-ev-item b { color: #12325c; }
+.tpi-ev-line { color: var(--text-dim); line-height: 1.45; padding-left: 2px; }
+
+.tpi-missing {
+  margin-top: 5px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  background: #fdf6ec;
+  color: #8a6a3a;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.tpi-empty { margin-top: 4px; font-size: 11px; color: var(--text-dim); }
+
+/* 目标面板里的折叠区：一/二/三级明细保留但与意图摘要分层，默认不全展开抢视线 */
+.tp-fold { padding-top: 8px; }
+.tp-fold > summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .4px;
+  user-select: none;
+  list-style: none;
+}
+.tp-fold > summary::-webkit-details-marker { display: none; }
+.tp-fold > summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 11px;
+  transition: transform .12s ease;
+}
+.tp-fold[open] > summary::before { transform: rotate(90deg); }
+.tp-fold[open] > summary { margin-bottom: 4px; }
 
 .tp-kv { display: flex; justify-content: space-between; gap: 8px; padding: 1.5px 0; font-size: 11.5px; }
 .tp-kv span { color: var(--text-dim); flex: 0 0 auto; }

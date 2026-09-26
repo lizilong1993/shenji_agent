@@ -266,6 +266,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/satellites/passes":
             self._api_satellite_passes(query)
             return
+        if path == "/api/intent/ontology":
+            self._api_intent_ontology()
+            return
         if path == "/api/health":
             self._api_health()
             return
@@ -363,6 +366,31 @@ class Handler(SimpleHTTPRequestHandler):
             "error": "卫星过境接口已移除",
             "detail": "该模块已按要求下线；engine/sgp4.py 与 engine/satellites.py 也已删除。",
         }, 410)
+
+    def _api_intent_ontology(self):
+        """The 22-intent tactical ontology, served so the front end has one source.
+
+        The front end must not carry a copy of 22 intent names: when the experts
+        refine the ontology, the UI has to follow automatically. The file itself
+        is vendored into `engine/data/` from the agent checkout
+        (`code/shenji_agent/Shenji/ontology/intent_ontology_v2.json`) -- see
+        engine/intent.py for why it is vendored rather than imported.
+        """
+        import engine.intent as intent
+
+        try:
+            full = intent.load_ontology()
+        except intent.IntentError as e:
+            self._send_json({"error": str(e)}, 503)
+            return
+        payload = dict(intent.ontology_summary())
+        # confusion_matrix and the per-intent evidence criteria are useful to a
+        # reviewer reading the UI, and they are already in the file.
+        payload["confusion_matrix"] = full.get("confusion_matrix") or []
+        payload["status_layer_definitions"] = full.get("status_layers") or []
+        payload["supported_rules"] = intent.SUPPORTED_RULES
+        payload["underivable"] = intent.underivable_report()
+        self._send_json(payload)
 
     def _api_health(self):
         """Cheap liveness/config probe for the front end and for scripts."""
