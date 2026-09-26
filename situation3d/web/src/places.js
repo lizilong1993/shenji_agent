@@ -41,14 +41,27 @@
   // 相机高度 → 允许显示的最大 scalerank。高度单位米。
   // 每档的条目数（全球）：rank≤1 68 个、≤2 186、≤3 522、≤4 1128、
   // ≤6 2443、≤7 5525、≤8 6768。
+  //
+  // **档位必须从低到高排列**（越近放得越宽）。原先是从高到低：
+  //   { maxHeight: 6000000, rank: 1 }, { 3000000, 2 }, ...
+  // 而 rankForHeight 是"第一个满足 h <= maxHeight 的就返回"，于是 6000 km 那条
+  // 永远先命中，**任何相机高度都返回 rank 1**——30 km 也不例外。
+  //
+  // 实测后果：屏幕放到市级/街道级时，候选集仍然只有全球那 68 个 rank-1 地名
+  // （对马六甲/台海一带大约是"台北、上海、香港"这几个），县城乡镇一概不出现，
+  // 而且因为只剩这几个名字可用，它们反复占据屏幕、大量互相重叠（实测 30 km 时
+  // 候选 68、放下 18、重叠 18）。反过来在 5000 km 全球视角又放开到 rank 1，
+  // 数字上碰巧是对的，所以只看全球视角发现不了。
+  //
+  // 现在按"越近越宽"排：h 先命中最低的那条，得到该距离下合理的信息量。
   const LOD = [
-    { maxHeight: 6000000, rank: 1 },
-    { maxHeight: 3000000, rank: 2 },
-    { maxHeight: 1500000, rank: 3 },
-    { maxHeight: 700000, rank: 4 },
-    { maxHeight: 300000, rank: 6 },
+    { maxHeight: 60000, rank: 8 },
     { maxHeight: 100000, rank: 7 },
-    { maxHeight: Infinity, rank: 8 },
+    { maxHeight: 300000, rank: 6 },
+    { maxHeight: 700000, rank: 4 },
+    { maxHeight: 1500000, rank: 3 },
+    { maxHeight: 3000000, rank: 2 },
+    { maxHeight: Infinity, rank: 1 },
   ];
 
   // 屏幕包围盒的估算：中文 13px 字号下，一个汉字约 13px 宽，英文约 7px。
@@ -56,6 +69,27 @@
   const CHAR_PX_LATIN = 7;
   const LINE_H_PX = 17;
   const PAD_PX = 2;
+
+  /**
+   * 每个 scalerank 档位的**标签预算**。数组下标即 rank。
+   *
+   * 为什么要有每档配额
+   * ------------------
+   * 之前是"按 rank 截断候选集 → 单遍贪心铺满 260 个槽"。问题是候选集里低等级的
+   * 地名数量远多于高等级（rank≤1 全球 68 个，rank≤4 就有 1128 个，rank≤8 上万个），
+   * 于是一旦相机压低、候选集放开，**大量村镇会先把 260 个槽吃干净**，而"北京/上海/
+   * 台北"这类最该出现的名字可能在第 261 个之后，直接一屏都看不到——标签图层看起来
+   * 就是"满屏都是小地方、没有大城市"。
+   *
+   * 配额把预算按等级切块：高等级先拿，低等级用剩下的。这样稀疏时行为不变（各档都
+   * 用不完，下面的回收 pass 会把余量还回去），密集时才体现出"优先显示重要的"。
+   *
+   * 数值按"1800x900 画布大约能放 260 个标签"估的：高等级少而精，低等级多而密。
+   */
+  const RANK_BUDGET = [0, 40, 36, 42, 46, 0, 40, 30, 26];
+
+  /** 没有单独配额时的兜底每档上限。 */
+  const RANK_BUDGET_DEFAULT = 30;
 
   const UPDATE_THROTTLE_MS = 250;
 
@@ -198,8 +232,13 @@
     const globe = scene.globe;
     const carto = new Cesium.Cartographic();
 
-    for (let i = 0; i < cand.length && used < MAX_LABELS; i++) {
-      const p = cand[i];
+    /**
+     * 尝试放下**一个**地名。放得下返回 true。
+     *
+     * 抽成函数是因为要按等级配额分多轮调用（见下方 RANK_BUDGET），
+     * 而"投影 → 视口剔除 → 屏幕空间取交"这段逻辑每轮都一样，不能复制粘贴。
+     */
+    function placeOne(p) {
       // 锚点高度取**地形表面**，不是椭球面（高度 0）。
       //
       // 地名在真实地理里的位置是"地面上的那一点"。地形打开后（本项目的
@@ -217,10 +256,10 @@
       // 上一次的投影结果会被下一次的 fromDegrees 覆盖掉。
       const pos = Cesium.Cartesian3.fromDegrees(p.x, p.y, height);
       const win = toWindow(scene, pos);
-      if (!win) { offScreen++; continue; }
+      if (!win) { offScreen++; return false; }
       if (win.x < -40 || win.y < -20 || win.x > w + 40 || win.y > h + 20) {
         offScreen++;
-        continue;
+        return false;
       }
 
       const lw = labelWidth(p.n) + PAD_PX * 2;
@@ -234,7 +273,7 @@
         const q = placed[k];
         if (x0 < q.x1 && x0 + lw > q.x0 && y0 < q.y1 && y0 + lh > q.y0) { hit = true; break; }
       }
-      if (hit) { overlapped++; continue; }
+      if (hit) { overlapped++; return false; }
       placed.push({ x0: x0, x1: x0 + lw, y0: y0, y1: y0 + lh });
 
       const lbl = pool[used++];
@@ -243,12 +282,53 @@
       // 不会因为"贴图在地形上、标签在椭球上"而分离。
       lbl.position = pos;
       lbl.show = true;
+      return true;
+    }
+
+    function budgetFor(rank) {
+      const b = RANK_BUDGET[rank];
+      return (typeof b === 'number' && b > 0) ? b : RANK_BUDGET_DEFAULT;
+    }
+
+    // 第 1 轮：按等级从高到低分档。每档只在**本档配额**内放，配额用完就跳到下一档。
+    // 这样"最重要的先占位"，不会出现低等级地名把槽吃干净、高等级一个都放不下。
+    let firstPassTotal = 0;
+    const placedByRank = {};
+    for (let r = 1; r <= maxRank && used < MAX_LABELS; r++) {
+      const quota = budgetFor(r);
+      let placedThisRank = 0;
+      for (let i = 0; i < cand.length && used < MAX_LABELS; i++) {
+        const p = cand[i];
+        if (p.r !== r) continue;
+        if (placedThisRank >= quota) break;
+        if (placeOne(p)) placedThisRank++;
+      }
+      placedByRank[r] = (placedByRank[r] || 0) + placedThisRank;
+      firstPassTotal += placedThisRank;
+    }
+
+    // 第 2 轮：回收。各档配额是"上限"不是"预留"——稀疏地区高等级地名很少，
+    // 余量不能浪费。这里再按等级顺序补一遍，把剩余的槽用掉。
+    // 密集地区这一轮几乎什么都不放（槽已在第 1 轮用完），稀疏地区则与旧行为一致。
+    if (used < MAX_LABELS) {
+      for (let r = 1; r <= maxRank && used < MAX_LABELS; r++) {
+        for (let i = 0; i < cand.length && used < MAX_LABELS; i++) {
+          const p = cand[i];
+          if (p.r !== r) continue;
+          if (placeOne(p)) placedByRank[r] = (placedByRank[r] || 0) + 1;
+        }
+      }
     }
 
     for (let i = used; i < pool.length; i++) pool[i].show = false;
     lastPlaced = used;
     lastStats = { candidates: cand.length, used: used, offScreen: offScreen,
-                  overlapped: overlapped, canvas: [w, h] };
+                  overlapped: overlapped, canvas: [w, h],
+                  // 首轮（受配额约束）放下的数量。若它明显小于 used，说明这一屏
+                  // 主要靠回收轮填满，即高等级地名本身就不够多。
+                  quotaPass: firstPassTotal,
+                  placedByRank: placedByRank,
+                  maxRank: maxRank };
   }
 
   /**
