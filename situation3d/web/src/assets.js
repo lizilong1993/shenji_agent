@@ -618,32 +618,32 @@
    *
    * maxHeight 相机高度上限（米）；grid 每轴格数；step 像素采样步长。
    * 以 0.12°（约 13 km）的城区 AOI 为例：
-   *   grid 32  → 约 400 m 体块，远看只看轮廓
-   *   grid 64  → 约 200 m
+   *   grid 64  → 约 200 m 体块
    *   grid 96  → 约 135 m
-   *   grid 144 → 约 90 m，与 WSF3D 原生分辨率相当
+   *   grid 128 → 约 100 m
+   *   grid 144 → 约 90 m，与源数据分辨率相当
    *
-   * 为什么 far/mid 要加密（改前是 grid 24 / 48）
-   * ------------------------------------------
-   * 相机在 150–400 km 时 AOI 只占屏幕几十个像素，格子再细渲染出来也挤在一起，
-   * 所以旧值看起来"够用"。但问题出在**反了**：远离时 maxHeight 把档位压到 far，
-   * 用户看到的是"一座城市只剩几十个方块"；而真要看清天际线时档位又跳得太晚。
-   * 实测 far 档在 AOI 里只有约 80 个块。加密 grid 并把高档位提前接管，远处才有
-   * 城市轮廓可言。
+   * **档位必须从"最近"往"最远"排**（maxHeight 递增）。
+   * lodForHeight 是"第一个满足 h <= maxHeight 的就返回"，所以表的顺序必须与
+   * 高度的递增方向一致。原先的表是反的：
+   *
+   *   { far, 400000 }, { mid, 160000 }, { near, 60000 }, { close, Infinity }
+   *
+   * 于是 60 km 以下与 60–400 km **全部命中 far**，而 close 只在**高于 400 km**
+   * 时才命中（即最远反而用最细的网格，且那时 AOI 已经小到看不见）。
+   * 表现就是"不论怎么推近，体块永远是 far 那一档的粗方块"——实测 9 km / 12 km /
+   * 30 km 高度下 lodForHeight 都返回 0（far）。地名图层（places.js 的 LOD）有
+   * **完全相同**的方向错误，一并修掉了。
    *
    * 关键约束：grid 加密**必须**同步抬 maxBlocks。块数是按 gy/gx 行优先顺序填充的，
    * 一旦撞上 maxBlocks 就 continue——那会从北/西侧开始整片丢失方块，比均匀稀疏
-   * 难看得多（一片地少东西、另一片满）。所以下表的 maxBlocks 按 grid² × 0.08 留量，
-   * 保证覆盖 300 km 尺度时不会静默截断。
-   *
-   * 条数增多会推高几何构建开销（Primitive 是 asynchronous 的，且结果按组合缓存），
-   * 但真机帧率必须在远程实测；若掉帧就回退 maxBlocks，而不是回退 grid。
+   * 难看得多（一片地少东西、另一片满）。
    */
   const BUILDING_LOD = [
-    { key: 'far',   maxHeight: 400000,   grid: 64,  step: 2, minHeight: 6, maxBlocks: 5200 },
-    { key: 'mid',   maxHeight: 160000,   grid: 96,  step: 2, minHeight: 5, maxBlocks: 7000 },
-    { key: 'near',  maxHeight: 60000,    grid: 128, step: 2, minHeight: 4, maxBlocks: 9000 },
-    { key: 'close', maxHeight: Infinity, grid: 144, step: 1, minHeight: 4, maxBlocks: 9000 },
+    { key: 'close', maxHeight: 60000,    grid: 144, step: 1, minHeight: 4, maxBlocks: 9000 },
+    { key: 'near',  maxHeight: 160000,   grid: 128, step: 2, minHeight: 4, maxBlocks: 9000 },
+    { key: 'mid',   maxHeight: 400000,   grid: 96,  step: 2, minHeight: 5, maxBlocks: 7000 },
+    { key: 'far',   maxHeight: Infinity, grid: 64,  step: 2, minHeight: 6, maxBlocks: 5200 },
   ];
 
 

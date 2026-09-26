@@ -63,6 +63,8 @@ const state = {
   // 最近一次 LayerRegistry.apply() 的结果（取证/数据健康面板用）。
   // 图层句柄本身不由 state 持有——注册表才是唯一的顺序与归属来源。
   lastLayerApply: null,
+  // 最近一次成功生成/取用的体块组合统计（结构化），供 debugBuildings() 取证。
+  lastBuildingsStats: null,
   cursorCarto: null,        // 光标处的地面点，用于"地理位置信息"读数
   lastError: null,          // 最近一次未捕获异常
   urbanLayers: null,        // 城区 z12-z14 高清影像层（按相机高度挂载）
@@ -1856,6 +1858,13 @@ function swapBuildings(entry, aoiIdx, lod, ms, alreadyInScene) {
 
   const aoi = state.urbanAoi[aoiIdx];
   const st = entry.stats;
+  // 结构化留一份：debugBuildings() 直接读它，不再从下面那条中文提示里抠数字。
+  state.lastBuildingsStats = {
+    aoi: aoi ? aoi.name : null, aoiIdx: aoiIdx, lod: lod,
+    lodKey: st.lod, grid: st.grid, step: st.step,
+    blocks: st.blocks, skipped: st.skipped,
+    buildMs: (ms === undefined ? null : ms), fromCache: (ms === undefined),
+  };
   setSwitchNote('建筑体块已显示：「' + aoi.name + '」LOD ' + st.lod +
     '（网格 ' + st.grid + '×' + st.grid + '，采样步长 ' + st.step + '），' +
     st.blocks + ' 个体块' + (ms === undefined ? '（缓存）' : '，用时 ' + ms + ' ms') +
@@ -2492,6 +2501,10 @@ window.SituationHost = {
       buildingsKey: state.buildingsKey,
       cacheKeys: Object.keys(state.buildingsCache || {}),
       hasPrimitive: !!state.buildingsPrimitive,
+      // 体块统计**结构化**报出来。不要靠 switchNote 里的中文抠数字：那条提示会被
+      // 在线层回落/关闭等别的分支覆盖，从文案里正则取数非常脆（本轮就吃过这个亏）。
+      buildingsStats: state.lastBuildingsStats || null,
+      pendingPrimitive: !!state.pendingPrimitive,
       switchNote: dom.switchNote ? dom.switchNote.textContent : null,
       // 在线实景那条链路（默认图层）的取证：断网/无令牌/令牌过期都只能从
       // phase 与 detail 分辨，光看画面是"没有建筑"还是"建筑没加载出来"分不清。
