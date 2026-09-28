@@ -44,6 +44,15 @@ START_TIME_UTC = "2026-09-15T00:00:00Z"
 # intent_predict.fill_carried），并在数据里标注为沿用而非新判定。
 INTENT_PREDICT_STRIDE = 8
 
+# Hard cap on how many frames the model is scored on. The stride alone does not
+# bound the cost, because per-frame feature extraction walks road geometry and
+# per-target neighbour scans: measured, the 16-target landing case did not finish
+# `build_dataset` within 800 s at stride 8 (181 scored ticks x 16 targets), which
+# left `web/data/taiwan_landing.json` ungenerated. The cap is applied on top of the
+# stride so a case with more targets automatically coarsens instead of silently
+# blowing up the build time. 40 scored frames is ~20 min of playback apart.
+INTENT_MAX_PREDICT_TICKS = 40
+
 # How long a candidate must stay below the threshold before it is permanently
 # barred, expressed in **ticks** (30 s each) rather than in scored frames, so the
 # meaning survives a change of stride.
@@ -1097,7 +1106,14 @@ def build_dataset(case=None) -> dict:
             # resolve to ~48 samples/min of playback, well above what the UI can
             # show, and the model's own temporal contraction is unaffected because
             # the stride is uniform and the projection still runs in tick order.
+            # Bound the scored-frame count on top of the stride: with many targets
+            # the per-frame cost dominates, and an unbounded count silently turns
+            # into an unusable build time rather than a visible error.
             pred_ticks = list(range(0, len(frames), INTENT_PREDICT_STRIDE))
+            if len(pred_ticks) > INTENT_MAX_PREDICT_TICKS:
+                step = len(pred_ticks) / float(INTENT_MAX_PREDICT_TICKS)
+                pred_ticks = [pred_ticks[int(i * step)]
+                              for i in range(INTENT_MAX_PREDICT_TICKS)]
             # `reentry_grace` is counted in *scored* frames, so with a stride it
             # spans stride x grace ticks of real time. At stride 8 the default
             # grace of 2 bars a candidate after only 16 ticks, and measured on the
@@ -1113,7 +1129,10 @@ def build_dataset(case=None) -> dict:
             intent_predict_mod.fill_carried(inferred["frames"], pred, order)
             intent_set_stats = pred["stats"]
             intent_set_stats["predicted_ticks"] = len(pred_ticks)
-            intent_set_stats["predict_stride"] = INTENT_PREDICT_STRIDE
+            intent_set_stats["predict_stride"] = (
+                pred_ticks[1] - pred_ticks[0] if len(pred_ticks) > 1
+                else INTENT_PREDICT_STRIDE)
+            intent_set_stats["max_predict_ticks"] = INTENT_MAX_PREDICT_TICKS
             intent_set_stats["reentry_grace"] = grace
     except Exception as e:  # noqa: BLE001
         # 模型链路是可选的；任何失败都退化为规则结果，但必须留下痕迹，
