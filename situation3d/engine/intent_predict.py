@@ -149,6 +149,9 @@ def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
     considered: Dict[str, set] = {}
     # codes barred at any point per target; `ever \ ever_dropped` only shrinks
     considered_dropped: Dict[str, set] = {}
+    # targets whose set has emptied at some point; an empty set is terminal (see
+    # the note where `dead` is written)
+    dead: set = set()
     no_reentry_events = 0
     size_series: Dict[str, List[int]] = {tid: [] for tid in order}
 
@@ -224,6 +227,18 @@ def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
                         ever_dropped.add(j)
                     eligible = eligible[:cap]
                 codes = eligible
+                # Once the set has emptied, it stays empty. Without this, an empty
+                # frame sets `prev = []`, which makes the cap `len(eligible)` on the
+                # next frame, so the set can grow from 0 to 1 - measured on the
+                # India case, H04 went 0 -> 1 at tick 760 with `ENCIRCLEMENT`, the
+                # single violation the generated dataset reported. Emitting nothing
+                # is not the same as having withdrawn a candidate, so the monotone
+                # guarantee has to treat "empty" as terminal rather than as a state
+                # the next frame may expand out of.
+                if not codes:
+                    dead.add(tid)
+                elif tid in dead:
+                    codes = []
 
                 # Bar a candidate only after it stays below the threshold for
                 # `reentry_grace` consecutive frames; counting strikes rather than
