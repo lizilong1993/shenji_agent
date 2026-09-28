@@ -123,7 +123,12 @@ CASES: List[DemoCase] = [
     ),
 ]
 
-DEFAULT_CASE_ID = "india_china_west"
+# The India-China case is registered and complete, but it cannot be the *default*
+# yet: the offline tile manifest still only covers the Taiwan Strait
+# (`bbox 115,18,125,29`), so opening the app on a Ladakh case would render an
+# untextured globe. Flip this once tools/fetch_assets.py has baked the
+# india_china theatre and the front end selects coverage per theatre.
+DEFAULT_CASE_ID = "joint_full"
 
 CASES_BY_ID: Dict[str, DemoCase] = {c.case_id: c for c in CASES}
 
