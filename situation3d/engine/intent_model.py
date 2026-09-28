@@ -57,7 +57,14 @@ MODEL_SCHEMA = "situation3d.intent_model.v1"
 # re-tune without touching code.
 LAMBDA_RANK = 1.0
 LAMBDA_CTR = 1.0
-LAMBDA_U = 1.0
+# Weight on the evidence-insufficiency term. `u` trains toward
+# `u* = 1 - 1/|C*|`, which for the observed 3-4 candidate sets is only ~0.69-0.75,
+# so with a weight of 1.0 the head sits mid-range and cannot raise delta enough to
+# widen the prediction sets. Measured, the model produced 76.9% singletons against
+# the CES target's 7.4%, i.e. it commits far earlier than the evidence supports.
+# The term is up-weighted so the contraction schedule is driven by `u` rather than
+# overridden by the compatibility term's tendency to saturate individual scores.
+LAMBDA_U = 3.0
 RANK_MARGIN = 0.1
 TAU = 0.05          # soft-cardinality temperature, as specified
 # L2 on the compatibility weights. Raised from 1e-4 after measuring the trained
@@ -329,9 +336,15 @@ class IntentModel(object):
                     gb[zi] += ds
 
                 # ---- L_u: BCE of u against u_star ----
+                # `LAMBDA_U` must be applied here. It was previously declared and
+                # used only in the reported loss total, so the gradient carried
+                # weight 1.0 regardless of the constant: the u head was nominally
+                # tunable but actually fixed. Eq. total writes the term as
+                # `lambda_u L_u`, so an unwired weight silently changes the
+                # objective the model is trained on.
                 tot_u += -(u_star * math.log(max(1e-12, u))
                            + (1 - u_star) * math.log(max(1e-12, 1 - u)))
-                du += (u - u_star)
+                du += LAMBDA_U * (u - u_star)
 
                 # ---- L_rank: max over wrong intents, only where CES is a singleton
                 pos = [i for i in range(nz) if y[i] > 0.5]
