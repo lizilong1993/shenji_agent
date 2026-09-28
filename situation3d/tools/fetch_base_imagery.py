@@ -51,6 +51,10 @@ MERCATOR_LAT = 85.0511
 
 GLOBAL_IMAGERY_MAX = 6
 THEATRE_TERRAIN_MAX = 12      # 战区高程补到 z12（≈38 m/px，已贴近 30 m 源）
+# Theatre-wide imagery band. `fetch_assets.py --max-zoom` normally produces this
+# at z11; a theatre baked only through this tool needs its own regional imagery or
+# it ends up with terrain but no imagery.
+THEATRE_IMAGERY_MAX = 11
 HOTSPOT_IMAGERY_MAX = 12
 HOTSPOT_TERRAIN_MAX = 12
 URBAN_IMAGERY_MIN = 13        # 城区影像从 z13 起补到 z17
@@ -64,6 +68,52 @@ def load_module(name, path):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def tiles_for_bbox(bbox, min_z, max_z):
+    """XYZ tiles covering a WGS84 box, for dry-run sizing.
+
+    Local copy rather than an import: `fetch_assets.py` is executed as a
+    subprocess by this tool, and importing it would pull in its own argument
+    handling. The formula is the standard Web Mercator one.
+    """
+    import math
+    w, s, e, n = bbox
+    for z in range(min_z, max_z + 1):
+        n_tiles = 2 ** z
+        def xt(lon):
+            return int((lon + 180.0) / 360.0 * n_tiles)
+        def yt(lat):
+            lat = max(-MERCATOR_LAT, min(MERCATOR_LAT, lat))
+            r = math.radians(lat)
+            return int((1.0 - math.log(math.tan(r) + 1.0 / math.cos(r)) / math.pi)
+                       / 2.0 * n_tiles)
+        x0, x1 = xt(w), xt(e)
+        y0, y1 = yt(n), yt(s)
+        for x in range(min(x0, x1), max(x0, x1) + 1):
+            for y in range(min(y0, y1), max(y0, y1) + 1):
+                yield (z, x, y)
+
+
+def theatre_spec(theatre):
+    """Resolve a theatre name to its bbox and hotspot sources.
+
+    Without this the bake is single-theatre by construction: `hotspot_boxes()`
+    reads only `scenario.HOTSPOTS` (Taiwan Strait) and the theatre pass reads the
+    manifest's top-level `bbox`. Baking the India-China sector therefore needs an
+    explicit selector, or it would re-bake Taiwan and silently report success.
+
+    Returns (bbox, hotspot_boxes, urban_boxes).
+    """
+    sys.path.insert(0, ROOT)
+    from engine import scenario  # noqa: E402
+
+    if theatre == "india_china":
+        return (list(scenario.THEATRE_BBOXES["india_china"]),
+                [h["bbox"] for h in scenario.INDIA_CHINA_HOTSPOTS],
+                [])
+    return (list(scenario.THEATRE_BBOXES["taiwan_strait"]),
+            hotspot_boxes(), urban_boxes())
 
 
 def hotspot_boxes():
@@ -114,24 +164,47 @@ def main(argv):
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--only", default="all",
                     choices=["all", "global", "theatre", "hotspot", "urban"])
+    ap.add_argument("--theatre", default="taiwan_strait",
+                    choices=["taiwan_strait", "india_china"],
+                    help="which theatre to bake; selects its bbox and hotspots")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="print the tile counts per pass without downloading")
     args = ap.parse_args(argv[1:])
 
     only = args.only
-    hot = hotspot_boxes()
-    urb = urban_boxes()
+    tb, hot, urb = theatre_spec(args.theatre)
+    print("theatre      : %s  bbox=%s  hotspots=%d  urban=%d"
+          % (args.theatre, tb, len(hot), len(urb)))
+    if args.dry_run:
+        total = 0
+        for fam, boxes, lo, hi, label in (
+                ("imagery", [-180.0, -MERCATOR_LAT, 180.0, MERCATOR_LAT], 0,
+                 GLOBAL_IMAGERY_MAX, "全球底图"),
+                ("terrain", tb, 11, THEATRE_TERRAIN_MAX, "战区高程"),
+                ("imagery", tb, 11, THEATRE_IMAGERY_MAX, "战区影像"),
+        ):
+            n = sum(len(list(tiles_for_bbox(boxes, lo, hi))) for _ in (0,))
+            total += n
+            print("  %-10s z%d-%d  %6d tiles" % (label, lo, hi, n))
+        hn = sum(len(list(tiles_for_bbox(b, 0, HOTSPOT_IMAGERY_MAX))) for b in hot)
+        tn = sum(len(list(tiles_for_bbox(b, 11, HOTSPOT_TERRAIN_MAX))) for b in hot)
+        total += hn + tn
+        print("  %-10s z0-%d  %6d tiles" % ("热点影像", HOTSPOT_IMAGERY_MAX, hn))
+        print("  %-10s z11-%d %6d tiles" % ("热点高程", HOTSPOT_TERRAIN_MAX, tn))
+        print("  TOTAL (excluding global, which is shared): %d tiles" % total)
+        return 0
 
     # ---- 1. 全球影像 ----
     if only in ("all", "global"):
         run_fetch("imagery", [-180.0, -MERCATOR_LAT, 180.0, MERCATOR_LAT],
                   0, GLOBAL_IMAGERY_MAX, args.workers, "全球底图")
 
-    # ---- 2. 战区高程（影像已由 fetch_assets.py 下到 z11） ----
+    # ---- 2. 战区影像与高程 ----
     if only in ("all", "theatre"):
-        man = {}
-        if os.path.exists(MANIFEST):
-            with open(MANIFEST, "r", encoding="utf-8") as fh:
-                man = json.load(fh)
-        tb = man.get("bbox") or [115.0, 18.0, 125.0, 29.0]
+        # The theatre's own imagery band. Previously the imagery above z11 was
+        # produced by `fetch_assets.py`, so a theatre baked only through this tool
+        # had terrain but no regional imagery.
+        run_fetch("imagery", tb, 11, THEATRE_IMAGERY_MAX, args.workers, "战区影像")
         run_fetch("terrain", tb, 11, THEATRE_TERRAIN_MAX, args.workers, "战区高程")
 
     # ---- 3. 热点区域：影像 z12 + 高程 z11-12 ----

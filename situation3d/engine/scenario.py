@@ -770,6 +770,16 @@ def targets_for(case) -> List[Target]:
 
 INDIA_CHINA_REGION = "中印边境西段（拉达克）"
 
+# Theatre bounding boxes (west, south, east, north). Single source for the tools
+# that must bake or route per theatre: `tools/fetch_base_imagery.py` (offline
+# imagery/terrain) and `tools/fetch_roads.py`. Kept here rather than duplicated in
+# each tool because the two theatres are disjoint, and a bake that picks the wrong
+# box silently re-bakes the other theatre and reports success.
+THEATRE_BBOXES = {
+    "taiwan_strait": (115.5, 20.0, 122.5, 26.5),
+    "india_china": (77.0, 31.5, 81.5, 36.5),
+}
+
 INDIA_CHINA_HOTSPOT_BOXES = [
     ("加勒万河谷", (78.50, 34.60, 78.80, 34.85), "2020 年冲突点", "valley"),
     ("班公湖", (78.45, 33.45, 79.10, 33.95), "摩擦点/脱离接触区", "lake"),
