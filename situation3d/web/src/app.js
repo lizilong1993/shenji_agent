@@ -1242,11 +1242,22 @@ function updateInferenceUi() {
     // continent.
     const declared = (state.data && state.data.phases) || [];
     const ph = (declared.length && fr) ? fr.phase : null;
+    // Per-unit phase comes precomputed from the engine (`frame.unit_phase`). A unit
+    // may lag the operation (still crossing while the first wave is ashore) or have
+    // finished (a transport holds at 航渡). That lag is the point of showing it, so
+    // it sits beside the operation's stage rather than replacing it. The cap rule
+    // deliberately is NOT re-derived here: it depends on the engine's
+    // `PHASE_TARGETS` table, and a second copy would drift.
+    const up = (ph && state.selected && fr.unit_phase)
+      ? fr.unit_phase[state.selected] : null;
+    const lags = up && up.id && up.id !== ph.id;
     dom.levelPhase.textContent = ph
-      ? (ph.name + ' ' + (ph.index + 1) + '/' + (ph.count || declared.length))
+      ? (ph.name + ' ' + (ph.index + 1) + '/' + (ph.count || declared.length)
+         + (lags ? ' · 该目标：' + up.name : ''))
       : '';
     dom.levelPhase.title = ph
-      ? ('本阶段已持续 ' + ph.ticks_in + ' 帧（自第 ' + ph.since_tick + ' 帧）')
+      ? ('本阶段已持续 ' + ph.ticks_in + ' 帧（自第 ' + ph.since_tick + ' 帧）'
+         + (lags ? '；所选目标仍处于「' + up.name + '」，落后于作战阶段' : ''))
       : '该战区未定义阶段';
   }
 
@@ -1607,6 +1618,10 @@ function selectTarget(id, fly) {
   syncSelection();
   renderTargetList();
   renderTargetPanel(id);
+  // The banner shows the operation's phase plus the selected unit's own phase when
+  // the two differ, so it has to be refreshed on selection - otherwise picking a
+  // unit that lags leaves the previous unit's comparison on screen.
+  updateInferenceUi();
   markScene('selectTarget');
 }
 

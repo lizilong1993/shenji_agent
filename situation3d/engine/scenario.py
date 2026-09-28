@@ -780,6 +780,13 @@ def build_frames(targets: Optional[List[Target]] = None,
             # Operation phase, attached to every frame so the front end can label
             # the situation without re-deriving the timeline.
             "phase": phase_at(tick),
+            # Per-unit phase ids. A unit may lag the operation (still crossing while
+            # the first wave is ashore) or have finished (a transport holds at 航渡
+            # rather than being carried into 向内陆夺控). Precomputed here so the cap
+            # rule lives in one place.
+            "unit_phase": {
+                t.target_id: unit_phase_name(tick, t.target_id) for t in targets
+            },
             "targets": state,
         })
 
@@ -954,13 +961,69 @@ LANDING_PHASES = [
     ("inland", "向内陆夺控", 1320),
 ]
 
+# Which units take part in each phase. Declared once here rather than as a field on
+# every target, because it is the *operation's* structure, and because a unit that
+# is still in an earlier phase than the operation is the interesting case: it shows
+# as a phase lag rather than being flattened into the operation label.
+PHASE_TARGETS = {
+    # loading at the assembly anchorage
+    "assembly": ("R03", "R08", "R09", "R10"),
+    # crossing the strait under escort and air cover
+    "transit": ("R01", "R02", "R03", "R06", "R07", "R08", "R09", "B01", "B02", "B04", "B05"),
+    # ship-to-shore: the amphibious lift and its close support. R03 (the supply
+    # ship) is deliberately absent - it stays with the fleet and is capped at 航渡.
+    "transfer": ("R02", "R08", "R09", "R10", "B01", "B02"),
+    # the beach assault itself
+    "assault": ("R09", "R10", "R06", "B02", "B04", "B06"),
+    # holding the beachhead
+    "consolidate": ("R09", "R10", "R05", "B04", "B06"),
+    # pushing inland
+    "inland": ("R09", "R06", "B06"),
+}
 
-def phase_at(tick: int) -> dict:
+
+def unit_phase_ids(target_id: str) -> Optional[str]:
+    """The last phase a unit takes part in, or None if it takes part in none.
+
+    Exposed so the frame builder can precompute each unit's phase instead of the
+    front end re-deriving it: the cap depends on `PHASE_TARGETS`, and duplicating
+    that rule in JavaScript would let the two drift apart silently.
+    """
+    last = None
+    for pid, _name, _start in LANDING_PHASES:
+        if target_id in PHASE_TARGETS.get(pid, ()):
+            last = pid
+    return last
+
+
+def unit_phase_name(tick: int, target_id: str) -> dict:
+    """A unit's phase at `tick`: the operation's stage, capped at the last phase the
+    unit takes part in."""
+    op = phase_at(tick)
+    cap = unit_phase_ids(target_id)
+    if cap is None:
+        return {"id": None, "name": "不参与登陆", "index": -1}
+    names = {p[0]: (i, p[1]) for i, p in enumerate(LANDING_PHASES)}
+    ci, cname = names[cap]
+    if op["index"] <= ci:
+        return {"id": op["id"], "name": op["name"], "index": op["index"]}
+    return {"id": cap, "name": cname, "index": ci}
+
+
+def phase_at(tick: int, target_ids: Optional[Sequence[str]] = None) -> dict:
     """Which landing phase a tick falls in.
 
     Returns `{"id", "name", "index", "since_tick", "ticks_in"}`. `ticks_in` lets the
     UI show how long the operation has been in this stage, which is the readable
     counterpart to the intent set's own contraction.
+
+    When `target_ids` is given, the phase is reported from that unit's point of
+    view: a phase the unit does not participate in is not "its" phase, even while
+    the operation as a whole is in it. That matters for the reason per-unit phases
+    exist at all - **a unit still in a phase the operation has left is behind
+    schedule**, and with a single operation-level label that fact is invisible.
+    A convoy still crossing the strait while the first wave is ashore is exactly the
+    kind of thing a situation display should surface, not hide.
     """
     idx = 0
     for i, (_pid, _name, start) in enumerate(LANDING_PHASES):
@@ -968,6 +1031,19 @@ def phase_at(tick: int) -> dict:
             idx = i
         else:
             break
+    if target_ids:
+        want = set(target_ids)
+        # Phases this unit takes part in. Participation is not necessarily
+        # contiguous, but for a landing operation it is: 航渡 precedes 换乘 which
+        # precedes 抢滩, and the phases a unit is *not* listed in are the ones after
+        # it has finished. So the unit's phase advances while the operation is in a
+        # phase it takes part in, and is then capped at the last such phase - a
+        # transport that has delivered its load holds at 航渡 instead of being
+        # carried along into 向内陆夺控, and does not read as permanently stuck.
+        active = [i for i, (pid_j, _n, _s) in enumerate(LANDING_PHASES)
+                  if any(tid in want for tid in PHASE_TARGETS.get(pid_j, ()))]
+        if active:
+            idx = min(idx, active[-1])
     pid, name, start = LANDING_PHASES[idx]
     return {
         "id": pid,
