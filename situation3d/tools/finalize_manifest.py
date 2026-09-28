@@ -61,6 +61,10 @@ def main(argv) -> int:
                     help="theatre-wide west,south,east,north")
     ap.add_argument("--max-zoom", type=int, default=None,
                     help="override the theatre-wide imagery/terrain/wsf3d max zoom")
+    ap.add_argument("--theatre", default=None,
+                    help="record this bbox under `theatres[NAME]` so the front end "
+                         "can switch coverage per case (e.g. taiwan_strait, "
+                         "india_china)")
     args = ap.parse_args(argv[1:])
     args.bbox = [float(v) for v in args.bbox.split(",")]
     if len(args.bbox) != 4:
@@ -103,6 +107,25 @@ def main(argv) -> int:
             "wsf3d": count_tiles(TILES, os.path.join("wsf3d", "buildingheight")),
         }
         man["tile_count"] = sum(man["tile_counts"].values())
+
+    # Per-theatre coverage. The two theatres are disjoint (Taiwan Strait and the
+    # India-China western sector), so a single `bbox` cannot describe both: one
+    # box spanning them covers most of Asia, and the front end would then declare
+    # regional imagery across a rectangle with no tiles and chase 404s.
+    # `--theatre NAME` records this run's box under that name; the front end reads
+    # `theatres` and falls back to a built-in table when it is absent.
+    if args.theatre:
+        theatres = man.setdefault("theatres", {})
+        prev_t = theatres.get(args.theatre) or {}
+        cov = dict(prev_t.get("coverage") or {})
+        for family in ("imagery", "terrain", "wsf3d"):
+            if family in man:
+                cov[family] = {"min_zoom": man[family].get("min_zoom", 0),
+                               "max_zoom": man[family].get("max_zoom")}
+        theatres[args.theatre] = {"bbox": list(args.bbox), "coverage": cov}
+        man["coverage_note"] = (
+            (man.get("coverage_note") or "")
+            + " 战区 %s bbox=%s。" % (args.theatre, list(args.bbox)))
     man["coverage_note"] = (
         "影像 z0-%d 覆盖 bbox；高程 z0-%d；WSF3D z0-%d。城区（URBAN_AOI）"
         "另有影像 z%d-%d 与 WSF3D z%d。前端 provider 的 rectangle 取自这里，"

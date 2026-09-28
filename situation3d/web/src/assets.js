@@ -301,15 +301,98 @@
     return layers;
   }
 
+  /**
+   * Theatre bounding boxes, for when the manifest does not carry them.
+   *
+   * Two theatres are disjoint (Taiwan Strait and the India-China western sector),
+   * and a single manifest `bbox` covering both would span most of Asia, so the
+   * offline providers would declare coverage over a vast area with no tiles and
+   * spend the session on 404s. Each provider therefore takes the *active*
+   * theatre's box, which `setTheatre` switches when a case is loaded.
+   *
+   * Kept in sync with `engine/scenario.py` (INDIA_CHINA_HOTSPOT_BOXES /
+   * `_HOTSPOT_BOXES`) and `tools/fetch_roads.py` THEATRES. The manifest wins when
+   * it provides `theatres`, so baking a theatre updates the front end without a
+   * code change; this table is the fallback that keeps the app working before the
+   * manifest has been regenerated.
+   */
+  var THEATRE_BBOX = {
+    taiwan_strait: [115.5, 20.0, 122.5, 26.5],
+    india_china: [77.0, 31.5, 81.5, 36.5],
+  };
+  var activeTheatre = 'taiwan_strait';
+
+  function theatreList() {
+    var m = manifest();
+    if (m.theatres && typeof m.theatres === 'object') {
+      var out = {};
+      Object.keys(m.theatres).forEach(function (k) {
+        var t = m.theatres[k] || {};
+        if (Array.isArray(t.bbox) && t.bbox.length === 4) out[k] = t.bbox;
+      });
+      if (Object.keys(out).length) return out;
+    }
+    return THEATRE_BBOX;
+  }
+
+  function getTheatre() { return activeTheatre; }
+
+  /**
+   * Select the theatre whose coverage the regional layers should use.
+   *
+   * Returns the previous name so the caller can skip a rebuild when a case is
+   * reloaded for the same theatre.
+   */
+  function setTheatre(name) {
+    var prev = activeTheatre;
+    if (name && theatreList()[name]) activeTheatre = name;
+    return prev;
+  }
+
+  function theatreBbox(name) {
+    var list = theatreList();
+    return list[name || activeTheatre] || manifest().bbox;
+  }
+
+  /**
+   * Does a hotspot box intersect the active theatre?
+   *
+   * NOT currently used to filter the mounted hotspot layers, and that is
+   * deliberate rather than an oversight. `manifest.hotspot_imagery.boxes` are
+   * anonymous coordinate arrays (no names), and the Taiwan case intentionally
+   * keeps four hotspots *outside* its theatre box - 三亚, 冲绳岛, 关岛, 羽田 -
+   * which the code comments call out as reachable only through this layer. A
+   * bounding-box filter therefore cannot tell "hotspot of the other theatre" from
+   * "hotspot deliberately outside this theatre", and applying it hid four
+   * intended layers.
+   *
+   * The leak it was meant to fix is real: measured, switching to the Ladakh case
+   * left ten Taiwan Strait hotspot providers mounted and requesting tiles at
+   * 117-145E. The fix requires hotspot identity, so the next step is to have
+   * `tools/finalize_manifest.py` emit `hotspot_imagery.boxes` as
+   * `{name, bbox}` (it already knows the names) and to select boxes by the case's
+   * declared `hotspot_names` instead of by geometry. This helper is kept for that
+   * change and for callers that only have a box.
+   */
+  function boxInTheatre(bbox) {
+    if (!bbox || bbox.length !== 4) return true;
+    var t = theatreBbox();
+    if (!t || t.length !== 4) return true;
+    var overlap = !(bbox[2] < t[0] || bbox[0] > t[2] || bbox[3] < t[1] || bbox[1] > t[3]);
+    return overlap;
+  }
+
   function createImageryProvider() {
     const m = manifest();
+    // Regional imagery is restricted to the active theatre, not the manifest bbox.
+    const bbox = theatreBbox();
     const provider = new Cesium.UrlTemplateImageryProvider({
       url: IMAGERY_URL,
       tilingScheme: new Cesium.WebMercatorTilingScheme(),
       minimumLevel: m.imagery.min_zoom || 0,
       maximumLevel: m.imagery.max_zoom || 11,
       // 关键：声明真实覆盖范围，域外不再发请求。
-      rectangle: aoiRectangle(m.bbox),
+      rectangle: aoiRectangle(bbox),
       credit: 'Esri World Imagery (Maxar / Earthstar Geographics)',
     });
     // 走前端缓存：取过的瓦片不再回服务器。
@@ -555,7 +638,7 @@
       tilingScheme: new Cesium.WebMercatorTilingScheme(),
       minimumLevel: 0,
       maximumLevel: m.wsf3d.max_zoom || 10,
-      rectangle: aoiRectangle(m.bbox),
+      rectangle: aoiRectangle(theatreBbox()),
       credit: 'World Settlement Footprint 3D v02, DLR EOC',
     });
     return attachCached(provider, template);
@@ -1038,6 +1121,13 @@
     instrument: instrument,
     newStats: newStats,
     createImageryProvider: createImageryProvider,
+    // Theatre selection: regional imagery/WSF3D rectangles follow the active
+    // theatre, so loading a Ladakh case stops the Taiwan Strait box from being
+    // declared (and vice versa).
+    setTheatre: setTheatre,
+    getTheatre: getTheatre,
+    theatreBbox: theatreBbox,
+    theatreList: theatreList,
     createGlobalImageryProvider: createGlobalImageryProvider,
     createTiandituProvider: createTiandituProvider,
     createTiandituLabelProvider: createTiandituLabelProvider,

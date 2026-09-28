@@ -522,6 +522,69 @@ function loadCase(caseId) {
  * 取数据与装载数据分开，两条来源共用装载逻辑，就不会出现"案例能跑、自建态势
  * 少初始化了某样东西"的偏差。
  */
+/**
+ * Remount the hotspot imagery layers for the current theatre.
+ *
+ * They are built once in `initViewer` from `base.json`, which is case-independent,
+ * so after a theatre switch the previous theatre's boxes stay mounted and keep
+ * requesting tiles - measured: ten Taiwan Strait hotspots (三亚/冲绳/关岛/羽田…,
+ * 117-145E) still mounted while showing Ladakh. The provider filter in
+ * `attachHotspotImagery` decides which boxes belong to the active theatre; this
+ * rebuilds the set.
+ */
+function remountHotspotImagery() {
+  if (!viewer || !window.OfflineAssets) return 0;
+  (state.hotspotLayers || []).forEach(function (L) {
+    try { viewer.imageryLayers.remove(L, true); } catch (e) { /* already gone */ }
+  });
+  const hboxes = (OfflineAssets.manifest().hotspot_imagery || {}).boxes || [];
+  state.hotspotLayers = OfflineAssets.attachHotspotImagery(viewer, hboxes);
+  registerImagerySlot('hotspot.imagery', state.hotspotLayers);
+  return state.hotspotLayers.length;
+}
+
+/**
+ * Point the offline regional layers at the case's theatre.
+ *
+ * The two theatres (Taiwan Strait, India-China western sector) are disjoint, and
+ * a single manifest bounding box covering both would span most of Asia: the
+ * providers would advertise imagery across that whole rectangle and spend the
+ * session chasing tiles that were never baked. Rebuilding the region layer on a
+ * theatre change keeps the declared rectangle equal to what actually exists.
+ *
+ * The global basemap is deliberately *not* rebuilt - its coverage is global at
+ * low zoom and is shared by both theatres.
+ */
+function switchTheatre(theatre) {
+  if (!theatre || !window.OfflineAssets || !OfflineAssets.setTheatre) return;
+  const prev = OfflineAssets.setTheatre(theatre);
+  if (prev === theatre) return;
+  if (!viewer || !state.imageryLayer) return;
+  try {
+    const wasShown = state.imageryLayer.show;
+    viewer.imageryLayers.remove(state.imageryLayer, true);
+    state.imageryLayer = viewer.imageryLayers.addImageryProvider(
+      OfflineAssets.instrument(OfflineAssets.createImageryProvider(),
+                               state.imageryStats));
+    state.imageryLayer.show = wasShown;
+    registerImagerySlot('imagery.offline', [state.globalLayer, state.imageryLayer]);
+    // Hotspot layers belong to a theatre too, so they are rebuilt here rather
+    // than left pointing at the previous one.
+    remountHotspotImagery();
+    if (state.layers && state.layers.imagery !== undefined) {
+      state.imageryLayer.show = !!state.layers.imagery;
+    }
+    markScene('switchTheatre');
+  } catch (e) {
+    // A failed rebuild must not abort loading the case: the data, targets and
+    // panels are independent of the basemap rectangle. Report it on the status
+    // bar and console rather than swallowing it, because "no imagery" and
+    // "imagery announced over the wrong rectangle" look identical on screen.
+    setStatus('战区影像层重建失败：' + e.message, 'warn');
+    if (window.console && console.warn) console.warn('switchTheatre failed', e);
+  }
+}
+
 function applySituationData(data, caseId) {
   {
       if (!data.frames || !data.frames.length) throw new Error('态势数据为空');
@@ -537,6 +600,10 @@ function applySituationData(data, caseId) {
       state.activeHotspot = -1;
       state.geoPinned = false;
       state.buildingsAoi = -1;
+      // Switch the theatre *before* any provider is built for the new case.
+      // Two theatres are disjoint, so the regional imagery/WSF3D rectangles must
+      // follow the case or the app declares coverage over the wrong continent.
+      switchTheatre(data.theatre);
       markScene('applySituationData');
       // 数据集自带本体的压缩形态，优先用它（离线可用），接口只是兜底。
       if (window.IntentUi) IntentUi.adoptFromModel(state.data && state.data.inference_model);
