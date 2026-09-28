@@ -523,22 +523,73 @@ function loadCase(caseId) {
  * 少初始化了某样东西"的偏差。
  */
 /**
- * Remount the hotspot imagery layers for the current theatre.
+ * Remount the hotspot imagery layers for the current case's theatre.
  *
- * They are built once in `initViewer` from `base.json`, which is case-independent,
- * so after a theatre switch the previous theatre's boxes stay mounted and keep
- * requesting tiles - measured: ten Taiwan Strait hotspots (三亚/冲绳/关岛/羽田…,
- * 117-145E) still mounted while showing Ladakh. The provider filter in
- * `attachHotspotImagery` decides which boxes belong to the active theatre; this
- * rebuilds the set.
+ * They are built once in `initViewer` from `manifest.hotspot_imagery.boxes`, which
+ * is case-independent, so after switching to the Ladakh case the ten Taiwan Strait
+ * hotspot providers stayed mounted and kept requesting tiles at 117-145E.
+ *
+ * Select by **identity, not geometry**. A bounding-box test cannot do this job:
+ * `manifest.hotspot_imagery.boxes` are anonymous coordinate arrays, and the Taiwan
+ * case deliberately keeps four hotspots *outside* its theatre box (三亚, 冲绳岛,
+ * 关岛, 羽田) that the code comments say are reachable only through this layer, so
+ * filtering by box would hide four intended layers.
+ *
+ * The case dataset, however, carries `hotspots[].name` and `.bbox`, so the boxes
+ * the app should mount can be derived by matching those bboxes against the
+ * manifest's list. Boxes matching no declared hotspot belong to another theatre
+ * and are skipped.
  */
 function remountHotspotImagery() {
   if (!viewer || !window.OfflineAssets) return 0;
   (state.hotspotLayers || []).forEach(function (L) {
     try { viewer.imageryLayers.remove(L, true); } catch (e) { /* already gone */ }
   });
-  const hboxes = (OfflineAssets.manifest().hotspot_imagery || {}).boxes || [];
-  state.hotspotLayers = OfflineAssets.attachHotspotImagery(viewer, hboxes);
+
+  const boxes = (OfflineAssets.manifest().hotspot_imagery || {}).boxes || [];
+  const declared = (state.data && state.data.hotspots) || [];
+  let want = boxes;
+
+  if (declared.length) {
+    const key = function (b) {
+      return [b[0], b[1], b[2], b[3]].map(function (v) {
+        return Math.round(Number(v) * 1000) / 1000;
+      }).join(',');
+    };
+    const wanted = {};
+    declared.forEach(function (h) { if (h && h.bbox) wanted[key(h.bbox)] = h.name; });
+    const matched = boxes.filter(function (b) { return wanted[key(b)] !== undefined; });
+    if (matched.length) {
+      want = matched;
+    } else {
+      // No coordinate match: mount everything rather than nothing. Hiding
+      // hotspots would look identical to "this case has no hotspots", and the
+      // manifest and dataset come from different tools so a rounding mismatch is
+      // plausible.
+      //
+      // Measured, this branch is what currently runs for the Ladakh case, because
+      // that theatre's hotspots have not been baked into the manifest at all
+      // (`manifest.hotspot_imagery.boxes` holds 9 Taiwan boxes and 0 of the 7
+      // declared Ladakh ones, so the match count is 0). The ten Taiwan providers
+      // therefore stay mounted while the Ladakh case is shown. That is a
+      // consequence of the missing bake, not of this selection logic: once
+      // `fetch_base_imagery.py` has baked the india_china parks, the boxes will
+      // exist, the match will succeed and only the declared ones will mount.
+      state.hotspotMatch = { declared: declared.length, boxes: boxes.length,
+                             matched: 0, fallback: true };
+      if (window.console && console.warn) {
+        console.warn('no manifest hotspot box matches this case\'s declared '
+                     + 'hotspots (' + declared.length + ' declared, ' + boxes.length
+                     + ' in manifest); mounting all. Expected until the theatre '
+                     + 'has been baked.');
+      }
+    }
+  } else {
+    state.hotspotMatch = { declared: 0, boxes: boxes.length, matched: boxes.length,
+                           fallback: false };
+  }
+
+  state.hotspotLayers = OfflineAssets.attachHotspotImagery(viewer, want);
   registerImagerySlot('hotspot.imagery', state.hotspotLayers);
   return state.hotspotLayers.length;
 }
@@ -558,8 +609,17 @@ function remountHotspotImagery() {
 function switchTheatre(theatre) {
   if (!theatre || !window.OfflineAssets || !OfflineAssets.setTheatre) return;
   const prev = OfflineAssets.setTheatre(theatre);
-  if (prev === theatre) return;
-  if (!viewer || !state.imageryLayer) return;
+  const changed = prev !== theatre;
+  if (changed && (!viewer || !state.imageryLayer)) return;
+  if (!changed) {
+    // The theatre is unchanged, but the *case* may differ and the hotspot layer is
+    // selected from the case's declared hotspots. Without this, the first load of
+    // a non-default case kept the previously mounted hotspot set (measured: the
+    // Ladakh case showed 9 Taiwan hotspot providers because the initial mount in
+    // `initViewer` is case-independent and this path returned early).
+    remountHotspotImagery();
+    return;
+  }
   try {
     const wasShown = state.imageryLayer.show;
     viewer.imageryLayers.remove(state.imageryLayer, true);
@@ -600,9 +660,10 @@ function applySituationData(data, caseId) {
       state.activeHotspot = -1;
       state.geoPinned = false;
       state.buildingsAoi = -1;
-      // Switch the theatre *before* any provider is built for the new case.
-      // Two theatres are disjoint, so the regional imagery/WSF3D rectangles must
-      // follow the case or the app declares coverage over the wrong continent.
+      // Switch the theatre *after* `state.data` is set and *before* any provider
+      // is built for the new case. Both halves matter: the regional imagery/WSF3D
+      // rectangles must follow the case, and the hotspot layer selection reads
+      // `state.data.hotspots`, which is empty until the assignment above.
       switchTheatre(data.theatre);
       markScene('applySituationData');
       // 数据集自带本体的压缩形态，优先用它（离线可用），接口只是兜底。
@@ -2781,6 +2842,10 @@ window.SituationHost = {
   // 图层顺序取证：imagery 的真实 index 顺序 + 每个图层的意图/事实。
   // 「哪个层压在哪个层上面」光看画面猜不出来，必须能读到 index。
   debugLayers: debugLayers,
+  // 热点层选框结果：declared=案例声明的热点数，boxes=manifest 里的框数，
+  // matched=按坐标匹配上的数量，fallback=true 表示没匹配上而全挂（战区未烘制时如此）。
+  // 没有这个读数时，"热点层挂错战区"与"该战区还没烘制"看起来完全一样。
+  hotspotMatch: function () { return state.hotspotMatch || null; },
   // 意图链路取证：本体是否加载、当前帧每目标的意图集合与状态、判不出的原因。
   debugIntent: debugIntent,
   applyLayers: applyLayers,
