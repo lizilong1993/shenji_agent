@@ -1234,10 +1234,16 @@ function updateInferenceUi() {
   // 所以阶段与等级、意图并列显示，而不是让人自己去推时间轴。
   if (dom.levelPhase) {
     const fr = state.data && state.data.frames && state.data.frames[state.tick];
-    const ph = fr && fr.phase;
-    const total = (state.data && state.data.phases && state.data.phases.length) || 0;
+    // Gate on the dataset *declaring* phases. The engine attaches a phase to every
+    // frame for the Taiwan landing operation, and the India-China case legitimately
+    // declares none (a standing confrontation has no landing sequence) - but its
+    // frames still carry the field, so reading `fr.phase` alone displayed
+    // "集结装载 1/6" on the Ladakh case: a Taiwan landing stage on the wrong
+    // continent.
+    const declared = (state.data && state.data.phases) || [];
+    const ph = (declared.length && fr) ? fr.phase : null;
     dom.levelPhase.textContent = ph
-      ? (ph.name + ' ' + (ph.index + 1) + '/' + (ph.count || total))
+      ? (ph.name + ' ' + (ph.index + 1) + '/' + (ph.count || declared.length))
       : '';
     dom.levelPhase.title = ph
       ? ('本阶段已持续 ' + ph.ticks_in + ' 帧（自第 ' + ph.since_tick + ' 帧）')
