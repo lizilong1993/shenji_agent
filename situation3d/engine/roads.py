@@ -49,6 +49,10 @@ MAX_SNAP_KM = 25.0
 # without exploding the frame payload.
 DEFAULT_VERTEX_SPACING_M = 3000.0
 
+# Sentinel for the distance cache, so a cached `None` ("no road within max_km")
+# is distinguishable from a cache miss.
+_MISS = object()
+
 
 class RoadError(ValueError):
     """Road data missing, malformed, or a route that cannot be satisfied."""
@@ -69,7 +73,7 @@ class Roads(object):
     """A loaded road network with routing."""
 
     __slots__ = ("theatre", "nodes", "ways", "adj", "speed", "meta",
-                 "_grid", "_cell", "comp", "comp_sizes", "_by_comp")
+                 "_grid", "_cell", "comp", "comp_sizes", "_by_comp", "_dist_cache")
 
     def __init__(self, doc: dict, grid_deg: float = 0.25):
         if doc.get("schema") != "situation3d.roads.v1":
@@ -140,6 +144,12 @@ class Roads(object):
         self._by_comp = {}
         for i, c in enumerate(comp):
             self._by_comp.setdefault(c, []).append(i)
+        # Cache for `distance_to_network_km`. Feature extraction asks the same
+        # question for every (target, frame) and again when predicting, and each
+        # answer walks thousands of grid nodes; on the India graph an uncached
+        # sampling pass took 223 s. Coordinates are rounded to ~11 m, which is far
+        # below the tolerance these distances are used at.
+        self._dist_cache = {}
 
         # Uniform grid for nearest-node lookup; a linear scan over 10^5 nodes per
         # query would dominate case generation.
@@ -198,10 +208,17 @@ class Roads(object):
         200 km search inspects far more of them than a 3 km one, which is the
         difference between minutes and seconds on a whole-dataset sweep.
         """
+        key = (round(lat, 4), round(lon, 4), max_km)
+        hit = self._dist_cache.get(key, _MISS)
+        if hit is not _MISS:
+            return hit
         i = self.nearest_node(lat, lon, max_km=max_km)
         if i is None:
-            return None
-        return _dist_m([lon, lat], self.nodes[i]) / 1000.0
+            out = None
+        else:
+            out = _dist_m([lon, lat], self.nodes[i]) / 1000.0
+        self._dist_cache[key] = out
+        return out
 
     # -- routing ----------------------------------------------------------
 

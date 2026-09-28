@@ -159,12 +159,59 @@ def intent_by_code(code: str, refresh: bool = False) -> Optional[dict]:
     return None
 
 
+def confusable_pairs(refresh: bool = False) -> set:
+    """Pairs the ontology's confusion matrix says are easy to *confuse*.
+
+    These are **not** mutually exclusive. The matrix exists to explain how to tell
+    two intents apart ("HOLD is area control over a designated objective; FORTIFY
+    is a posture"), so a decoder that treated them as exclusive would drop
+    legitimate co-occurring hypotheses. Use `conflict_pairs()` for exclusions.
+    """
+    out = set()
+    for entry in (_doc(refresh).get("confusion_matrix") or []):
+        pair = entry.get("pair") or entry.get("confusable_pair") or []
+        if isinstance(pair, (list, tuple)) and len(pair) == 2:
+            a, b = str(pair[0]), str(pair[1])
+            # The matrix carries a wildcard row, `['FIRE_SUPPORT', 'any primary
+            # intent']`, which states the secondary-only rule rather than a pair.
+            # Keeping it as a pair would create a tuple that can never match
+            # anything, i.e. silently dead code.
+            if a.startswith("any ") or b.startswith("any "):
+                continue
+            out.add((a, b))
+    return out
+
+
+def conflict_pairs(refresh: bool = False) -> set:
+    """Pairs of intents the ontology declares mutually exclusive.
+
+    Taken from each intent's own `conflicts_with` list, which is an
+    exclusivity declaration: ASSAULT cannot hold at the same time as RETREAT,
+    EVADE, HOLD or RECON. This is the set a decoder should use to prune.
+
+    Kept separate from `confusable_pairs()` on purpose. Folding the two together
+    (as an earlier build did) yields ~71 exclusion pairs, and because the two
+    relations are independent the closure then excludes almost every pair, so the
+    prediction set collapses to a singleton and the ambiguity the system exists to
+    express disappears. The asymmetry is easy to miss and expensive to get wrong.
+    """
+    out = set()
+    for i in intents(refresh):
+        code = i["code"]
+        for other in (i.get("conflicts_with") or []):
+            other = str(other)
+            if other and other != code and not other.startswith("any "):
+                out.add((code, other))
+    return out
+
+
 def secondary_only_codes(refresh: bool = False) -> List[str]:
     """Intents the ontology forbids as a standalone answer."""
     out = []
     for i in intents(refresh):
         if str(i.get("primary_vs_secondary", "")).startswith("secondary"):
             out.append(i["code"])
+    return out
     return out
 
 

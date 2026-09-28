@@ -747,10 +747,20 @@ def extract_target_features(tracks: Dict[str, TrackView], order: Sequence[str],
     f["net_speed_3_kmh"] = (d3 / W_SHORT) * 120.0
     f["net_speed_8_kmh"] = (d8 / W_MID) * 120.0
     f["net_speed_30_kmh"] = (d30 / W_LONG) * 120.0
-    f["path_ratio_8"] = (d8 / d8) if d8 <= 0 else min(10.0, d8 / max(1e-6, d8))
+    # Path length over net displacement: 1.0 means a straight transit, and higher
+    # values mean the platform wandered (loiter, patrol orbit, re-attack run).
+    # Both a stationary platform (no path) and one whose endpoints coincide have
+    # no meaningful ratio, and dividing by zero here previously crashed training
+    # outright -- the guard is explicit rather than relying on `max(1e-6, ...)`
+    # after the division has already happened.
+    f["path_ratio_8"] = 0.0
     if len(w8) >= 2:
         straight = geo.haversine_m(w8[0], w8[-1]) / 1000.0
-        f["path_ratio_8"] = min(10.0, d8 / max(1e-6, straight)) if straight > 0 else 1.0
+        if straight > 1e-6:
+            f["path_ratio_8"] = min(10.0, d8 / straight)
+        elif d8 > 1e-6:
+            # Returned to its own start: a closed loop, ratio is unbounded, so cap.
+            f["path_ratio_8"] = 10.0
     f["stationary_8"] = 1.0 if d8 < 2.0 else 0.0
     f["stationary_30"] = 1.0 if d30 < 5.0 else 0.0
 
