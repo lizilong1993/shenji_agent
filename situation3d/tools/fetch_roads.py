@@ -90,16 +90,23 @@ ROAD_CLASSES = ["motorway", "trunk", "primary", "secondary", "tertiary"]
 # they are the reason for the narrowing, not an arbitrary preference.
 THEATRES = {
     "taiwan_strait": {
-        "bbox": (117.5, 22.0, 122.0, 26.5),
+        "bbox": (115.5, 20.0, 122.5, 26.5),
         "route_bbox": (118.0, 22.5, 120.5, 26.0),
         "classes": ["trunk", "primary", "secondary"],
         "note": "台海：海峡与两岸沿海路网（陆军阶段在西岸，故路由图只取西岸走廊）",
     },
     "india_china": {
-        "bbox": (78.0, 32.0, 81.0, 36.0),
-        "route_bbox": (78.0, 32.0, 81.0, 36.0),
+        # route_bbox was (78.0, 32.0, 81.0, 36.0) and that silently clipped the
+        # theatre's own logistics hub: probed against the fetched graph, Leh
+        # (34.16N, 77.58E) snapped **35.10 km** from the nearest road because the
+        # box starts at 78.0E. A "pushed forward from Leh" narrative cannot stand
+        # on a network that does not reach Leh, and the intent layer reads road
+        # distance as evidence. Widened west/north to take in the Indus valley and
+        # the Srinagar-Leh approach.
+        "bbox": (77.0, 31.5, 81.5, 36.5),
+        "route_bbox": (77.0, 31.5, 81.5, 36.5),
         "classes": ["trunk", "primary", "secondary", "tertiary"],
-        "note": "中印边境西段：拉达克/加勒万—班公湖（路网稀疏，全部保留）",
+        "note": "中印边境西段：拉达克/加勒万—班公湖（含列城后勤枢纽）",
     },
 }
 

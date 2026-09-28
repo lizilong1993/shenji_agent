@@ -69,7 +69,7 @@ class Roads(object):
     """A loaded road network with routing."""
 
     __slots__ = ("theatre", "nodes", "ways", "adj", "speed", "meta",
-                 "_grid", "_cell")
+                 "_grid", "_cell", "comp", "comp_sizes", "_by_comp")
 
     def __init__(self, doc: dict, grid_deg: float = 0.25):
         if doc.get("schema") != "situation3d.roads.v1":
@@ -108,6 +108,38 @@ class Roads(object):
                 if bwd:
                     adj[b].append((a, m, kmh))
         self.adj = adj
+
+        # Weakly-connected components. Road networks along a disputed border are
+        # frequently *not* contiguous in OSM: the India-China graph splits into 52
+        # components whose largest holds only 35.5% of nodes, with Leh (comp 13),
+        # Chushul/Galwan (comp 16) and Depsang/DBO (comp 43) in three separate
+        # ones even though they are physically joined on the ground. Routing
+        # therefore has to know which component a node belongs to, or a
+        # geometrically nearest snap can land in a component with no path to the
+        # destination and the whole leg fails for a reason that looks like a data
+        # gap but is really a snapping choice.
+        comp = [-1] * len(self.nodes)
+        cid = 0
+        for s in range(len(self.nodes)):
+            if comp[s] != -1:
+                continue
+            comp[s] = cid
+            stack = [s]
+            while stack:
+                u = stack.pop()
+                for v, _m, _k in adj[u]:
+                    if comp[v] == -1:
+                        comp[v] = cid
+                        stack.append(v)
+            cid += 1
+        self.comp = comp
+        self.comp_sizes = {}
+        for c in comp:
+            self.comp_sizes[c] = self.comp_sizes.get(c, 0) + 1
+        # component -> member node indices, for snapping into a given component
+        self._by_comp = {}
+        for i, c in enumerate(comp):
+            self._by_comp.setdefault(c, []).append(i)
 
         # Uniform grid for nearest-node lookup; a linear scan over 10^5 nodes per
         # query would dominate case generation.
@@ -216,13 +248,44 @@ class Roads(object):
         """
         if not waypoints:
             return []
-        nodes = []
+        # First snap freely, then resolve components. Snapping each waypoint
+        # independently to "the nearest node" is not enough on a fragmented
+        # graph: the nearest node to a point on the Indus valley road can belong
+        # to a component that never connects to the next waypoint's component,
+        # and the leg then fails as if there were no road at all.
+        free = []
         for (lat, lon) in waypoints:
             i = self.nearest_node(lat, lon, max_km=max_snap_km)
             if i is None:
                 raise RoadError(
                     "waypoint (%.4f, %.4f) is more than %.0f km from any road in "
                     "the %s network" % (lat, lon, max_snap_km, self.theatre))
+            free.append(i)
+
+        # Pick the component that covers the most waypoints; that is the network
+        # the route actually travels on. Requiring a single component for *every*
+        # waypoint would reject a route whose start merely sits nearer a stray
+        # side road.
+        counts: Dict[int, int] = {}
+        for i in free:
+            c = self.comp[i]
+            counts[c] = counts.get(c, 0) + 1
+        best_comp = max(counts, key=lambda c: (counts[c], self.comp_sizes.get(c, 0)))
+
+        nodes = []
+        for (lat, lon) in waypoints:
+            i = self.nearest_node_in_component(lat, lon, best_comp, max_km=max_snap_km)
+            if i is None:
+                # The waypoint itself may sit closer to a stray component; retry
+                # with its own snap so the failure reports the real reason.
+                own = self.comp[free[len(nodes)]]
+                raise RoadError(
+                    "component mismatch in the %s network: no road within %.0f km of "
+                    "(%.4f, %.4f) in component %d (route is on component %d, %d nodes)"
+                    % (self.theatre, max_snap_km, lat, lon, best_comp, best_comp,
+                       self.comp_sizes.get(best_comp, 0))
+                    + (" [nearest node is in component %d]" % own
+                       if own != best_comp else ""))
             nodes.append(i)
 
         out = [self.node_latlon(nodes[0])]
@@ -237,6 +300,21 @@ class Roads(object):
             for i in path[1:]:
                 out.append(self.node_latlon(i))
         return out
+
+    def nearest_node_in_component(self, lat: float, lon: float, comp_id: int,
+                                  max_km: float = MAX_SNAP_KM) -> Optional[int]:
+        """Nearest node belonging to a specific component, else None."""
+        members = self._by_comp.get(comp_id)
+        if not members:
+            return None
+        best = None
+        best_m = None
+        limit_m = max_km * 1000.0
+        for i in members:
+            m = _dist_m([lon, lat], self.nodes[i])
+            if m < limit_m and (best_m is None or m < best_m):
+                best, best_m = i, m
+        return best
 
     def path_length_km(self, path: Sequence[Tuple[float, float]]) -> float:
         return geo.path_length_m(path) / 1000.0

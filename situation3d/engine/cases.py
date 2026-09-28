@@ -26,6 +26,11 @@ class DemoCase:
     target_ids: List[str]
     hotspot_names: List[str]
     camera: Dict[str, float] = field(default_factory=dict)
+    # Which theatre this case belongs to. Selects the road network used to
+    # constrain land movement, and (once the front end is theatre-aware) the
+    # image/terrain coverage. Defaults to the Taiwan Strait because every case
+    # in the registry so far is there.
+    theatre: str = "taiwan_strait"
 
 
 DEFAULT_CAMERA = {
@@ -37,6 +42,24 @@ DEFAULT_CAMERA = {
 }
 
 CASES: List[DemoCase] = [
+    DemoCase(
+        case_id="india_china_west",
+        name="中印边境西段（拉达克）",
+        description=(
+            "高原边境对峙态势：红方高原合成营沿 Indus 谷机动，无人机实施侦察监视；"
+            "蓝方以列城为后勤枢纽沿干线前送，德普桑前哨分队守备 DBO 走廊，"
+            "航空兵在高原机场起降巡逻。双方处于脱离接触后的缓冲区状态，"
+            "意图在证据不足时应保持为集合而非单一结论——本案例刻意**不收敛**，"
+            "用于验证系统在证据有限时如实输出歧义的能力。"
+        ),
+        target_ids=["H01", "H02", "H03", "H04", "H05"],
+        hotspot_names=[
+            "加勒万河谷", "班公湖", "德普桑平地", "典角", "楚舒勒", "诺玛", "列城",
+        ],
+        camera={"lon": 78.60, "lat": 33.90, "height": 420000.0,
+                "heading": 0.0, "pitch": -70.0},
+        theatre="india_china",
+    ),
     DemoCase(
         case_id="joint_full",
         name="联合态势演示（海陆空全要素）",
@@ -100,7 +123,7 @@ CASES: List[DemoCase] = [
     ),
 ]
 
-DEFAULT_CASE_ID = "joint_full"
+DEFAULT_CASE_ID = "india_china_west"
 
 CASES_BY_ID: Dict[str, DemoCase] = {c.case_id: c for c in CASES}
 

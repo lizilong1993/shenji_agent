@@ -19,7 +19,7 @@ least once.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from . import geo, symbology
 
@@ -602,21 +602,92 @@ ALL_TARGETS = _build_targets()
 # --------------------------------------------------------------------------
 
 
-def build_frames(targets: Optional[List[Target]] = None) -> List[dict]:
+def route_land_targets(targets: List[Target], theatre: Optional[str] = None
+                       ) -> Tuple[Dict[str, List], Dict[str, dict]]:
+    """Snap land targets' waypoints onto the road network and route between them.
+
+    Returns `(routes, meta)` where `routes` maps target id -> denormalised
+    (lat, lon) polyline and `meta` records, per target, whether it was routed and
+    which road classes it uses.
+
+    Sea and air targets are returned untouched: a ship is not on a road, and
+    pretending otherwise would put `on_road` evidence into the intent layer for a
+    platform where it means nothing.
+
+    A land target whose waypoints cannot be snapped, or whose legs are
+    unreachable, is **left on its straight-line route and reported** in `meta`
+    rather than being silently dropped or silently routed the wrong way. The
+    dataset carries that flag so the road self-test can tell "routed and correct"
+    apart from "could not route".
+    """
+    from . import roads as roads_mod
+
+    routes: Dict[str, List] = {}
+    meta: Dict[str, dict] = {}
+
+    network = None
+    if theatre and any(t.domain == "land" for t in targets):
+        try:
+            network = roads_mod.load(theatre)
+        except roads_mod.RoadError as e:
+            network = None
+            network_error = str(e)
+        else:
+            network_error = None
+    else:
+        network_error = "no theatre given"
+
+    for t in targets:
+        if t.domain != "land" or network is None:
+            routes[t.target_id] = list(t.waypoints)
+            meta[t.target_id] = {
+                "routed": False,
+                "reason": ("not a land target" if t.domain != "land"
+                           else network_error or "no road network"),
+            }
+            continue
+        try:
+            path = network.route_latlon(t.waypoints)
+        except roads_mod.RoadError as e:
+            routes[t.target_id] = list(t.waypoints)
+            meta[t.target_id] = {"routed": False, "reason": str(e)}
+            continue
+        routes[t.target_id] = path
+        meta[t.target_id] = {
+            "routed": True,
+            "length_km": round(network.path_length_km(path), 2),
+            "speed_kmh": round(network.path_speed_kmh(path), 1),
+            "osm_base_utc": network.meta.get("osm_base_utc"),
+        }
+
+    return routes, meta
+
+
+def build_frames(targets: Optional[List[Target]] = None,
+                 theatre: Optional[str] = None,
+                 routes: Optional[Dict[str, List]] = None) -> List[dict]:
     """Generate per-tick positions for every target.
 
     Each frame carries the simulation time plus one entry per target with its
     position, altitude, speed, heading and along-track distance. This is the
     canonical per-tick state that the front end replays and that a later
     PostgreSQL trajectory table would store.
+
+    Land targets are normally routed along the road network first (see
+    `route_land_targets`); pass the result as `routes` so the roads are not
+    re-solved for every caller. Without it, land targets fall back to their
+    straight-line waypoints.
     """
     targets = targets if targets is not None else ALL_TARGETS
+    if routes is None:
+        routes, _ = route_land_targets(targets, theatre)
 
-    routes = {}
+    dense_routes = {}
     lengths = {}
     for t in targets:
-        dense = geo.densify(t.waypoints, max_segment_m=2000.0)
-        routes[t.target_id] = dense
+        dense = geo.densify(routes.get(t.target_id) or t.waypoints,
+                            max_segment_m=2000.0)
+        dense_routes[t.target_id] = dense
         lengths[t.target_id] = geo.path_length_m(dense)
 
     frames = []
@@ -634,7 +705,7 @@ def build_frames(targets: Optional[List[Target]] = None) -> List[dict]:
             else:
                 along = min(travelled, total)
                 on_lap = 0.0
-            (lat, lon), bearing = geo.sample_polyline(routes[t.target_id], along)
+            (lat, lon), bearing = geo.sample_polyline(dense_routes[t.target_id], along)
             state.append(
                 {
                     "id": t.target_id,
@@ -654,13 +725,175 @@ def build_frames(targets: Optional[List[Target]] = None) -> List[dict]:
 
 
 def targets_for(case) -> List[Target]:
-    """Subset of the full order of battle selected by a demo case."""
+    """Subset of the order of battle selected by a demo case.
+
+    The pool depends on the case's theatre: the Taiwan Strait order of battle is
+    maritime and the India-China one is a high-altitude land/air force, so mixing
+    them would put a coastal missile brigade on a Ladakh road.
+    """
     wanted = set(case.target_ids)
-    picked = [t for t in ALL_TARGETS if t.target_id in wanted]
+    pool = (INDIA_CHINA_TARGETS if getattr(case, "theatre", None) == "india_china"
+            else ALL_TARGETS)
+    picked = [t for t in pool if t.target_id in wanted]
     if len(picked) != len(wanted):
         missing = sorted(wanted - {t.target_id for t in picked})
         raise KeyError("case references unknown target ids: %s" % ", ".join(missing))
     return picked
+
+
+# --------------------------------------------------------------------------
+# Theatres
+# --------------------------------------------------------------------------
+#
+# The Taiwan Strait theatre is the module-level default above (REGION, ANCHORS,
+# _HOTSPOT_BOXES) so every existing caller keeps working. The India-China theatre
+# lives here and is selected per case via `DemoCase.theatre`.
+
+INDIA_CHINA_REGION = "中印边境西段（拉达克）"
+
+INDIA_CHINA_HOTSPOT_BOXES = [
+    ("加勒万河谷", (78.50, 34.60, 78.80, 34.85), "2020 年冲突点", "valley"),
+    ("班公湖", (78.45, 33.45, 79.10, 33.95), "摩擦点/脱离接触区", "lake"),
+    ("德普桑平地", (77.65, 35.15, 78.05, 35.50), "巡逻权争议平原", "plain"),
+    ("典角", (79.30, 32.60, 79.65, 32.90), "2024 脱离接触点", "valley"),
+    ("楚舒勒", (78.60, 33.35, 78.95, 33.60), "前沿枢纽", "plain"),
+    ("诺玛", (78.45, 33.05, 78.85, 33.35), "前进机场/集结", "base"),
+    ("列城", (77.45, 34.00, 77.75, 34.35), "战区后勤枢纽", "base"),
+]
+
+INDIA_CHINA_HOTSPOTS = [_hotspot(n, b, note, kind)
+                        for n, b, note, kind in INDIA_CHINA_HOTSPOT_BOXES]
+
+# Land order of battle for the India-China theatre. Kept separate from ALL_TARGETS
+# because the Taiwanese order of battle is a maritime one: reusing those ids here
+# would put a coastal missile brigade on a Ladakh road.
+#
+# Every waypoint chain below was checked against the fetched network, and each one
+# stays inside a single road component. That matters more here than in Taiwan:
+# Ladakh's roads are *not* contiguous in OSM (52 components; Leh is in component
+# 13, Chushul/Galwan in 16, Depsang/DBO in 43), so a chain that crosses a
+# component boundary cannot be routed and would be reported as unrouted.
+INDIA_CHINA_TARGETS: List[Target] = [
+    Target(
+        target_id="H01",
+        name="红方高原合成营装甲分队",
+        platform_class="装甲分队",
+        domain="land",
+        affiliation="red",
+        # 典角—楚舒勒 沿 Indus 谷，实测 280.6 km
+        waypoints=[
+            (32.72, 79.47), (33.00, 79.10), (33.30, 78.90), (33.55, 78.75),
+            (32.95, 79.15), (32.72, 79.47),
+        ],
+        speed_kn=8.0,
+        altitude_m=4300.0,
+        role="地面机动",
+        model="15 式轻型坦克",
+        model_note="高原型，功率降额",
+        icon="armor",
+        loop=True,
+        sensor_name="车通/光电观瞄",
+        sensor_range_km=8.0,
+        influence_km=12.0,
+        engage_km=4.0,
+        attributes={
+            "兵种": "高原装甲",
+            "海拔": "4200–4600 m",
+            "动力": "高原功率降额 ~30%",
+            "机动": "需沿既有道路，越野受限",
+        },
+    ),
+    Target(
+        target_id="H02",
+        name="蓝方列城—诺玛后勤运输队",
+        platform_class="运输队",
+        domain="land",
+        affiliation="blue",
+        # 列城—诺玛—班公湖 后勤干线，实测 283.1 km
+        waypoints=[
+            (34.16, 77.58), (33.95, 77.85), (33.60, 78.20), (33.20, 78.65),
+            (33.55, 78.70),
+        ],
+        speed_kn=6.0,
+        altitude_m=3800.0,
+        role="后勤保障",
+        model="高原运输车队",
+        model_note="沿公路干线前送",
+        icon="armor",
+        sensor_name="导航",
+        sensor_range_km=2.0,
+        influence_km=4.0,
+        engage_km=0.5,
+        attributes={
+            "兵种": "后勤运输",
+            "路线": "列城—诺玛干线",
+            "约束": "严格沿路网，脱离道路即失去机动能力",
+        },
+    ),
+    Target(
+        target_id="H03",
+        name="蓝方德普桑前哨分队",
+        platform_class="装甲分队",
+        domain="land",
+        affiliation="blue",
+        # 德普桑—DBO 走廊，实测 22.3 km（独立连通分量）
+        waypoints=[(35.30, 77.90), (35.40, 77.82), (35.42, 77.85), (35.30, 77.90)],
+        speed_kn=5.0,
+        altitude_m=4900.0,
+        role="前沿警戒",
+        model="高原哨所分队",
+        model_note="DBO 走廊",
+        icon="armor",
+        loop=True,
+        sensor_name="地面监视雷达",
+        sensor_range_km=20.0,
+        influence_km=15.0,
+        engage_km=3.0,
+        attributes={"兵种": "前沿警戒", "海拔": "约 4900 m"},
+    ),
+    Target(
+        target_id="H04",
+        name="蓝方列城航空兵分队",
+        platform_class="战斗机",
+        domain="air",
+        affiliation="blue",
+        waypoints=[(34.15, 77.60), (33.60, 78.10), (33.10, 78.70), (33.70, 79.00),
+                   (34.15, 77.60)],
+        speed_kn=420.0,
+        altitude_m=9000.0,
+        role="战斗空中巡逻",
+        model="高空战斗机",
+        model_note="高原机场起降",
+        icon="fighter",
+        loop=True,
+        sensor_name="机载雷达",
+        sensor_range_km=160.0,
+        influence_km=80.0,
+        engage_km=60.0,
+        attributes={"兵种": "航空兵", "基地": "列城", "海拔": "起降场 3500 m"},
+    ),
+    Target(
+        target_id="H05",
+        name="红方无人机侦察分队",
+        platform_class="无人机",
+        domain="air",
+        affiliation="red",
+        waypoints=[(33.30, 79.60), (33.70, 79.10), (34.10, 78.70), (33.70, 79.10),
+                   (33.30, 79.60)],
+        speed_kn=110.0,
+        altitude_m=7500.0,
+        role="侦察监视",
+        model="中高空长航时无人机",
+        model_note="高原侦察",
+        icon="aew",
+        loop=True,
+        sensor_name="光电/合成孔径雷达",
+        sensor_range_km=120.0,
+        influence_km=60.0,
+        engage_km=0.0,
+        attributes={"兵种": "无人侦察", "升限": "受高原空气密度限制"},
+    ),
+]
 
 
 def build_dataset(case=None) -> dict:
@@ -678,7 +911,13 @@ def build_dataset(case=None) -> dict:
         case = cases_mod.get_case(cases_mod.DEFAULT_CASE_ID)
 
     targets = targets_for(case)
-    frames = build_frames(targets)
+    # 陆军先沿路网路由，再把路由结果交给 build_frames。放在这里而不是
+    # build_frames 内部，是因为要同时拿到 meta（哪些目标真的路由成功）写进数据集，
+    # 让 road_selftest 能区分"已约束且正确"与"没能路由"。
+    theatre = getattr(case, "theatre", None)
+    land_ids = {t.target_id for t in targets if t.domain == "land"}
+    land_routes, land_meta = route_land_targets(targets, theatre)
+    frames = build_frames(targets, theatre=theatre, routes=land_routes)
     inferred = inference_mod.infer(frames, targets, case.hotspot_names)
 
     # 战术意图判定（22 种本体口径）。在推理之后做，因为规则要用 L1/L2/L3 之外的
@@ -721,17 +960,30 @@ def build_dataset(case=None) -> dict:
         "scenario_id": SCENARIO_ID,
         "scenario_name": SCENARIO_NAME,
         "region": REGION,
+        "theatre": theatre,
+        # True only when every *land* target was actually routed on the network.
+        # `road_selftest` checks the tracks when this is set and skips them
+        # otherwise, instead of reporting a pass for data that was never
+        # constrained. Non-land targets are excluded: a ship is not on a road, and
+        # counting it would make the flag false for a reason that means nothing.
+        "road_constrained": bool(land_ids) and all(
+            land_meta[tid].get("routed") for tid in land_ids),
+        "land_route_meta": land_meta,
         "provenance": "simulated",
         "provenance_note": (
             "基于真实地理航路构造的仿真态势；航路点取自台海真实地理位置，"
-            "速度与高度取自真实装备量级。非真实 AIS/ADS-B 观测记录。"
+            "速度与高度取自真实装备量级。陆军航路沿 OSM 路网路由。"
+            "非真实 AIS/ADS-B 观测记录。"
         ),
         "tick_seconds": TICK_SECONDS,
         "tick_count": TICK_COUNT,
         "start_time_utc": START_TIME_UTC,
         "camera": case.camera,
         "symbology": symbology.catalog(),
-        "hotspots": [h for h in HOTSPOTS if h["name"] in set(case.hotspot_names)],
+        "hotspots": [
+            h for h in (INDIA_CHINA_HOTSPOTS if theatre == "india_china" else HOTSPOTS)
+            if h["name"] in set(case.hotspot_names)
+        ],
         "urban_aoi": URBAN_AOI,
         "targets": [t.to_dataset_entry() for t in targets],
         "inference_model": inferred["model"],
