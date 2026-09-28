@@ -61,12 +61,14 @@ CASES: List[DemoCase] = [
         theatre="india_china",
     ),
     DemoCase(
-        case_id="joint_full",
-        name="联合态势演示（海陆空全要素）",
+        case_id="taiwan_landing",
+        name="登台作战（海陆空全要素）",
         description=(
-            "红方水面编队自东海经台湾海峡南下，岸舰导弹营与远程防空营沿海一线展开；"
-            "蓝方以护卫舰、巡逻舰实施海上拦截，以战斗机与预警机建立空中巡逻与预警。"
-            "海、陆、空三个域与红蓝双方全部覆盖，用于展示完整的三级态势推理链路。"
+            "红方两栖编队自大陆沿海集结装载、经台湾海峡航渡，在护航与制空掩护下"
+            "于西岸滩头换乘编波、抢滩突击，随后沿路网向内陆推进夺控要点；"
+            "蓝方以护卫舰与巡逻舰实施海上拦截，以战斗机与预警机建立空中巡逻与预警，"
+            "岸防兵力依托要点组织防御。海、陆、空三域与红蓝双方全部覆盖，"
+            "用于展示完整的三级态势推理链路与意图集合的收缩过程。"
         ),
         target_ids=["R01", "R02", "R03", "R04", "R05", "R06", "R07",
                     "B01", "B02", "B03", "B04", "B05"],
@@ -77,58 +79,11 @@ CASES: List[DemoCase] = [
         ],
         camera=dict(DEFAULT_CAMERA),
     ),
-    DemoCase(
-        case_id="sea_convoy",
-        name="海上编队穿越与护航",
-        description=(
-            "聚焦水面兵力：红方驱逐舰、护卫舰、补给舰组成编队穿越海峡，"
-            "蓝方护卫舰与巡逻舰实施海上拦截。用于验证编组级态势推理与编队形态判定。"
-        ),
-        target_ids=["R01", "R02", "R03", "R07", "B01", "B02", "B05"],
-        hotspot_names=[
-            "中国 台湾海峡", "中国 平潭", "中国 澎湖列岛", "中国 东海", "中国 巴士海峡",
-        ],
-        camera={"lon": 119.80, "lat": 24.30, "height": 700000.0,
-                "heading": 0.0, "pitch": -72.0},
-    ),
-    DemoCase(
-        case_id="air_control",
-        name="空中巡逻与预警指挥",
-        description=(
-            "聚焦空中兵力：红蓝双方战斗机在中高空建立战斗空中巡逻，"
-            "双方预警机在后方实施空中预警与指挥。用于验证空中域的目标级威胁推理与军标渲染。"
-        ),
-        target_ids=["R01", "R06", "R07", "B01", "B04", "B05"],
-        hotspot_names=[
-            "中国 台湾海峡", "中国 东海", "中国台湾省 台北", "中国台湾省 高雄",
-        ],
-        camera={"lon": 120.40, "lat": 24.60, "height": 800000.0,
-                "heading": 0.0, "pitch": -70.0},
-    ),
-    DemoCase(
-        case_id="coastal_defense",
-        name="沿海要地防空反导",
-        description=(
-            "聚焦陆基与空中对抗：红方岸舰导弹营、远程防空营沿海一线机动展开，"
-            "蓝方要地防空连在北部要地组织防空，双方战斗机与预警机构成空中掩护与预警。"
-            "用于验证陆域目标与防空反导场景下的区域级态势推理。"
-        ),
-        target_ids=["R04", "R05", "R06", "R07", "B03", "B04", "B05"],
-        hotspot_names=[
-            "中国 台湾海峡", "中国 平潭", "中国 澎湖列岛",
-            "中国台湾省 台北", "中国台湾省 高雄",
-        ],
-        camera={"lon": 120.10, "lat": 24.70, "height": 650000.0,
-                "heading": 0.0, "pitch": -68.0},
-    ),
 ]
 
-# The India-China case is registered and complete, but it cannot be the *default*
-# yet: the offline tile manifest still only covers the Taiwan Strait
-# (`bbox 115,18,125,29`), so opening the app on a Ladakh case would render an
-# untextured globe. Flip this once tools/fetch_assets.py has baked the
-# india_china theatre and the front end selects coverage per theatre.
-DEFAULT_CASE_ID = "joint_full"
+# The Taiwan landing case is the default: its offline tile coverage is baked,
+# whereas the India-China theatre still has none (see the note above).
+DEFAULT_CASE_ID = "taiwan_landing"
 
 CASES_BY_ID: Dict[str, DemoCase] = {c.case_id: c for c in CASES}
 

@@ -44,6 +44,11 @@ START_TIME_UTC = "2026-09-15T00:00:00Z"
 # intent_predict.fill_carried），并在数据里标注为沿用而非新判定。
 INTENT_PREDICT_STRIDE = 8
 
+# How long a candidate must stay below the threshold before it is permanently
+# barred, expressed in **ticks** (30 s each) rather than in scored frames, so the
+# meaning survives a change of stride. 8 ticks = 4 minutes of playback.
+REENTRY_GRACE_TICKS = 8
+
 # Real geographic reference points (WGS84), used as waypoint anchors.
 ANCHORS = {
     "fuzhou": (26.07, 119.30),      # 福州
@@ -964,13 +969,23 @@ def build_dataset(case=None) -> dict:
             # show, and the model's own temporal contraction is unaffected because
             # the stride is uniform and the projection still runs in tick order.
             pred_ticks = list(range(0, len(frames), INTENT_PREDICT_STRIDE))
+            # `reentry_grace` is counted in *scored* frames, so with a stride it
+            # spans stride x grace ticks of real time. At stride 8 the default
+            # grace of 2 bars a candidate after only 16 ticks, and measured on the
+            # generated dataset that emptied the intent set entirely for every
+            # land target (size 0, BACKGROUND for the whole case). Widening the
+            # window keeps the intent of the parameter - a brief dip is noise, a
+            # sustained drop is a decision - at the coarser sampling rate.
+            grace = max(2, int(round(REENTRY_GRACE_TICKS / float(INTENT_PREDICT_STRIDE))))
             pred = intent_predict_mod.predict_frames(
                 frames, tracks, order, model, inference_frames=inferred["frames"],
-                hotspots=hotspots, routes=land_routes, road=road, ticks=pred_ticks)
+                hotspots=hotspots, routes=land_routes, road=road, ticks=pred_ticks,
+                reentry_grace=grace)
             intent_predict_mod.fill_carried(inferred["frames"], pred, order)
             intent_set_stats = pred["stats"]
             intent_set_stats["predicted_ticks"] = len(pred_ticks)
             intent_set_stats["predict_stride"] = INTENT_PREDICT_STRIDE
+            intent_set_stats["reentry_grace"] = grace
     except Exception as e:  # noqa: BLE001
         # 模型链路是可选的；任何失败都退化为规则结果，但必须留下痕迹，
         # 否则"界面上没有集合"将无法区分"没模型"与"模型坏了"。
