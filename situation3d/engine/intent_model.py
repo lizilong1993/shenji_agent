@@ -60,7 +60,13 @@ LAMBDA_CTR = 1.0
 LAMBDA_U = 1.0
 RANK_MARGIN = 0.1
 TAU = 0.05          # soft-cardinality temperature, as specified
-L2 = 1e-4
+# L2 on the compatibility weights. Raised from 1e-4 after measuring the trained
+# read-out: scores saturated at exactly 1.0 for several intents at once
+# (ASSEMBLE 1.0, DISPERSE 0.9998, PURSUIT 0.736), which destroys the ranking the
+# adaptive threshold depends on and made every target collapse to one intent.
+# Logistic read-outs on unnormalised features saturate easily; the penalty keeps
+# the weights small enough that the scores stay discriminative.
+L2 = 1e-2
 # Global gradient-norm clip for the full-batch update. See the note in `train`.
 GRAD_CLIP = 5.0
 
@@ -112,17 +118,59 @@ class IntentModel(object):
         self.a = 1.0
         self.b_delta = 0.0
         self.meta: Dict[str, object] = {}
+        # Feature standardisation (mean/std per feature), computed from the training
+        # set by `fit_scaler`. Kept as part of the model because inference must
+        # apply exactly the same transform the weights were fitted under; deriving
+        # it from whatever data happens to be at hand would silently shift every
+        # score.
+        self.mean: Optional[List[float]] = None
+        self.std: Optional[List[float]] = None
+
+    def fit_scaler(self, samples: Sequence[dict]) -> None:
+        """Per-feature mean/std over the training rows.
+
+        The features are raw physical quantities on wildly different scales (km,
+        knots, 0/1 flags, road class codes). Without standardisation the logistic
+        read-out saturates: several intents scored exactly 1.0 at once, which
+        leaves the adaptive threshold nothing to rank.
+        """
+        if not samples:
+            raise ValueError("no samples to fit the scaler on")
+        n = len(samples)
+        k = self.n_features
+        mean = [0.0] * k
+        for s in samples:
+            x = s["x"]
+            for i in range(k):
+                mean[i] += x[i]
+        mean = [v / n for v in mean]
+        var = [0.0] * k
+        for s in samples:
+            x = s["x"]
+            for i in range(k):
+                d = x[i] - mean[i]
+                var[i] += d * d
+        # A constant feature has zero variance; dividing by it would emit inf/NaN.
+        std = [math.sqrt(v / n) if v > 1e-12 else 1.0 for v in var]
+        self.mean, self.std = mean, std
+
+    def transform(self, x: Sequence[float]) -> List[float]:
+        if self.mean is None or self.std is None:
+            return list(x)
+        return [(v - m) / s for v, m, s in zip(x, self.mean, self.std)]
 
     # -- forward ---------------------------------------------------------
 
     def compat(self, x: Sequence[float]) -> List[float]:
         """s_t(z) for every modelled intent."""
-        return [_sigmoid(sum(w * v for w, v in zip(row, x)) + bi)
+        v = self.transform(x)
+        return [_sigmoid(sum(w * q for w, q in zip(row, v)) + bi)
                 for row, bi in zip(self.W, self.b)]
 
     def insufficiency(self, x: Sequence[float]) -> float:
         """u_t in [0, 1]: how little the evidence separates the candidates."""
-        return _sigmoid(sum(w * v for w, v in zip(self.wu, x)) + self.bu)
+        v = self.transform(x)
+        return _sigmoid(sum(w * q for w, q in zip(self.wu, v)) + self.bu)
 
     def delta(self, u: float) -> float:
         """Eq. delta: delta_t = sigma(a (1 - u_t) + b)."""
@@ -179,7 +227,9 @@ class IntentModel(object):
             tot_ces = tot_rank = tot_ctr = tot_u = 0.0
 
             for smp in samples:
-                x = smp["x"]
+                # Standardise once per row: the gradients below assume the same
+                # transformed input the forward pass used.
+                x = self.transform(smp["x"])
                 y = smp["y"]
                 u_star = smp["u_star"]
                 s = self.compat(x)
@@ -312,6 +362,8 @@ class IntentModel(object):
             "intents": self.intents,
             "n_features": self.n_features,
             "seed": self.seed,
+            "mean": self.mean,
+            "std": self.std,
             "a": self.a,
             "b_delta": self.b_delta,
             "bu": self.bu,
@@ -336,6 +388,8 @@ class IntentModel(object):
         if doc.get("feature_names") != F.feature_names():
             raise ValueError("model feature_names do not match the current layout")
         m = IntentModel(int(doc["n_features"]), doc.get("intents"), int(doc.get("seed", 0)))
+        m.mean = [float(v) for v in doc["mean"]] if doc.get("mean") else None
+        m.std = [float(v) for v in doc["std"]] if doc.get("std") else None
         m.a = float(doc["a"])
         m.b_delta = float(doc["b_delta"])
         m.bu = float(doc["bu"])

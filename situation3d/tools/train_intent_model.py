@@ -177,6 +177,10 @@ def main(argv) -> int:
 
     paired = intent_cf.pair_sequences(train)
     model = intent_model.IntentModel(F.feature_dim(), seed=args.seed)
+    # Fit the feature scaler on the *training* split only. Fitting on all samples
+    # would leak holdout statistics into the weights.
+    model.fit_scaler(train)
+    print("scaler          : fitted on %d training rows" % len(train))
     t0 = time.time()
     print("training        : %d features, %d intents, %d epochs"
           % (F.feature_dim(), len(model.intents), args.epochs))
@@ -231,6 +235,22 @@ def main(argv) -> int:
     print("no-reentry events   : %d" % pred.get("no_reentry_events", -1))
     print("nesting violations  : %d  (must be 0 with the projection on)"
           % pred.get("nesting_violations", -1))
+    # Saturation check: if several intents score exactly 1.0 the read-out has
+    # blown up and the adaptive threshold has no ranking to work with.
+    sat = {}
+    top_gaps = []
+    for fr in res["targets"]:
+        for e in fr.values():
+            for code, v in (e.get("intent_probs") or {}).items():
+                if v >= 0.9999:
+                    sat[code] = sat.get(code, 0) + 1
+            vals = sorted((e.get("intent_probs") or {}).values(), reverse=True)
+            if len(vals) >= 2:
+                top_gaps.append(vals[0] - vals[1])
+    print("saturated (score>=0.9999): %s" % (sat or "none"))
+    if top_gaps:
+        print("top-1 minus top-2 gap    : mean=%.3f min=%.3f"
+              % (sum(top_gaps) / len(top_gaps), min(top_gaps)))
     print("conflict pairs      : %d from the ontology confusion matrix"
           % len(intent.conflict_pairs()))
     print("FEINT emitted       : %d  (must be 0)"

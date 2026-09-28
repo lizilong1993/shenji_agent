@@ -113,6 +113,8 @@ def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
     # candidates ever admitted per target; the pool only widens, never narrows, so
     # it cannot be the reason a prediction set grows
     considered: Dict[str, set] = {}
+    # codes barred at any point per target; `ever \ ever_dropped` only shrinks
+    considered_dropped: Dict[str, set] = {}
     no_reentry_events = 0
     size_series: Dict[str, List[int]] = {tid: [] for tid in order}
 
@@ -154,6 +156,34 @@ def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
                 for j in range(len(s)):
                     if s[j] >= delta:
                         ever.add(j)
+                # Codes barred at any point. `ever \ ever_dropped` only shrinks, so
+                # no output drawn from it can resurrect a dropped intent.
+                ever_dropped = considered_dropped.setdefault(tid, set())
+                prev = last_set.get(tid)
+                # Apply the size cap *before* filtering on `banned`, and re-check
+                # `banned` afterwards. The cap can move a candidate into `banned`
+                # in this very iteration; if the ban filter has already run, that
+                # candidate still shows up this frame and - worse - reappears from
+                # the previous set on the next one, which is exactly the
+                # resurrection `reentry_grace=1` promises cannot happen (measured:
+                # 20 occurrences when the cap ran after the filter).
+                if prev:
+                    cap = len(prev)
+                    passing = [c for c in codes if model.intents.index(c) not in banned]
+                    passing.sort(key=lambda c: -s[model.intents.index(c)])
+                    if len(passing) > cap:
+                        for c in passing[cap:]:
+                            j = model.intents.index(c)
+                            banned.add(j)
+                            ever_dropped.add(j)
+                        passing = passing[:cap]
+                    # Prefer candidates already in the previous set so the set
+                    # narrows instead of swapping members.
+                    keep = [c for c in passing if c in prev]
+                    for c in passing:
+                        if c not in keep and len(keep) < cap:
+                            keep.append(c)
+                    codes = keep
                 filtered = []
                 for c in codes:
                     j = model.intents.index(c)
@@ -162,33 +192,6 @@ def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
                             no_reentry_events += 1
                         continue
                     filtered.append(c)
-                # Cap the set at the previous frame's size. The paper's
-                # contraction proposition assumes the compatibility ordering is
-                # stable over the interval; on this data it is not, and the raw
-                # set genuinely expanded (measured: H04 went 2 candidates at tick 0
-                # to 5 at tick 12, because the score ordering swapped), which broke
-                # nesting in 16 frames even with a monotone candidate pool.
-                # Enforcing non-growth directly is the only reading under which the
-                # property holds unconditionally, and it is what an operator is
-                # promised: the candidate set never widens.
-                prev = last_set.get(tid)
-                if prev:
-                    cap = len(prev)
-                    if len(filtered) > cap:
-                        dropped = len(filtered) - cap
-                        # Keep the strongest; the cut is on score, not on position.
-                        filtered.sort(key=lambda c: -s[model.intents.index(c)])
-                        for c in filtered[cap:]:
-                            banned.add(model.intents.index(c))
-                        inter = [c for c in filtered[:cap] if c in prev]
-                        # Prefer candidates that were already in the set, so the
-                        # set narrows rather than swapping members.
-                        for c in filtered[:cap]:
-                            if c not in inter and len(inter) < cap:
-                                inter.append(c)
-                        filtered = inter
-                        if dropped:
-                            pass
                 # Bar a candidate only after it stays below the threshold for
                 # `reentry_grace` consecutive frames; counting strikes rather than
                 # acting on one frame keeps a noisy tick from permanently removing
@@ -202,15 +205,25 @@ def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
                     strikes[tid][j] = strikes[tid].get(j, 0) + 1
                     if strikes[tid][j] >= max(1, reentry_grace):
                         banned.add(j)
+                        ever_dropped.add(j)
                 codes = filtered
                 if not codes:
+                    # Nothing passed. Algorithm 1 still wants a non-empty answer, so
+                    # draw from `ever \ ever_dropped` -- never from a barred code.
+                    # This fallback previously drew on `ever` alone and so
+                    # reintroduced codes the projection had already removed (20
+                    # frames). The set may go empty here; that is the honest
+                    # outcome, and it is reported as BACKGROUND.
                     if prev:
-                        codes = [c for c in prev if model.intents.index(c) not in banned]
+                        codes = [c for c in prev
+                                 if model.intents.index(c) in ever
+                                 and model.intents.index(c) not in banned]
                     if not codes:
-                        allowed = [j for j in ever if j not in banned]
-                        pick = (max(allowed, key=lambda j: s[j]) if allowed
-                                else max(range(len(s)), key=lambda j: s[j]))
-                        codes = [model.intents[pick]]
+                        allowed = [j for j in ever
+                                   if j not in banned and j not in ever_dropped]
+                        if allowed:
+                            pick = max(allowed, key=lambda j: s[j])
+                            codes = [model.intents[pick]]
                 last_set[tid] = list(codes)
 
             # primary / secondary split, mirroring the rule layer's contract
@@ -274,6 +287,49 @@ def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
         "final_set_sizes": {t: (s[-1] if s else 0) for t, s in size_series.items()},
     }
     return {"targets": per_frame, "stats": stats}
+
+
+def fill_carried(inference_frames: Sequence[dict], result: dict,
+                 order: Sequence[str]) -> int:
+    """Carry each prediction forward over the frames that were not scored.
+
+    Predictions are computed on a strided tick set (see `INTENT_PREDICT_STRIDE`)
+    because per-frame scoring is too slow to build a dataset with. Frames between
+    two scored ticks would otherwise have no `intent_set` at all, so the panel
+    would blank out between samples.
+
+    Every carried entry is flagged `intent_carried: True` and keeps the tick it was
+    actually computed on (`intent_eval_tick`), so a viewer can tell a fresh
+    judgement from a repeat. Presenting carried values as fresh would be the same
+    class of error as inventing a probability.
+    """
+    per_frame = result.get("targets") or []
+    scored = {i: entries for i, entries in enumerate(per_frame) if entries}
+    if not scored:
+        return 0
+    n = 0
+    last: Dict[str, dict] = {}
+    for i, frame in enumerate(inference_frames):
+        tgts = frame.get("targets") or {}
+        fresh = scored.get(i)
+        if fresh:
+            for tid, entry in fresh.items():
+                if tid in tgts:
+                    tgts[tid].update(entry)
+                    m = dict(entry)
+                    m["intent_carried"] = False
+                    m["intent_eval_tick"] = i
+                    last[tid] = m
+                    n += 1
+            continue
+        for tid in order:
+            if tid not in tgts or tid not in last:
+                continue
+            carried = dict(last[tid])
+            carried["intent_carried"] = True
+            tgts[tid].update(carried)
+            n += 1
+    return n
 
 
 def merge_into_frames(inference_frames: Sequence[dict], result: dict) -> int:

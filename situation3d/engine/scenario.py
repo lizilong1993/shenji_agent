@@ -38,6 +38,12 @@ TICK_COUNT = 1440
 # "第 N 帧"换算成钟点，两处必须是同一个值，否则简报里会出现对不上的时间。
 START_TIME_UTC = "2026-09-15T00:00:00Z"
 
+# 意图集合（CES）预测的步长。模型链路逐帧跑代价过高（实测 5 目标案例 1645 s），
+# 而 8 帧≈4 分钟一次已远超界面的刷新能力；步长是均匀的，且 no-reentry 投影仍在
+# tick 顺序上执行，因此不改变模型的收缩行为。其余帧沿用上一个预测帧（见
+# intent_predict.fill_carried），并在数据里标注为沿用而非新判定。
+INTENT_PREDICT_STRIDE = 8
+
 # Real geographic reference points (WGS84), used as waypoint anchors.
 ANCHORS = {
     "fuzhou": (26.07, 119.30),      # 福州
@@ -927,6 +933,51 @@ def build_dataset(case=None) -> dict:
     intent_result = intent_mod.derive(frames, targets)
     intent_mod.merge_into_frames(inferred["frames"], intent_result)
 
+    # 意图集合（CES/ShenJi）。有模型就走模型，模型缺失时**不注入**并回退规则结果，
+    # 数据集的 `intent_source` 会如实写成 "rule"。绝不因为缺模型就伪造概率。
+    intent_set_stats = None
+    model = None
+    try:
+        from . import intent_model as intent_model_mod
+        from . import intent_predict as intent_predict_mod
+        from . import intent_features as intent_features_mod
+        from . import roads as roads_mod
+
+        model = intent_model_mod.load(intent_model_mod.model_path())
+        if model is not None:
+            road = None
+            try:
+                if theatre:
+                    road = roads_mod.load(theatre)
+            except roads_mod.RoadError:
+                road = None
+            hotspots = [h for h in (INDIA_CHINA_HOTSPOTS if theatre == "india_china"
+                                    else HOTSPOTS)
+                        if h["name"] in set(case.hotspot_names)]
+            order = [t.target_id for t in targets]
+            tracks = intent_features_mod.build_tracks(frames, targets)
+            # Predict on a strided subset. Feature extraction walks road geometry
+            # and per-target neighbour scans for every (target, frame); scoring all
+            # 1441 frames took **1645 s** for a single 5-target case, which is not
+            # a cost the dataset build can carry. INTENT_PREDICT_STRIDE ticks still
+            # resolve to ~48 samples/min of playback, well above what the UI can
+            # show, and the model's own temporal contraction is unaffected because
+            # the stride is uniform and the projection still runs in tick order.
+            pred_ticks = list(range(0, len(frames), INTENT_PREDICT_STRIDE))
+            pred = intent_predict_mod.predict_frames(
+                frames, tracks, order, model, inference_frames=inferred["frames"],
+                hotspots=hotspots, routes=land_routes, road=road, ticks=pred_ticks)
+            intent_predict_mod.fill_carried(inferred["frames"], pred, order)
+            intent_set_stats = pred["stats"]
+            intent_set_stats["predicted_ticks"] = len(pred_ticks)
+            intent_set_stats["predict_stride"] = INTENT_PREDICT_STRIDE
+    except Exception as e:  # noqa: BLE001
+        # 模型链路是可选的；任何失败都退化为规则结果，但必须留下痕迹，
+        # 否则"界面上没有集合"将无法区分"没模型"与"模型坏了"。
+        intent_set_stats = {"error": "%s: %s" % (type(e).__name__, e)}
+        model = None
+
+
     icons = [t.icon for t in targets]
     unknown = symbology.validate(icons)
     if unknown:
@@ -989,6 +1040,11 @@ def build_dataset(case=None) -> dict:
         "inference_model": inferred["model"],
         "inference_summary": inferred["summary"],
         "intent_summary": intent_result["summary"],
+        # 意图集合（CES）链路的状态：模型版本、嵌套违例、no-reentry 次数，
+        # 或缺失/失败原因。前端据此决定显示"模型"还是"规则（模型未加载）"。
+        "intent_set": intent_set_stats,
+        "intent_model_version": (model.meta.get("version") if model else None),
+        "intent_source": ("model" if model else "rule"),
         "frames": frames,
         "inference_frames": inferred["frames"],
         "brief": situation_brief,
