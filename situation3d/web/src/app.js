@@ -98,7 +98,7 @@ const FALLBACK_CAMERA = { lon: 119.6, lat: 24.4, height: 900000, heading: 0, pit
 const dom = {};
 ['statusText', 'statusDot', 'scenarioName', 'targetList', 'hotspotBody',
  'geoLon', 'geoLat', 'geoRegion', 'geoSpan', 'geoLevel',
- 'levelValue', 'levelNote', 'levelIntent', 'targetPanel', 'tpTitle', 'tpBody', 'tpClose',
+ 'levelValue', 'levelNote', 'levelIntent', 'levelPhase', 'targetPanel', 'tpTitle', 'tpBody', 'tpClose',
  'menuCase', 'menuCaseList', 'menuLayers', 'menuLayerList', 'menuView', 'menuViewList',
  'switchNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner', 'btnOverview',
  'countRed', 'countBlue', 'countSea', 'countLand', 'countAir', 'targetCountHint',
@@ -1228,6 +1228,20 @@ function updateInferenceUi() {
     dom.levelIntent.textContent = top.length
       ? top.map(function (x) { return x.zh + ' ×' + x.n; }).join('、')
       : '无带意图判定的目标';
+  }
+
+  // 作战阶段：登陆作战是分阶段的，同一个意图在不同阶段含义不同，
+  // 所以阶段与等级、意图并列显示，而不是让人自己去推时间轴。
+  if (dom.levelPhase) {
+    const fr = state.data && state.data.frames && state.data.frames[state.tick];
+    const ph = fr && fr.phase;
+    const total = (state.data && state.data.phases && state.data.phases.length) || 0;
+    dom.levelPhase.textContent = ph
+      ? (ph.name + ' ' + (ph.index + 1) + '/' + (ph.count || total))
+      : '';
+    dom.levelPhase.title = ph
+      ? ('本阶段已持续 ' + ph.ticks_in + ' 帧（自第 ' + ph.since_tick + ' 帧）')
+      : '该战区未定义阶段';
   }
 
   // 热点区域表格里的态势等级与意图随之刷新。

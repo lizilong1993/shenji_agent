@@ -1213,3 +1213,13 @@ select {
   color: #5a6b80;
   margin-left: 3px;
 }
+
+/* 作战阶段：与等级、意图并列。同一意图在不同阶段含义不同，阶段必须可见。 */
+.level-banner .lb-phase {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #eef4ea;
+  color: #3d5a2f;
+  font-size: 11px;
+}

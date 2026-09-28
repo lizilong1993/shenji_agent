@@ -774,7 +774,14 @@ def build_frames(targets: Optional[List[Target]] = None,
                     "reached_end": (not t.loop) and along >= total,
                 }
             )
-        frames.append({"tick": tick, "t_seconds": round(t_seconds, 1), "targets": state})
+        frames.append({
+            "tick": tick,
+            "t_seconds": round(t_seconds, 1),
+            # Operation phase, attached to every frame so the front end can label
+            # the situation without re-deriving the timeline.
+            "phase": phase_at(tick),
+            "targets": state,
+        })
 
     return frames
 
@@ -926,6 +933,50 @@ THEATRE_BBOXES = {
     "taiwan_strait": (115.5, 20.0, 122.5, 26.5),
     "india_china": (77.0, 31.5, 81.5, 36.5),
 }
+
+# Landing operation phases, as (id, name, first_tick). The phases are a property
+# of the *operation*, not of a single platform: every unit is somewhere in the same
+# six-stage narrative at any moment, which is what lets the UI say "the operation
+# is at the ship-to-shore stage" and what lets the intent sets be read in context
+# (a `HOLD` during 巩固滩头 means something different from a `HOLD` during 航渡).
+#
+# Boundaries are declared rather than inferred from unit positions, because
+# inferring them would mean guessing a stage transition from kinematics - the same
+# mistake as guessing intent from a single frame. They are placed to match the
+# route design: R08's final leg reaches the 安平 换乘 area at tick ~600, and the
+# land units begin their inland run at ~1080.
+LANDING_PHASES = [
+    ("assembly", "集结装载", 0),
+    ("transit", "航渡", 240),
+    ("transfer", "换乘编波", 600),
+    ("assault", "抢滩突击", 840),
+    ("consolidate", "巩固滩头", 1080),
+    ("inland", "向内陆夺控", 1320),
+]
+
+
+def phase_at(tick: int) -> dict:
+    """Which landing phase a tick falls in.
+
+    Returns `{"id", "name", "index", "since_tick", "ticks_in"}`. `ticks_in` lets the
+    UI show how long the operation has been in this stage, which is the readable
+    counterpart to the intent set's own contraction.
+    """
+    idx = 0
+    for i, (_pid, _name, start) in enumerate(LANDING_PHASES):
+        if tick >= start:
+            idx = i
+        else:
+            break
+    pid, name, start = LANDING_PHASES[idx]
+    return {
+        "id": pid,
+        "name": name,
+        "index": idx,
+        "since_tick": start,
+        "ticks_in": int(tick - start),
+        "count": len(LANDING_PHASES),
+    }
 
 INDIA_CHINA_HOTSPOT_BOXES = [
     ("加勒万河谷", (78.50, 34.60, 78.80, 34.85), "2020 年冲突点", "valley"),
@@ -1214,6 +1265,12 @@ def build_dataset(case=None) -> dict:
         "road_constrained": bool(land_ids) and all(
             land_meta[tid].get("routed") for tid in land_ids),
         "land_route_meta": land_meta,
+        # Landing-phase timeline. Only the Taiwan landing operation is staged; the
+        # India-China case is a standing confrontation with no landing sequence, so
+        # it declares none rather than borrowing a narrative that does not fit.
+        "phases": ([{"id": p, "name": n, "first_tick": t}
+                    for (p, n, t) in LANDING_PHASES]
+                   if theatre == "taiwan_strait" else []),
         "provenance": "simulated",
         "provenance_note": (
             "基于真实地理航路构造的仿真态势；航路点取自台海真实地理位置，"
