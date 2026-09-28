@@ -235,9 +235,18 @@ def main(argv):
     if only in ("all", "theatre"):
         man["theatre_terrain"] = {"min_zoom": 11, "max_zoom": THEATRE_TERRAIN_MAX}
     if only in ("all", "hotspot"):
+        # Merge, never replace. The manifest is shared by every theatre, so
+        # overwriting this list with one theatre's boxes silently deletes the
+        # others. Measured: baking india_china replaced the 9 Taiwan boxes with 7
+        # India ones, after which the Taiwan case mounted the *India* hotspots and
+        # its own coverage disappeared with no error anywhere.
+        prev_boxes = (man.get("hotspot_imagery") or {}).get("boxes") or []
+        merged = {tuple(round(float(v), 3) for v in b) for b in prev_boxes if len(b) == 4}
+        for b in hot:
+            merged.add(tuple(round(float(v), 3) for v in b))
         man["hotspot_imagery"] = {
             "min_zoom": 0, "max_zoom": HOTSPOT_IMAGERY_MAX,
-            "boxes": [list(b) for b in hot],
+            "boxes": [list(b) for b in sorted(merged)],
         }
         man["hotspot_terrain"] = {"min_zoom": 11, "max_zoom": HOTSPOT_TERRAIN_MAX}
     if only in ("all", "urban"):
