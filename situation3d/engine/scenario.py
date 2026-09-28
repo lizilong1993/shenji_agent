@@ -752,7 +752,7 @@ def targets_for(case) -> List[Target]:
     """
     wanted = set(case.target_ids)
     pool = (INDIA_CHINA_TARGETS if getattr(case, "theatre", None) == "india_china"
-            else ALL_TARGETS)
+            else (ALL_TARGETS + AMPHIBIOUS_TARGETS))
     picked = [t for t in pool if t.target_id in wanted]
     if len(picked) != len(wanted):
         missing = sorted(wanted - {t.target_id for t in picked})
@@ -769,6 +769,117 @@ def targets_for(case) -> List[Target]:
 # lives here and is selected per case via `DemoCase.theatre`.
 
 INDIA_CHINA_REGION = "中印边境西段（拉达克）"
+
+# Amphibious lift for the Taiwan landing case: the ship-to-shore phase that a
+# maritime order of battle alone cannot express.
+#
+# The landing is placed at 台南 安平 (≈23.00N, 120.15E) because the fetched road
+# network reaches only to **120.55E**. The natural landing beaches further north
+# (桃园/淡水, 121.1-121.4E) are 40+ km from any road in the graph, so land units
+# there cannot be routable at all; 安平 snaps at 0.14 km and chains through it
+# route in 33-56 km. Moving the beach to match the data is the honest option -
+# the alternative was to bake a much larger road graph, and even then the
+# cross-strait graph is not contiguous in OSM.
+AMPHIBIOUS_TARGETS: List[Target] = [
+    Target(
+        target_id="R08",
+        name="红方两栖船坞登陆舰",
+        platform_class="两栖舰",
+        domain="sea",
+        affiliation="red",
+        # 集结锚地 → 海峡航渡 → 换乘海域（安平外海）
+        waypoints=[
+            (25.60, 119.30), (24.90, 119.40), (24.10, 119.70),
+            (23.40, 119.95), (23.05, 120.05),
+        ],
+        speed_kn=16.0,
+        role="两栖输送",
+        model="071 型船坞登陆舰",
+        model_note="北约代号 Yuzhao",
+        icon="replenishment",
+        sensor_name="对海搜索雷达",
+        sensor_range_km=120.0,
+        influence_km=60.0,
+        engage_km=8.0,
+        attributes={
+            "舰种": "船坞登陆舰",
+            "任务阶段": "集结装载→航渡→换乘",
+            "装载": "两栖战车 / 登陆兵",
+            "满载排水量": "约 25000 t",
+        },
+    ),
+    Target(
+        target_id="R09",
+        name="红方两栖突击车分队",
+        platform_class="两栖战车",
+        domain="land",
+        affiliation="red",
+        # 泛水 → 抢滩 → 沿路向内陆夺控。路网路由把陆上段约束在道路上，
+        # 泛水段是水面到岸的直线过渡（两栖车本来就能自行泛水，不是陆上机动）。
+        waypoints=[(23.00, 120.15), (23.08, 120.20), (23.02, 120.26),
+                   (22.95, 120.20), (23.00, 120.15)],
+        speed_kn=8.0,
+        altitude_m=0.0,
+        role="抢滩突击",
+        model="05 式两栖突击车",
+        model_note="泛水自行登陆",
+        icon="armor",
+        loop=True,
+        sensor_name="车通/光电观瞄",
+        sensor_range_km=6.0,
+        influence_km=10.0,
+        engage_km=3.0,
+        attributes={
+            "兵种": "两栖装甲",
+            "阶段": "泛水→抢滩→向内陆夺控",
+            "约束": "陆上段沿路网，泛水段自行航渡",
+        },
+    ),
+    Target(
+        target_id="R10",
+        name="红方武装直升机分队",
+        platform_class="武装直升机",
+        domain="air",
+        affiliation="red",
+        # 近距支援：随抢滩梯队前出，沿滩头线往返
+        waypoints=[(23.20, 120.05), (23.05, 120.20), (22.92, 120.28),
+                   (23.02, 120.10), (23.20, 120.05)],
+        speed_kn=140.0,
+        altitude_m=600.0,
+        role="近距空中支援",
+        model="直-10 武装直升机",
+        model_note="滩头火力支援",
+        icon="fighter",
+        loop=True,
+        sensor_name="光电/毫米波",
+        sensor_range_km=20.0,
+        influence_km=15.0,
+        engage_km=6.0,
+        attributes={"兵种": "陆航", "任务": "滩头火力支援", "升限": "约 6000 m"},
+    ),
+    Target(
+        target_id="B06",
+        name="蓝方机动装甲分队",
+        platform_class="装甲分队",
+        domain="land",
+        affiliation="blue",
+        # 滩头反突击：从内陆向登陆场机动
+        waypoints=[(23.22, 120.22), (23.12, 120.30), (23.00, 120.15),
+                   (23.10, 120.18), (23.22, 120.22)],
+        speed_kn=10.0,
+        altitude_m=20.0,
+        role="滩头反突击",
+        model="CM-11 主战坦克",
+        model_note="沿岸机动预备队",
+        icon="armor",
+        loop=True,
+        sensor_name="车通/光电",
+        sensor_range_km=8.0,
+        influence_km=12.0,
+        engage_km=4.0,
+        attributes={"兵种": "装甲", "任务": "反登陆机动预备队"},
+    ),
+]
 
 # Theatre bounding boxes (west, south, east, north). Single source for the tools
 # that must bake or route per theatre: `tools/fetch_base_imagery.py` (offline
