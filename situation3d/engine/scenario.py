@@ -46,8 +46,16 @@ INTENT_PREDICT_STRIDE = 8
 
 # How long a candidate must stay below the threshold before it is permanently
 # barred, expressed in **ticks** (30 s each) rather than in scored frames, so the
-# meaning survives a change of stride. 8 ticks = 4 minutes of playback.
-REENTRY_GRACE_TICKS = 8
+# meaning survives a change of stride.
+#
+# Calibration note: at stride 8 an earlier value of 8 ticks produced grace=2
+# scored frames, and because banning that fast removed almost every candidate the
+# India case ended with **4303 of 7205 annotated target-frames carrying an empty
+# set**. On long, near-constant tracks (a patrol orbit, a supply run) the score
+# genuinely wobbles around the threshold, so a short window turns noise into
+# permanent exclusions. 48 ticks = 24 minutes of playback, which is the timescale
+# over which a real intent change would be visible anyway.
+REENTRY_GRACE_TICKS = 48
 
 # Real geographic reference points (WGS84), used as waypoint anchors.
 ANCHORS = {
@@ -976,7 +984,7 @@ def build_dataset(case=None) -> dict:
             # land target (size 0, BACKGROUND for the whole case). Widening the
             # window keeps the intent of the parameter - a brief dip is noise, a
             # sustained drop is a decision - at the coarser sampling rate.
-            grace = max(2, int(round(REENTRY_GRACE_TICKS / float(INTENT_PREDICT_STRIDE))))
+            grace = max(3, int(round(REENTRY_GRACE_TICKS / float(INTENT_PREDICT_STRIDE))))
             pred = intent_predict_mod.predict_frames(
                 frames, tracks, order, model, inference_frames=inferred["frames"],
                 hotspots=hotspots, routes=land_routes, road=road, ticks=pred_ticks,

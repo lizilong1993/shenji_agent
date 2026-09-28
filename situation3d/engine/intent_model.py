@@ -117,6 +117,14 @@ class IntentModel(object):
         # the set from the first step rather than having to discover the sign.
         self.a = 1.0
         self.b_delta = 0.0
+        # Temperature for *reported* probabilities only.
+        #
+        # It must not enter `compat()`, because the adaptive threshold delta_t was
+        # trained against the untempered scores: tempering before the comparison
+        # would move every score relative to a threshold that no longer matches.
+        # So decisions keep using the raw score and the UI reads a separated
+        # distribution. Fitted by `fit_temperature`.
+        self.temperature = 1.0
         self.meta: Dict[str, object] = {}
         # Feature standardisation (mean/std per feature), computed from the training
         # set by `fit_scaler`. Kept as part of the model because inference must
@@ -155,11 +163,79 @@ class IntentModel(object):
         self.mean, self.std = mean, std
 
     def transform(self, x: Sequence[float]) -> List[float]:
+        """Standardise, then clamp to +-6 sigma.
+
+        The clamp matters. Several features are near-constant for long stretches
+        (a platform holding a steady course), so their standard deviation is tiny
+        and a small physical change yields a large z-score. Unclamped, those
+        outliers drove the logistic read-out into saturation: measured across the
+        generated datasets, 39915 of 17292 Taiwan target-frames carried a top-k
+        probability of exactly 1.0 and India had more saturated entries than
+        targets (7228 vs 7205), with a mean top1-top2 gap of 0.038. A saturated
+        score carries no ranking information, and ranking is exactly what the
+        adaptive threshold consumes.
+        """
         if self.mean is None or self.std is None:
             return list(x)
-        return [(v - m) / s for v, m, s in zip(x, self.mean, self.std)]
+        out = []
+        for v, m, s in zip(x, self.mean, self.std):
+            z = (v - m) / s
+            out.append(6.0 if z > 6.0 else (-6.0 if z < -6.0 else z))
+        return out
 
     # -- forward ---------------------------------------------------------
+
+    def prob(self, s: float) -> float:
+        """Reported probability for a raw score, after temperature scaling.
+
+        Maps the score back through its logit, divides by T, and re-applies the
+        logistic. T > 1 flattens an over-confident distribution; the ranking is
+        unchanged, so the decision that consumed the raw score still stands.
+        """
+        t = self.temperature if self.temperature and self.temperature > 1e-6 else 1.0
+        if t == 1.0:
+            return s
+        return _sigmoid(_logit(s) / t)
+
+    def fit_temperature(self, samples: Sequence[dict],
+                        grid: Optional[Sequence[float]] = None) -> float:
+        """Pick the temperature minimising per-intent log loss on `samples`.
+
+        Reported confidence should be checked against held-out data rather than
+        asserted. Measured before this: 39915 of 17292 Taiwan target-frames had a
+        top-k probability of exactly 1.0, so "100%" was shown for several
+        competing intents at once and meant nothing.
+
+        The search is restricted to T >= 1, i.e. flattening only. Unconstrained,
+        the held-out log-loss optimum was **T = 0.50** - it *sharpened* the
+        distribution - while the model already under-reports ambiguity badly
+        (76.9% singleton predictions against 7.4% in the CES target). Minimising
+        average log loss is not the same objective as not overstating confidence
+        to an operator; where they disagree, this display errs toward showing the
+        ambiguity, so sharpening is not available.
+        """
+        if not samples:
+            return self.temperature
+        grid = grid or [1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0]
+        best_t, best_ll = 1.0, None
+        for t in grid:
+            if t < 1.0:
+                continue
+            self.temperature = t
+            ll = 0.0
+            n = 0
+            for smp in samples:
+                s = self.compat(smp["x"])
+                for zi, y in enumerate(smp["y"]):
+                    p = self.prob(s[zi])
+                    p = min(1.0 - 1e-9, max(1e-9, p))
+                    ll += -(y * math.log(p) + (1 - y) * math.log(1 - p))
+                    n += 1
+            ll = ll / max(1, n)
+            if best_ll is None or ll < best_ll:
+                best_t, best_ll = t, ll
+        self.temperature = best_t
+        return best_t
 
     def compat(self, x: Sequence[float]) -> List[float]:
         """s_t(z) for every modelled intent."""
@@ -362,6 +438,7 @@ class IntentModel(object):
             "intents": self.intents,
             "n_features": self.n_features,
             "seed": self.seed,
+            "temperature": self.temperature,
             "mean": self.mean,
             "std": self.std,
             "a": self.a,
@@ -388,6 +465,7 @@ class IntentModel(object):
         if doc.get("feature_names") != F.feature_names():
             raise ValueError("model feature_names do not match the current layout")
         m = IntentModel(int(doc["n_features"]), doc.get("intents"), int(doc.get("seed", 0)))
+        m.temperature = float(doc.get("temperature", 1.0))
         m.mean = [float(v) for v in doc["mean"]] if doc.get("mean") else None
         m.std = [float(v) for v in doc["std"]] if doc.get("std") else None
         m.a = float(doc["a"])

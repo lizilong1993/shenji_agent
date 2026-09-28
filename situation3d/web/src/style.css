@@ -1188,3 +1188,28 @@ select {
 
 /* 菜单按钮的禁用态（鸟瞰图尚未接入时占位） */
 .topbar-actions button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* 候选集合大小：CES 的核心读数，收缩过程要一眼可见 */
+.tpi-setbar {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px dashed #cfdaea;
+  font-size: 11px;
+  color: #12325c;
+}
+/* 沿用上一次评分的标注：步长采样下不标注会让人以为每帧都在重新判定 */
+.tpi-carry {
+  margin-top: 3px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: #f4f6f9;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+/* 意图标签内的概率/权重百分比 */
+.tpi-pct {
+  font-size: 9.5px;
+  font-style: normal;
+  color: #5a6b80;
+  margin-left: 3px;
+}

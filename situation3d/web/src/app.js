@@ -1153,12 +1153,22 @@ function debugIntent() {
         status: e.intent_status || null,
         set: (e.intent_set || []).map(function (x) { return x.code; }),
         missing: e.missing_evidence || [],
+        // CES 链路：集合大小、来源（model/rule）、不足度、是否沿用上一评分帧
+        setSize: (typeof e.intent_set_size === 'number') ? e.intent_set_size : null,
+        source: e.intent_source || null,
+        insufficiency: (typeof e.insufficiency === 'number') ? e.insufficiency : null,
+        carried: e.intent_carried === true,
+        evalTick: (e.intent_eval_tick !== undefined) ? e.intent_eval_tick : null,
       };
     });
   }
   const summary = state.data && state.data.intent_summary;
   return {
     ontology: window.IntentUi ? IntentUi.debug() : null,
+    // 数据集层面的 CES 链路状态（模型版本、嵌套违例、步长、评分帧数）
+    datasetIntentSet: (state.data && state.data.intent_set) || null,
+    datasetIntentSource: (state.data && state.data.intent_source) || null,
+    intentModelVersion: (state.data && state.data.intent_model_version) || null,
     modelHasOntology: !!(state.data && state.data.inference_model
       && state.data.inference_model.intent_ontology),
     hasData: !!state.data,

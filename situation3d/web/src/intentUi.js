@@ -120,19 +120,41 @@
     var prim = set.filter(function (e) { return e.role !== 'secondary' && !isSecondaryOnly(e.code); });
     var sec = set.filter(function (e) { return e.role === 'secondary' || isSecondaryOnly(e.code); });
 
+    // 模型与规则两条链路给分数字段不同名：CES 模型给 `score`（概率），
+    // 规则给 `weight`。早先只读 `weight`，于是走模型时置信度永远显示 0%——
+    // 一个看起来"没坏"但完全错误的读数。这里两者都认。
+    function scoreOf(e) {
+      if (!e) return 0;
+      if (typeof e.score === 'number') return e.score;
+      if (typeof e.weight === 'number') return e.weight;
+      return 0;
+    }
+
+    var isModel = entry.intent_source === 'model';
+    var setSize = (typeof entry.intent_set_size === 'number')
+      ? entry.intent_set_size : set.length;
+
     var html = '<div class="tp-intent">';
 
     // ---- 主导意图：一行，最大字号 ----
     html += '<div class="tpi-head">战术意图'
-      + (ontology ? '<span class="tpi-src">本体 v' + esc(ontology.version || '?') + '</span>' : '')
-      + '</div>';
+      + '<span class="tpi-src">'
+      + (isModel
+          ? '模型 ' + esc(entry.model_version || '') + ' · |C|=' + setSize
+          : '规则（模型未加载）')
+      + '</span></div>';
 
     if (prim.length) {
       var top = prim[0];
       html += '<div class="tpi-primary">' + esc(nameZh(top.code)) + '</div>';
       html += '<div class="tpi-sub">' + esc(parentZh(top.code))
-        + ' · 置信度 ' + Math.round((top.weight || 0) * 100) + '%'
+        + ' · ' + (isModel ? '模型概率 ' : '规则权重 ')
+        + Math.round(scoreOf(top) * 100) + '%'
         + (top.approximated ? ' · 近似判据' : '') + '</div>';
+    } else if (setSize > 1) {
+      // 集合非空但都是次要意图：说清"还没有主意图"，而不是显示"未判定"。
+      html += '<div class="tpi-primary tpi-primary-none">尚未确定主意图</div>';
+      html += '<div class="tpi-sub">|C|=' + setSize + '，当前只有次要意图候选</div>';
     } else if (st) {
       var si = statusInfo(st);
       html += '<div class="tpi-primary tpi-primary-none">'
@@ -140,6 +162,32 @@
       html += '<div class="tpi-sub">' + esc(si ? si.note : '') + '</div>';
     } else {
       html += '<div class="tpi-primary tpi-primary-none">未判定</div>';
+    }
+
+    // ---- 集合收缩：|C| 越小越接近结论 ----
+    if (isModel) {
+      html += '<div class="tpi-setbar">候选集合 <b>|C| = ' + setSize + '</b>';
+      if (setSize === 0) {
+        html += '（证据不足，无可支持意图）';
+      } else if (setSize === 1) {
+        html += '（已收敛到唯一意图）';
+      } else {
+        html += '（' + setSize + ' 个候选仍无法区分）';
+      }
+      html += '</div>';
+      if (typeof entry.insufficiency === 'number') {
+        html += '<div class="tpi-sub">证据不足度 u = '
+          + entry.insufficiency.toFixed(3)
+          + ' · 判定阈值 δ = '
+          + (typeof entry.delta === 'number' ? entry.delta.toFixed(3) : '—')
+          + '</div>';
+      }
+      if (entry.intent_carried) {
+        // 步长采样：这一帧沿用上一次评分。不标注会让人以为每帧都在重新判定。
+        html += '<div class="tpi-carry">沿用第 '
+          + (entry.intent_eval_tick !== undefined ? entry.intent_eval_tick : '?')
+          + ' 帧的判定（按步长采样）</div>';
+      }
     }
 
     // ---- 状态徽章（与威胁度配色分开） ----
@@ -207,9 +255,14 @@
         + esc(p ? p.name_zh : '其它') + '</span>';
       byParent[pc].forEach(function (item) {
         var e = item.e;
+        // 模型给出的是概率，显示在标签上；规则给权重。两者都不是"准确率"，
+        // 所以只在标签内以百分比呈现，不写成"置信度"以免被读成可信程度。
+        var s = (typeof e.score === 'number') ? e.score
+              : (typeof e.weight === 'number') ? e.weight : null;
         html += '<span class="tpi-chip' + (item.roleLabel === '次' ? ' tpi-chip-sec' : '')
           + '" title="' + esc((e.evidence || []).join('；')) + '">'
           + esc(nameZh(e.code))
+          + (s !== null ? '<i class="tpi-pct">' + Math.round(s * 100) + '%</i>' : '')
           + '<i class="tpi-role">' + esc(item.roleLabel) + '</i>'
           + (e.approximated ? '<i class="tpi-approx" title="用近似判据推出">≈</i>' : '')
           + '</span>';

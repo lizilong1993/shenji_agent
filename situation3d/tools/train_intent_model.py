@@ -186,6 +186,12 @@ def main(argv) -> int:
           % (F.feature_dim(), len(model.intents), args.epochs))
     hist = model.train(paired, epochs=args.epochs, lr=args.lr, verbose=True)
     print("train time      : %.1fs" % (time.time() - t0))
+    # Temperature is fitted on the *holdout* split: calibrating reported
+    # confidence on the data the weights were fitted to would just re-assert
+    # whatever the training loss already forced.
+    if test:
+        t_best = model.fit_temperature(intent_cf.pair_sequences(test))
+        print("temperature     : %.2f (fitted on %d held-out rows)" % (t_best, len(test)))
 
     model.meta.update({
         "version": "1.0.0-%s" % datetime.now(timezone.utc).strftime("%Y%m%d"),

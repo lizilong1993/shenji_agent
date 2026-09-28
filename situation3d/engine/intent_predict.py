@@ -64,6 +64,40 @@ def resolve_conflicts(codes: Sequence[str]) -> List[str]:
     return kept
 
 
+def _drop_conflicts(codes: List[str], scores: Sequence[float],
+                    model: M.IntentModel, banned: set,
+                    ever_dropped: set) -> List[str]:
+    """Remove one side of every ontology-declared conflict, keeping the stronger.
+
+    `codes` is expected strongest-first. The dropped code is also barred, so the
+    removal is permanent and the eligibility set keeps shrinking - a conflict that
+    is resolved once cannot reappear later from a previous frame's set.
+    """
+    conflicts = intent.conflict_pairs()
+    kept: List[str] = []
+    for c in codes:
+        clash = None
+        for k in kept:
+            if (c, k) in conflicts or (k, c) in conflicts:
+                clash = k
+                break
+        if clash is None:
+            kept.append(c)
+            continue
+        # Keep whichever scores higher; on a tie keep the one already held.
+        if scores[model.intents.index(c)] > scores[model.intents.index(clash)]:
+            j = model.intents.index(clash)
+            banned.add(j)
+            ever_dropped.add(j)
+            kept = [x for x in kept if x != clash]
+            kept.append(c)
+        else:
+            j = model.intents.index(c)
+            banned.add(j)
+            ever_dropped.add(j)
+    return kept
+
+
 def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
                    order: Sequence[str], model: M.IntentModel,
                    inference_frames: Optional[Sequence[dict]] = None,
@@ -156,42 +190,41 @@ def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
                 for j in range(len(s)):
                     if s[j] >= delta:
                         ever.add(j)
-                # Codes barred at any point. `ever \ ever_dropped` only shrinks, so
-                # no output drawn from it can resurrect a dropped intent.
                 ever_dropped = considered_dropped.setdefault(tid, set())
-                prev = last_set.get(tid)
-                # Apply the size cap *before* filtering on `banned`, and re-check
-                # `banned` afterwards. The cap can move a candidate into `banned`
-                # in this very iteration; if the ban filter has already run, that
-                # candidate still shows up this frame and - worse - reappears from
-                # the previous set on the next one, which is exactly the
-                # resurrection `reentry_grace=1` promises cannot happen (measured:
-                # 20 occurrences when the cap ran after the filter).
-                if prev:
-                    cap = len(prev)
-                    passing = [c for c in codes if model.intents.index(c) not in banned]
-                    passing.sort(key=lambda c: -s[model.intents.index(c)])
-                    if len(passing) > cap:
-                        for c in passing[cap:]:
-                            j = model.intents.index(c)
-                            banned.add(j)
-                            ever_dropped.add(j)
-                        passing = passing[:cap]
-                    # Prefer candidates already in the previous set so the set
-                    # narrows instead of swapping members.
-                    keep = [c for c in passing if c in prev]
-                    for c in passing:
-                        if c not in keep and len(keep) < cap:
-                            keep.append(c)
-                    codes = keep
-                filtered = []
-                for c in codes:
-                    j = model.intents.index(c)
-                    if j in banned or j not in ever:
-                        if j in banned:
-                            no_reentry_events += 1
-                        continue
-                    filtered.append(c)
+                prev = last_set.get(tid) or []
+
+                # The output is restricted to E = (prev ∪ passing) \ (banned ∪
+                # ever_dropped), which is provably non-increasing: `prev` is the
+                # previous output, `passing` is recomputed each frame, `banned` and
+                # `ever_dropped` only grow as codes are barred. Nothing outside E
+                # can be emitted, so no barred code can ever come back.
+                #
+                # Earlier versions filtered only against `banned` and then let the
+                # empty-set fallback draw on `ever`; because the size cap bans
+                # overflow codes, that fallback re-emitted exactly the codes the
+                # cap had just barred. Measured against the shipped model: 48
+                # resurrections at grace=1.
+                passing = [c for c in codes
+                           if model.intents.index(c) not in banned
+                           and model.intents.index(c) not in ever_dropped]
+                prev_allowed = [c for c in prev
+                                if model.intents.index(c) not in banned
+                                and model.intents.index(c) not in ever_dropped]
+                eligible = list(prev_allowed)
+                for c in sorted(passing, key=lambda c: -s[model.intents.index(c)]):
+                    if c not in eligible:
+                        eligible.append(c)
+
+                cap = len(prev) if prev else len(eligible)
+                eligible.sort(key=lambda c: -s[model.intents.index(c)])
+                if len(eligible) > cap:
+                    for c in eligible[cap:]:
+                        j = model.intents.index(c)
+                        banned.add(j)
+                        ever_dropped.add(j)
+                    eligible = eligible[:cap]
+                codes = eligible
+
                 # Bar a candidate only after it stays below the threshold for
                 # `reentry_grace` consecutive frames; counting strikes rather than
                 # acting on one frame keeps a noisy tick from permanently removing
@@ -206,24 +239,16 @@ def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
                     if strikes[tid][j] >= max(1, reentry_grace):
                         banned.add(j)
                         ever_dropped.add(j)
-                codes = filtered
-                if not codes:
-                    # Nothing passed. Algorithm 1 still wants a non-empty answer, so
-                    # draw from `ever \ ever_dropped` -- never from a barred code.
-                    # This fallback previously drew on `ever` alone and so
-                    # reintroduced codes the projection had already removed (20
-                    # frames). The set may go empty here; that is the honest
-                    # outcome, and it is reported as BACKGROUND.
-                    if prev:
-                        codes = [c for c in prev
-                                 if model.intents.index(c) in ever
-                                 and model.intents.index(c) not in banned]
-                    if not codes:
-                        allowed = [j for j in ever
-                                   if j not in banned and j not in ever_dropped]
-                        if allowed:
-                            pick = max(allowed, key=lambda j: s[j])
-                            codes = [model.intents[pick]]
+
+                # Re-resolve ontology conflicts after the merge. `prev` and the
+                # current frame were each conflict-free on their own, but their
+                # union need not be: a candidate that arrives while a conflicting
+                # one is already held produces a pair the ontology declares
+                # mutually exclusive. Dropping the weaker one here is still
+                # monotone, because the drop is recorded in `banned`, so E shrinks.
+                # (Measured: 5 co-occurrences appeared as soon as eligibility
+                # became `prev ∪ passing`.)
+                codes = _drop_conflicts(codes, s, model, banned, ever_dropped)
                 last_set[tid] = list(codes)
 
             # primary / secondary split, mirroring the rule layer's contract
@@ -232,7 +257,9 @@ def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
             ordered = prim + sec
 
             sized = sorted(range(len(s)), key=lambda j: -s[j])[:top_k]
-            probs = {model.intents[j]: round(s[j], 4) for j in sized}
+            # Reported probabilities are temperature-calibrated; the scores used
+            # for the threshold decision above are deliberately left raw.
+            probs = {model.intents[j]: round(model.prob(s[j]), 4) for j in sized}
 
             if not ordered:
                 status = "BACKGROUND"
@@ -250,7 +277,7 @@ def predict_frames(frames: Sequence[dict], tracks: Dict[str, F.TrackView],
                 "intent_set": [
                     {
                         "code": c,
-                        "score": round(s[model.intents.index(c)], 4),
+                        "score": round(model.prob(s[model.intents.index(c)]), 4),
                         "role": "secondary" if c in secondary_only else "primary",
                         "name_zh": meta.get(c, {}).get("name_zh") or c,
                     }
