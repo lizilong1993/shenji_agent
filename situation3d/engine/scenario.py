@@ -172,6 +172,16 @@ class Target:
     # True for platforms that fly or sail a closed patrol circuit: they cycle
     # the route instead of stopping at the last vertex.
     loop: bool = False
+    # True when this land platform's movement must follow the road network.
+    #
+    # Not every `domain == "land"` target is road-bound. Area-defence batteries
+    # (岸舰导弹营 / 远程防空营 / 要地防空连) occupy a position and fight from it;
+    # they are defined by where they are emplaced, not by a road march, and forcing
+    # them onto the network both misrepresents them and makes the dataset's
+    # `road_constrained` flag depend on whether a road happens to pass near a
+    # missile site. Only mobile land units - armour, mechanised infantry, artillery
+    # moving between positions, logistics - are road-bound.
+    road_bound: bool = True
     attributes: Dict[str, str] = field(default_factory=dict)
 
     @property
@@ -208,6 +218,10 @@ class Target:
             "speed_kmh": round(self.speed_kmh, 1),
             "speed_unit": self.speed_unit,
             "altitude_m": self.altitude_m,
+            # Whether this platform's movement must follow the road network. The
+            # front end and `road_selftest` both read it, so a positional battery is
+            # not held to a constraint that does not apply to it.
+            "road_bound": bool(self.road_bound),
             "attributes": self.attributes,
             "waypoints": [[round(a, 6), round(b, 6)] for a, b in self.waypoints],
         }
@@ -399,6 +413,9 @@ def _build_targets() -> List[Target]:
             platform_class="岸舰导弹",
             domain="land",
             affiliation="red",
+            # Positional area-defence battery: it fights from where it is
+            # emplaced, so it is not routed on the road network.
+            road_bound=False,
             waypoints=coastal_route,
             speed_kn=geo.kmh_to_knots(45.0),
             role="岸海打击",
@@ -423,6 +440,9 @@ def _build_targets() -> List[Target]:
             platform_class="地面防空",
             domain="land",
             affiliation="red",
+            # Positional area-defence battery: it fights from where it is
+            # emplaced, so it is not routed on the road network.
+            road_bound=False,
             waypoints=sam_route,
             speed_kn=geo.kmh_to_knots(30.0),
             role="要地防空",
@@ -548,6 +568,9 @@ def _build_targets() -> List[Target]:
             platform_class="地面防空",
             domain="land",
             affiliation="blue",
+            # Positional area-defence battery: it fights from where it is
+            # emplaced, so it is not routed on the road network.
+            road_bound=False,
             waypoints=blue_sam_route,
             speed_kn=geo.kmh_to_knots(25.0),
             role="要地防空",
@@ -666,11 +689,14 @@ def route_land_targets(targets: List[Target], theatre: Optional[str] = None
         network_error = "no theatre given"
 
     for t in targets:
-        if t.domain != "land" or network is None:
+        if t.domain != "land" or network is None or not getattr(t, "road_bound", True):
             routes[t.target_id] = list(t.waypoints)
             meta[t.target_id] = {
                 "routed": False,
+                "road_bound": bool(getattr(t, "road_bound", True)),
                 "reason": ("not a land target" if t.domain != "land"
+                           else "positional battery, not road-bound"
+                           if not getattr(t, "road_bound", True)
                            else network_error or "no road network"),
             }
             continue
@@ -678,7 +704,8 @@ def route_land_targets(targets: List[Target], theatre: Optional[str] = None
             path = network.route_latlon(t.waypoints)
         except roads_mod.RoadError as e:
             routes[t.target_id] = list(t.waypoints)
-            meta[t.target_id] = {"routed": False, "reason": str(e)}
+            meta[t.target_id] = {"routed": False, "road_bound": True,
+                                 "reason": str(e)}
             continue
         routes[t.target_id] = path
         meta[t.target_id] = {
@@ -1064,7 +1091,11 @@ def build_dataset(case=None) -> dict:
     # build_frames 内部，是因为要同时拿到 meta（哪些目标真的路由成功）写进数据集，
     # 让 road_selftest 能区分"已约束且正确"与"没能路由"。
     theatre = getattr(case, "theatre", None)
-    land_ids = {t.target_id for t in targets if t.domain == "land"}
+    # Road-bound land platforms only. A positional battery is `domain == "land"`
+    # but is not expected to be on a road, so including it would make the flag
+    # false for a reason that says nothing about the routing.
+    land_ids = {t.target_id for t in targets
+                if t.domain == "land" and getattr(t, "road_bound", True)}
     land_routes, land_meta = route_land_targets(targets, theatre)
     frames = build_frames(targets, theatre=theatre, routes=land_routes)
     inferred = inference_mod.infer(frames, targets, case.hotspot_names)

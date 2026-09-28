@@ -218,7 +218,13 @@ def theatre_report(name: str) -> None:
             continue
         if ds.get("theatre") not in (None, name):
             continue
-        land_ids = {t["id"] for t in ds.get("targets", []) if t.get("domain") == "land"}
+        # Only road-bound land platforms. A positional area-defence battery is
+        # `domain == "land"` but fights from where it is emplaced, so requiring it
+        # to sit near a road would fail for a reason that says nothing about the
+        # routing (measured: it flagged B03/R04/R05, three fixed batteries that sit
+        # tens of km from the clipped network).
+        land_ids = {t["id"] for t in ds.get("targets", [])
+                    if t.get("domain") == "land" and t.get("road_bound", True)}
         if not land_ids:
             continue
         if not ds.get("road_constrained"):
