@@ -141,8 +141,6 @@
       + TIERS.map(function (t, i) {
           return '<span><i class="os-sw os-tier-' + i + '"></i>' + esc(t.label) + '</span>';
         }).join('')
-      + '<span class="os-legend-note">图标数量 = 该类型目标数量</span>'
-      + '<span class="os-legend-note">颜色表示告警等级，非战损</span>'
       + '</div>';
 
     return side('red', '红方') + side('blue', '蓝方') + legend;
@@ -263,83 +261,38 @@
   }
 
   /**
-   * 目标态势栏：状态信息 / 活动规律 / 可能的意图。
+   * 目标意图栏：**只显示意图集合**（CES 候选集合）与它的判据。
    *
-   * 意图那块**直接复用** `IntentUi.renderIntentBlock`，不重写：集合大小、概率、
+   * 按你的要求把标题从「可能的意图」改成「目标意图」，内容收敛为意图集合本身，
+   * 去掉了状态信息 / 活动规律 / 装备参数——这一栏要回答的是"这个目标想干什么"，
+   * 其余读数会把它淹掉（`deriveActivity` 与 `headingStd` 因此暂时没有调用方，
+   * 保留实现以便将来需要时挂回来）。
+   *
+   * 意图集合那块**直接复用** `IntentUi.renderIntentBlock`，不重写：集合大小、概率、
    * 状态徽章、判据的呈现已有既定实现与验收，重写只会引入分歧。
+   *
+   * 头部只保留"这是哪个目标"的识别信息（军标 + 编号 + 名称）——没有它，意图集合
+   * 就不知道是谁的。
    */
   function renderTargetStatus(hostEl, def, frameState, l1, entry, frames, tick) {
     if (!hostEl) return;
     if (!def) {
-      hostEl.innerHTML = '<div class="ts-empty">点击地图上的目标，查看该目标的'
-        + '状态信息、活动规律与可能的意图。</div>';
+      hostEl.innerHTML = '<div class="ts-empty">未选择目标</div>';
       return;
     }
 
     var html = '<div class="ts-head">'
       + '<img class="ts-sym" src="' + Symbology.symbolUri(def.icon, def.affiliation, {}) + '" alt="">'
       + '<div class="ts-id"><b>' + esc(def.id) + '</b>'
-      + '<span>' + esc(def.name) + '</span>'
-      + '<span class="ts-sub">' + esc(def.model || '') + ' · '
-      + (def.affiliation === 'red' ? '红方' : '蓝方') + ' · '
-      + esc(Symbology.domainLabel(def.domain) || def.domain) + '</span></div></div>';
+      + '<span>' + esc(def.name) + '</span></div></div>';
 
-    // ---- 状态信息 ----
-    html += '<div class="ts-sec"><h4>状态信息</h4>';
-    if (l1) {
-      var lv = (l1.alert | 0) + 1;
-      html += kv('状态', l1.state_label);
-      html += kv('告警等级', l1.alert_label, 'lv-' + lv);
-      html += kv('威胁度', l1.threat + ' / 100', 'lv-' + lv);
-      html += kv('最近对方', l1.nearest_id
-        ? (l1.nearest_id + ' · ' + l1.nearest_km + ' km') : '无');
-      html += kv('被对方探测', l1.covered_by + ' 部传感器');
-    } else {
-      html += '<div class="ts-empty">无该帧推理结果</div>';
-    }
-    html += kv('经度', frameState ? fmtDeg(frameState.lon, 'E', 'W') : '—');
-    html += kv('纬度', frameState ? fmtDeg(frameState.lat, 'N', 'S') : '—');
-    html += kv('高度', frameState ? Math.round(frameState.alt) + ' m' : '—');
-    html += kv('航向 / 航速', frameState
-      ? (Math.round(frameState.heading) + '° / ' + frameState.speed_kn + ' ' + (def.speed_unit || ''))
-      : '—');
-    html += kv('传感器', (def.sensor_name || '—') + '（' + Math.round(def.sensor_range_km || 0) + ' km）');
-    html += '</div>';
-
-    // ---- 活动规律 ----
-    var act = deriveActivity(frames, tick, def);
-    html += '<div class="ts-sec"><h4>活动规律</h4>';
-    if (act.insufficient) {
-      html += '<div class="ts-empty">样本不足（本窗口仅 ' + act.samples
-        + ' 帧），不下结论。</div>';
-    } else {
-      html += kv('机动模式', act.mode);
-      html += kv('航向特征', act.stability + '（σ≈' + act.headingStdDeg + '°）');
-      html += kv('平均航速', act.avgSpeedKn + ' ' + (def.speed_unit || ''));
-      html += kv('窗口位移', act.netKm + ' km（航程 ' + act.pathKm + ' km）');
-      if (act.travelledKm !== null) html += kv('累计航程', act.travelledKm + ' km');
-      if (act.laps !== null) html += kv('已巡逻圈次', act.laps);
-      html += '<div class="ts-note">统计窗口：最近 ' + act.samples + ' 帧</div>';
-    }
-    html += '</div>';
-
-    // ---- 可能的意图 ----
-    html += '<div class="ts-sec"><h4>可能的意图</h4>';
+    html += '<div class="ts-sec">';
     if (window.IntentUi) {
       html += IntentUi.renderIntentBlock(entry, def);
     } else {
       html += '<div class="ts-empty">意图模块未加载</div>';
     }
     html += '</div>';
-
-    // ---- 装备参数 ----
-    var attrs = def.attributes || {};
-    var keys = Object.keys(attrs);
-    if (keys.length) {
-      html += '<details class="ts-fold"><summary>装备参数</summary>';
-      keys.forEach(function (k) { html += kv(k, attrs[k]); });
-      html += '</details>';
-    }
 
     hostEl.innerHTML = html;
   }

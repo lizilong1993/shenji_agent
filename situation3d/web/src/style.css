@@ -793,6 +793,34 @@ select {
 }
 .transport-right select { font-size: 11px; padding: 1px 2px; }
 
+/* 播放、复位、倍速已移到前进/后退**左边**（时间轴是主轴，这些是它的操作）。
+   播放组与步进组之间加一道竖线：否则"▶ 播放"和"▶ 步进"两个三角紧挨着，极易看混。 */
+.transport-left { flex-wrap: nowrap; }
+/* 按钮文字不许换行、也不许被压缩。窄屏上把播放/复位移到左边后这一组变长，
+   默认的 flex-shrink 会把按钮挤到只剩一个字宽，"▶ 播放"被拆成竖排两行。 */
+.transport-left button,
+.transport-left select,
+.transport-left .tr-sep,
+.transport-right button { flex: 0 0 auto; white-space: nowrap; }
+.transport-left .tr-speed {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.transport-left select { font-size: 11px; padding: 1px 2px; }
+.tr-sep {
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 2px;
+  flex: 0 0 auto;
+}
+
 .tp-symbol { display: flex; gap: 10px; align-items: center; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
 .tp-symbol img { width: 44px; height: 44px; flex: 0 0 auto; }
 .tp-symbol-meta { display: flex; flex-direction: column; min-width: 0; }
@@ -963,14 +991,18 @@ select {
 
 .transport-left, .transport-right { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 
+/* 这条 `width: 30px` 是播放栏还只有 ▶◀ 两个方形步进按钮时定的。播放/复位搬进来后
+   它们继承同一个类，被硬压成 30px —— "▶ 播放" 直接裁掉只剩箭头。所以方形尺寸改为
+   只作用于步进按钮，播放/复位按内容自适应。 */
 .transport button {
-  width: 30px;
   height: 24px;
   border: 1px solid var(--border);
   border-radius: 3px;
   background: #f7f9fc;
   cursor: pointer;
 }
+#btnStepBack, #btnStepFwd { width: 30px; }
+#btnPlay, #btnReset { width: auto; min-width: 56px; padding: 0 8px; }
 
 .transport button:hover { background: #eef2f8; }
 

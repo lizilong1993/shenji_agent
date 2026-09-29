@@ -77,16 +77,14 @@
           <label class="check"><input type="checkbox" id="filterAir" checked> 空中 <b id="countAir">0</b></label>
         </div>
         <label class="check"><input type="checkbox" id="followTarget"> 目标跟随</label>
-        <div class="switch-note" id="followNote">开启后点击任一目标，相机以随航向旋转的追踪视角持续跟随；拖动地图即自动解除。</div>
       </details>
 
       <details class="layer-group panel-block" open>
         <summary>底图</summary>
         <label class="check"><input type="checkbox" id="modelTianditu" checked> 天地图（在线影像+注记）</label>
         <label class="check"><input type="checkbox" id="modelTiandituLabel" checked> 天地图注记（保证不被影像盖住）</label>
-        <!-- 天地图可用性说明。key 只存服务端 .env，前端不下发；这里只报"通不通"。
-             以前 key 失效时底图静默变成一片深蓝（球体底色），没人知道是 key 的问题。 -->
-        <div class="switch-note" id="tdtNote">在线底图状态检查中…</div>
+        <!-- 在线底图状态。只说通/不通与原因，不讲操作方法（操作方法在用户手册里）。 -->
+        <div class="switch-note" id="tdtNote"></div>
         <!-- 离线影像**默认开**：它垫在天地图下面（layerRegistry z=5 < 10）。
              两者不再互斥——天地图没有瓦片的地方（离线、key 失效、瓦片在途）露出的是
              离线影像，而不是球体底色。 -->
@@ -99,10 +97,6 @@
         <label class="check"><input type="checkbox" id="modelBuildings"> 建筑体块（三维，本机离线）</label>
         <details class="layer-sub">
           <summary>Cesium ion 令牌（在线三维实景用）</summary>
-          <div class="switch-note">
-            在线层<strong>必须联网</strong>，且 Google 不允许缓存或离线存储这些瓦片，
-            因此断网时会自动回落到下面的本机体块。
-          </div>
           <label class="check" for="ionTokenInput">令牌</label>
           <input type="password" id="ionTokenInput" class="token-input"
                  placeholder="粘贴 Cesium ion access token" autocomplete="off" spellcheck="false">
@@ -111,7 +105,6 @@
         </details>
         <label class="check"><input type="checkbox" id="modelPlaces" checked> 地名</label>
         <label class="check"><input type="checkbox" id="modelWeather"> 气象模型</label>
-        <div class="switch-note" id="switchNote">各开关的生效状态会在此说明。</div>
       </details>
 
       <details class="layer-group panel-block" open>
@@ -191,7 +184,7 @@
         <span id="sbLabel">—</span>
       </div>
 
-      <div id="hint" class="hint">滚轮缩放 · 拖拽旋转 · 点击目标在右侧「目标态势栏」查看 · 点击热点区域联动「区域态势栏」</div>
+      <!-- 界面不写操作说明：操作方法见用户手册。 -->
     </section>
 
     <aside class="panel panel-right">
@@ -202,12 +195,13 @@
         <div id="overallBody" class="os-body">未加载态势</div>
       </section>
 
-      <!-- 目标态势栏：点击地图目标后显示 状态信息 / 活动规律 / 可能的意图。
-           原中部浮动面板已移除，内容全部并入此处，目标信息只在一处。 -->
+      <!-- 目标意图：选中目标后只显示它的**意图集合**（CES 候选集合）及其判据。
+           状态/活动规律/装备参数等已按要求移除——这一栏回答的是"这个目标想干什么"，
+           别的读数会把它淹掉。 -->
       <section class="panel-block">
-        <h2>目标态势</h2>
+        <h2>目标意图</h2>
         <div id="targetBody" class="ts-body">
-          <div class="ts-empty">点击地图上的目标，查看该目标的状态信息、活动规律与可能的意图。</div>
+          <div class="ts-empty">未选择目标</div>
         </div>
       </section>
 
@@ -215,44 +209,26 @@
            原先分散在「光标位置信息」与「热点区域」两块，现在同属一栏。 -->
       <section class="panel-block">
         <h2>区域态势</h2>
-        <div id="regionHead" class="region-head">
-          <div class="kv"><span>经度</span><b id="geoLon">—</b></div>
-          <div class="kv"><span>纬度</span><b id="geoLat">—</b></div>
-          <div class="kv"><span>区域</span><b id="geoRegion">—</b></div>
-          <div class="kv"><span>范围</span><b id="geoSpan">—</b></div>
-          <div class="kv"><span>区域态势</span><b id="geoLevel">—</b></div>
-        </div>
-        <!-- 区域态势栏里的这几个读数与地图上的 #levelBanner 是**两份**显示：
-             地图横幅是有独立开关的 HUD，右栏是常驻信息。因此用独立 id（rl*），
-             避免与横幅重名——重名时 getElementById 只返回文档中靠前的那个，
-             右栏就永远不会更新。 -->
+        <!-- 只显示**整个案例范围**的整体态势：不再逐热点罗列，也不再随光标显示
+             单个区域的态势——那两者都是"局部"，与"区域态势"这一栏要回答的问题
+             （这一仗整体打到什么程度）不是一回事。 -->
+        <div class="kv"><span>范围</span><b id="geoSpan">—</b></div>
         <div class="region-level">
           <span class="rl-value" id="rlValue">—</span>
           <span class="rl-intent" id="rlIntent">—</span>
           <span class="rl-phase" id="rlPhase">—</span>
         </div>
         <div class="region-note" id="rlNote"></div>
-        <table class="hotspot-table">
-          <thead><tr><th>#</th><th>名称</th><th>经纬范围</th><th>态势</th><th>主导意图</th></tr></thead>
-          <tbody id="hotspotBody"></tbody>
-        </table>
       </section>
     </aside>
   </main>
 
   <footer class="transport">
     <div class="transport-left">
-      <button id="btnStepBack" type="button">◀</button>
-      <button id="btnStepFwd" type="button">▶</button>
-      <span id="tickLabel">0 / 0</span>
-    </div>
-    <input id="timeline" type="range" min="0" max="0" value="0" step="1">
-    <div class="transport-right">
-      <!-- 原先在右栏「本地控制」里，那边整块已移除，播放控制归到播放栏，就近操作。
-           id 不变，app.js 的播放/复位/倍速绑定无需改动。 -->
+      <!-- 播放控制在前进/后退**左边**：时间轴是主轴，播放/复位/倍速是它的操作。 -->
       <button id="btnPlay" type="button" class="mini">▶ 播放</button>
       <button id="btnReset" type="button" class="mini">⟲ 复位</button>
-      <label class="tr-speed">推演倍速
+      <label class="tr-speed">倍速
         <select id="speedSelect">
           <option value="1">1×</option>
           <option value="10">10×</option>
@@ -261,6 +237,13 @@
           <option value="120">120×</option>
         </select>
       </label>
+      <span class="tr-sep"></span>
+      <button id="btnStepBack" type="button">◀</button>
+      <button id="btnStepFwd" type="button">▶</button>
+      <span id="tickLabel">0 / 0</span>
+    </div>
+    <input id="timeline" type="range" min="0" max="0" value="0" step="1">
+    <div class="transport-right">
       <span id="clockLabel">—</span>
     </div>
   </footer>

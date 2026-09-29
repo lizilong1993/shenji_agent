@@ -97,23 +97,43 @@ const FALLBACK_CAMERA = { lon: 119.6, lat: 24.4, height: 900000, heading: 0, pit
 
 // 已移除的 id（连同对应的面板一起）：targetList / targetCountHint（左栏目标列表）、
 // healthSummary / healthBody / healthRefresh（数据健康栏）、
-// targetPanel / tpTitle / tpBody / tpClose（中部浮动目标面板，内容并入右栏目标态势栏）、
+// targetPanel / tpTitle / tpBody / tpClose（中部浮动目标面板，内容并入右栏目标意图栏）、
 // mvLon / mvLat / mvAlt（视点三行合并为单行 mvAll）、
-// menuLayers / menuView / menuSituation（顶栏下拉）、btnOverview / btnShareScene。
+// menuLayers / menuView / menuSituation（顶栏下拉）、btnOverview / btnShareScene、
+// switchNote / followNote / hint（说明性文字，按"界面不写操作说明"移除）、
+// geoLon / geoLat / geoRegion / geoLevel / hotspotBody（区域态势栏只保留案例范围的整体
+// 态势，逐热点与光标所辖区域的那些读数一并去掉）。
 const dom = {};
-['statusText', 'statusDot', 'scenarioName', 'hotspotBody',
- 'geoLon', 'geoLat', 'geoRegion', 'geoSpan', 'geoLevel',
+['statusText', 'statusDot', 'scenarioName',
+ 'geoSpan',
  'levelValue', 'levelNote', 'levelIntent', 'levelPhase',
  'rlValue', 'rlNote', 'rlIntent', 'rlPhase',
  'overallBody', 'targetBody',
  'menuCase', 'menuCaseList',
- 'switchNote', 'tdtNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner',
+ 'tdtNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner',
  'countRed', 'countBlue', 'countSea', 'countLand', 'countAir',
  'loadingBadge', 'loadingText',
  'mapCompass', 'compRose', 'mapViewpoint', 'mvAll', 'modelPlaces',
  'modelTianditu', 'modelImagery', 'modelTerrain', 'modelBuildings',
- 'mapScalebar', 'sbBar', 'sbLabel', 'followTarget', 'followNote',
+ 'mapScalebar', 'sbBar', 'sbLabel', 'followTarget',
 ].forEach(function (id) { dom[id] = document.getElementById(id); });
+
+// 已移除读数的**惰性桩**。
+//
+// `selectHotspot()` / `updateGeoReadout()` 里还有若干"跟随光标/热点"的读数写入，那些
+// 元素已随区域态势栏的收敛而去掉。与其在有限的改动里逐处删（容易漏一处、漏了就是
+// 每次移动鼠标抛一次 TypeError），不如在这里给一个显式的空对象：写入静默丢失，
+// 控制流（尤其是 selectHotspot 里的相机动作）完全不受影响。
+//
+// 这是有意为之的取舍，不是疏忽——**桩名里带 Removed 前缀**，一眼能看出它不对应任何
+// DOM，将来清理这些死写入时也容易定位。
+['geoLon', 'geoLat', 'geoRegion', 'geoLevel', 'hotspotBody', 'switchNote', 'followNote']
+  .forEach(function (id) {
+    if (!dom[id]) {
+      dom[id + 'Removed'] = true;
+      dom[id] = { textContent: '', className: '', innerHTML: '', appendChild: function () {} };
+    }
+  });
 
 // --------------------------------------------------------------------------
 // 瓦片加载进度
@@ -301,9 +321,21 @@ function setStatus(text, kind) {
   dom.statusDot.className = 'dot' + (kind ? ' ' + kind : '');
 }
 
-function setSwitchNote(text) {
-  dom.switchNote.textContent = text;
-}
+/**
+ * 图层状态说明。**已按要求改为空实现**。
+ *
+ * 「去掉整个系统 UI 中的说明性文字，用户只能通过用户手册了解系统操作」——这 40 多处
+ * 调用写的都是"某图层为什么这样显示"的解释，正是要拿掉的东西。
+ *
+ * 保留函数本身而不是删掉 40 个调用点：这些调用分布在每个 setXxx 里，逐个删既容易漏、
+ * 又会让"这里本该有一句状态说明"的意图消失；留一个注明原因的空实现，将来若要恢复
+ * 状态提示，改一处即可。真实故障仍然有出口——`setStatus()`（顶栏状态点）与
+ * `#tdtNote` 不受影响。
+ */
+function setSwitchNote(text) { /* 见上方说明：说明性文字已从界面移除 */ }
+
+/** 同 setSwitchNote：跟随模式的说明文字已从界面移除。 */
+function setFollowNote(text) { /* 见 setSwitchNote 的说明 */ }
 
 function el(tag, className, html) {
   const node = document.createElement(tag);
@@ -1439,10 +1471,23 @@ function renderTargetCounts() {
 }
 
 // --------------------------------------------------------------------------
-// 热点区域表格
+// 热点区域表格 —— 已移除
 // --------------------------------------------------------------------------
+//
+// 「区域态势」栏按你的要求只显示**整个态势案例范围**的整体态势，不再逐热点罗列。
+// 表格 DOM（#hotspotBody）已从 index.html 删除，但相机联动仍然需要"点击热点区域"的
+// 能力，所以 `createHotspots()` 与 `selectHotspot()` 都保留；这里只把**建表**这一步
+// 停掉：不再构造 11~18 行 DOM，也不再把行挂进 state.hotspotRows。
+//
+// 保留函数本身（而不是删掉调用点）是为了让"表格曾经在这里、且被有意去掉"这件事留在
+// 代码里；否则以后有人看到 selectHotspot 里的 active 行逻辑会一头雾水。
 
 function renderHotspotTable() {
+  // 没有真实表格就什么都不做——不能靠 dom 的惰性桩，否则会往一个空对象里塞 DOM。
+  if (!document.getElementById('hotspotBody')) {
+    state.hotspotRows = [];
+    return;
+  }
   const body = dom.hotspotBody;
   body.innerHTML = '';
   state.hotspotRows = [];
@@ -2620,10 +2665,6 @@ const FOLLOW_VIEW = {
 };
 
 const _followHpr = new Cesium.HeadingPitchRange(0, 0, 0);
-
-function setFollowNote(text) {
-  if (dom.followNote) dom.followNote.textContent = text;
-}
 
 /** 被跟随目标是否仍然可跟随（存在、可见、有位置）。 */
 function followTargetUsable(id) {
