@@ -189,7 +189,14 @@ body {
 .layer-groups::-webkit-scrollbar-thumb:hover { background: #53688a; }
 .layer-groups::-webkit-scrollbar-track { background: transparent; }
 
-.panel-right { border-right: none; border-left: 1px solid var(--border); flex: 0 0 306px; }
+/* 右栏承载三个分栏（整体/目标/区域态势）。整体态势栏要放"家族标签 + 图标条 + 计数"
+   三列，306px 装不下，加宽到 380px；三栏内容较长，整列纵向滚动。 */
+.panel-right {
+  border-right: none;
+  border-left: 1px solid var(--border);
+  flex: 0 0 380px;
+  overflow-y: auto;
+}
 
 .panel-block {
   background: var(--panel);
@@ -506,10 +513,11 @@ select {
 .globe-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
 #cesiumContainer { position: absolute; inset: 0; }
 
+/* 图例：移到左上角 hint 下方（原在左下，bottom:12）。左下角现已让给比例尺。 */
 .legend {
   position: absolute;
   left: 12px;
-  bottom: 12px;
+  top: 46px;
   display: flex;
   gap: 14px;
   padding: 6px 10px;
@@ -605,54 +613,171 @@ select {
 }
 .level-banner .lb-note { color: var(--text-dim); line-height: 1.45; }
 
-/* ---------------- 目标信息面板（中间窗口右上角） ---------------- */
+/* ---------------- 右侧「目标态势栏」的样式 ----------------
+   注意：原有的 `.tp-kv` / `.tp-reason` / `.tp-intent` / `.tpi-*` / `.tp-fold`
+   仍然由 intentUi.js 生成的意图集合块使用，本轮只是换了容器，因此全部保留。
+   浮动的 `.target-panel` / `.tp-head` / `.tp-title` / `.tp-close` / `.tp-body`
+   已随浮动面板一起移除。 */
 
-.target-panel {
-  position: absolute;
-  right: 12px;
-  top: 12px;
-  width: 350px;
-  max-height: calc(100% - 24px);
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #b9c6d8;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, .975);
-  box-shadow: 0 10px 28px rgba(20, 34, 54, .22);
-  z-index: 40;
+.ts-body { display: flex; flex-direction: column; gap: 8px; }
+
+.ts-empty {
+  padding: 8px 9px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 
-.target-panel.hidden { display: none; }
+.ts-head { display: flex; gap: 10px; align-items: center; }
+.ts-head .ts-sym { width: 34px; height: 34px; flex: 0 0 auto; }
+.ts-id { display: flex; flex-direction: column; min-width: 0; }
+.ts-id b { font-size: 13px; }
+.ts-id > span { font-size: 11.5px; color: var(--text); }
+.ts-id .ts-sub { font-size: 10.5px; color: var(--text-dim); }
 
-.tp-head {
-  flex: 0 0 auto;
+.ts-sec { border-top: 1px dashed var(--border); padding-top: 6px; }
+.ts-sec h4 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .4px;
+}
+.ts-kv { display: flex; justify-content: space-between; gap: 8px; padding: 1.5px 0; font-size: 11.5px; }
+.ts-kv span { color: var(--text-dim); flex: 0 0 auto; }
+.ts-kv b { font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+.ts-note { margin-top: 3px; font-size: 10px; color: var(--text-dim); }
+.ts-fold { border-top: 1px dashed var(--border); padding-top: 6px; }
+.ts-fold > summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .4px;
+  user-select: none;
+  list-style: none;
+}
+.ts-fold > summary::-webkit-details-marker { display: none; }
+.ts-fold > summary::before { content: '▸'; display: inline-block; width: 11px; }
+.ts-fold[open] > summary::before { transform: rotate(90deg); }
+.ts-fold[open] > summary { margin-bottom: 4px; }
+
+/* ---------------- 右侧「整体态势栏」的样式 ----------------
+   图标用 CSS filter 分级降饱和压暗，而不是新建 4 套 SVG：颜色语义是告警等级
+   （正常/注意/警告/严重），不是战损——见 statusPanels.js 顶部说明。 */
+
+.os-body { display: flex; flex-direction: column; gap: 8px; }
+
+.os-side { border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.os-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 4px 8px;
+  font-size: 11.5px;
+}
+.os-red .os-head { background: #fbeceb; border-bottom: 1px solid #f0d3d0; }
+.os-blue .os-head { background: #ebf1fb; border-bottom: 1px solid #d2dff2; }
+.os-title { font-weight: 700; }
+.os-red .os-title { color: var(--red); }
+.os-blue .os-title { color: var(--blue); }
+.os-sub { font-size: 10px; color: var(--text-dim); }
+
+.os-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  background: #f3f7fd;
-  border-radius: 6px 6px 0 0;
+  gap: 6px;
+  padding: 3px 8px;
+  border-bottom: 1px dashed #eef2f7;
 }
-
-.tp-title { flex: 1 1 auto; font-size: 13px; font-weight: 700; }
-
-.tp-close {
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: #fff;
+.os-row:last-child { border-bottom: none; }
+.os-fam {
+  flex: 0 0 82px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
   color: var(--text-dim);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
 }
+.os-fam-ico { width: 15px; height: 15px; flex: 0 0 auto; }
+.os-icons { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 1px; }
+.os-icon { width: 16px; height: 16px; display: block; }
+.os-count { flex: 0 0 auto; font-size: 10.5px; color: var(--text-dim); }
+.os-count b { font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
 
-.tp-close:hover { background: #eef2f8; color: var(--text); }
+.os-empty { padding: 6px 8px; font-size: 11px; color: var(--text-dim); }
 
-.tp-body { overflow-y: auto; padding: 8px 10px 10px; }
+/* 四档告警：满色 -> 逐级降饱和压暗，得到与参考图一致的单调渐变 */
+.os-tier-0 { filter: none; }
+.os-tier-1 { filter: saturate(.72) brightness(.94); }
+.os-tier-2 { filter: saturate(.5) brightness(.8); }
+.os-tier-3 { filter: grayscale(.78) brightness(.7); }
+
+.os-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding-top: 2px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.os-legend span { display: flex; align-items: center; gap: 4px; }
+.os-legend-note { font-style: italic; }
+.os-sw {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: #c8352c;
+}
+.os-sw.os-tier-1 { background: #c05a52; }
+.os-sw.os-tier-2 { background: #9d6a66; }
+.os-sw.os-tier-3 { background: #8a8a8a; }
+
+/* ---------------- 右侧「区域态势栏」的样式 ---------------- */
+
+.region-head { margin-bottom: 4px; }
+.region-level {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 0 2px;
+  border-top: 1px dashed var(--border);
+}
+.rl-value { font-size: 12px; font-weight: 700; }
+/* 区域等级配色：与地图横幅同源（--lv1..--lv4）。
+   注意 `.lv1` 这类类在全局只对 `.lv-cell` / `.lb-value` 生效，所以这里必须显式声明，
+   否则右栏的等级会一直是无色的。 */
+.rl-value.lv1 { color: var(--lv1); }
+.rl-value.lv2 { color: var(--lv2); }
+.rl-value.lv3 { color: var(--lv3); }
+.rl-value.lv4 { color: var(--lv4); }
+.rl-intent, .rl-phase {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10.5px;
+}
+.rl-intent { background: #eaf1fb; color: #12325c; }
+.rl-phase { background: #eef4ea; color: #3d5a2f; }
+.region-note { font-size: 10.5px; color: var(--text-dim); line-height: 1.45; margin-bottom: 4px; }
+
+/* 左栏图层管理的批量操作按钮（原在顶栏「图层管理」下拉里） */
+.layer-cmds { display: flex; gap: 4px; flex: 0 0 auto; }
+.layer-cmds .mini { flex: 1 1 auto; font-size: 11px; padding: 3px 4px; }
+
+/* 播放栏右侧的倍速选择 */
+.transport-right .tr-speed {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.transport-right select { font-size: 11px; padding: 1px 2px; }
 
 .tp-symbol { display: flex; gap: 10px; align-items: center; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
 .tp-symbol img { width: 44px; height: 44px; flex: 0 0 auto; }
@@ -870,10 +995,12 @@ select {
  * z-index 取 36，低于目标面板的 40；视点坐标与比例尺不接收鼠标事件。
  */
 
+/* 指南针：移到右上角、鸟瞰图下方（原在左上）。
+   z-index 36 保持；目标面板已移除，右上角不再有 40 层的面板与之冲突。 */
 .map-comp {
   position: absolute;
-  left: 12px;
-  top: 46px;
+  right: 12px;
+  top: 192px;              /* 鸟瞰图 172 + 间距 8 + 12 */
   width: 84px;
   height: 84px;
   z-index: 36;
@@ -888,28 +1015,48 @@ select {
   transition: transform .1s linear;
 }
 
+/* 视点经纬高：底部居中、单行。 */
 .map-viewpoint {
   position: absolute;
-  left: 12px;
-  top: 138px;
-  min-width: 186px;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   z-index: 36;
   pointer-events: none;
-  padding: 6px 8px;
+  padding: 5px 10px;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: rgba(255, 255, 255, .92);
   font-size: 11px;
 }
 
-.mv-row { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; }
-.mv-row span { color: var(--text-dim); }
-.mv-row b { font-weight: 500; font-variant-numeric: tabular-nums; }
+.map-viewpoint span { color: var(--text-dim); }
+.map-viewpoint b { font-weight: 500; font-variant-numeric: tabular-nums; }
 
+/* 复位视角：顶栏「视图」菜单移除后就近放在指南针下方，保留原 id。 */
+.map-locate {
+  position: absolute;
+  right: 12px;
+  top: 284px;              /* 指南针 192 + 84 + 间距 8 */
+  z-index: 36;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .92);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.map-locate:hover { background: #eef2f8; }
+
+/* 比例尺：左下角（原在左上）。 */
 .map-scalebar {
   position: absolute;
   left: 12px;
-  top: 208px;
+  bottom: 12px;
   z-index: 36;
   pointer-events: none;
   display: flex;
@@ -954,10 +1101,12 @@ select {
  * 态势横幅占用。z-index 35 低于目标面板的 40。
  */
 
+/* 鸟瞰图：移到右上角（原在左下）。目标面板已移除，右上角空出来给它。
+   指南针与复位视角依次排在它下方（见 .map-comp / .map-locate 的 top）。 */
 .overview-wrap {
   position: absolute;
-  left: 12px;
-  bottom: 64px;            /* 让开 .legend（bottom:12，高约 28） */
+  right: 12px;
+  top: 12px;
   width: 240px;
   height: 172px;
   display: flex;

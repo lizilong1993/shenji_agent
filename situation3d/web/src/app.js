@@ -95,15 +95,22 @@ let camChangedCount = 0;      // camera.changed 触发次数（诊断用）
 // base.json 缺失时的兜底机位（台海全景）
 const FALLBACK_CAMERA = { lon: 119.6, lat: 24.4, height: 900000, heading: 0, pitch: -75 };
 
+// 已移除的 id（连同对应的面板一起）：targetList / targetCountHint（左栏目标列表）、
+// healthSummary / healthBody / healthRefresh（数据健康栏）、
+// targetPanel / tpTitle / tpBody / tpClose（中部浮动目标面板，内容并入右栏目标态势栏）、
+// mvLon / mvLat / mvAlt（视点三行合并为单行 mvAll）、
+// menuLayers / menuView / menuSituation（顶栏下拉）、btnOverview / btnShareScene。
 const dom = {};
-['statusText', 'statusDot', 'scenarioName', 'targetList', 'hotspotBody',
+['statusText', 'statusDot', 'scenarioName', 'hotspotBody',
  'geoLon', 'geoLat', 'geoRegion', 'geoSpan', 'geoLevel',
- 'levelValue', 'levelNote', 'levelIntent', 'levelPhase', 'targetPanel', 'tpTitle', 'tpBody', 'tpClose',
- 'menuCase', 'menuCaseList', 'menuLayers', 'menuLayerList', 'menuView', 'menuViewList',
- 'switchNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner', 'btnOverview',
- 'countRed', 'countBlue', 'countSea', 'countLand', 'countAir', 'targetCountHint',
+ 'levelValue', 'levelNote', 'levelIntent', 'levelPhase',
+ 'rlValue', 'rlNote', 'rlIntent', 'rlPhase',
+ 'overallBody', 'targetBody',
+ 'menuCase', 'menuCaseList',
+ 'switchNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner',
+ 'countRed', 'countBlue', 'countSea', 'countLand', 'countAir',
  'loadingBadge', 'loadingText',
- 'mapCompass', 'compRose', 'mapViewpoint', 'mvLon', 'mvLat', 'mvAlt', 'modelPlaces',
+ 'mapCompass', 'compRose', 'mapViewpoint', 'mvAll', 'modelPlaces',
  'modelTianditu', 'modelImagery', 'modelTerrain', 'modelBuildings',
  'mapScalebar', 'sbBar', 'sbLabel', 'followTarget', 'followNote',
 ].forEach(function (id) { dom[id] = document.getElementById(id); });
@@ -686,9 +693,9 @@ function applySituationData(data, caseId) {
       applyCamera(data.camera);
 
       renderHotspotTable();
-      renderTargetList();
+      renderTargetCounts();
       renderTransport();
-      closeTargetPanel();
+      clearTargetSelection();
       setTick(0);
       updateInferenceUi();
 
@@ -698,8 +705,10 @@ function applySituationData(data, caseId) {
         dom.followTarget.title = '';
       }
       setFollowNote('开启后点击任一目标，相机以随航向旋转的追踪视角持续跟随；拖动地图即自动解除。');
-      setStatus('就绪 · ' + data.targets.length + ' 个目标 · ' +
-                (data.frames.length - 1) + ' 帧 · ' + data.hotspots.length + ' 个热点区域', 'ok');
+      // 原先这里打印「就绪 · N 个目标 · M 帧 · K 个热点区域」。按界面重构要求
+      // 移除该概略文本；状态栏只保留**动态**信息（加载进度、错误、操作反馈），
+      // 空闲时不占用视线。案例身份已由顶栏 `#scenarioName` 显示，不再重复。
+      setStatus('', 'ok');
       setSwitchNote('已加载「' + data.case_name + '」。各开关的生效状态会在此说明。');
       if (window.Overview && window.Overview.setCenter) {
         const cam = data.camera || {};
@@ -717,7 +726,7 @@ function applySituationData(data, caseId) {
 function teardownScene() {
   if (!viewer) return;
   detachFollow('态势已切换');
-  closeTargetPanel();
+  clearTargetSelection();
   viewer.entities.removeAll();
   state.targets = {};
   state.hotspotEntities = [];
@@ -798,12 +807,12 @@ function clearSituation() {
   dom.scenarioName.textContent = state.baseRegion || '未加载态势';
   document.title = '三维战场态势生成系统';
 
-  renderTargetList();
+  renderTargetCounts();
   renderHotspotTable();
   renderTransport();
   updateInferenceUi();
   clearHotspotSelection();
-  closeTargetPanel();
+  clearTargetSelection();
   setTransportEnabled(false);
 
   if (dom.followTarget) {
@@ -1211,15 +1220,33 @@ function updateInferenceUi() {
   if (!inf) {
     dom.levelValue.textContent = '—';
     dom.levelNote.textContent = '未加载推理结果';
+    if (dom.rlValue) dom.rlValue.textContent = '—';
+    if (dom.rlNote) dom.rlNote.textContent = '未加载推理结果';
+    // 没有推理帧时整体态势栏仍然渲染，只是所有图标按"正常"档并在 title 里说明。
+    if (window.StatusPanels && dom.overallBody && state.data) {
+      StatusPanels.renderOverall(dom.overallBody, state.data, null);
+    }
     return;
   }
 
   const lv = inf.overall.level;
   dom.levelValue.textContent = lv + ' 级 · ' + inf.overall.level_label;
-  dom.levelValue.className = 'lb-value ' + (LEVEL_CLASS[lv] || '');
   dom.levelNote.textContent = inf.overall.note +
     ' 平均威胁 ' + inf.overall.mean_threat + '，最高 ' + inf.overall.max_threat +
     '，对抗域 ' + inf.overall.engaged_pairs + ' 个。';
+  // 右侧「区域态势栏」是同一份数据的常驻副本（地图横幅有独立开关，可能被关掉）。
+  if (dom.rlValue) {
+    dom.rlValue.textContent = lv + ' 级 · ' + inf.overall.level_label;
+    dom.rlValue.className = 'rl-value ' + (LEVEL_CLASS[lv] || '');
+  }
+  if (dom.rlNote) dom.rlNote.textContent = dom.levelNote.textContent;
+
+  // 整体态势栏：红蓝双方各类型目标的整体状态（图标按告警等级着色）。
+  // 只更新每个图标 `<img>` 的档位 class，结构在案例切换时才重建——见
+  // statusPanels.js 的缓存说明。
+  if (window.StatusPanels && dom.overallBody && state.data) {
+    StatusPanels.renderOverall(dom.overallBody, state.data, inf);
+  }
 
   // 区域级横幅补上"主导意图"：等级回答"多紧张"，意图回答"在打什么"，
   // 两者并列才算把区域态势说全。
@@ -1228,6 +1255,7 @@ function updateInferenceUi() {
     dom.levelIntent.textContent = top.length
       ? top.map(function (x) { return x.zh + ' ×' + x.n; }).join('、')
       : '无带意图判定的目标';
+    if (dom.rlIntent) dom.rlIntent.textContent = dom.levelIntent.textContent;
   }
 
   // 作战阶段：登陆作战是分阶段的，同一个意图在不同阶段含义不同，
@@ -1259,6 +1287,10 @@ function updateInferenceUi() {
       ? ('本阶段已持续 ' + ph.ticks_in + ' 帧（自第 ' + ph.since_tick + ' 帧）'
          + (lags ? '；所选目标仍处于「' + up.name + '」，落后于作战阶段' : ''))
       : '该战区未定义阶段';
+    if (dom.rlPhase) {
+      dom.rlPhase.textContent = dom.levelPhase.textContent;
+      dom.rlPhase.title = dom.levelPhase.title;
+    }
   }
 
   // 热点区域表格里的态势等级与意图随之刷新。
@@ -1279,7 +1311,7 @@ function updateInferenceUi() {
     }
   }
 
-  if (state.selected) renderTargetPanel(state.selected);
+  if (state.selected) renderTargetStatus(state.selected);
 }
 
 function levelLabel(code) {
@@ -1337,69 +1369,35 @@ function debugIntent() {
     datasetRuleHits: summary ? summary.rule_hits : null,
     datasetStatusCounts: summary ? summary.status_counts : null,
     underivableCount: summary && summary.underivable ? summary.underivable.length : null,
-    panelHasIntentBlock: !!(dom.tpBody && dom.tpBody.querySelector
-      && dom.tpBody.querySelector('.tp-intent')),
+    panelHasIntentBlock: !!(dom.targetBody && dom.targetBody.querySelector
+      && dom.targetBody.querySelector('.tp-intent')),
   };
 }
 
 // --------------------------------------------------------------------------
-// 目标列表
+// 目标计数
 // --------------------------------------------------------------------------
+//
+// 左栏的「目标列表」已按界面重构移除，但「目标图层」里的红/蓝/海/陆/空计数仍然
+// 有用，所以保留计数更新、不再渲染列表。
+//
+// 不能只是把原函数留着不调：它会写 `dom.targetList`，而该元素已从 DOM 移除，
+// 一旦被调用就会在 null 上取 innerHTML 直接抛异常。因此改为只更新计数。
 
-function renderTargetList() {
-  const host = dom.targetList;
-  host.innerHTML = '';
-
+function renderTargetCounts() {
   const counts = { red: 0, blue: 0, sea: 0, land: 0, air: 0 };
-  let shown = 0;
-  const inf = inferenceAt(state.tick);
   const targets = (state.data && state.data.targets) || [];
-
   targets.forEach(function (def) {
+    // 计数按**编成**统计，不随地图可见性过滤变化——过滤是"看得见什么"，
+    // 而这里回答的是"编成里有多少"。
     counts[def.affiliation]++;
     counts[def.domain]++;
-    if (!isVisible(def)) return;
-    shown++;
-
-    const s = positionFor(def.id, state.tick);
-    const l1 = inf && inf.targets[def.id];
-
-    const div = el('div', 'target-item ' + def.affiliation +
-      (state.selected === def.id ? ' active' : ''));
-
-    const head = el('div', 'ti-head');
-    head.appendChild(el('span', 'ti-id', def.id));
-    head.appendChild(el('span', 'ti-name', def.name));
-    if (l1) {
-      head.appendChild(el('span', 'ti-threat ' + (LEVEL_CLASS[l1.alert + 1] || ''),
-        '威胁 ' + l1.threat));
-    }
-
-    const sub = el('div', 'ti-sub',
-      (s ? fmtDeg(s.lat, 'N', 'S') + ' ' + fmtDeg(s.lon, 'E', 'W') : '—') +
-      (s ? ' · ' + s.speed_kn + ' kn · ' + s.heading.toFixed(0) + '°' : ''));
-
-    const meta = el('div', 'ti-meta',
-      (def.model || def.platform_class) + ' · ' + def.role +
-      (l1 ? ' · ' + l1.state_label : ''));
-
-    div.appendChild(head);
-    div.appendChild(sub);
-    div.appendChild(meta);
-    div.addEventListener('click', function () { selectTarget(def.id, true); });
-    host.appendChild(div);
   });
-
-  dom.countRed.textContent = counts.red;
-  dom.countBlue.textContent = counts.blue;
-  dom.countSea.textContent = counts.sea;
-  dom.countLand.textContent = counts.land;
-  dom.countAir.textContent = counts.air;
-  dom.targetCountHint.textContent = shown + ' / ' + targets.length;
-
-  if (!targets.length) {
-    host.appendChild(el('div', 'empty-state', '未加载态势。请从顶栏「演示案例」选择案例。'));
-  }
+  if (dom.countRed) dom.countRed.textContent = counts.red;
+  if (dom.countBlue) dom.countBlue.textContent = counts.blue;
+  if (dom.countSea) dom.countSea.textContent = counts.sea;
+  if (dom.countLand) dom.countLand.textContent = counts.land;
+  if (dom.countAir) dom.countAir.textContent = counts.air;
 }
 
 // --------------------------------------------------------------------------
@@ -1603,8 +1601,11 @@ function clearHotspotSelection() {
 }
 
 // --------------------------------------------------------------------------
-// 目标信息面板（中间窗口右上角）
+// 目标态势栏（右侧栏中段）
 // --------------------------------------------------------------------------
+//
+// 原先是中部地图右上角的浮动面板 `#targetPanel`。该位置与新增的鸟瞰图重叠，且
+// 右栏已专设「目标态势栏」，因此浮动面板整体移除，内容迁到这里——目标信息只在一处。
 
 function selectTarget(id, fly) {
   state.selected = id;
@@ -1616,8 +1617,8 @@ function selectTarget(id, fly) {
     flyTo(s.lon, s.lat, 180000);
   }
   syncSelection();
-  renderTargetList();
-  renderTargetPanel(id);
+  renderTargetCounts();
+  renderTargetStatus(id);
   // The banner shows the operation's phase plus the selected unit's own phase when
   // the two differ, so it has to be refreshed on selection - otherwise picking a
   // unit that lags leaves the previous unit's comparison on screen.
@@ -1625,11 +1626,12 @@ function selectTarget(id, fly) {
   markScene('selectTarget');
 }
 
-function closeTargetPanel() {
+/** 清除选中态并把目标态势栏复位成提示语。Esc 与「解除跟随」都会走到这里。 */
+function clearTargetSelection() {
   state.selected = null;
-  dom.targetPanel.classList.add('hidden');
   syncSelection();
-  markScene('closeTargetPanel');
+  renderTargetStatus(null);
+  markScene('clearTargetSelection');
 }
 
 function kvRow(label, value, extraClass) {
@@ -1637,109 +1639,33 @@ function kvRow(label, value, extraClass) {
     (extraClass ? ' class="' + extraClass + '"' : '') + '>' + value + '</b></div>';
 }
 
-function renderTargetPanel(id) {
-  // 「目标元数据面板」开关关掉后，点击目标只做选中与高亮，不弹面板。
-  if (!state.layers.targetPanel) { dom.targetPanel.classList.add('hidden'); return; }
+/**
+ * 渲染右栏目标态势栏：状态信息 / 活动规律 / 可能的意图。
+ *
+ * 渲染本身在 `statusPanels.js`，这里只负责把状态取齐（目标定义、当前帧状态、
+ * 一级推理结果、帧序列）后交出去。
+ *
+ * `state.layers.targetPanel`（「目标元数据面板」开关）仍然生效：关掉后点击目标只做
+ * 选中与高亮，右栏显示提示而不展开详情。
+ */
+function renderTargetStatus(id) {
+  const host = dom.targetBody;
+  if (!host) return;
+  if (!window.StatusPanels) return;
+  if (id === null || id === undefined || !state.layers.targetPanel) {
+    StatusPanels.renderTargetStatus(host, null, null, null, null, null, 0);
+    return;
+  }
   const rec = state.targets[id];
-  if (!rec) return;
-  const def = rec.def;
+  if (!rec) {
+    StatusPanels.renderTargetStatus(host, null, null, null, null, null, 0);
+    return;
+  }
   const s = positionFor(id, state.tick);
   const inf = inferenceAt(state.tick);
-  const l1 = inf ? inf.targets[id] : null;
-  const group = inf ? inf.groups.find(function (g) {
-    return g.affiliation === def.affiliation && g.domain === def.domain;
-  }) : null;
-
-  // 该目标所在的热点区域（取包含它的第一个），用于展示区域级态势。
-  let regionIdx = -1;
-  if (s) {
-    state.data.hotspots.forEach(function (hs, i) {
-      if (regionIdx >= 0) return;
-      if (s.lat >= hs.bbox[1] && s.lat <= hs.bbox[3] &&
-          s.lon >= hs.bbox[0] && s.lon <= hs.bbox[2]) regionIdx = i;
-    });
-  }
-  const region = regionIdx >= 0 ? state.data.hotspots[regionIdx] : null;
-  const r3 = regionIdx >= 0 && inf ? inf.regions[regionIdx] : null;
-
-  dom.tpTitle.textContent = def.id + ' ' + def.name;
-
-  let html = '';
-  html += '<div class="tp-symbol">' +
-    '<img src="' + Symbology.symbolUri(def.icon, def.affiliation, { selected: true }) + '" alt="军标">' +
-    '<div class="tp-symbol-meta"><b>' + def.model + '</b><span>' + def.model_note + '</span>' +
-    '<span>' + Symbology.iconLabel(def.icon) + ' · ' +
-    (def.affiliation === 'red' ? '红方' : '蓝方') + ' · ' +
-    (Symbology.domainLabel(def.domain) || def.domain) + '</span></div></div>';
-
-  // 意图摘要**置顶**：ZHY 关注的是"这个目标在干什么"。以前意图只是「一级」里的
-  // 一行，要读完一堆属性才看到；现在它排在最前，一/二/三级明细仍在下方按原样给出
-  // （未删减，只是不再抢视线）。
-  if (window.IntentUi) {
-    html += IntentUi.renderIntentBlock(l1, def);
-  }
-
-  // 目标要素：保留但降为一个折叠区。意图摘要已经占了最上方，属性/一/二/三级明细
-  // 仍在原处、内容未删减，只是不再与意图抢第一眼。
-  html += '<details class="tp-fold" open><summary>目标要素</summary>';
-  html += kvRow('目标 ID', def.id);
-  html += kvRow('型号', def.model);
-  html += kvRow('平台类别', def.platform_class + ' · ' + def.role);
-  html += kvRow('经度', s ? fmtDeg(s.lon, 'E', 'W') : '—');
-  html += kvRow('纬度', s ? fmtDeg(s.lat, 'N', 'S') : '—');
-  html += kvRow('高度', s ? s.alt.toFixed(0) + ' m' : '—');
-  html += kvRow('航向 / 航速', s ? s.heading.toFixed(0) + '° / ' + s.speed_kn + ' ' + def.speed_unit : '—');
-  html += kvRow('传感器', def.sensor_name + '（' + def.sensor_range_km.toFixed(0) + ' km）');
-  html += '</details>';
-
-  if (l1) {
-    const terms = l1.threat_terms;
-    html += '<details class="tp-fold" open><summary>一级 · 目标级态势</summary>';
-    html += kvRow('状态', l1.state_label);
-    html += kvRow('威胁度', l1.threat + ' / 100', 'lv-' + (l1.alert + 1));
-    html += kvRow('告警等级', l1.alert_label, 'lv-' + (l1.alert + 1));
-    html += kvRow('最近对方目标',
-      l1.nearest_id ? (l1.nearest_id + ' · ' + l1.nearest_km + ' km') : '—');
-    html += kvRow('被对方探测', l1.covered_by + ' 部传感器');
-    html += '<div class="tp-reason">判定依据：装备权重 ' + terms.base +
-      ' + 接近度 ' + terms.proximity + ' + 覆盖度 ' + terms.coverage + '</div>';
-    html += '</details>';
-  }
-
-  if (group) {
-    html += '<details class="tp-fold"><summary>二级 · 编组级态势</summary>';
-    html += kvRow('所属编组', (group.affiliation === 'red' ? '红方' : '蓝方') +
-      (Symbology.domainLabel(group.domain) || group.domain) + '编组（' + group.count + ' 个目标）');
-    html += kvRow('编队形态', group.posture_label + '（跨度 ' + group.spread_km + ' km）');
-    html += kvRow('对方同域编组', group.opposing_key || '无');
-    html += kvRow('最小距离', group.min_distance_km === null ? '—' : group.min_distance_km + ' km');
-    html += kvRow('对抗关系', group.relation_label, 'lv-' + (group.relation + 1));
-    html += '</details>';
-  }
-
-  html += '<details class="tp-fold"><summary>三级 · 区域级态势</summary>';
-  if (region && r3) {
-    html += kvRow('所在区域', region.name);
-    html += kvRow('区域等级', r3[0] + ' 级 · ' + levelLabel(r3[0]), 'lv-' + r3[0]);
-    html += kvRow('兵力对比', '红方 ' + r3[1] + ' / 蓝方 ' + r3[2]);
-    html += kvRow('主导方', codeLabel('dominance_codes', r3[3]));
-  } else {
-    html += kvRow('所在区域', '不在已登记的热点区域内');
-  }
-  if (inf) {
-    html += kvRow('全局态势', inf.overall.level + ' 级 · ' + inf.overall.level_label,
-      'lv-' + inf.overall.level);
-  }
-  html += '</details>';
-
-  html += '<details class="tp-fold"><summary>装备参数</summary>';
-  Object.keys(def.attributes || {}).forEach(function (k) {
-    html += kvRow(k, def.attributes[k]);
-  });
-  html += '</details>';
-
-  dom.tpBody.innerHTML = html;
-  dom.targetPanel.classList.remove('hidden');
+  const l1 = (inf && inf.targets[id]) || null;
+  StatusPanels.renderTargetStatus(
+    host, rec.def, s || null, l1, l1, state.data && state.data.frames, state.tick);
 }
 
 // --------------------------------------------------------------------------
@@ -1951,14 +1877,33 @@ function applyLayers() {
   return out;
 }
 
-var healthDirty = true;
-
-/** 标脏并（在面板展开时）立刻重渲染。 */
-function markHealthDirty() {
-  healthDirty = true;
-  var el = document.getElementById('healthPanel');
-  if (el && el.open) renderHealthPanel();
+/**
+ * 数据健康诊断。
+ *
+ * 左栏的「数据健康」面板已随界面重构移除，但诊断结论仍然必须保留出口——否则
+ * "开关开着、图层却没生效"这类问题就没有任何证据可查了。因此保留
+ * `DataHealth.report()` 的调用口，改为按需查询：`SituationHost.health()`。
+ *
+ * 原先"面板展开时才渲染、收起时只标脏"的缓存逻辑一并删除：没有面板可刷新了，
+ * 留着只会让人以为某处还在渲染它。
+ */
+function healthReport() {
+  if (!window.DataHealth) return { available: false, reason: 'dataHealth.js 未加载' };
+  try {
+    return DataHealth.report();
+  } catch (e) {
+    return { available: false, reason: String((e && e.message) || e) };
+  }
 }
+
+/**
+ * 图层变化后的钩子。
+ *
+ * 面板已移除，诊断改为按需查询，这里不再需要标脏；保留空函数是为了让
+ * `applyLayers()` 里的调用点语义明确（"图层变了、诊断结论需要重算"），
+ * 而不是把一个"看起来还会渲染"的调用悄悄删掉。
+ */
+function markHealthDirty() { /* 面板已移除：诊断按需查询，不缓存 */ }
 
 /**
  * 把仲裁结果同步回复选框。
@@ -1973,57 +1918,6 @@ function syncLayerCheckboxes() {
     const box = document.getElementById(s.checkbox);
     if (box && box.checked !== !!s.effective) box.checked = !!s.effective;
   });
-}
-
-/**
- * 渲染"数据健康"面板。
- *
- * 这个面板只回答一个问题：**"我以为开着的图层，到底有没有真的在显示"**。
- * 所以正文只列 attention（想开但没生效）的条目，其余图层收在下面的计数里；
- * 全部正常时给一行"全部正常"，不制造噪音。
- */
-function renderHealthPanel() {
-  const body = document.getElementById('healthBody');
-  const sum = document.getElementById('healthSummary');
-  if (!body || !window.DataHealth) return;
-
-  const r = DataHealth.report();
-  if (sum) sum.textContent = r.healthy ? '全部正常' : (r.attention.length + ' 项待查');
-
-  const rows = [];
-  if (!r.attention.length) {
-    rows.push('<div class="health-ok">全部图层均按开关生效。</div>');
-  } else {
-    r.attention.forEach(function (a) {
-      rows.push('<div class="health-item"><b>' + a.label + '</b>' +
-        '<span class="health-feed">' + a.feed + '</span>' +
-        '<div class="health-detail">' + (a.detail || '已开但未生效') + '</div></div>');
-    });
-  }
-
-  // 摘要行：让"看起来正常但其实有问题"的数字浮出来（瓦片错误率、重叠丢弃率）。
-  const t = r.tiles || {};
-  const p = r.places || {};
-  const g = r.governor || {};
-  const bits = [];
-  if (t.totalRequests) {
-    bits.push('影像请求 ' + t.totalRequests + (t.totalErrors ? '（错误 ' + t.totalErrors + '）' : ''));
-  }
-  if (t.sources && t.sources[0] && t.sources[0].maxLevel >= 0) {
-    bits.push('影像层级 ' + t.sources[0].minLevel + '–' + t.sources[0].maxLevel);
-  }
-  if (p.loaded) bits.push('地名 ' + p.placed + '/' + p.candidates + '（重叠丢弃 ' + p.overlapped + '）');
-  if (r.buildings && r.buildings.buildingsStats) {
-    const bs = r.buildings.buildingsStats;
-    bits.push('体块 ' + bs.blocks + ' 个 / LOD ' + bs.lodKey);
-  }
-  if (g.skipRatio !== null && g.skipRatio !== undefined) {
-    bits.push('渲染跳过率 ' + (g.skipRatio * 100).toFixed(1) + '%');
-  }
-  if (r.viewport) bits.push('视高 ' + r.viewport.heightKm + ' km');
-  rows.push('<div class="health-meta">' + bits.join(' · ') + '</div>');
-
-  body.innerHTML = rows.join('');
 }
 
 /** 图层顺序与状态的取证入口。 */
@@ -2391,6 +2285,22 @@ function cameraOrientation() {
  *
  * 另一种语义"指针指向相机朝向"在这里没有信息量——屏幕上方本身就是相机朝向，
  * 指针会恒指顶端。
+ *
+ * --- 关于"缩放时指针晃动"的调查结论（2026-09-29）---
+ * 原先怀疑俯视时 `atan2(dirEast, dirNorth)` 病态（视线趋垂直 → 水平分量 → 0），
+ * 于是改成"视线 / 屏幕上方向量取水平分量更大的那个"并加圆周平滑。**实测推翻了这个
+ * 判断，改法已回退**：
+ *
+ *   在三个姿态（pitch −89.5°/heading 0、−86°/35、−70°/120）下做**动画缩放**扫掠，
+ *   每个姿态采样 40 次，量"相邻采样的最大角度跳变"：
+ *     原实现（本函数）      0 / 0 / 0.01 度
+ *     改后的双向量选择      0 / **10.09** / 0 度
+ *   即原实现在这套测试里是稳定的，而"修法"在 −86° 姿态引入了 10° 跳变——因为
+ *   `hUp > hDir` 在俯仰变化时会翻转选择源，交接处产生不连续。
+ *
+ * 所以：**晃动未能在脚本化缩放下复现**，而那次改动是有害的，故还原为原实现。
+ * 若晃动仍然存在，需要用户给出具体复现条件（是否在跟随模式 / 是否在天地图瓦片加载中 /
+ * 缩放时是否同时旋转），否则任何"修"都只是猜测——本函数就是那次猜测的代价。
  */
 function updateCompass() {
   if (!dom.compRose) return;
@@ -2400,16 +2310,16 @@ function updateCompass() {
 
 /** 视点坐标：相机自身的经纬高。高度是椭球高（WGS84），不是海拔。 */
 function updateViewpoint() {
-  if (!dom.mvLon) return;
+  if (!dom.mvAll) return;
   const c = viewer.camera.positionCartographic;
   const lon = Cesium.Math.toDegrees(c.longitude);
   const lat = Cesium.Math.toDegrees(c.latitude);
-  dom.mvLon.textContent = fmtDeg(lon, 'E', 'W');
-  dom.mvLat.textContent = fmtDeg(lat, 'N', 'S');
-  dom.mvAlt.textContent = c.height < 1000
+  const alt = c.height < 1000
     ? c.height.toFixed(0) + ' m'
     : (c.height / 1000).toFixed(c.height < 100000 ? 2 : 1) + ' km';
-  dom.mvAlt.title = '椭球高（WGS84 椭球面），非海拔';
+  // 单行显示（底部居中）。用 | 分隔而不是空格，读数紧凑且便于对齐比较。
+  dom.mvAll.textContent = fmtDeg(lon, 'E', 'W') + '|' + fmtDeg(lat, 'N', 'S') + '|' + alt;
+  dom.mvAll.parentNode.title = '视点经纬高：椭球高（WGS84 椭球面），非海拔';
 }
 
 /**
@@ -2507,10 +2417,10 @@ const COMPONENT_NODES = {
  */
 function setOverview(on) {
   state.layers.overview = !!on;
+  // 顶栏的「鸟瞰图」按钮已移除，可见性改由左栏「地图组件 / 态势图层」里的
+  // `#layerOverview` 复选框驱动，勾选状态与 state 保持同步。
   const box = document.getElementById('layerOverview');
   if (box) box.checked = !!on;
-  const btn = dom.btnOverview;
-  if (btn) btn.classList.toggle('primary', !!on);
 
   if (!on) { Overview.hide(); return; }
   if (!window.Overview) return;
@@ -2742,7 +2652,7 @@ function loop(nowMs) {
     const next = Math.floor(state.tickFloat);
     if (next !== state.tick) {
       state.tick = next;
-      renderTargetList();
+      renderTargetCounts();
       renderTransport();
       updateInferenceUi();
       // 播放推进也是一次状态变化：不标记的话画面会停在原地（只在拖动时间轴时更新）。
@@ -2775,7 +2685,7 @@ function loop(nowMs) {
 function reloadSituation() {
   if (!state.data || !viewer) return;
   detachFollow('态势已更新');
-  closeTargetPanel();
+  clearTargetSelection();
   viewer.entities.removeAll();
   state.targets = {};
   state.hotspotEntities = [];
@@ -2787,7 +2697,7 @@ function reloadSituation() {
   createRouteEntities();
   createTargetEntities();
   renderHotspotTable();
-  renderTargetList();
+  renderTargetCounts();
   renderTransport();
   updateInferenceUi();
   setStatus('态势已更新 · ' + state.data.targets.length + ' 个目标', 'ok');
@@ -2877,6 +2787,55 @@ window.SituationHost = {
   // 图层顺序取证：imagery 的真实 index 顺序 + 每个图层的意图/事实。
   // 「哪个层压在哪个层上面」光看画面猜不出来，必须能读到 index。
   debugLayers: debugLayers,
+  // 数据健康诊断的出口。左栏「数据健康」面板已随界面重构移除，但诊断结论仍需可查：
+  // 否则"开关开着、图层没生效"就失去了唯一的证据出口。
+  health: healthReport,
+  // 界面骨架的取证入口：各面板与地图组件的实际几何位置。
+  // 组件重排（鸟瞰图右上、指南针其下、比例尺左下、视点底部居中）靠截图判断不可靠
+  // ——本项目已确认 --shot 会给出相同图。这里输出可断言的矩形，让验收有据可依。
+  uiLayout: function () {
+    function rect(id) {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      const hidden = el.classList.contains('hidden') || r.width === 0;
+      return {
+        hidden: hidden,
+        left: Math.round(r.left), top: Math.round(r.top),
+        right: Math.round(r.right), bottom: Math.round(r.bottom),
+        width: Math.round(r.width), height: Math.round(r.height),
+        centerX: Math.round((r.left + r.right) / 2),
+      };
+    }
+    const wrap = document.getElementById('cesiumContainer');
+    return {
+      viewport: { w: window.innerWidth, h: window.innerHeight },
+      globe: wrap ? rect('cesiumContainer') : null,
+      overview: rect('overviewWrap'),
+      compass: rect('mapCompass'),
+      locate: rect('btnLocate'),
+      scalebar: rect('mapScalebar'),
+      viewpoint: rect('mapViewpoint'),
+      legend: rect('legend'),
+      hint: rect('hint'),
+      levelBanner: rect('levelBanner'),
+      panels: {
+        left: rect('layerGroups') || (function () {
+          const el = document.querySelector('.layer-groups');
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { height: Math.round(r.height), width: Math.round(r.width) };
+        })(),
+        right: (function () {
+          const el = document.querySelector('.panel-right');
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { left: Math.round(r.left), width: Math.round(r.width),
+                   height: Math.round(r.height) };
+        })(),
+      },
+    };
+  },
   // 热点层选框结果：declared=案例声明的热点数，boxes=manifest 里的框数，
   // matched=按坐标匹配上的数量，fallback=true 表示没匹配上而全挂（战区未烘制时如此）。
   // 没有这个读数时，"热点层挂错战区"与"该战区还没烘制"看起来完全一样。
@@ -2979,7 +2938,7 @@ function bindUI() {
   bindCheck('layerHotspots', function (v) { state.layers.hotspots = v; markScene('layerHotspots'); });
   bindCheck('layerLabels', function (v) { state.layers.labels = v; markScene('layerLabels'); });
 
-  const refilter = function () { renderTargetList(); markScene('filter'); guardFollow(); };
+  const refilter = function () { renderTargetCounts(); markScene('filter'); guardFollow(); };
   bindCheck('filterRed', function (v) { state.filters.red = v; refilter(); });
   bindCheck('filterBlue', function (v) { state.filters.blue = v; refilter(); });
   bindCheck('filterSea', function (v) { state.filters.sea = v; refilter(); });
@@ -2988,10 +2947,8 @@ function bindUI() {
 
   bindCheck('layerOverview', setOverview);
 
-  if (dom.btnOverview) {
-    dom.btnOverview.disabled = false;
-    dom.btnOverview.addEventListener('click', function () { setOverview(!state.layers.overview); });
-  }
+  // 顶栏「鸟瞰图」按钮已移除，改由上面的 #layerOverview 复选框控制；
+  // 组件自带的 × 仍可关闭。
   const ovHide = document.getElementById('ovHide');
   if (ovHide) ovHide.addEventListener('click', function () { setOverview(false); });
 
@@ -2999,9 +2956,11 @@ function bindUI() {
     state.layers.levelBanner = v;
     if (dom.levelBanner) dom.levelBanner.classList.toggle('hidden', !v);
   });
+  // 「目标元数据面板」开关现在控制右栏「目标态势栏」是否展开详情。
   bindCheck('layerTargetPanel', function (v) {
     state.layers.targetPanel = v;
-    if (!v) closeTargetPanel();
+    if (!v) clearTargetSelection();
+    else if (state.selected) renderTargetStatus(state.selected);
   });
   bindCheck('modelPlaces', function (v) {
     LayerRegistry.setDesired('places.labels', !!v);
@@ -3074,23 +3033,9 @@ function bindUI() {
   // 但把提示文案写清楚，否则用户不知道当前底图是在线还是离线。
   if (dom.modelTianditu && dom.modelTianditu.checked) setTianditu(true);
 
-  // 数据健康面板：展开时才算、才渲染；点"重新检查"强制刷新。
-  const healthPanel = document.getElementById('healthPanel');
-  if (healthPanel) {
-    healthPanel.addEventListener('toggle', function () {
-      if (healthPanel.open && healthDirty) { renderHealthPanel(); healthDirty = false; }
-    });
-  }
-  const healthRefresh = document.getElementById('healthRefresh');
-  if (healthRefresh) {
-    healthRefresh.addEventListener('click', function () {
-      healthDirty = false;
-      renderHealthPanel();
-    });
-  }
-
-  const shareBtn = document.getElementById('btnShareScene');
-  if (shareBtn) shareBtn.addEventListener('click', function () { shareScene(); });
+  // 数据健康面板与「分享场景」按钮已随界面重构移除。
+  // 诊断改为按需查询 SituationHost.health()；`?scene=` 深链仍然可用（sceneDoc 未动），
+  // 只是不再有顶栏按钮来生成它。
 
   // ion 令牌输入：保存到服务端 web/data/ion.json（该文件被 gitignore）。
   // 输入框里的值**不回显**到任何提示里，保存成功后只报"已保存"。
@@ -3122,11 +3067,9 @@ function bindUI() {
   // 提示文案由 setBuildingsOnline 的成功/回落分支负责写。
   if (checkboxOn('modelBuildingsOnline')) setBuildingsOnline(true);
 
-  // 三个顶栏下拉菜单统一开合，互斥，点空白处收起。
+  // 顶栏仍有两个下拉（态势案例）；态势注册/管理/下载与图层批量操作已改为直挂按钮，
+  // 不再需要 bindMenu。
   bindMenu('menuCase', 'menuCaseList');
-  bindMenu('menuSituation', 'menuSituationList');
-  bindMenu('menuLayers', 'menuLayerList');
-  bindMenu('menuView', 'menuViewList');
   if (dom.menuCase) dom.menuCase.addEventListener('click', function () { openCaseMenu(); });
   document.addEventListener('click', function () { closeAllMenus(); });
 
@@ -3149,10 +3092,9 @@ function bindUI() {
       });
     });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { closeCaseMenu(); closeTargetPanel(); }
+    // 浮动目标面板已移除，Esc 改为清除选中态 + 复位目标态势栏。
+    if (e.key === 'Escape') { closeCaseMenu(); clearTargetSelection(); }
   });
-
-  dom.tpClose.addEventListener('click', closeTargetPanel);
 
   document.getElementById('btnPlay').addEventListener('click', function () { setPlaying(!state.playing); });
   document.getElementById('btnRun').addEventListener('click', function () { setPlaying(!state.playing); });
@@ -3163,7 +3105,7 @@ function bindUI() {
       state.targets[id].trail.length = 0;
       state.targets[id].lastTick = -1;
     });
-    renderTargetList();
+    renderTargetCounts();
     renderTransport();
     updateInferenceUi();
   });
@@ -3175,16 +3117,16 @@ function bindUI() {
   dom.timeline.addEventListener('input', function (e) {
     setPlaying(false);
     setTick(Number(e.target.value));
-    renderTargetList();
+    renderTargetCounts();
     renderTransport();
     updateInferenceUi();
   });
 
   document.getElementById('btnStepBack').addEventListener('click', function () {
-    setPlaying(false); setTick(state.tick - 1); renderTargetList(); renderTransport(); updateInferenceUi();
+    setPlaying(false); setTick(state.tick - 1); renderTargetCounts(); renderTransport(); updateInferenceUi();
   });
   document.getElementById('btnStepFwd').addEventListener('click', function () {
-    setPlaying(false); setTick(state.tick + 1); renderTargetList(); renderTransport(); updateInferenceUi();
+    setPlaying(false); setTick(state.tick + 1); renderTargetCounts(); renderTransport(); updateInferenceUi();
   });
 
 
@@ -3492,7 +3434,7 @@ function applyCaseHooks() {
     const seek = Number(params.get('tick'));
     if (Number.isFinite(seek)) {
       setTick(seek);
-      renderTargetList();
+      renderTargetCounts();
       renderTransport();
       updateInferenceUi();
     }

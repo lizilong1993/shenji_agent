@@ -22,62 +22,15 @@
         <div id="menuCaseList" class="menu-list" role="menu"></div>
       </div>
 
-      <div class="menu">
-        <button id="menuSituation" type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false">
-          态势 <span class="caret">▾</span>
-        </button>
-        <div id="menuSituationList" class="menu-list menu-list-narrow" role="menu">
-          <button type="button" class="menu-item" data-situation-cmd="input">
-            <span class="mi-head">态势输入</span>
-            <span class="mi-sub">框选或输入经纬度确定战场范围，添加目标与图层后生成双方态势</span>
-          </button>
-          <button type="button" class="menu-item" data-situation-cmd="manage">
-            <span class="mi-head">态势管理</span>
-            <span class="mi-sub">查看与编辑当前态势：战场范围、目标编成、图层</span>
-          </button>
-          <button type="button" class="menu-item" data-situation-cmd="download">
-            <span class="mi-head">态势数据下载</span>
-            <span class="mi-sub">导出当前帧 / 全帧 CSV / 态势定义</span>
-          </button>
-        </div>
-      </div>
+      <!-- 态势三件套直接挂在顶栏，不再套二级下拉：它们各自只有一个动作，
+           多一层展开反而慢。仍复用 [data-situation-cmd] 委托与 SituationPanel.open()。 -->
+      <button type="button" class="menu-btn" data-situation-cmd="input"
+              title="框选或输入经纬度确定战场范围，添加目标与图层后生成双方态势">态势注册</button>
+      <button type="button" class="menu-btn" data-situation-cmd="manage"
+              title="查看与编辑当前态势：战场范围、目标编成、图层">态势管理</button>
+      <button type="button" class="menu-btn" data-situation-cmd="download"
+              title="导出当前帧 / 全帧 CSV / 态势定义">态势下载</button>
 
-      <div class="menu">
-        <button id="menuLayers" type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false">
-          图层管理 <span class="caret">▾</span>
-        </button>
-        <div id="menuLayerList" class="menu-list menu-list-narrow" role="menu">
-          <button type="button" class="menu-item" data-layer-cmd="show">
-            <span class="mi-head">全部显示</span>
-            <span class="mi-sub">打开四大类下所有开关（目标跟随除外）</span>
-          </button>
-          <button type="button" class="menu-item" data-layer-cmd="hide">
-            <span class="mi-head">全部隐藏</span>
-            <span class="mi-sub">关闭四大类下所有开关（底图与地图组件保留）</span>
-          </button>
-          <div class="menu-sep"></div>
-          <button type="button" class="menu-item" data-layer-cmd="default">
-            <span class="mi-head">恢复默认</span>
-            <span class="mi-sub">回到首次打开时的图层状态</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="menu">
-        <button id="menuView" type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false">
-          视图 <span class="caret">▾</span>
-        </button>
-        <div id="menuViewList" class="menu-list menu-list-narrow" role="menu">
-          <button type="button" class="menu-item" id="btnLocate">
-            <span class="mi-head">复位视角</span>
-            <span class="mi-sub">回到案例默认机位，并解除热点锁定与目标跟随</span>
-          </button>
-        </div>
-      </div>
-
-      <button id="btnOverview" type="button" disabled title="鸟瞰图">鸟瞰图</button>
-      <button id="btnShareScene" type="button"
-              title="把当前机位 / 图层组合 / 时间轴打包成链接并复制">分享场景</button>
       <button id="btnRun" type="button" class="primary">态势自动推演</button>
     </nav>
 
@@ -92,7 +45,15 @@
       <!-- 图层管理独立滚动：它内容最长（四大类 + 说明文字），小屏上会把下面的
            目标列表挤出可视区。整列滚动会让目标列表跟着一起滚，所以这里只让
            图层管理这一块滚，目标列表固定在下方。 -->
+      <!-- 图层管理现在独占左栏（目标列表已移除），不再需要"只让这一块滚动"的妥协，
+           整列即它的滚动区。 -->
       <div class="layer-groups">
+      <!-- 顶栏的「图层管理」下拉已移除，批量操作就近放在这里，功能不丢。 -->
+      <div class="layer-cmds">
+        <button type="button" class="mini" data-layer-cmd="show" title="打开四大类下所有开关（目标跟随除外）">全部显示</button>
+        <button type="button" class="mini" data-layer-cmd="hide" title="关闭四大类下所有开关（底图与地图组件保留）">全部隐藏</button>
+        <button type="button" class="mini" data-layer-cmd="default" title="回到首次打开时的图层状态">恢复默认</button>
+      </div>
       <details class="layer-group panel-block" open>
         <summary>态势图层</summary>
         <label class="check"><input type="checkbox" id="layerHotspots" checked> 热点区域</label>
@@ -154,33 +115,13 @@
         <label class="check"><input type="checkbox" id="compViewpoint" checked> 视点坐标</label>
       </details>
 
-      <details class="layer-group panel-block" id="healthPanel">
-        <summary>数据健康 <span class="hint-inline" id="healthSummary">—</span></summary>
-        <div class="switch-note">
-          只列出<strong>「开关开着、实际没显示」</strong>的图层。全都正常时不打扰。
-        </div>
-        <div id="healthBody" class="health-body">尚未检查。</div>
-        <button type="button" id="healthRefresh" class="mini">重新检查</button>
-      </details>
       </div>
-
-      <section class="panel-block grow">
-        <h2>目标列表 <span class="hint-inline" id="targetCountHint"></span></h2>
-        <div id="targetList" class="target-list"></div>
-      </section>
     </aside>
 
     <section class="globe-wrap">
       <div id="cesiumContainer"></div>
 
-      <!-- 点击目标后在其右上角弹出的信息面板 -->
-      <div id="targetPanel" class="target-panel hidden" aria-live="polite">
-        <div class="tp-head">
-          <span class="tp-title" id="tpTitle">目标</span>
-          <button id="tpClose" type="button" class="tp-close" aria-label="关闭">×</button>
-        </div>
-        <div class="tp-body" id="tpBody"></div>
-      </div>
+      <!-- 目标信息面板已移除：内容并入右栏「目标态势栏」，同时把右上角让给鸟瞰图。 -->
 
       <div id="levelBanner" class="level-banner">
         <span class="lb-label">区域级态势</span>
@@ -210,7 +151,8 @@
         <div id="overviewContainer" class="ov-canvas"></div>
       </div>
 
-      <!-- 地图组件：Cesium 1.145 无内置指南针与比例尺，三项均为自建 -->
+      <!-- 地图组件：Cesium 1.145 无内置指南针与比例尺，三项均为自建。
+           角位：鸟瞰图右上、指南针其下、复位视角再下、比例尺左下、视点底部居中。 -->
       <div id="mapCompass" class="map-comp" title="点击复位正北（相机航向归零）">
         <svg viewBox="0 0 100 100" aria-hidden="true">
           <circle cx="50" cy="50" r="46" fill="rgba(255,255,255,.92)" stroke="#b9c6d8"/>
@@ -229,10 +171,13 @@
         </svg>
       </div>
 
+      <!-- 顶栏「视图」菜单已移除，复位视角就近放在指南针下方；保留原 id，
+           app.js 里的绑定不变。 -->
+      <button id="btnLocate" type="button" class="map-locate"
+              title="回到案例默认机位，并解除热点锁定与目标跟随">复位视角</button>
+
       <div id="mapViewpoint" class="map-viewpoint">
-        <div class="mv-row"><span>视点经度</span><b id="mvLon">—</b></div>
-        <div class="mv-row"><span>视点纬度</span><b id="mvLat">—</b></div>
-        <div class="mv-row"><span>视点高度</span><b id="mvAlt">—</b></div>
+        <span>视点经纬高：</span><b id="mvAll">—</b>
       </div>
 
       <div id="mapScalebar" class="map-scalebar">
@@ -240,44 +185,51 @@
         <span id="sbLabel">—</span>
       </div>
 
-      <div id="hint" class="hint">滚轮缩放 · 拖拽旋转 · 点击目标查看信息面板 · 点击热点区域联动地理位置信息</div>
+      <div id="hint" class="hint">滚轮缩放 · 拖拽旋转 · 点击目标在右侧「目标态势栏」查看 · 点击热点区域联动「区域态势栏」</div>
     </section>
 
     <aside class="panel panel-right">
+      <!-- 整体态势栏：全局各类型、各方目标的整体状态（图标 + 告警等级着色）。
+           展示案例完整编成，不跟随地图上的红/蓝/域过滤开关。 -->
       <section class="panel-block">
-        <h2>光标位置信息</h2>
-        <div class="kv"><span>经度</span><b id="geoLon">—</b></div>
-        <div class="kv"><span>纬度</span><b id="geoLat">—</b></div>
-        <div class="kv"><span>区域</span><b id="geoRegion">—</b></div>
-        <div class="kv"><span>范围</span><b id="geoSpan">—</b></div>
-        <div class="kv"><span>区域态势</span><b id="geoLevel">—</b></div>
+        <h2>整体态势</h2>
+        <div id="overallBody" class="os-body">未加载态势</div>
       </section>
 
-      <section class="panel-block grow">
-        <h2>热点区域</h2>
+      <!-- 目标态势栏：点击地图目标后显示 状态信息 / 活动规律 / 可能的意图。
+           原中部浮动面板已移除，内容全部并入此处，目标信息只在一处。 -->
+      <section class="panel-block">
+        <h2>目标态势</h2>
+        <div id="targetBody" class="ts-body">
+          <div class="ts-empty">点击地图上的目标，查看该目标的状态信息、活动规律与可能的意图。</div>
+        </div>
+      </section>
+
+      <!-- 区域态势栏：光标所在区域 + 区域级态势 + 热点区域列表。
+           原先分散在「光标位置信息」与「热点区域」两块，现在同属一栏。 -->
+      <section class="panel-block">
+        <h2>区域态势</h2>
+        <div id="regionHead" class="region-head">
+          <div class="kv"><span>经度</span><b id="geoLon">—</b></div>
+          <div class="kv"><span>纬度</span><b id="geoLat">—</b></div>
+          <div class="kv"><span>区域</span><b id="geoRegion">—</b></div>
+          <div class="kv"><span>范围</span><b id="geoSpan">—</b></div>
+          <div class="kv"><span>区域态势</span><b id="geoLevel">—</b></div>
+        </div>
+        <!-- 区域态势栏里的这几个读数与地图上的 #levelBanner 是**两份**显示：
+             地图横幅是有独立开关的 HUD，右栏是常驻信息。因此用独立 id（rl*），
+             避免与横幅重名——重名时 getElementById 只返回文档中靠前的那个，
+             右栏就永远不会更新。 -->
+        <div class="region-level">
+          <span class="rl-value" id="rlValue">—</span>
+          <span class="rl-intent" id="rlIntent">—</span>
+          <span class="rl-phase" id="rlPhase">—</span>
+        </div>
+        <div class="region-note" id="rlNote"></div>
         <table class="hotspot-table">
           <thead><tr><th>#</th><th>名称</th><th>经纬范围</th><th>态势</th><th>主导意图</th></tr></thead>
           <tbody id="hotspotBody"></tbody>
         </table>
-      </section>
-
-      <section class="panel-block">
-        <h2>本地控制</h2>
-        <div class="control-row">
-          <span>态势控制</span>
-          <button id="btnPlay" type="button" class="mini">▶ 播放</button>
-          <button id="btnReset" type="button" class="mini">⟲ 复位</button>
-        </div>
-        <div class="control-row">
-          <span>推演倍速</span>
-          <select id="speedSelect">
-            <option value="1">1×</option>
-            <option value="10">10×</option>
-            <option value="30" selected>30×</option>
-            <option value="60">60×</option>
-            <option value="120">120×</option>
-          </select>
-        </div>
       </section>
     </aside>
   </main>
@@ -290,6 +242,19 @@
     </div>
     <input id="timeline" type="range" min="0" max="0" value="0" step="1">
     <div class="transport-right">
+      <!-- 原先在右栏「本地控制」里，那边整块已移除，播放控制归到播放栏，就近操作。
+           id 不变，app.js 的播放/复位/倍速绑定无需改动。 -->
+      <button id="btnPlay" type="button" class="mini">▶ 播放</button>
+      <button id="btnReset" type="button" class="mini">⟲ 复位</button>
+      <label class="tr-speed">推演倍速
+        <select id="speedSelect">
+          <option value="1">1×</option>
+          <option value="10">10×</option>
+          <option value="30" selected>30×</option>
+          <option value="60">60×</option>
+          <option value="120">120×</option>
+        </select>
+      </label>
       <span id="clockLabel">—</span>
     </div>
   </footer>
@@ -319,6 +284,7 @@
   <script src="./src/dataHealth.js"></script>
   <script src="./src/sceneDoc.js"></script>
   <script src="./src/intentUi.js"></script>
+  <script src="./src/statusPanels.js"></script>
   <script src="./src/buildings3d.js"></script>
   <script src="./src/overview.js"></script>
   <script src="./src/places.js"></script>
