@@ -5,17 +5,30 @@ emits on every target and that the front end renders. Keeping the catalogue in
 the engine rather than hard-coding it in JavaScript means a target's symbol can
 never disagree with the scenario definition it came from.
 
-Symbol construction follows the MIL-STD-2525 / APP-6 convention as adapted for
-red/blue force wargaming:
+Symbol construction follows MIL-STD-2525D. **The frame shape encodes both
+affiliation and domain** -- it is not a rectangle with a colour difference:
 
-* the *frame* encodes the affiliation -- a rectangle for both sides, drawn in
-  the side's colour (red force red, blue force blue);
-* the *domain modifier* is an arc above the frame for air, below the frame for
-  surface, and absent for land;
-* the *glyph* inside the frame encodes the platform family.
+* affiliation: friendly = a filled frame in the friendly palette, hostile = a
+  **pointed diamond**. Colour alone is not the encoding;
+* domain determines the *frame shape*: land unit (friendly) = square,
+  sea surface (friendly) = circle, air (friendly) = arch/dome, and hostile air
+  is a pentagon/"house" rather than a diamond with an arc over it;
+* there is **no domain modifier arc for surface units**. A below-frame arc is the
+  *subsurface* (submerged) modifier, not surface. Land units carry no modifier
+  either. Only air gets an arc above the frame;
+* the glyph inside the frame encodes the platform family.
 
-Only the catalogue lives here; the actual vector drawing is in
-``web/src/symbology.js``, which reads this same table out of the dataset.
+The rendered symbols are **pre-generated** by ``tools/gen_symbols.py`` using
+milsymbol (MIT, MIL-STD-2525D/APP-6) from the SIDC table in that tool, and
+committed as ``web/assets/symbols/*.svg``. ``web/src/symbology.js`` prefers those
+static assets and falls back to a built-in approximation only if they are
+missing. The icon keys below remain the contract between engine and front end;
+the SIDC mapping lives with the generator that consumes it.
+
+NOTE: MIL-STD-2525D has **no dedicated coastal anti-ship missile battery
+entity**. ``coastal_missile`` is drawn from Land Unit -> Fires -> Missile
+(130700), which is an explicit approximation -- see PLATFORMS in
+``tools/gen_symbols.py``.
 """
 
 from __future__ import annotations

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>symbol-gen</title>
+</head>
+<body>
+<!--
+  milsymbol 符号生成页 —— 只给 tools/gen_symbols.py 用，不是给人看的界面。
+
+  为什么需要这么一个页面：部署容器里**没有 node/npm**（python3.8、无 pip），
+  所以 milsymbol 只能在浏览器里跑。而生成器需要一个"加载了 milsymbol、但没有加载
+  Cesium"的轻页面，才能在一两秒内把 40 个符号生成完——走完整应用页面得先等 Cesium
+  启动 20 秒。
+
+  页面只做一件事：把 window.genSymbols(specs) 暴露出去，由 CDP 的 --eval 调用。
+-->
+<script src="../vendor/milsymbol/milsymbol.js"></script>
+<script>
+window.msReady = !!(window.ms && window.ms.Symbol);
+
+/**
+ * 按 specs 批量生成符号。
+ *
+ * viewBox 归一化**不在这里做**——统一两套变体的画布交给 gen_symbols.py，
+ * 因为那一步要同时改写文件内容，放在一处更好核对。
+ *
+ * 选中态用 milsymbol 的 outlineColor/outlineWidth 画外圈高亮，而不是自绘一个环：
+ * 红蓝归属语义因此不被破坏，选中只是"加一圈"。
+ */
+window.genSymbols = function (specs) {
+  if (!window.ms || !window.ms.Symbol) return { error: 'milsymbol 未加载' };
+  var out = {};
+  for (var i = 0; i < specs.length; i++) {
+    var s = specs[i];
+    var opts = { size: s.size || 40, padding: (s.padding === undefined ? 12 : s.padding) };
+    if (s.selected) {
+      opts.outlineWidth = 6;
+      opts.outlineColor = '#ffd400';
+    }
+    var sym = new window.ms.Symbol(s.sidc, opts);
+    out[s.name] = {
+      svg: sym.asSVG(),
+      anchor: sym.getAnchor(),
+      size: sym.getSize(),
+      valid: sym.isValid ? sym.isValid() : null,
+    };
+  }
+  return out;
+};
+</script>
+</body>
+</html>

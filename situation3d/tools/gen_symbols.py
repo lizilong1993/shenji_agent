@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+"""Pre-generate the platform symbol SVGs with milsymbol.
+
+Output (committed):
+    web/assets/symbols/<icon>_<affiliation>.svg
+    web/assets/symbols/<icon>_<affiliation>_sel.svg
+    web/assets/symbols/manifest.json
+
+Why pre-generate instead of shipping milsymbol
+----------------------------------------------
+* The bundle is 862 KB; the 40 SVG files total a few tens of KB.
+* Rendering becomes deterministic and reviewable: generate once, look at the
+  contact sheet, commit. A renderer change can never alter the deployed look.
+* The browser does not need a JS symbol library at runtime.
+
+Why the browser does the generating
+-----------------------------------
+There is **no node/npm in the deployment container** (python3.8, stdlib only, no
+pip), and project code must not run on the developer machine. The browser is the
+only JS engine available, so this tool drives the existing headless-Chrome
+harness (`tools/inspect_remote.py`) against `web/tools/symbol-gen.html` and takes
+the SVG strings back over the CDP eval channel.
+
+Usage:
+    python3 tools/fetch_milsymbol.py       # once: vendor the bundle
+    python3 server/serve.py --port 8848 &  # the harness needs a served page
+    python3 tools/gen_symbols.py
+    python3 tools/gen_symbols.py --dry-run # generate and report, write nothing
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, ROOT)
+
+WEB = os.path.join(ROOT, "web")
+OUT_DIR = os.path.join(WEB, "assets", "symbols")
+PAGE_URL = "http://127.0.0.1:8848/tools/symbol-gen.html"
+
+# ---------------------------------------------------------------------------
+# SIDC table -- MIL-STD-2525D, 20 digits.
+# ---------------------------------------------------------------------------
+# Layout (verified field by field; see the assertion in _sidc()):
+#   1-2 version/coding scheme | 3 context | 4 affiliation | 5-6 symbol set
+#   7 status | 8 HQ/TF | 9-10 echelon | 11-16 entity | 17-18 mod1 | 19-20 mod2
+#
+# Affiliation digit: 3 = Friend (blue force here), 6 = Hostile (red force).
+#
+# The entity codes were checked against the mil-std-2525 TSV tables
+# (Sea surface / Land unit / Air) by the research pass.
+#
+# NOTE ON 岸舰导弹: MIL-STD-2525D has **no dedicated coastal anti-ship missile
+# battery entity**. 130700 (Land Unit -> Fires -> Missile) is the closest unit
+# symbol and is an explicit approximation, not a standard entity. Flagged here
+# so it is never mistaken for one.
+PLATFORMS = {
+    "destroyer":       ("30", "120203"),   # Sea Surface / Destroyer
+    "frigate":         ("30", "120204"),   # Sea Surface / Frigate
+    "replenishment":   ("30", "130110"),   # Sea Surface / Oiler, Replenishment
+    "corvette":        ("30", "120205"),   # Sea Surface / Corvette
+    "coastal_missile": ("10", "130700"),   # Land Unit / Fires / Missile  (近似)
+    "sam_battalion":   ("10", "130102"),   # Land Unit / Air Defense / Missile
+    "armor":           ("10", "120500"),   # Land Unit / Armor
+    "artillery":       ("10", "130300"),   # Land Unit / Field Artillery
+    "fighter":         ("01", "110104"),   # Air / Fixed Wing / Fighter
+    "aew":             ("01", "110116"),   # Air / Fixed Wing / AEW
+}
+
+# blue force = Friend, red force = Hostile. Colour comes from the SIDC itself
+# (milsymbol's affiliation palette), so the two sides can never drift apart.
+AFFILIATIONS = {"red": "6", "blue": "3"}
+
+# Canvas: `size` is the icon-octagon width, `padding` the margin around it.
+# Identical for every symbol so all files share one viewBox -- that is what lets
+# the front end draw them all at one fixed pixel size with no per-icon maths.
+SIZE = 40
+PADDING = 12
+
+SVG_TAG = re.compile(r"<svg\b[^>]*>", re.I)
+VIEWBOX = re.compile(r'viewBox="([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)"', re.I)
+WH = re.compile(r'\b(width|height)="([\d.]+)"', re.I)
+
+
+def _sidc(affiliation_digit, symbol_set, entity):
+    code = ("10" + "0" + affiliation_digit + symbol_set + "0" + "0"
+            + "00" + entity + "00" + "00")
+    # The first version of this table was 21 digits: one extra '0' shifted every
+    # field after the affiliation, so friendly fighters came out as dashed
+    # "unknown" circles and land units as air frames -- and milsymbol renders
+    # over-long input **without complaint**, so the error was completely silent.
+    # Only the rendered contact sheet caught it. Hence this hard assertion.
+    if len(code) != 20:
+        raise AssertionError("SIDC 必须是 20 位，得到 %d 位：%r" % (len(code), code))
+    return code
+
+
+def specs():
+    """Build the generation spec list and the expected file names."""
+    out = []
+    for icon, (symbol_set, entity) in PLATFORMS.items():
+        for aff, digit in AFFILIATIONS.items():
+            code = _sidc(digit, symbol_set, entity)
+            out.append({"name": "%s_%s" % (icon, aff), "icon": icon,
+                        "sidc": code, "selected": False, "size": SIZE,
+                        "padding": PADDING})
+            out.append({"name": "%s_%s_sel" % (icon, aff), "icon": icon,
+                        "sidc": code, "selected": True, "size": SIZE,
+                        "padding": PADDING})
+    return out
+
+
+def check_icons_match_engine():
+    """
+    The icon keys must be exactly the catalogue the engine emits.
+
+    gen_symbols.py can silently fall out of step with engine/symbology.py (a new
+    platform type added there, no symbol generated here) and the only symptom
+    would be an empty icon in the panel. So compare the two sets and refuse.
+    """
+    try:
+        import engine.symbology as symbology
+    except Exception as exc:  # noqa: BLE001
+        print("[gen] 无法导入 engine.symbology（%s），跳过一致性检查" % exc)
+        return
+    engine_keys = set(symbology.ICONS.keys())
+    mine = set(PLATFORMS.keys())
+    missing = sorted(engine_keys - mine)
+    extra = sorted(mine - engine_keys)
+    if missing:
+        print("[gen] engine/symbology.py 里有而这里没有的平台：%s" % ", ".join(missing))
+        print("      -> 请在 PLATFORMS 里补上 SIDC，否则这些目标的图标是空的")
+    if extra:
+        print("[gen] 这里有而 engine/symbology.py 没有的平台：%s" % ", ".join(extra))
+    if missing or extra:
+        raise SystemExit(2)
+    print("[gen] 平台清单与 engine/symbology.py 一致（%d 个）" % len(engine_keys))
+
+
+def normalize_pair(normal_svg, selected_svg):
+    """
+    Rewrite both SVGs to a common square viewBox so the two variants overlay
+    exactly.
+
+    Why this is needed: the selected variant carries an outline halo, so
+    milsymbol gives it a **larger** canvas. Swapping the image on an existing
+    billboard would then draw the selected symbol smaller (same 34 px box, wider
+    viewBox) -- the icon would visibly shrink when you click it. Forcing one
+    shared canvas removes that, and means the front end needs no per-variant
+    size maths at all.
+    """
+    def parse(svg):
+        tag = SVG_TAG.search(svg)
+        if not tag:
+            raise ValueError("找不到 <svg> 标签")
+        vb = VIEWBOX.search(tag.group(0))
+        if not vb:
+            raise ValueError("找不到 viewBox")
+        x, y, w, h = (float(v) for v in vb.groups())
+        return x, y, w, h, tag
+
+    nx, ny, nw, nh, ntag = parse(normal_svg)
+    sx, sy, sw, sh, stag = parse(selected_svg)
+
+    # Both are centred on the same anchor; take the larger canvas, centred on the
+    # normal variant's centre (they agreed to well under a pixel in practice).
+    cx, cy = nx + nw / 2.0, ny + nh / 2.0
+    scx, scy = sx + sw / 2.0, sy + sh / 2.0
+    if abs(cx - scx) > 1.0 or abs(cy - scy) > 1.0:
+        print("[gen] 警告：两套变体的中心不一致（normal %.1f,%.1f / sel %.1f,%.1f），"
+              "以 normal 为准" % (cx, cy, scx, scy))
+    side = max(nw, nh, sw, sh)
+    vx, vy = cx - side / 2.0, cy - side / 2.0
+
+    def rewrite(svg, tag):
+        new_tag = tag.group(0)
+        new_tag = VIEWBOX.sub(
+            'viewBox="%s %s %s %s"' % (_n(vx), _n(vy), _n(side), _n(side)),
+            new_tag)
+        # width/height: drop them and let the viewBox define the aspect. Leaving
+        # absolute px would make the two files disagree again.
+        new_tag = WH.sub("", new_tag)
+        new_tag = re.sub(r"\s+>", ">", new_tag)
+        return svg.replace(tag.group(0), new_tag, 1)
+
+    return rewrite(normal_svg, ntag), rewrite(selected_svg, stag), side
+
+
+def _n(v):
+    s = ("%.3f" % v).rstrip("0").rstrip(".")
+    return s if s not in ("", "-0") else "0"
+
+
+def call_browser(spec_list):
+    """Drive the headless browser and return the generated symbols."""
+    js = ("(function(){var r=window.genSymbols(" + json.dumps(spec_list) + ");"
+          "return r;})()")
+    js_path = os.path.join(tempfile.gettempdir(), "_gensym.js")
+    with open(js_path, "w", encoding="utf-8") as fh:
+        fh.write(js)
+    out_json = os.path.join(tempfile.gettempdir(), "_gensym.json")
+
+    cmd = [sys.executable, os.path.join(HERE, "inspect_remote.py"),
+           "--url", PAGE_URL, "--out", out_json,
+           "--wait-ms", "2500", "--eval", js]
+    print("[gen] 调用无头浏览器生成 %d 个符号…" % len(spec_list))
+    proc = subprocess.run(cmd, cwd=ROOT, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, timeout=180)
+    if proc.returncode != 0:
+        sys.stdout.write(proc.stdout.decode("utf-8", "replace"))
+        raise SystemExit("[gen] inspect_remote.py 退出码 %d" % proc.returncode)
+
+    with open(out_json, "r", encoding="utf-8") as fh:
+        report = json.load(fh)
+    if not report.get("evalOk"):
+        raise SystemExit("[gen] 页面内生成失败：%s" % report.get("evalError"))
+    data = report.get("eval")
+    if not isinstance(data, dict) or data.get("error"):
+        raise SystemExit("[gen] 生成返回异常：%r" % (data,))
+    return data
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--dry-run", action="store_true", help="只生成并报告，不写文件")
+    args = ap.parse_args()
+
+    check_icons_match_engine()
+
+    if not os.path.exists(os.path.join(WEB, "vendor", "milsymbol", "milsymbol.js")):
+        raise SystemExit("[gen] 缺少 web/vendor/milsymbol/milsymbol.js，"
+                         "先跑 python3 tools/fetch_milsymbol.py")
+
+    spec_list = specs()
+    # 生成结果是 milsymbol 的对象（svg/anchor/size/valid），不回带我们传入的 sidc，
+    # 所以这里自己留一份 name -> sidc 的映射写进 manifest。
+    sidc_of = {s['name']: s['sidc'] for s in spec_list}
+    results = call_browser(spec_list)
+
+    written, manifest = 0, {"milsymbol": _vendored_version(), "size": SIZE,
+                            "padding": PADDING, "symbols": {}}
+    # Pair each normal variant with its selected twin.
+    for icon in PLATFORMS:
+        for aff in AFFILIATIONS:
+            nkey, skey = "%s_%s" % (icon, aff), "%s_%s_sel" % (icon, aff)
+            if nkey not in results or skey not in results:
+                raise SystemExit("[gen] 缺少生成结果：%s" % nkey)
+            n, s = results[nkey], results[skey]
+            if not n.get("valid") or not s.get("valid"):
+                raise SystemExit("[gen] SIDC 无效：%s" % nkey)
+            nsvg, ssvg, side = normalize_pair(n["svg"], s["svg"])
+            for name, svg in ((nkey, nsvg), (skey, ssvg)):
+                if not args.dry_run:
+                    with open(os.path.join(OUT_DIR, name + ".svg"), "w",
+                              encoding="utf-8") as fh:
+                        fh.write(svg)
+                written += 1
+            manifest["symbols"][nkey] = {
+                "icon": icon, "affiliation": aff, "sidc": sidc_of[nkey],
+                "viewBoxSize": _n(side), "selectedVariant": skey + ".svg",
+            }
+
+    if not args.dry_run:
+        if not os.path.isdir(OUT_DIR):
+            os.makedirs(OUT_DIR)
+        with open(os.path.join(OUT_DIR, "manifest.json"), "w", encoding="utf-8") as fh:
+            json.dump(manifest, fh, ensure_ascii=False, indent=2, sort_keys=True)
+
+    print("[gen] %s %d 个 SVG，共用画布 %s×%s"
+          % ("试运行：" if args.dry_run else "写入", written,
+             _n(side), _n(side)))
+    print("[gen] 平台 %d 个 × 归属 %d 种 × 变体 2 套" % (len(PLATFORMS), len(AFFILIATIONS)))
+    return 0
+
+
+def _vendored_version():
+    p = os.path.join(WEB, "vendor", "milsymbol", "VERSION")
+    try:
+        with open(p, "r", encoding="utf-8") as fh:
+            return fh.read().strip()
+    except OSError:
+        return "unknown"
+
+
+if __name__ == "__main__":
+    sys.exit(main())

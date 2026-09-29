@@ -1,0 +1,147 @@
+{
+  "milsymbol": "3.0.4",
+  "padding": 12,
+  "size": 40,
+  "symbols": {
+    "aew_blue": {
+      "affiliation": "blue",
+      "icon": "aew",
+      "selectedVariant": "aew_blue_sel.svg",
+      "sidc": "10030100001101160000",
+      "viewBoxSize": "164"
+    },
+    "aew_red": {
+      "affiliation": "red",
+      "icon": "aew",
+      "selectedVariant": "aew_red_sel.svg",
+      "sidc": "10060100001101160000",
+      "viewBoxSize": "174"
+    },
+    "armor_blue": {
+      "affiliation": "blue",
+      "icon": "armor",
+      "selectedVariant": "armor_blue_sel.svg",
+      "sidc": "10031000001205000000",
+      "viewBoxSize": "194"
+    },
+    "armor_red": {
+      "affiliation": "red",
+      "icon": "armor",
+      "selectedVariant": "armor_red_sel.svg",
+      "sidc": "10061000001205000000",
+      "viewBoxSize": "188"
+    },
+    "artillery_blue": {
+      "affiliation": "blue",
+      "icon": "artillery",
+      "selectedVariant": "artillery_blue_sel.svg",
+      "sidc": "10031000001303000000",
+      "viewBoxSize": "194"
+    },
+    "artillery_red": {
+      "affiliation": "red",
+      "icon": "artillery",
+      "selectedVariant": "artillery_red_sel.svg",
+      "sidc": "10061000001303000000",
+      "viewBoxSize": "188"
+    },
+    "coastal_missile_blue": {
+      "affiliation": "blue",
+      "icon": "coastal_missile",
+      "selectedVariant": "coastal_missile_blue_sel.svg",
+      "sidc": "10031000001307000000",
+      "viewBoxSize": "194"
+    },
+    "coastal_missile_red": {
+      "affiliation": "red",
+      "icon": "coastal_missile",
+      "selectedVariant": "coastal_missile_red_sel.svg",
+      "sidc": "10061000001307000000",
+      "viewBoxSize": "188"
+    },
+    "corvette_blue": {
+      "affiliation": "blue",
+      "icon": "corvette",
+      "selectedVariant": "corvette_blue_sel.svg",
+      "sidc": "10033000001202050000",
+      "viewBoxSize": "164"
+    },
+    "corvette_red": {
+      "affiliation": "red",
+      "icon": "corvette",
+      "selectedVariant": "corvette_red_sel.svg",
+      "sidc": "10063000001202050000",
+      "viewBoxSize": "188"
+    },
+    "destroyer_blue": {
+      "affiliation": "blue",
+      "icon": "destroyer",
+      "selectedVariant": "destroyer_blue_sel.svg",
+      "sidc": "10033000001202030000",
+      "viewBoxSize": "164"
+    },
+    "destroyer_red": {
+      "affiliation": "red",
+      "icon": "destroyer",
+      "selectedVariant": "destroyer_red_sel.svg",
+      "sidc": "10063000001202030000",
+      "viewBoxSize": "188"
+    },
+    "fighter_blue": {
+      "affiliation": "blue",
+      "icon": "fighter",
+      "selectedVariant": "fighter_blue_sel.svg",
+      "sidc": "10030100001101040000",
+      "viewBoxSize": "164"
+    },
+    "fighter_red": {
+      "affiliation": "red",
+      "icon": "fighter",
+      "selectedVariant": "fighter_red_sel.svg",
+      "sidc": "10060100001101040000",
+      "viewBoxSize": "174"
+    },
+    "frigate_blue": {
+      "affiliation": "blue",
+      "icon": "frigate",
+      "selectedVariant": "frigate_blue_sel.svg",
+      "sidc": "10033000001202040000",
+      "viewBoxSize": "164"
+    },
+    "frigate_red": {
+      "affiliation": "red",
+      "icon": "frigate",
+      "selectedVariant": "frigate_red_sel.svg",
+      "sidc": "10063000001202040000",
+      "viewBoxSize": "188"
+    },
+    "replenishment_blue": {
+      "affiliation": "blue",
+      "icon": "replenishment",
+      "selectedVariant": "replenishment_blue_sel.svg",
+      "sidc": "10033000001301100000",
+      "viewBoxSize": "164"
+    },
+    "replenishment_red": {
+      "affiliation": "red",
+      "icon": "replenishment",
+      "selectedVariant": "replenishment_red_sel.svg",
+      "sidc": "10063000001301100000",
+      "viewBoxSize": "188"
+    },
+    "sam_battalion_blue": {
+      "affiliation": "blue",
+      "icon": "sam_battalion",
+      "selectedVariant": "sam_battalion_blue_sel.svg",
+      "sidc": "10031000001301020000",
+      "viewBoxSize": "194"
+    },
+    "sam_battalion_red": {
+      "affiliation": "red",
+      "icon": "sam_battalion",
+      "selectedVariant": "sam_battalion_red_sel.svg",
+      "sidc": "10061000001301020000",
+      "viewBoxSize": "188"
+    }
+  }
+}

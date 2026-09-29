@@ -3263,6 +3263,22 @@ function bindUI() {
   // 之前 key 失效时底图静默变深蓝，就是因为没有任何人问过这个问题。
   probeTiandituStatus();
 
+  // 军标资产探测：确认 web/assets/symbols/ 里有预生成的 SVG。没有就退回内置生成器。
+  // 放在这里（而非首次用到符号时）是为了**在画图标之前**定下来，否则会先用静态路径
+  // 建好一波 billboard，等探测失败再逐个改回来。资产缺失时 `<img>`/billboard 是静默
+  // 失败的，页面上只会看到空白，所以这里必须显式判断并在退回后重画一遍。
+  if (window.Symbology && Symbology.verifyAssets) {
+    Symbology.verifyAssets().then(function (ok) {
+      if (ok) return;
+      // 退回内置生成器：已建好的 billboard 与已渲染的整体态势栏都要重画。
+      syncSelection();
+      if (window.StatusPanels && StatusPanels._resetCache) {
+        StatusPanels._resetCache();
+        updateInferenceUi();
+      }
+    });
+  }
+
   // 数据健康面板与「分享场景」按钮已随界面重构移除。
   // 诊断改为按需查询 SituationHost.health()；`?scene=` 深链仍然可用（sceneDoc 未动），
   // 只是不再有顶栏按钮来生成它。

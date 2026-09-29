@@ -17,6 +17,25 @@
 (function (global) {
   const SIZE = 64;
 
+  /**
+   * 预生成的军标资产目录。
+   *
+   * 首选路径是**静态 SVG**：由 `tools/gen_symbols.py` 用 milsymbol（MIT，MIL-STD-2525D）
+   * 离线生成、提交进仓库，文件名 `<icon>_<affiliation>[_sel].svg`。
+   * 好处是渲染确定、可逐个人工核对、浏览器不需要 862 KB 的符号库，且红蓝与域的形状
+   * 全部由标准 SIDC 决定——下面这套手绘 GLYPHS 只作为**兜底**：资产缺失时（例如只
+   * 部署了源码、没跑生成器）仍然要有图标，不能开天窗。
+   *
+   * 兜底是**近似**：它保留了 2525 的关键语义（敌方=尖角菱形、友方=矩形、空中=上方弧、
+   * 水面与陆上无域修饰符），但不像 milsymbol 那样按域给出方/圆/拱等标准帧形。
+   */
+  // 生成这些资产时用的 milsymbol 版本（tools/gen_symbols.py 写进 manifest）。
+  // 对不上只告警不报错：形状可能变了，但用着总比空白好。
+  const MILSYMBOL_EXPECTED = '3.0.4';
+  const ASSET_BASE = './assets/symbols/';
+  let useAssets = true;
+  let assetManifest = null;
+
   // 与 engine/symbology.py 的 AFFILIATIONS 保持一致；这里的值只在数据集
   // 尚未加载时作为兜底。
   const FALLBACK_AFFILIATIONS = {
@@ -33,11 +52,38 @@
   // 框体几何：矩形 36x24，居中略偏下，为域修饰符留出空间。
   const FRAME = { x: 14, y: 20, w: 36, h: 24 };
 
-  // 域修饰符：空中是框体上方的弧，水面是下方的弧。
+  /**
+   * 域修饰符：**只有空中是框体上方的弧**。
+   *
+   * 原先这里水面也画了一条下方弧线——那是**潜艇**（subsurface）的修饰符，不是水面
+   * 舰艇的。MIL-STD-2525 里水面单位**没有任何域修饰符**（帧形本身就表示水面）。
+   * 已核实：DISA 的部件库里 `0_630_0.svg`（敌方+水面）与 `0_610_0.svg`（敌方+陆上）
+   * 是同一个纯菱形，水面那一版没有弧。
+   * 陆上同样无修饰符。
+   */
   const DOMAIN_ARC = {
     air: 'M14,20 A18,9 0 0 1 50,20 Z',
-    sea: 'M14,44 A18,9 0 0 0 50,44 Z',
   };
+
+  /**
+   * 敌方帧形 = **尖角菱形**（矩形四边中点外凸），友方 = 矩形。
+   *
+   * 原先红蓝双方都画矩形，只靠颜色区分——而 2525 里**对抗关系是靠帧形编码的**，
+   * 只改颜色会让"红方"在形制上仍是友军符号。改后：友军=矩形、敌军=菱形。
+   * （标准里敌方空中还是五边形、友军海上还是圆形等更细的划分由 milsymbol 那份
+   * 静态资产负责；这里是兜底，取最要紧的两条语义。）
+   */
+  function framePath(affiliationKey) {
+    const x = FRAME.x, y = FRAME.y, w = FRAME.w, h = FRAME.h;
+    if (affiliationKey !== 'red') {
+      return { tag: 'rect', attrs: 'x="' + x + '" y="' + y + '" width="' + w +
+               '" height="' + h + '" rx="2"' };
+    }
+    const mx = x + w / 2, my = y + h / 2, px = w * 0.26, py = h * 0.26;
+    return { tag: 'polygon',
+             attrs: 'points="' + [mx, y, x + w + px, my, mx, y + h, x - px, my]
+               .join(' ') + '"' };
+  }
 
   // 图形线画。坐标全部落在框体内侧 (x 18..46, y 24..40)。
   const GLYPHS = {
@@ -133,6 +179,8 @@
     const ink = '#ffffff';
     const domain = domainOf(icon);
     const glyph = GLYPHS[icon] || UNKNOWN_GLYPH;
+    // 帧形由对抗关系决定：友方矩形、敌方尖角菱形（见 framePath 的说明）。
+    const fp = framePath(affiliation);
 
     const parts = [];
 
@@ -143,19 +191,32 @@
                  '" stroke-width="1.5" stroke-linejoin="round"/>');
     }
 
-    parts.push('<rect x="' + FRAME.x + '" y="' + FRAME.y + '" width="' + FRAME.w +
-               '" height="' + FRAME.h + '" rx="2" fill="' + frame +
+    parts.push('<' + fp.tag + ' ' + fp.attrs + ' fill="' + frame +
                '" stroke="' + ink + '" stroke-width="2"/>');
-
     glyph.forEach(function (item) {
       parts.push(item.d ? pathEl(item, ink) : circleEl(item, ink));
     });
 
     if (opts.selected) {
-      // 选中态：外圈高亮环，与框体保持 3px 间距。
-      parts.push('<rect x="' + (FRAME.x - 3) + '" y="' + (FRAME.y - 3) + '" width="' +
-                 (FRAME.w + 6) + '" height="' + (FRAME.h + 6) +
-                 '" rx="3" fill="none" stroke="#ffd24a" stroke-width="2.5"/>');
+      // 选中态：外圈高亮环。敌方帧是菱形，用矩形环会在四角留出空隙，所以按同一个
+      // 形状放大一圈来画——环的形状必须跟着帧形走。
+      if (fp.tag === 'polygon') {
+        const pts = fp.attrs.match(/points="([^"]+)"/)[1].split(/\s+/)
+          .map(function (p) { return p.split(',').map(Number); });
+        const mx = (FRAME.x + FRAME.w / 2), my = (FRAME.y + FRAME.h / 2);
+        const grown = pts.map(function (p) {
+          const dx = p[0] - mx, dy = p[1] - my;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          const k = (len + 3.5) / len;
+          return (mx + dx * k).toFixed(1) + ',' + (my + dy * k).toFixed(1);
+        }).join(' ');
+        parts.push('<polygon points="' + grown +
+                   '" fill="none" stroke="#ffd24a" stroke-width="2.5"/>');
+      } else {
+        parts.push('<rect x="' + (FRAME.x - 3) + '" y="' + (FRAME.y - 3) + '" width="' +
+                   (FRAME.w + 6) + '" height="' + (FRAME.h + 6) +
+                   '" rx="3" fill="none" stroke="#ffd24a" stroke-width="2.5"/>');
+      }
     }
 
     const opacity = opts.dim ? 0.35 : 1;
@@ -173,11 +234,23 @@
   const cache = new Map();
 
   /**
-   * Data URI for a symbol, memoised: the same (icon, affiliation, selected)
-   * triple is requested on every frame otherwise.
+   * URL for a symbol, memoised: the same (icon, affiliation, selected) triple is
+   * requested on every frame otherwise.
+   *
+   * 默认返回**静态资产**路径（`assets/symbols/<icon>_<affil>[_sel].svg`，由
+   * tools/gen_symbols.py 用 milsymbol 预生成并提交）；只有在资产被判定不可用
+   * （见 verifyAssets）时才退回内置生成器的 data URI。
+   *
+   * 返回的是 URL 而不是 data URI，所以 Cesium 的 billboard 与 HTML 的 `<img>` 都能
+   * 直接用；缓存也随之变成"路径查询"，比编码 SVG 便宜得多。
    */
+  function assetUri(icon, affiliation, opts) {
+    return ASSET_BASE + icon + '_' + affiliation + (opts.selected ? '_sel' : '') + '.svg';
+  }
+
   function symbolUri(icon, affiliation, opts) {
     opts = opts || {};
+    if (useAssets) return assetUri(icon, affiliation, opts);
     const key = icon + '|' + affiliation + '|' + (opts.selected ? 1 : 0) + '|' + (opts.dim ? 1 : 0);
     let uri = cache.get(key);
     if (!uri) {
@@ -185,6 +258,52 @@
       cache.set(key, uri);
     }
     return uri;
+  }
+
+  /**
+   * 检查预生成资产是否可用，并据此决定走静态资产还是内置兜底。
+   *
+   * 为什么要探测而不是假定存在：`web/assets/symbols/` 是**提交进 git 的**，但若有人
+   * 只部署了源码而没跑生成器（或生成器换了 milsymbol 版本后忘了提交产物），图标会
+   * 整片消失——而 `<img>`/billboard 加载失败是**静默**的，页面上只会看到空白。
+   * 用一次 manifest 请求把这件事变成显式判断，并在退回时打日志。
+   *
+   * 返回 Promise<boolean>：true = 用静态资产。
+   */
+  function verifyAssets() {
+    return fetch(ASSET_BASE + 'manifest.json', { cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (m) {
+        assetManifest = m;
+        useAssets = true;
+        // 版本对不上说明产物不是当前 milsymbol 生成的，仍可用但要留痕。
+        if (m && m.milsymbol && m.milsymbol !== MILSYMBOL_EXPECTED) {
+          console.warn('[symbology] 符号资产由 milsymbol ' + m.milsymbol +
+            ' 生成，期望 ' + MILSYMBOL_EXPECTED + '；请重跑 tools/gen_symbols.py');
+        }
+        return true;
+      })
+      .catch(function (e) {
+        useAssets = false;
+        cache.clear();
+        console.warn('[symbology] 预生成军标资产不可用（' + e.message +
+          '），回退到内置生成器；跑 tools/gen_symbols.py 可生成资产');
+        return false;
+      });
+  }
+
+  /** 资产清单（verifyAssets 成功后可用），供诊断用。 */
+  function assets() {
+    return { enabled: useAssets, manifest: assetManifest };
+  }
+
+  /** 手动切换资产/兜底模式（verifyAssets 会自己调；测试与诊断也用它）。 */
+  function setAssetMode(on) {
+    useAssets = !!on;
+    cache.clear();
   }
 
   /** Adopt the catalogue published by the engine. */
@@ -213,6 +332,10 @@
   global.Symbology = {
     symbolSvg: symbolSvg,
     symbolUri: symbolUri,
+    assetUri: assetUri,
+    verifyAssets: verifyAssets,
+    setAssetMode: setAssetMode,
+    assets: assets,
     setCatalog: setCatalog,
     iconLabel: iconLabel,
     iconAbbrev: iconAbbrev,
