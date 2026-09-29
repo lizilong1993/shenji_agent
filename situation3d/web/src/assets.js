@@ -159,51 +159,42 @@
   // ------------------------------------------------------------------------
 
   /**
-   * 天地图 WMTS 服务。
+   * 天地图 WMTS 服务 —— 经**服务端代理** `/tdt/<layer>/<z>/<x>/<y>`。
    *
-   * 与其它 provider 的关键差异：**这是在线服务，不经过 TileCache**。
-   * 其它图层都是离线瓦片（`./tiles/...`），走前端缓存是为了"浏览过的瓦片不再回
-   * 服务器"；天地图本来就必须联网，缓存它的字节只会占 IndexedDB 配额，还会让
-   * "离线可用"这条边界变得含糊。所以这里直接交给 Cesium 的加载器。
+   * 为什么不再由浏览器直连天地图
+   * --------------------------
+   * 原先这里是 `http://t0.tianditu.gov.cn/...&tk=<硬编码的 key>`。两个问题：
    *
-   * 两套坐标：`w` 是 Web Mercator（与 Cesium 的 WebMercatorTilingScheme 一致），
-   * `c` 是经纬度直投（GeographicTilingScheme）。这里用 `w`。
+   *  1. **key 写死在源码里**，随 git 泄漏；而且换 key 要改代码重新部署。
+   *  2. **key 类型决定调用方**。天地图按 User-Agent 区分调用方：
+   *     浏览器端 key 只接受浏览器 UA（否则 301012），服务器端 key 只接受非浏览器
+   *     UA（否则 301013）。直连只对"浏览器端 key"有效——用户拿到一个服务器端 key
+   *     时，前端无论怎么写都是 403，而错误只会躺在控制台里没人看见。
    *
-   * 影像服务本身是**不带注记**的纯底图，中文注记在 `cva`（矢量注记）里，必须叠一层，
-   * 否则地图上一个地名都没有。两者是不同 layer，由 createTiandituLabelProvider 提供。
+   * 改走服务端代理后：key 只存在服务端 `.env`（见 .env.example），代理按 key 类型
+   * 自动切换 UA，两种 key 都能用，浏览器拿到的只是 `/tdt/...` 这样的路径。
+   * 代理还顺手做磁盘缓存（`web/tiles/tdt/`），浏览过的区域离线也还在。
+   *
+   * 失败不再静默：`/api/tdt/status` 报配置与最近一次错误，前端据此在「底图」面板
+   * 里显示 `#tdtNote`。之前 key 配额耗尽（429）时整张底图变成深蓝而无人知晓，
+   * 就是"失败没有出口"的直接后果。
+   *
+   * 代理只实现 Web Mercator（`_w`）这一套瓦片矩阵；`c`（经纬度直投）没有对应路径。
    */
-  const TIANDITU_BASE = 'http://t0.tianditu.gov.cn';
-  // 申请的 key。可用 `?tdtkey=` 覆盖，便于换 key 时不必改代码。
-  const TIANDITU_KEY_DEFAULT = '8af77812ad311e785fa7d8c0539da6d5';
+  const TIANDITU_PROXY = '/tdt';
 
-  function tiandituKey() {
-    try {
-      const q = new URLSearchParams(global.location.search);
-      return q.get('tdtkey') || TIANDITU_KEY_DEFAULT;
-    } catch (e) {
-      return TIANDITU_KEY_DEFAULT;
-    }
-  }
-
-  function tiandituUrl(layer, suffix, ext) {
-    return TIANDITU_BASE + '/' + layer + '_' + suffix + '/wmts' +
-      '?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
-      '&LAYER=' + layer + '&STYLE=default' +
-      '&TILEMATRIXSET=' + suffix + '&FORMAT=' + (ext || 'tiles') +
-      '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=' + tiandituKey();
+  function tiandituUrl(layer) {
+    // Cesium 的 URL 模板：{z}/{x}/{y}。代理侧再补上 WMTS 参数与 key。
+    return TIANDITU_PROXY + '/' + layer + '/{z}/{x}/{y}';
   }
 
   /**
    * @param {string} kind 'img' 影像 / 'vec' 矢量底图 / 'ter' 地形晕渲
-   * @param {string} suffix 'w' WebMercator / 'c' 经纬度
    */
-  function createTiandituProvider(kind, suffix) {
-    const s = suffix || 'w';
-    const scheme = s === 'c' ? new Cesium.GeographicTilingScheme()
-                             : new Cesium.WebMercatorTilingScheme();
+  function createTiandituProvider(kind) {
     return new Cesium.UrlTemplateImageryProvider({
-      url: tiandituUrl(kind || 'img', s),
-      tilingScheme: scheme,
+      url: tiandituUrl(kind || 'img'),
+      tilingScheme: new Cesium.WebMercatorTilingScheme(),
       minimumLevel: 1,
       maximumLevel: 18,
       credit: '天地图（国家地理信息公共服务平台）',
@@ -211,17 +202,35 @@
   }
 
   /** 中文注记层：影像底图必须叠这一层才有地名。 */
-  function createTiandituLabelProvider(suffix) {
-    const s = suffix || 'w';
-    const scheme = s === 'c' ? new Cesium.GeographicTilingScheme()
-                             : new Cesium.WebMercatorTilingScheme();
+  function createTiandituLabelProvider() {
     return new Cesium.UrlTemplateImageryProvider({
-      url: tiandituUrl('cva', s),
-      tilingScheme: scheme,
+      url: tiandituUrl('cva'),
+      tilingScheme: new Cesium.WebMercatorTilingScheme(),
       minimumLevel: 1,
       maximumLevel: 18,
       credit: '天地图注记',
     });
+  }
+
+  /**
+   * 探测天地图是否真的可用：取一块已知存在的低层瓦片。
+   *
+   * 返回 Promise<{ok, status?, reason?}>。**不抛异常**——探测失败只是"没有在线底图"，
+   * 不该影响页面其余部分。
+   *
+   * 为什么非要探测：`/api/tdt/status` 只能说明"配了 key"，说明不了"key 还能用"。
+   * 配额耗尽（429）和被禁用（301005）都只有真发一次请求才知道。
+   */
+  function probeTianditu() {
+    return fetch(TIANDITU_PROXY + '/img/3/6/3', { method: 'GET', cache: 'no-store' })
+      .then(function (r) {
+        if (r.ok) return { ok: true };
+        return r.text().then(function (body) {
+          return { ok: false, status: r.status,
+                   reason: (body || '').replace(/\s+/g, ' ').slice(0, 160) };
+        }, function () { return { ok: false, status: r.status, reason: '' }; });
+      })
+      .catch(function (e) { return { ok: false, status: 0, reason: String(e && e.message || e) }; });
   }
 
   /**
@@ -1131,7 +1140,9 @@
     createGlobalImageryProvider: createGlobalImageryProvider,
     createTiandituProvider: createTiandituProvider,
     createTiandituLabelProvider: createTiandituLabelProvider,
-    tiandituKey: tiandituKey,
+    // 天地图可用性探测。**不再导出 key**——key 只存在服务端 .env，
+    // 浏览器这一侧根本不需要知道它（这正是改走代理的目的之一）。
+    probeTianditu: probeTianditu,
     attachHotspotImagery: attachHotspotImagery,
     terrainMaxLevel: terrainMaxLevel,
     createOverviewImageryProvider: createOverviewImageryProvider,

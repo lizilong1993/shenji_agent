@@ -1,3 +1,10 @@
+# Credentials: Tianditu key, Cesium ion token, and anything else third-party.
+# Keys live in .env (server reads it; see .env.example for the template) and
+# must never enter git. The previously hard-coded Tianditu key had to be
+# rotated precisely because it was in a tracked file.
+.env
+.env.local
+
 # Third-party vendor bundle (45 MB unpacked). Pinned and fetched by
 # tools/fetch_cesium.sh instead of being committed.
 web/vendor/

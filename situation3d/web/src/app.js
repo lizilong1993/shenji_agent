@@ -107,7 +107,7 @@ const dom = {};
  'rlValue', 'rlNote', 'rlIntent', 'rlPhase',
  'overallBody', 'targetBody',
  'menuCase', 'menuCaseList',
- 'switchNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner',
+ 'switchNote', 'tdtNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner',
  'countRed', 'countBlue', 'countSea', 'countLand', 'countAir',
  'loadingBadge', 'loadingText',
  'mapCompass', 'compRose', 'mapViewpoint', 'mvAll', 'modelPlaces',
@@ -337,16 +337,18 @@ function initViewer() {
   //
   // 图层顺序（index 0 在最底层，Cesium 由下往上叠）：
   //   [0] 天地图影像（在线，默认底图）
-  //   [1] 天地图中文注记（在线）
-  //   [2] 离线全球 z0-6  →  [3] 战区 z0-11  →  [4..] 热点 z0-12  →  城区 z13-17
-  // 天地图与"离线影像底图"是**两套互斥的底图方案**（都铺满视野，同时开会互相
-  // 遮挡），由 setTianditu/setImagery 互相对冲；热点/城区/专题层始终叠在最上面，
-  // 与用哪套底图无关。
+  //   [0] 离线影像垫底（z=5）  →  [1] 天地图影像（z=10，在线，经 /tdt 代理）
+  //   [2] 天地图中文注记（z=90，在线）
+  //   离线全球 z0-6 → 战区 z0-11 → 热点 z0-12 → 城区 z13-17，全部叠在 [1] 之上
+  //
+  // 离线与天地图**不再互斥**：离线垫在下面当兜底，天地图有瓦片的地方盖住它。
+  // 这样 key 失效 / 离线 / 瓦片在途时露出的是离线影像，而不是球体底色（rgb(0,0,128)
+  // ——以前底图"变蓝"就是这个）。顺序由 layerRegistry 的 z 决定，不在这里手工调整。
   state.imageryStats = OfflineAssets.newStats('imagery');
   state.tiandituLayer = new Cesium.ImageryLayer(
-    OfflineAssets.createTiandituProvider('img', 'w'));
+    OfflineAssets.createTiandituProvider('img'));
   state.tiandituLabelLayer = new Cesium.ImageryLayer(
-    OfflineAssets.createTiandituLabelProvider('w'));
+    OfflineAssets.createTiandituLabelProvider());
 
   viewer = new Cesium.Viewer('cesiumContainer', {
     baseLayer: state.tiandituLayer,
@@ -363,6 +365,18 @@ function initViewer() {
     selectionIndicator: false,
     shouldAnimate: false,
   });
+
+  // 按设备像素比渲染，别按 CSS 像素。
+  //
+  // Cesium 的 `useBrowserRecommendedResolution` 默认是 **true**，含义是"忽略
+  // devicePixelRatio，按 CSS 像素渲染再放大"。在 Windows 缩放 125%/150%（很常见）
+  // 或任何 HiDPI 屏上，后果是**整幅画面连同所有文字一起发虚**——地名、目标标牌、
+  // 天地图注记全都糊。这不是"字号太小"能解释的，也不是加粗描边能救的。
+  //
+  // 实测本项目的无头环境 devicePixelRatio=1，所以这个改动在自动截图里看不出来，
+  // 但在用户的机器上很可能是清晰度的主因。代价是 GPU 负载上升；若某台机器吃不消，
+  // 把这一行改回 true 即可（只是又回到发虚的状态）。
+  viewer.useBrowserRecommendedResolution = false;
 
   if (viewer.imageryLayers.length === 0) {
     throw new Error('底图图层未创建：Cesium ' + Cesium.VERSION + ' 需要 baseLayer 选项');
@@ -1021,7 +1035,9 @@ function createTargetEntities() {
         font: '12px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
         fillColor: Cesium.Color.fromCssColorString('#1d2430'),
         outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 3,
+        // 12px 配 3px 描边会把汉字糊成一团——汉字笔画本身才 1px 出头，3px 的白边
+        // 从两侧吃掉笔画，字怀就填死了。降到 1.5 才留得住字形。
+        outlineWidth: 1.5,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -24),
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
@@ -1136,10 +1152,11 @@ function createHotspots() {
       position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, boxH),
       label: {
         text: hs.name,
-        font: '12px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
+        font: '13px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
         fillColor: Cesium.Color.fromCssColorString('#8a5a00'),
         outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 3,
+        // 同目标标牌：12px/3px 的描边会糊字，改 13px/1.5。
+        outlineWidth: 1.5,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, 0),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -1885,6 +1902,28 @@ function setOnlineTilesetVisible(on) {
  * 每帧动一次会让 Cesium 反复重建表面瓦片顺序。
  */
 function applyLayers() {
+  // 天地图注记（cva）与本机地名层**都画中文地名**，叠在一起就是重影——实测截图里
+  // 杭州、浙江、福州、南昌都能看到清清楚楚的两份，位置还差几个像素。这是"地名看不清"
+  // 里最容易被误判成"分辨率不够"的一条。
+  //
+  // 规则：cva 想要显示时，本机地名层让位（cva 是天地图的官方注记，排布更专业；
+  // 本机那层在离线时仍然可用，因为那时 cva 本来就不生效）。
+  //
+  // **必须在 apply() 之前改 desired**：这样注册表算出的 effective 与实际一致，
+  // 健康面板不会出现"开关开着却没在显示"的假状态；在 apply 之后再关就会留下它。
+  // 同时把复选框也改掉——界面不能与事实不符。
+  var st = LayerRegistry.status();
+  var cvaWanted = st.some(function (s) {
+    return s.id === 'tianditu.label' && s.desired;
+  });
+  if (cvaWanted && st.some(function (s) {
+        return s.id === 'places.labels' && s.desired;
+      })) {
+    LayerRegistry.setDesired('places.labels', false);
+    var pbox = document.getElementById('modelPlaces');
+    if (pbox) pbox.checked = false;
+  }
+
   var out = LayerRegistry.apply();
   state.lastLayerApply = out;
   syncLayerCheckboxes();
@@ -2205,15 +2244,15 @@ function syncUrbanImagery() {
 
 function setImagery(on) {
   // 「影像底图（离线）」管全球层 + 战区层；热点层与城区层各有自己的开关。
-  // 与天地图的互斥**不再在这里手工对冲**：LAYERS 里 imagery.offline 与
-  // tianditu.base 互相列进 exclusives，由注册表解算谁让位。
+  // 与天地图**不再互斥**（2026-09-29 起）：离线层 z=5 垫在天地图 z=10 下面，
+  // 两者可以同时开——天地图没有瓦片的地方露出离线影像，而不是球体底色。
   // 注记层依旧不受影响——注记是"文字覆盖"而不是底图，用户可以要离线影像 +
   // 天地图注记。
   LayerRegistry.setDesired('imagery.offline', !!on);
   applyLayers();
   setSwitchNote(on
-    ? '离线影像底图已启用：全球/战区层（离线 Esri World Imagery）。'
-    : '离线影像底图已关闭。');
+    ? '离线影像底图已启用：全球/战区层（离线 Esri World Imagery），垫在天地图之下。'
+    : '离线影像底图已关闭；天地图取不到瓦片的地方会露出球体底色。');
 }
 
 /**
@@ -2229,8 +2268,24 @@ function setImagery(on) {
  */
 function setTiandituLabel(on) {
   LayerRegistry.setDesired('tianditu.label', !!on);
+  let extra = '';
+  if (on) {
+    // 天地图注记（cva）**自带中文地名**，而本项目还有一层自己的地名
+    // （Natural Earth，县镇更密）。两层同时开会把同一个城市画两遍，位置略有差异
+    // —— 屏幕上就是重影。这是"地名看不清"里最容易被误判成"分辨率不够"的一条，
+    // 实测截图里杭州/浙江/福州都能看到双份。
+    //
+    // 所以开 cva 时自动关掉本机地名层，并且**说出来**（不静默改用户的开关）。
+    const box = document.getElementById('modelPlaces');
+    if (box && box.checked) {
+      box.checked = false;
+      LayerRegistry.setDesired('places.labels', false);
+      extra = ' 同时关闭了本机地名层：两层都带中文地名，叠在一起会重影。'
+            + '需要本机地名（县镇更密）时，先取消勾选天地图注记。';
+    }
+  }
   applyLayers();
-  setSwitchNote(on ? '天地图注记已显示（置于所有影像层之上）。'
+  setSwitchNote(on ? '天地图注记已显示（置于所有影像层之上）。' + extra
                    : '天地图注记已隐藏。');
 }
 
@@ -2240,6 +2295,10 @@ function setTiandituLabel(on) {
  * 天地图影像与它的中文注记是**两个 layer**：影像本身不含地名，不叠 `cva` 注记层
  * 地图上一个字都没有。所以打开这个开关会同时打开注记；注记另有一个独立开关
  * （setTiandituLabel）用来在需要时单独关掉。
+ *
+ * 自 2026-09-29 起天地图与**离线底图不再互斥**：离线影像垫在下面（z=5），天地图
+ * 盖在上面（z=10）。所以这里不再需要"关掉一个才能开另一个"的说法；key 失效时露出
+ * 的是离线影像而不是球体底色。key 只存在服务端 `.env`，前端连它的尾号都拿不到。
  */
 function setTianditu(on) {
   LayerRegistry.setDesired('tianditu.base', !!on);
@@ -2247,11 +2306,53 @@ function setTianditu(on) {
   // 但关闭影像时**不动注记**——用户可能就是想"离线影像 + 天地图注记"。
   if (on) LayerRegistry.setDesired('tianditu.label', true);
   applyLayers();
-  const key = OfflineAssets.tiandituKey ? OfflineAssets.tiandituKey() : '';
   setSwitchNote(on
-    ? '天地图已启用（在线影像 + 中文注记，key …' + String(key).slice(-6) +
-      '）。离线影像底图已暂时关闭，可在同组里切回。'
-    : '天地图影像已关闭（注记层保持当前状态）。');
+    ? '天地图已启用（在线影像 + 中文注记，经服务端代理取瓦片，key 存于 .env）。'
+      + '离线影像仍垫在下面作为兜底。'
+    : '天地图影像已关闭（注记层保持当前状态）；可见底图为离线影像。');
+}
+
+/**
+ * 探测天地图是否真的可用，并把结论写进「底图」面板的 `#tdtNote`。
+ *
+ * 为什么必须真发一次请求：`/api/tdt/status` 只能说明"服务端配了 key"，说明不了
+ * "key 还能用"。配额耗尽（429）与被禁用（301005）都只有发了请求才知道——而这个项目
+ * 已经吃过一次亏：旧 key 配额耗尽后底图静默变成一片深蓝，很久没人发现。
+ *
+ * 失败**不关闭**天地图图层：留着它，取不到瓦片的地方自然露出下面的离线影像；
+ * 关掉它反而让"重试"没有入口。用户看到提示后可以在同组里自行决定。
+ */
+function probeTiandituStatus() {
+  const setNote = function (text, cls) {
+    if (!dom.tdtNote) return;
+    dom.tdtNote.textContent = text;
+    dom.tdtNote.className = 'switch-note' + (cls ? ' ' + cls : '');
+  };
+  fetch('/api/tdt/status', { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .catch(function () { return null; })
+    .then(function (st) {
+      if (st && st.configured === false) {
+        setNote('未配置天地图 key：把 TIANDITU_KEY 写进仓库根目录的 .env，重启服务后生效。'
+          + '当前底图为离线影像。', 'warn');
+        return null;
+      }
+      return OfflineAssets.probeTianditu().then(function (res) {
+        if (res.ok) {
+          setNote('天地图可用（经服务端代理取瓦片，key 存于 .env，不下发到浏览器）。'
+            + '离线影像垫在下面兜底。', 'ok');
+        } else {
+          setNote('天地图取瓦片失败（HTTP ' + res.status
+            + (res.reason ? '：' + res.reason : '') + '）。当前显示的是离线影像。'
+            + '常见原因：301005 key 已被禁用 / 429 配额耗尽 / 301012·301013 key 类型与'
+            + '调用方式不符。', 'warn');
+        }
+        return null;
+      });
+    })
+    .catch(function (e) {
+      setNote('天地图状态检查失败：' + (e && e.message ? e.message : e), 'warn');
+    });
 }
 
 function setHotspotImagery(on) {
@@ -3121,10 +3222,17 @@ function bindUI() {
   bindCheck('modelImagery', setImagery);
   bindCheck('modelTianditu', setTianditu);
   bindCheck('modelTiandituLabel', setTiandituLabel);
+  // 离线底图也默认开（垫在天地图下面兜底），把它的 desired 同步给注册表。
+  if (dom.modelImagery && dom.modelImagery.checked) setImagery(true);
   // 天地图是默认底图：HTML 的 checked 只是初始显示，change 不会自动触发，
   // 而 initViewer 里已经把它设成 baseLayer，所以这里不需要再调用一次；
   // 但把提示文案写清楚，否则用户不知道当前底图是在线还是离线。
   if (dom.modelTianditu && dom.modelTianditu.checked) setTianditu(true);
+
+  // 天地图可用性探测。必须**真的发一次请求**：`/api/tdt/status` 只能说明"配了 key"，
+  // 说明不了"key 还能用"——配额耗尽（429）与被禁用（301005）都只有请求了才知道。
+  // 之前 key 失效时底图静默变深蓝，就是因为没有任何人问过这个问题。
+  probeTiandituStatus();
 
   // 数据健康面板与「分享场景」按钮已随界面重构移除。
   // 诊断改为按需查询 SituationHost.health()；`?scene=` 深链仍然可用（sceneDoc 未动），

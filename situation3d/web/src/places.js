@@ -58,16 +58,28 @@
     { maxHeight: 60000, rank: 8 },
     { maxHeight: 100000, rank: 7 },
     { maxHeight: 300000, rank: 6 },
-    { maxHeight: 700000, rank: 4 },
-    { maxHeight: 1500000, rank: 3 },
+    // 中距离两档放宽了一级（原 700000→4、1500000→3）。
+    //
+    // 依据是实测：加入地平线剔除后，默认机位（h=900 km、台海）真正可见的候选只剩
+    // **7 个**——因为该高度原先把 rank 卡在 3（全球 522 个大城市），而落在台海视野里的
+    // 只有这么几个。剔除本身是对的（那 203 个背面城市确实不该占预算），但也暴露出
+    // 真正的瓶颈是**档位太紧**：视野里该有福州、厦门、泉州、温州、汕头这一级的地名，
+    // 它们都在 rank 4–5。放宽后同一机位能拿到的本地地名多一个量级，而密度仍由
+    // 每档配额与去重兜住。
+    { maxHeight: 700000, rank: 5 },
+    { maxHeight: 1500000, rank: 4 },
     { maxHeight: 3000000, rank: 2 },
     { maxHeight: Infinity, rank: 1 },
   ];
 
-  // 屏幕包围盒的估算：中文 13px 字号下，一个汉字约 13px 宽，英文约 7px。
-  const CHAR_PX_CJK = 13;
-  const CHAR_PX_LATIN = 7;
-  const LINE_H_PX = 17;
+  // 字号是**唯一**的真源：Cesium 的字体串、去重用的包围盒、行高全部由它推导。
+  // 原先 CHAR_PX_CJK=13 是照着 13px 手写的字面量，字号一改包围盒就跟真实文字不符，
+  // 重叠判定随之失效——那种"改了一处、坏在另一处"的漂移不要再来一次。
+  const FONT_PX = 15;
+  // 屏幕包围盒的估算：中文字宽约等于字号，英文约 0.55 倍。
+  const CHAR_PX_CJK = FONT_PX;
+  const CHAR_PX_LATIN = Math.round(FONT_PX * 0.55);
+  const LINE_H_PX = Math.round(FONT_PX * 1.3);
   const PAD_PX = 2;
 
   /**
@@ -139,12 +151,20 @@
     for (let i = 0; i < MAX_LABELS; i++) {
       pool.push(collection.add({
         text: '',
-        font: '13px "Microsoft YaHei", "PingFang SC", sans-serif',
+        font: FONT_PX + 'px "Microsoft YaHei", "PingFang SC", sans-serif',
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        // 深色字 + 白色描边：陆地和海面都读得清
-        fillColor: Cesium.Color.fromCssColorString('#2b3440'),
-        outlineColor: Cesium.Color.fromCssColorString('#ffffff').withAlpha(0.92),
-        outlineWidth: 2.4,
+        // 浅字 + 深描边：卫星影像上深浅不一，浅色字配深色描边比反过来稳。
+        fillColor: Cesium.Color.fromCssColorString('#ffffff'),
+        outlineColor: Cesium.Color.fromCssColorString('#1b2430').withAlpha(0.95),
+        // 描边**必须细**。原先 13px 字号配 2.4px 白描边：13px 汉字的笔画本身才
+        // 1–1.2px，2.4px 的描边会把字怀填死、相邻笔画粘成一团——这是"地名看不清"
+        // 最直接的原因，不是分辨率问题。
+        outlineWidth: 1.6,
+        // 半透明白底牌 + 内边距：无论底下是深色海水、亮色沙漠还是城市肌理，文字
+        // 都有稳定对比。比继续加粗描边有效得多，也不会糊字。
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString('#ffffff').withAlpha(0.66),
+        backgroundPadding: new Cesium.Cartesian2(5, 3),
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         // **不要关掉深度测试**。原来这里是 Number.POSITIVE_INFINITY（即"永远画在
         // 最前面"），后果是地名无视地球遮挡——地球背面的、被山体挡住的、被三维
@@ -158,7 +178,9 @@
         //   - 只改绘制位置，不改锚点经纬度，贴地关系不变；
         //   - 深度排序仍然生效，地球背面/地平线以下的标签照旧不显示。
         eyeOffset: new Cesium.Cartesian3(0, 0, -400),
-        scaleByDistance: new Cesium.NearFarScalar(2.0e5, 1.0, 1.2e7, 0.75),
+        // 原先还有 scaleByDistance(…, 1.0, …, 0.75)：远处把标签压到约 10px。
+        // 缩小的是**已栅格化的纹理**，必然发虚；而密度控制已经由 LOD 分档 + 每档
+        // 配额负责，这层缩放只剩副作用。所以去掉——远处宁可少显示几个，也不要糊。
         show: false,
       }));
     }
@@ -229,8 +251,15 @@
     let used = 0;
     let offScreen = 0;
     let overlapped = 0;
+    // 地球背面被剔除的数量。单独计数，因为它是"看不见"与"没地方放"之外的
+    // 第三种丢标签原因；混进 offScreen 就再也分不清是谁在吃预算了。
+    let behindGlobe = 0;
     const globe = scene.globe;
     const carto = new Cesium.Cartographic();
+    // 地平线遮挡判定器。构造时绑定**当前**相机位置，所以每次重算标签都要新建一个
+    // （相机一动，可见半球就变了）。
+    const occluder = new Cesium.EllipsoidalOccluder(
+      Cesium.Ellipsoid.WGS84, scene.camera.positionWC);
 
     /**
      * 尝试放下**一个**地名。放得下返回 true。
@@ -261,6 +290,18 @@
         offScreen++;
         return false;
       }
+
+      // **地球背面剔除**。这一步不能省，而且必须在屏幕包围盒判定**之前**。
+      //
+      // 只判"投影坐标落在视口内"是不够的：地球背面的城市同样会投影到视口里
+      // （相机俯视时它们落在画面中部）。实测默认机位（h=900 km、台海）：
+      // 候选 522 个，投影在视口内 210 个，其中 **203 个在地球背面**——纽约、巴黎、
+      // 伦敦、圣保罗这些。它们看不见，却照样占掉屏幕矩形，把 260 个标签槽和画面
+      // 中部的空位全占了，真正该显示的十几个地名反而被"重叠"规则挤掉。
+      //
+      // 深度测试会在绘制阶段挡住它们，但**去重阶段发生得更早**，所以必须在去重前
+      // 就剔除。EllipsoidalOccluder 用椭球体做地平线判定，是 Cesium 给的标准做法。
+      if (!occluder.isPointVisible(pos)) { behindGlobe++; return false; }
 
       const lw = labelWidth(p.n) + PAD_PX * 2;
       const lh = LINE_H_PX + PAD_PX * 2;
@@ -323,6 +364,7 @@
     for (let i = used; i < pool.length; i++) pool[i].show = false;
     lastPlaced = used;
     lastStats = { candidates: cand.length, used: used, offScreen: offScreen,
+                  behindGlobe: behindGlobe,
                   overlapped: overlapped, canvas: [w, h],
                   // 首轮（受配额约束）放下的数量。若它明显小于 used，说明这一屏
                   // 主要靠回收轮填满，即高等级地名本身就不够多。

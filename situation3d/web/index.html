@@ -84,7 +84,13 @@
         <summary>底图</summary>
         <label class="check"><input type="checkbox" id="modelTianditu" checked> 天地图（在线影像+注记）</label>
         <label class="check"><input type="checkbox" id="modelTiandituLabel" checked> 天地图注记（保证不被影像盖住）</label>
-        <label class="check"><input type="checkbox" id="modelImagery"> 影像底图（离线）</label>
+        <!-- 天地图可用性说明。key 只存服务端 .env，前端不下发；这里只报"通不通"。
+             以前 key 失效时底图静默变成一片深蓝（球体底色），没人知道是 key 的问题。 -->
+        <div class="switch-note" id="tdtNote">在线底图状态检查中…</div>
+        <!-- 离线影像**默认开**：它垫在天地图下面（layerRegistry z=5 < 10）。
+             两者不再互斥——天地图没有瓦片的地方（离线、key 失效、瓦片在途）露出的是
+             离线影像，而不是球体底色。 -->
+        <label class="check"><input type="checkbox" id="modelImagery" checked> 影像底图（离线，垫底兜底）</label>
         <label class="check"><input type="checkbox" id="modelHotspotImagery" checked> 热点区域高清影像</label>
         <label class="check"><input type="checkbox" id="modelUrbanImagery" checked> 城区高清影像（米级）</label>
         <label class="check"><input type="checkbox" id="modelTerrain"> 地形模型（DEM 高程）</label>

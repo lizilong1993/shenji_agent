@@ -33,6 +33,8 @@ import json
 import os
 import sys
 import time
+import urllib.error
+import urllib.request
 
 try:
     from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -84,6 +86,223 @@ IMMUTABLE_MAX_AGE = 7 * 24 * 3600
 _ETAG_CACHE = {}
 
 # --------------------------------------------------------------------------
+# 凭据：一律从 .env 读取
+# --------------------------------------------------------------------------
+# 第三方 key（天地图、Cesium ion）从仓库根目录的 `.env` 读，`.env` 进 .gitignore，
+# 源码里**不留任何默认 key**。
+#
+# 为什么必须这么改：此前天地图 key 硬编码在 assets.js 里，配额耗尽后服务端返回
+# 429，而代码对这个失败完全静默——整个底图变成一片深蓝，很久没人发现。凭据写死在
+# 源码里还会随 git 泄漏，且换 key 要改代码。
+#
+# 优先级：**真实环境变量 > .env**。环境变量优先是为了让容器/CI 能在不落文件的情况下
+# 覆盖，也让"临时用另一个 key 启动一次"不必动 .env。
+#
+# 只用标准库：运行环境是 python3.8 且没有 pip，装不了 python-dotenv。
+ENV_PATH = os.path.join(os.path.dirname(HERE), ".env")
+_ENV_CACHE = None
+
+
+def _parse_env_file(path):
+    """
+    解析 KEY=VALUE。支持 `#` 注释、空行、`export ` 前缀、值两端成对的引号。
+
+    格式不对的行**只告警不抛**：一个笔误不该让服务器起不来；把它打出来，
+    比让整个服务崩掉更有用。
+    """
+    out = {}
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            lines = fh.readlines()
+    except OSError:
+        return out
+    for lineno, raw in enumerate(lines, 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].lstrip()
+        if "=" not in line:
+            print("[env] %s:%d 不是 KEY=VALUE，已跳过" % (path, lineno))
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        # 只去掉成对引号，不做转义展开：可预测比"聪明"重要。
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        if not key:
+            print("[env] %s:%d 键名为空，已跳过" % (path, lineno))
+            continue
+        out[key] = value
+    return out
+
+
+def env(key, default=None):
+    """读一个配置项；进程环境变量优先于 .env。空字符串视为未设置。"""
+    global _ENV_CACHE
+    if _ENV_CACHE is None:
+        _ENV_CACHE = _parse_env_file(ENV_PATH)
+        # 只打印**键名**，绝不打印值——这些是凭据。
+        # flush=True：这段在模块导入期执行，而服务器随后会一直跑下去；不 flush 的话
+        # 这行会卡在缓冲区里，日志上看不到，等于没打印。
+        if _ENV_CACHE:
+            print("[env] 已载入 %s（%d 项：%s）"
+                  % (ENV_PATH, len(_ENV_CACHE), ", ".join(sorted(_ENV_CACHE))),
+                  flush=True)
+        else:
+            print("[env] 未找到 %s —— 第三方 key 视为未配置" % ENV_PATH, flush=True)
+    value = os.environ.get(key)
+    if value is None:
+        value = _ENV_CACHE.get(key)
+    if value is None:
+        return default
+    value = value.strip()
+    return value if value else default
+
+
+def tianditu_key():
+    """天地图 key，未配置返回 None。"""
+    return env("TIANDITU_KEY")
+
+
+# --------------------------------------------------------------------------
+# 天地图瓦片代理
+# --------------------------------------------------------------------------
+# 为什么必须走代理，而不是把 key 发给浏览器：
+#
+# 天地图按 **User-Agent** 判断调用方类型，并据此校验 key 类型：
+#   浏览器 UA   → 只接受「浏览器端」key，否则 301012「权限类型错误」
+#   非浏览器 UA → 只接受「服务器端」key，否则 301013「权限类型错误」
+# （两条都是 2026-09-29 在本容器实测的结果。）
+#
+# 于是「把 key 下发到前端用 UrlTemplateImageryProvider 直连」这条路**只对浏览器端
+# key 有效**；服务器端 key 从浏览器发出去必然 403。而 key 类型是用户在天地图后台
+# 自己选的，我们不该要求用户去改。
+#
+# 代理成 `/tdt/<layer>/<z>/<x>/<y>` 后：
+#   * 两种 key 都能用——先按非浏览器 UA 请求，被 301012 拒绝就换浏览器 UA 重试，
+#     并把成功的组合记住（_TDT_UA_MODE）；
+#   * key 始终留在服务端，不下发、不进 git、不出现在浏览器网络面板里；
+#   * 顺带能做磁盘缓存，弱网/离线时已看过的区域仍然有图。
+#
+# 缓存目录在 web/tiles/ 下，该目录已被 .gitignore 覆盖。
+TDT_BASE = "http://t0.tianditu.gov.cn"
+# 允许的图层白名单：既是功能约束，也挡住把 layer 拼进 URL 造成的注入。
+TDT_LAYERS = ("img", "cia", "vec", "cva", "ter")
+TDT_CACHE_DIR = os.path.join(WEB_ROOT, "tiles", "tdt")
+TDT_TIMEOUT = 12.0
+TDT_MAX_LEVEL = 18
+# 探测到的 UA 组合（'server' = 非浏览器 UA）。默认按服务器端 key 起步，因为
+# 服务器端 key 更常见于后端代理场景。
+_TDT_UA_MODE = ["server"]
+# 最近一次失败原因，供 /api/tdt/status 查询——静默失败是这个项目已经吃过一次亏的地方。
+_TDT_LAST_ERROR = [None]
+# 上一次已经打过日志的原因，避免每块失败的瓦片都刷一行。
+_TDT_LOG_STATE = [None]
+# 上游并发上限。天地图会限流（实测遇到过 429 配额耗尽），而 Cesium 一次会抛来
+# 几十个瓦片请求。不设上限的话代理会替浏览器把并发放大，反而更快触发限流。
+# 4 是在本地缓存热起来之前，速度与"别把对方惹毛"之间的折中。
+_TDT_MAX_UPSTREAM = 4
+_TDT_SLOTS = None  # threading.Semaphore，用到时才建（模块导入期不建线程原语）
+
+
+def _tdt_slot():
+    global _TDT_SLOTS
+    if _TDT_SLOTS is None:
+        import threading
+        _TDT_SLOTS = threading.Semaphore(_TDT_MAX_UPSTREAM)
+    return _TDT_SLOTS
+
+
+def _tdt_user_agent(mode):
+    if mode == "browser":
+        return ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    # 非浏览器 UA。用自述式而不是伪装成 curl/python：真出问题时对方日志里能认出我们。
+    return "situation3d/1.1 (tile-proxy)"
+
+
+def _tdt_error_detail(exc):
+    """天地图的错误体是 JSON：{"code":301012,"msg":...,"resolve":...}。"""
+    try:
+        body = exc.read().decode("utf-8", "replace")
+        data = json.loads(body)
+        return data.get("code"), (data.get("msg") or data.get("resolve") or "")
+    except Exception:  # noqa: BLE001 - 拿不到结构化错误就退回字符串
+        return None, str(exc)
+
+
+def _tdt_cache_write(path, data):
+    """尽力写缓存。写不进去不影响本次返回（可能是只读挂载或磁盘满）。"""
+    try:
+        d = os.path.dirname(path)
+        if not os.path.isdir(d):
+            os.makedirs(d)
+        tmp = path + ".tmp"
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _tdt_upstream(layer, z, x, y, mode):
+    key = tianditu_key()
+    if not key:
+        raise RuntimeError("未配置 TIANDITU_KEY")
+    url = ("%s/%s_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0"
+           "&LAYER=%s&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles"
+           "&TILEMATRIX=%d&TILEROW=%d&TILECOL=%d&tk=%s"
+           % (TDT_BASE, layer, layer, z, y, x, key))
+    req = urllib.request.Request(url, headers={"User-Agent": _tdt_user_agent(mode)})
+    with urllib.request.urlopen(req, timeout=TDT_TIMEOUT) as resp:
+        return resp.read(), (resp.headers.get("Content-Type") or "image/jpeg")
+
+
+def fetch_tdt_tile(layer, z, x, y):
+    """
+    取一块瓦片，返回 (bytes, content_type)。命中磁盘缓存则直接返回。
+
+    key 类型未知，所以两种 UA 都试一遍：先用记忆中的组合，失败再换另一种。
+    成功的组合被记住，后续请求不再多花一次往返。
+    """
+    cache = os.path.join(TDT_CACHE_DIR, layer, str(z), str(x), "%d.jpg" % y)
+    try:
+        with open(cache, "rb") as fh:
+            return fh.read(), "image/jpeg"
+    except OSError:
+        pass
+
+    order = (["server", "browser"] if _TDT_UA_MODE[0] == "server"
+             else ["browser", "server"])
+    last = "未知错误"
+    slot = _tdt_slot()
+    for mode in order:
+        # 上游请求计数上限：缓存命中不会走到这里，所以只在真正要联网时才占坑。
+        with slot:
+            try:
+                data, ctype = _tdt_upstream(layer, z, x, y, mode)
+            except urllib.error.HTTPError as exc:
+                code, msg = _tdt_error_detail(exc)
+                last = "HTTP %s code=%s %s" % (exc.code, code, msg)
+                # 301012 = 这是浏览器端 key；301013 = 这是服务器端 key。换另一种 UA 再试。
+                if code in (301012, 301013):
+                    continue
+                break
+            except Exception as exc:  # noqa: BLE001 - 网络层什么都可能抛
+                last = "%s: %s" % (type(exc).__name__, exc)
+                break
+        _TDT_UA_MODE[0] = mode
+        _TDT_LAST_ERROR[0] = None
+        _tdt_cache_write(cache, data)
+        return data, ctype
+
+    _TDT_LAST_ERROR[0] = last
+    raise RuntimeError(last)
+
+
+# --------------------------------------------------------------------------
 # Cesium ion token
 # --------------------------------------------------------------------------
 # The online 3D-reality layer (Google Photorealistic 3D Tiles, ion asset
@@ -110,7 +329,16 @@ def _b64url_decode(seg):
 
 
 def read_ion_token():
-    """Return the configured token, or None. Never raises."""
+    """
+    Return the configured token, or None. Never raises.
+
+    `.env` 里的 `CESIUM_ION_TOKEN` 优先于 web/data/ion.json：key 统一从 .env 读之后，
+    这里是"配置"与"界面上临时填的"两条路，前者应当赢——否则 .env 改了却不生效，
+    比没有 .env 更让人困惑。ion.json 保留为兼容路径（界面上的保存钮写的就是它）。
+    """
+    from_env = env("CESIUM_ION_TOKEN")
+    if from_env:
+        return from_env
     try:
         with open(ION_CONFIG_PATH, "r") as fh:
             data = json.load(fh)
@@ -263,6 +491,24 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self._send_json({"token": token, "assetId": ION_ASSET_ID})
             return
+        if path == "/api/tdt/status":
+            # **绝不下发 key 本身**：key 只存在服务端，浏览器用的是 /tdt/ 代理。
+            # 这里只回答"配没配、通不通、按哪种 UA"。keyLen 用于区分"没配"与
+            # "配错成空串"，不足以还原 key。
+            key = tianditu_key()
+            self._send_json({
+                "configured": key is not None,
+                "keyLen": len(key) if key else 0,
+                "uaMode": _TDT_UA_MODE[0],
+                "lastError": _TDT_LAST_ERROR[0],
+                "proxyTemplate": "/tdt/{layer}/{z}/{x}/{y}",
+                "layers": list(TDT_LAYERS),
+                "cacheDir": os.path.relpath(TDT_CACHE_DIR, WEB_ROOT),
+                "hint": ("已配置天地图 key（服务端代理取瓦片，key 不下发到浏览器）"
+                         if key else
+                         "未配置：把 TIANDITU_KEY 写进仓库根目录的 .env"),
+            })
+            return
         if path == "/api/satellites/passes":
             self._api_satellite_passes(query)
             return
@@ -402,6 +648,8 @@ class Handler(SimpleHTTPRequestHandler):
         self._send_json({
             "ok": True,
             "ion_configured": read_ion_token() is not None,
+            "tianditu_configured": tianditu_key() is not None,
+            "env_file": ENV_PATH,
             "wfs_types": types,
             "web_root": WEB_ROOT,
         })
@@ -434,7 +682,64 @@ class Handler(SimpleHTTPRequestHandler):
             return
         self._send_json({"ok": True, "assetId": ION_ASSET_ID})
 
+    def _tdt_tile(self):
+        """
+        GET /tdt/<layer>/<z>/<x>/<y> —— 天地图瓦片代理（见 fetch_tdt_tile 的说明）。
+
+        放在 `/tdt/` 而不是 `/api/` 下：它是给 Cesium 的 URL 模板直接用的。
+        任何失败都回 404 而不是 500 —— 底下的离线底图仍在，缺一块瓦片不该让整个
+        图层报错或让控制台刷满异常。
+        """
+        parts = self.path.split("?")[0].strip("/").split("/")
+        if len(parts) != 5 or parts[0] != "tdt":
+            self.send_error(404, "bad tile path")
+            return
+        layer = parts[1]
+        try:
+            z, x, y = int(parts[2]), int(parts[3]), int(parts[4])
+        except ValueError:
+            self.send_error(400, "bad tile coords")
+            return
+        if (layer not in TDT_LAYERS or not (0 <= z <= TDT_MAX_LEVEL)
+                or x < 0 or y < 0):
+            self.send_error(404, "bad tile")
+            return
+        if not tianditu_key():
+            self.send_error(503, "TIANDITU_KEY 未配置")
+            return
+        try:
+            data, ctype = fetch_tdt_tile(layer, z, x, y)
+        except Exception as exc:  # noqa: BLE001
+            # 每个坐标都打日志会刷屏；只在原因变化时打一条，避免淹没其它日志。
+            reason = str(exc)
+            if _TDT_LAST_ERROR[0] != reason or _TDT_LOG_STATE[0] != reason:
+                print("[tdt] %s z=%d x=%d y=%d 取瓦片失败：%s"
+                      % (layer, z, x, y, reason))
+                _TDT_LOG_STATE[0] = reason
+            self.send_error(404, "tile unavailable")
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", ctype or "image/jpeg")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "public, max-age=%d" % IMMUTABLE_MAX_AGE)
+        self.end_headers()
+        try:
+            self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def do_GET(self):
+        if self.path.split("?")[0].startswith("/tdt/"):
+            try:
+                self._tdt_tile()
+            except Exception:  # noqa: BLE001 - never leave the client hanging
+                import traceback
+                traceback.print_exc()
+                try:
+                    self.send_error(500, "tdt proxy error")
+                except Exception:  # noqa: BLE001
+                    pass
+            return
         if self._is_api_path():
             try:
                 self._api_get(self.path.split("?")[0], self._query(self.path))
@@ -595,6 +900,10 @@ def main() -> int:
     if not os.path.isdir(WEB_ROOT):
         sys.stderr.write("web root not found: %s\n" % WEB_ROOT)
         return 1
+
+    # 启动时就把 .env 读掉：语法有问题的行会在开机日志里立刻报出来，而不是等到
+    # 第一个请求来了才发现（惰性读取会让"配错了"和"没人访问"看起来一模一样）。
+    env("_WARM_")
 
     httpd = Server((args.host, args.port), Handler)
     sys.stderr.write("serving %s on http://%s:%d/  (started %s)\n"

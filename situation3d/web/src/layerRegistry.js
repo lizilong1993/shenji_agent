@@ -54,15 +54,25 @@
    */
   var LAYERS = [
     // ---- imagery 栈：序号即 imageryLayers 的 index，越大越靠上 ----
+    // 离线底图**垫在天地图下面**（z=5 < z=10），两者不再互斥。
+    //
+    // 原先是互斥的：两边都开时"后动的一方赢"，另一方判为不可见。规则本身没问题，
+    // 但前提假设错了——它假设两个底图是**二选一**。实际发生的是：天地图 key 配额
+    // 耗尽后返回 429，整张底图变成一片深蓝（地球底色），而离线底图被互斥规则按住，
+    // 明明有瓦片却不肯显示。
+    //
+    // 垫一层就没有这个单点：天地图有瓦片的地方盖住离线层；没瓦片的地方（离线、
+    // key 失效、瓦片还在路上）露出离线影像，而不是露出球体底色。代价是天地图加载
+    // 期间会短暂看到较粗的离线影像——这比看到空洞好。
+    {
+      id: 'imagery.offline', kind: 'imagery', z: 5,
+      label: '影像底图（离线）', group: '底图', checkbox: 'modelImagery',
+      exclusives: [],
+    },
     {
       id: 'tianditu.base', kind: 'imagery', z: 10,
       label: '天地图影像', group: '底图', checkbox: 'modelTianditu',
-      exclusives: ['imagery.offline'],
-    },
-    {
-      id: 'imagery.offline', kind: 'imagery', z: 20,
-      label: '影像底图（离线）', group: '底图', checkbox: 'modelImagery',
-      exclusives: ['tianditu.base'],
+      exclusives: [],
     },
     {
       id: 'hotspot.imagery', kind: 'imagery', z: 30,
