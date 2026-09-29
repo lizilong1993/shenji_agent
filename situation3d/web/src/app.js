@@ -1094,12 +1094,30 @@ function createRouteEntities() {
   });
 }
 
+/**
+ * 热点区域框的高度（米）。
+ *
+ * 原先矩形是 `height: 0` 的一张**平面**：贴在椭球面上，一来没有"高度"可言，
+ * 二来开了 DEM 地形后会被地形盖住（陆上区域尤其明显）。
+ * 现在改成从地面拔起的**立体框**（`height` 作底、`extrudedHeight` 作顶），
+ * 于是它同时解决了两个问题：有了可见的高度、且必然高过地形。
+ *
+ * 取 25 km：这些区域的经纬跨度约 0.5–1.5°（数十至一百多公里），25 km 的高度
+ * 在默认机位（视高数百公里）下看得清，又不会把区域本身糊住。若某个热点自带
+ * `height_m` 字段则以它为准，便于个别区域单独调整。
+ *
+ * 注意 `outlineWidth` 在 Windows/ANGLE 上被 Cesium 忽略（只能画 1px），
+ * 所以"框"的立体感主要来自侧面与顶面，而不是加粗的棱线。
+ */
+const HOTSPOT_HEIGHT_M = 25000;
+
 function createHotspots() {
   state.data.hotspots.forEach(function (hs, i) {
     const w = hs.bbox[0], s = hs.bbox[1], e = hs.bbox[2], n = hs.bbox[3];
     const centerLat = hs.center[0], centerLon = hs.center[1];
+    const boxH = Number.isFinite(hs.height_m) ? hs.height_m : HOTSPOT_HEIGHT_M;
 
-    // 热点区域按真实经纬范围绘制成矩形，而不是一个点 —— 面板展示的是"范围"，
+    // 热点区域按真实经纬范围绘制成矩形棱柱，而不是一个点 —— 面板展示的是"范围"，
     // 一个点无法表示一条海峡或一个群岛。
     const entity = viewer.entities.add({
       id: 'hotspot-' + i,
@@ -1110,9 +1128,12 @@ function createHotspots() {
         outline: true,
         outlineColor: Cesium.Color.fromCssColorString('#f0a020').withAlpha(0.85),
         outlineWidth: 1,
+        // 底在椭球面、顶在 boxH：得到一个立起来的框，而不是贴地的一张纸。
         height: 0,
+        extrudedHeight: boxH,
       },
-      position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 0),
+      // 标签放到框顶：区域范围一高，标签留在底部会与侧面重叠、看起来像在框里。
+      position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, boxH),
       label: {
         text: hs.name,
         font: '12px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
