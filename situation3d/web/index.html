@@ -58,7 +58,6 @@
         <summary>态势图层</summary>
         <label class="check"><input type="checkbox" id="layerHotspots" checked> 热点区域</label>
         <label class="check"><input type="checkbox" id="layerRoutes" checked> 计划航路</label>
-        <label class="check"><input type="checkbox" id="layerLevelBanner" checked> 区域级态势横幅</label>
         <label class="check"><input type="checkbox" id="layerOverview" checked> 鸟瞰图</label>
       </details>
 
@@ -122,13 +121,8 @@
 
       <!-- 目标信息面板已移除：内容并入右栏「目标态势栏」，同时把右上角让给鸟瞰图。 -->
 
-      <div id="levelBanner" class="level-banner">
-        <span class="lb-label">区域级态势</span>
-        <span class="lb-value" id="levelValue">—</span>
-        <span class="lb-intent" id="levelIntent">—</span>
-        <span class="lb-phase" id="levelPhase">—</span>
-        <span class="lb-note" id="levelNote"></span>
-      </div>
+      <!-- 地图上的「区域级态势」横幅已移除：内容全部移到右栏「区域态势」栏。
+           同一个读数不该有两份显示——地图上那份还占地、挡住地图本身。 -->
 
       <div id="legend" class="legend">
         <span><i class="swatch red"></i>红方</span>

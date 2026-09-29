@@ -39,7 +39,7 @@ const state = {
   ticksPerSecond: 30,
   targets: {},              // id -> { def, entity, trail: [], lastTick, sensorEntity }
   layers: { targets: true, tracks: true, routes: true, hotspots: true, labels: true,
-            levelBanner: true, targetPanel: true, overview: true },
+            targetPanel: true, overview: true },
   filters: { red: true, blue: true, sea: true, land: true, air: true },
   selected: null,
   hotspotEntities: [],
@@ -106,11 +106,10 @@ const FALLBACK_CAMERA = { lon: 119.6, lat: 24.4, height: 900000, heading: 0, pit
 const dom = {};
 ['statusText', 'statusDot', 'scenarioName',
  'geoSpan',
- 'levelValue', 'levelNote', 'levelIntent', 'levelPhase',
  'rlValue', 'rlNote', 'rlIntent', 'rlPhase',
  'overallBody', 'targetBody',
  'menuCase', 'menuCaseList',
- 'tdtNote', 'tickLabel', 'timeline', 'clockLabel', 'levelBanner',
+ 'tdtNote', 'tickLabel', 'timeline', 'clockLabel',
  'countRed', 'countBlue', 'countSea', 'countLand', 'countAir',
  'loadingBadge', 'loadingText',
  'mapCompass', 'compRose', 'mapViewpoint', 'mvAll', 'modelPlaces',
@@ -971,7 +970,7 @@ function closeCaseMenu() { closeAllMenus(); }
 // 关掉等于隐式解除跟随，语义混乱。
 
 const LAYER_GROUPS = [
-  { name: '态势图层', ids: ['layerHotspots', 'layerRoutes', 'layerLevelBanner'] },
+  { name: '态势图层', ids: ['layerHotspots', 'layerRoutes'] },
   { name: '目标图层', ids: ['layerTargets', 'layerLabels', 'layerTracks', 'modelSensor',
                             'layerTargetPanel', 'filterRed', 'filterBlue', 'filterSea',
                             'filterLand', 'filterAir'] },
@@ -1288,8 +1287,6 @@ function regionIntentCounts(inf) {
 function updateInferenceUi() {
   const inf = inferenceAt(state.tick);
   if (!inf) {
-    dom.levelValue.textContent = '—';
-    dom.levelNote.textContent = '未加载推理结果';
     if (dom.rlValue) dom.rlValue.textContent = '—';
     if (dom.rlNote) dom.rlNote.textContent = '未加载推理结果';
     // 没有推理帧时整体态势栏仍然渲染，只是所有图标按"正常"档并在 title 里说明。
@@ -1300,16 +1297,17 @@ function updateInferenceUi() {
   }
 
   const lv = inf.overall.level;
-  dom.levelValue.textContent = lv + ' 级 · ' + inf.overall.level_label;
-  dom.levelNote.textContent = inf.overall.note +
+  // 区域态势只写在**右栏**。地图上那份「区域级态势」横幅已移除（内容与之重复，
+  // 且占着地图），所以这里不再有"两份显示、需要同步"的问题——原先 rl* 是从
+  // level* 复制过来的，现在直接算一份。
+  const noteText = inf.overall.note +
     ' 平均威胁 ' + inf.overall.mean_threat + '，最高 ' + inf.overall.max_threat +
     '，对抗域 ' + inf.overall.engaged_pairs + ' 个。';
-  // 右侧「区域态势栏」是同一份数据的常驻副本（地图横幅有独立开关，可能被关掉）。
   if (dom.rlValue) {
     dom.rlValue.textContent = lv + ' 级 · ' + inf.overall.level_label;
     dom.rlValue.className = 'rl-value ' + (LEVEL_CLASS[lv] || '');
   }
-  if (dom.rlNote) dom.rlNote.textContent = dom.levelNote.textContent;
+  if (dom.rlNote) dom.rlNote.textContent = noteText;
 
   // 整体态势栏：红蓝双方各类型目标的整体状态（图标按告警等级着色）。
   // 只更新每个图标 `<img>` 的档位 class，结构在案例切换时才重建——见
@@ -1318,19 +1316,17 @@ function updateInferenceUi() {
     StatusPanels.renderOverall(dom.overallBody, state.data, inf);
   }
 
-  // 区域级横幅补上"主导意图"：等级回答"多紧张"，意图回答"在打什么"，
-  // 两者并列才算把区域态势说全。
-  if (dom.levelIntent) {
+  // 主导意图：等级回答"多紧张"，意图回答"在打什么"，两者并列才算把区域态势说全。
+  if (dom.rlIntent) {
     const top = regionIntentCounts(inf);
-    dom.levelIntent.textContent = top.length
+    dom.rlIntent.textContent = top.length
       ? top.map(function (x) { return x.zh + ' ×' + x.n; }).join('、')
       : '无带意图判定的目标';
-    if (dom.rlIntent) dom.rlIntent.textContent = dom.levelIntent.textContent;
   }
 
   // 作战阶段：登陆作战是分阶段的，同一个意图在不同阶段含义不同，
   // 所以阶段与等级、意图并列显示，而不是让人自己去推时间轴。
-  if (dom.levelPhase) {
+  if (dom.rlPhase) {
     const fr = state.data && state.data.frames && state.data.frames[state.tick];
     // Gate on the dataset *declaring* phases. The engine attaches a phase to every
     // frame for the Taiwan landing operation, and the India-China case legitimately
@@ -1349,18 +1345,14 @@ function updateInferenceUi() {
     const up = (ph && state.selected && fr.unit_phase)
       ? fr.unit_phase[state.selected] : null;
     const lags = up && up.id && up.id !== ph.id;
-    dom.levelPhase.textContent = ph
+    dom.rlPhase.textContent = ph
       ? (ph.name + ' ' + (ph.index + 1) + '/' + (ph.count || declared.length)
          + (lags ? ' · 该目标：' + up.name : ''))
       : '';
-    dom.levelPhase.title = ph
+    dom.rlPhase.title = ph
       ? ('本阶段已持续 ' + ph.ticks_in + ' 帧（自第 ' + ph.since_tick + ' 帧）'
          + (lags ? '；所选目标仍处于「' + up.name + '」，落后于作战阶段' : ''))
       : '该战区未定义阶段';
-    if (dom.rlPhase) {
-      dom.rlPhase.textContent = dom.levelPhase.textContent;
-      dom.rlPhase.title = dom.levelPhase.title;
-    }
   }
 
   // 热点区域表格里的态势等级与意图随之刷新。
@@ -3053,7 +3045,6 @@ window.SituationHost = {
       viewpoint: rect('mapViewpoint'),
       legend: rect('legend'),
       hint: rect('hint'),
-      levelBanner: rect('levelBanner'),
       panels: {
         left: rect('layerGroups') || (function () {
           const el = document.querySelector('.layer-groups');
@@ -3187,10 +3178,7 @@ function bindUI() {
   const ovHide = document.getElementById('ovHide');
   if (ovHide) ovHide.addEventListener('click', function () { setOverview(false); });
 
-  bindCheck('layerLevelBanner', function (v) {
-    state.layers.levelBanner = v;
-    if (dom.levelBanner) dom.levelBanner.classList.toggle('hidden', !v);
-  });
+  // 地图上的「区域级态势」横幅与其开关已移除，读数只在右栏「区域态势」显示。
   // 「目标元数据面板」开关现在控制右栏「目标态势栏」是否展开详情。
   bindCheck('layerTargetPanel', function (v) {
     state.layers.targetPanel = v;

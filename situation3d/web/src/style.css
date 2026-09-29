@@ -593,39 +593,10 @@ select {
   color: var(--text-dim);
 }
 
-/* ---------------- 区域级态势横幅 ---------------- */
-
-.level-banner {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  max-width: 46%;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 7px 11px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, .94);
-  font-size: 11px;
-}
-
-.level-banner .lb-label { color: var(--text-dim); flex: 0 0 auto; }
-.level-banner .lb-value { font-size: 13px; font-weight: 700; flex: 0 0 auto; }
-.level-banner .lb-value.lv1 { color: var(--lv1); }
-.level-banner .lb-value.lv2 { color: var(--lv2); }
-.level-banner .lb-value.lv3 { color: var(--lv3); }
-.level-banner .lb-value.lv4 { color: var(--lv4); }
-/* 主导意图：与等级并列。等级说"多紧张"，意图说"在打什么"，两者缺一都说不清区域态势。 */
-.level-banner .lb-intent {
-  flex: 0 0 auto;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: #eaf1fb;
-  color: #12325c;
-  font-size: 11px;
-}
-.level-banner .lb-note { color: var(--text-dim); line-height: 1.45; }
+/* ---------------- 区域级态势横幅：已移除 ----------------
+   地图右下角那条横幅整个去掉了（读数移进右栏「区域态势」栏）。这里原本的
+   `.level-banner` / `.lb-*` 规则随之删除——留着一段指向不存在元素的样式，
+   下一个人会以为界面上还有这个模块，改样式时白费功夫。 */
 
 /* ---------------- 右侧「目标态势栏」的样式 ----------------
    注意：原有的 `.tp-kv` / `.tp-reason` / `.tp-intent` / `.tpi-*` / `.tp-fold`
@@ -764,7 +735,7 @@ select {
 }
 .rl-value { font-size: 12px; font-weight: 700; }
 /* 区域等级配色：与地图横幅同源（--lv1..--lv4）。
-   注意 `.lv1` 这类类在全局只对 `.lv-cell` / `.lb-value` 生效，所以这里必须显式声明，
+   注意 `.lv1` 这类类在全局只对 `.lv-cell` 生效（`.lb-value` 那份随横幅一起删了），所以这里必须显式声明，
    否则右栏的等级会一直是无色的。 */
 .rl-value.lv1 { color: var(--lv1); }
 .rl-value.lv2 { color: var(--lv2); }
@@ -1371,15 +1342,11 @@ select {
 /* 顶栏下拉：图层管理与视图用更窄的菜单 */
 .menu-list-narrow { width: 268px; }
 
-.level-banner.hidden { display: none; }
-
 /* 菜单按钮的禁用态（鸟瞰图尚未接入时占位） */
 .topbar-actions button:disabled { opacity: .45; cursor: not-allowed; }
 
 /* 顶栏下拉：图层管理与视图用更窄的菜单 */
 .menu-list-narrow { width: 268px; }
-
-.level-banner.hidden { display: none; }
 
 /* 菜单按钮的禁用态（鸟瞰图尚未接入时占位） */
 .topbar-actions button:disabled { opacity: .45; cursor: not-allowed; }
@@ -1409,12 +1376,5 @@ select {
   margin-left: 3px;
 }
 
-/* 作战阶段：与等级、意图并列。同一意图在不同阶段含义不同，阶段必须可见。 */
-.level-banner .lb-phase {
-  flex: 0 0 auto;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: #eef4ea;
-  color: #3d5a2f;
-  font-size: 11px;
-}
+/* 作战阶段（.rl-phase）的配色在 .region-level 那一节里定义——横幅移除后这里不再有
+   第二份 .lb-phase 规则。 */
