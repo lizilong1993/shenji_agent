@@ -2286,26 +2286,63 @@ function cameraOrientation() {
  * 另一种语义"指针指向相机朝向"在这里没有信息量——屏幕上方本身就是相机朝向，
  * 指针会恒指顶端。
  *
- * --- 关于"缩放时指针晃动"的调查结论（2026-09-29）---
- * 原先怀疑俯视时 `atan2(dirEast, dirNorth)` 病态（视线趋垂直 → 水平分量 → 0），
- * 于是改成"视线 / 屏幕上方向量取水平分量更大的那个"并加圆周平滑。**实测推翻了这个
- * 判断，改法已回退**：
+ * 写入值必须是**连续角度**，不能直接写 `atan2` 的结果。
+ * `cameraOrientation().headingRad` 由 `atan2` 得到，落在 (-180°, 180°]：航向跨过
+ * 正南时会从 +179.9 跳到 -179.9。CSS 对 `rotate()` 的角度是按数值**线性**插值的，
+ * 于是 `transition` 会让指针多转 359.8° —— 看上去就是指针猛地晃一下。
+ * 这里改为累加"最短角差"，写入值因此始终连续；跨 ±180 只是数值上的事，
+ * 不再产生绕圈。
  *
- *   在三个姿态（pitch −89.5°/heading 0、−86°/35、−70°/120）下做**动画缩放**扫掠，
- *   每个姿态采样 40 次，量"相邻采样的最大角度跳变"：
- *     原实现（本函数）      0 / 0 / 0.01 度
- *     改后的双向量选择      0 / **10.09** / 0 度
- *   即原实现在这套测试里是稳定的，而"修法"在 −86° 姿态引入了 10° 跳变——因为
- *   `hUp > hDir` 在俯仰变化时会翻转选择源，交接处产生不连续。
- *
- * 所以：**晃动未能在脚本化缩放下复现**，而那次改动是有害的，故还原为原实现。
- * 若晃动仍然存在，需要用户给出具体复现条件（是否在跟随模式 / 是否在天地图瓦片加载中 /
- * 缩放时是否同时旋转），否则任何"修"都只是猜测——本函数就是那次猜测的代价。
+ * 关于"缩放时指针晃动"：**尚未定位**。曾按"俯视时 atan2 病态"的假设改过一次
+ * （改用视线/屏幕上方向量取水平分量较大者 + 圆周平滑），实测被推翻并在
+ * −86° 姿态引入了 10° 跳变，已回退（详见提交 d9ef78c）。目前可复现的路径都测不出
+ * 抖动：脚本化 setView + 动画 zoomIn/zoomOut 在 pitch −89.5/−86/−70、heading 0/35/120
+ * 下各采样 40 次，角度极差 ≤0.08°。因此改为**采集实测数据**而不是继续猜：
+ * 见下方 COMPASS_TRACE 与 `SituationHost.compassTrace()` / `compassTraceStats()`。
  */
+let _compassWrittenDeg = null;
+
+const COMPASS_TRACE_MAX = 240;
+const COMPASS_TRACE = [];
+
+function compassSample(rawDeg, writtenDeg) {
+  // 量**容器** `#mapCompass` 而不是被旋转的 `#compRose`：旋转元素的轴对齐包围盒
+  // 会随角度胀缩（84px 的方块转会得到 84~119px 的盒子），拿它当"位置移动"会得到
+  // 5~14px 的假位移，把人引到"布局抖动"这个错误方向上去——本轮就先踩了这个坑。
+  // 容器没有 transform，它的矩形变化才是真的布局/重排。
+  const box = dom.mapCompass || dom.compRose;
+  const r = box.getBoundingClientRect();
+  const c = viewer.camera;
+  COMPASS_TRACE.push({
+    t: Date.now(),
+    raw: Math.round(rawDeg * 100) / 100,
+    written: Math.round(writtenDeg * 100) / 100,
+    elLeft: Math.round(r.left),
+    elTop: Math.round(r.top),
+    elW: Math.round(r.width),
+    elH: Math.round(r.height),
+    hdg: Math.round(Cesium.Math.toDegrees(c.heading) * 100) / 100,
+    pitch: Math.round(Cesium.Math.toDegrees(c.pitch) * 100) / 100,
+    heightM: Math.round(c.positionCartographic.height),
+  });
+  if (COMPASS_TRACE.length > COMPASS_TRACE_MAX) COMPASS_TRACE.shift();
+}
+
 function updateCompass() {
   if (!dom.compRose) return;
-  const deg = Cesium.Math.toDegrees(cameraOrientation().headingRad);
-  dom.compRose.style.transform = 'rotate(' + (-deg) + 'deg)';
+  const rawDeg = Cesium.Math.toDegrees(cameraOrientation().headingRad);
+  if (_compassWrittenDeg === null) {
+    _compassWrittenDeg = rawDeg;
+  } else {
+    // 归一到 (-180, 180] 后累加：写入值连续，跨 ±180 不产生绕圈。
+    let d = rawDeg - _compassWrittenDeg;
+    d = ((d + 540) % 360) - 180;
+    _compassWrittenDeg += d;
+    // 长时间运行后把数值收敛回 ±360 内（不影响视觉，只避免数值越滚越大）
+    if (Math.abs(_compassWrittenDeg) > 3600) _compassWrittenDeg = _compassWrittenDeg % 360;
+  }
+  dom.compRose.style.transform = 'rotate(' + (-_compassWrittenDeg) + 'deg)';
+  compassSample(rawDeg, _compassWrittenDeg);
 }
 
 /** 视点坐标：相机自身的经纬高。高度是椭球高（WGS84），不是海拔。 */
@@ -2790,6 +2827,41 @@ window.SituationHost = {
   // 数据健康诊断的出口。左栏「数据健康」面板已随界面重构移除，但诊断结论仍需可查：
   // 否则"开关开着、图层没生效"就失去了唯一的证据出口。
   health: healthReport,
+  // 指南针实测采集：把"指针抖动"从主观描述变成可量的数。
+  // 关键是把**角度变化**与**元素位移**分开统计：
+  //   maxWrittenStep 大 → 写入的旋转角在跳（指南针自身的角度问题）
+  //   maxRawStep 大而 maxWrittenStep 小 → 原始航向在跳，但连续化把它压住了
+  //   maxElementMove 大 → 抖动的是整个指南针的**位置**（布局/重排问题），
+  //                      与旋转无关，此前几轮一直在错的维度上找
+  compassTrace: function () { return COMPASS_TRACE.slice(); },
+  compassTraceStats: function () {
+    let maxWritten = 0, maxRawWrap = 0, maxRawNorm = 0, maxEl = 0, maxHdg = 0, maxResize = 0;
+    for (let i = 1; i < COMPASS_TRACE.length; i++) {
+      const a = COMPASS_TRACE[i], b = COMPASS_TRACE[i - 1];
+      if (a.t - b.t > 1500) continue;              // 跨过长空档（例如切案例）不算跳变
+      maxWritten = Math.max(maxWritten, Math.abs(a.written - b.written));
+      // raw 的**未归一化**差值：±180 处的锯齿会在这里显示成约 360，
+      // 这正是"直接写 atan2 结果"会让 CSS 多转一圈的证据。
+      maxRawWrap = Math.max(maxRawWrap, Math.abs(a.raw - b.raw));
+      let d = a.raw - b.raw;
+      d = ((d + 540) % 360) - 180;
+      maxRawNorm = Math.max(maxRawNorm, Math.abs(d));
+      maxHdg = Math.max(maxHdg, Math.abs(a.hdg - b.hdg));
+      maxEl = Math.max(maxEl, Math.abs(a.elLeft - b.elLeft), Math.abs(a.elTop - b.elTop));
+      maxResize = Math.max(maxResize, Math.abs(a.elW - b.elW), Math.abs(a.elH - b.elH));
+    }
+    const r2 = function (v) { return Math.round(v * 100) / 100; };
+    return {
+      samples: COMPASS_TRACE.length,
+      maxWrittenStepDeg: r2(maxWritten),
+      maxRawWrapStepDeg: r2(maxRawWrap),
+      maxRawNormStepDeg: r2(maxRawNorm),
+      maxCameraHeadingStepDeg: r2(maxHdg),
+      maxElementMovePx: maxEl,
+      maxElementResizePx: maxResize,
+    };
+  },
+  compassTraceReset: function () { COMPASS_TRACE.length = 0; _compassWrittenDeg = null; },
   // 界面骨架的取证入口：各面板与地图组件的实际几何位置。
   // 组件重排（鸟瞰图右上、指南针其下、比例尺左下、视点底部居中）靠截图判断不可靠
   // ——本项目已确认 --shot 会给出相同图。这里输出可断言的矩形，让验收有据可依。
