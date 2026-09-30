@@ -64,18 +64,13 @@ SITUATION3D_ROOT = os.path.dirname(HERE)
 # Relative location of the ontology inside the repository that holds both the
 # agent checkout and `situation3d`.
 #
-# term-replace:keep-start
-# NOTE (term replacement, exemption R2): the ontology's parent-category name
-# `机动态势` (MANEUVER_POSTURE) is **deliberately left in the original wording**
-# while the rest of the UI moved to the `TS` / `ZC` abbreviations. Two reasons:
-#   1. it is a term of art shared with the Shenji / 庙算 ontology, and the copy
-#      vendored at `engine/data/intent_ontology_v2.json` must stay byte-compatible
-#      with the authority file this constant points at -- translating one side
-#      only would make the two disagree;
-#   2. it is displayed as a parent-category label in the target-intent panel, so
-#      `机动TS` would read as a typo rather than a category.
-# See NOTES_term_replacement.md for the full exemption table.
-# term-replace:keep-end
+# NOTE (term replacement): the ontology's parent-category name is spelled
+# `机动TS` in the vendored copy at `engine/data/intent_ontology_v2.json` and is
+# emitted to the front end as-is. The authority file this constant points at
+# lives in the Shenji checkout, which is **not** modified here, so re-syncing the
+# vendored copy will restore the old spelling `机动TS` and the UI will follow.
+# That divergence is the accepted cost of translating the term at all; see
+# NOTES_term_replacement.md.
 _ONTOLOGY_REL = os.path.join("code", "shenji_agent", "Shenji", "ontology",
                              "intent_ontology_v2.json")
 

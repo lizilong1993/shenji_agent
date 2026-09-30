@@ -62,7 +62,7 @@
     },
     {
       "code": "MANEUVER_POSTURE",
-      "name_zh": "机动态势",
+      "name_zh": "机动TS",
       "name_en": "Maneuver and posture",
       "children": ["REDEPLOY", "ASSEMBLE", "DISPERSE", "FORTIFY"]
     },

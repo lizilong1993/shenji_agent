@@ -1,4 +1,4 @@
-/* situation3d — 三维ZC-TS生成系统前端
+/* situation3d — 三维ZCTS生成系统前端
  *
  * 职责：
  *   1. 加载引擎输出的逐帧TS与三级推理结果，在 Cesium 三维地球上回放；
@@ -740,7 +740,7 @@ function applySituationData(data, caseId) {
   syncUrbanImagery();
 
       dom.scenarioName.textContent = data.region + ' · ' + data.case_name;
-      document.title = '三维ZC-TS生成系统 — ' + data.case_name;
+      document.title = '三维ZCTS生成系统 — ' + data.case_name;
 
       createHotspots();
       createRouteEntities();
@@ -860,7 +860,7 @@ function clearSituation() {
   markScene('clearSituation');
 
   dom.scenarioName.textContent = state.baseRegion || '未加载TS';
-  document.title = '三维ZC-TS生成系统';
+  document.title = '三维ZCTS生成系统';
 
   renderTargetCounts();
   renderHotspotTable();

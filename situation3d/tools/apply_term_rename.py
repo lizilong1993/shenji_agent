@@ -1,21 +1,30 @@
 #!/usr/bin/env python3
 """术语替换：态势 -> TS、战场 -> ZC。
 
-这是**一次性的迁移工具**，保留在仓库里是为了让这次替换可复核、可复现：清单怎么来的、
-哪些地方被豁免、豁免理由是什么，都在这里，而不是散在一次性的 sed 里。
+这是**一次性的迁移工具**，保留在仓库里是为了让这次替换可复核、可复现：规则怎么定的、
+哪些地方有意保留、理由是什么，都在这里，而不是散在一次性的 sed 里。
 
-三条豁免规则（见 NOTES_term_replacement.md 的风险表）
------------------------------------------------------
-R1  产品名「三维战场态势生成系统」原样保留。
-    机械替换会得到「三维ZCTS生成系统」——作为对外名称不可读。
-R2  本体论里的「机动态势」（MANEUVER_POSTURE）原样保留。
-    它是 2525/庙算术语体系的父类名称，会显示在意图集合里，且与
-    code/shenji_agent/Shenji/ontology/ 下的孪生文件必须保持同一口径。
-R3  「战场态势」相邻出现时写成 `ZC-TS` 而不是 `ZCTS`——两个缩写黏在一起无法辨读。
+规则（最终版）
+--------------
+态势          → `TS`
+战场          → `ZC`
+「战场态势」相邻 → `ZCTS`（**不加连字符**）
+「机动态势」    → `机动TS`
 
-R1 产品名豁免**已按用户要求取消**：产品名与网页 title 一并替换。原先保留是为了避免
-得到不可读的「三维ZCTS生成系统」，现在按 R3 的相邻规则写作「三维ZC-TS生成系统」，
-与全局术语保持一致（用户明确要求"包括网页的 title 也要换"）。
+三条早期豁免的现状
+------------------
+R1 产品名「三维战场态势生成系统」——**已取消**（用户要求连网页 title 一并替换）。
+   结果：`三维ZCTS生成系统`。
+R2 本体论「机动态势」（MANEUVER_POSTURE）——**已取消**（用户要求改为 `机动TS`）。
+   ⚠ 后果要知道：`engine/data/intent_ontology_v2.json` 是
+   `code/shenji_agent/Shenji/ontology/intent_ontology_v2.json` 的内嵌副本，而后者不在
+   本项目可改范围内，**两处从此口径不一致**（副本写 `机动TS`，权威件仍写 `机动态势`）。
+   重新同步本体论时会把这里的改动覆盖回去——这是有意接受的代价，不是遗漏。
+R3 「战场态势」相邻曾写作 `ZC-TS`（怕 `ZCTS` 无法辨读）——**已改为 `ZCTS`**。
+   工具因此也把已存在的 `ZC-TS` 一并归一为 `ZCTS`，保证重复运行是收敛的。
+
+现在**没有任何术语豁免**：唯一不动的只有夹在 keep 标记之间的说明文字（它们必须引用
+原词才讲得清，例如 style.css 里解释 `ts-*` 前缀与"态势→TS"同形但无关的那段）。
 
 其它不动的类别
 --------------
@@ -47,16 +56,16 @@ ROOT = os.path.dirname(HERE)
 TEXT_EXT = {".js", ".mjs", ".py", ".css", ".html", ".json", ".md", ".sh",
             ".yml", ".yaml", ".example", ".txt", ".toml", ".cfg"}
 
-PRODUCT = "三维战场态势生成系统"       # R1 —— 已取消豁免，见文件头说明
-ADJACENT = "战场态势"                    # R3
-ONTOLOGY_TERM = "机动态势"               # R2
+PRODUCT = "三维战场态势生成系统"       # R1 豁免已取消，仅作注释用途
+ADJACENT = "战场态势"                    # R3 → ZCTS
+# 早期 R2 已取消：本体论「机动态势」现改为 `机动TS`，不再特殊对待。
 
 # 逐行豁免标记：夹在这两行之间的内容一律不改。
 #
-# 为什么需要它：**解释这次替换的注释本身必须引用原词**。比如 index.html 里标注
-# "产品名保留原样"的注释会写出「三维战场态势生成系统」，style.css 里说明 `ts-` 前缀
-# 歧义的注释会写出「态势」——工具复扫时会把它们当成漏改的地方再次提议改写，形成
-# "文档一写就又要改"的循环。用显式标记把这类引用圈起来，语义清楚且可 grep。
+# 为什么需要它：**解释这次替换的注释本身必须引用原词**。例如 style.css 里说明
+# `ts-*` 前缀与「态势→TS」同形但无关的那段，一旦被替换成「TS→TS」就完全读不通。
+# 工具复扫时会把这些当成漏改、反复提议改写，形成"文档一写就又要改"的循环。
+# 用显式标记圈起来，语义清楚且可 grep。
 KEEP_START = "term-replace:keep-start"
 KEEP_END = "term-replace:keep-end"
 
@@ -66,24 +75,21 @@ SKIP_FILES = {
     "NOTES_term_replacement.md",
 }
 
-# 顺序要紧：长串排在前面，否则会被短规则先吃掉。
+# 顺序要紧：长串排前面。`ZC-TS` 必须排在最后但它只匹配**已经替换过**的产物——
+# 上一轮按 ZC-TS 写过，本轮要归一为 ZCTS；放进模式里，重复运行才收敛（幂等）。
 #
-# **产品名不能放进这个模式里**。第一版把它放进来了、并在 repl 里返回 "ZC-TS"，
-# 结果是整串「三维战场态势生成系统」被替换成 "ZC-TS"——**"三维" 与 "生成系统"
-# 一起丢了**（实测 README/title/brand/document.title 全变成 "ZC-TS"）。正确做法是
-# 让模式只匹配「战场态势」这一小段：产品名因此自然变成「三维ZC-TS生成系统」，
-# 前后文字原样保留。教训：替换表里放"整句"而不是"词"，一旦返回值不是原串就会吞掉上下文。
+# **产品名不能作为整串放进这个模式**。第一版曾把「三维战场态势生成系统」整串放进模式、
+# 并在回调里返回 "ZC-TS"，结果整串被替换掉——"三维" 与 "生成系统" 一起丢了。正确做法是
+# 只匹配「战场态势」这一小段：产品名自然变成「三维ZCTS生成系统」，前后文字原样保留。
 _PAT = re.compile("|".join(re.escape(s) for s in
-                           (ADJACENT, ONTOLOGY_TERM, "态势", "战场")))
+                           ("ZC-TS", ADJACENT, "态势", "战场")))
 
 
 def convert(text: str) -> str:
     def repl(m: "re.Match[str]") -> str:
         s = m.group(0)
-        if s == ADJACENT:
-            return "ZC-TS"      # R3（产品名内的那一处同样走这里）
-        if s == ONTOLOGY_TERM:
-            return s            # R2
+        if s == ADJACENT or s == "ZC-TS":
+            return "ZCTS"       # R3（产品名内的那一处同样走这里）；ZC-TS 归一化
         if s == "态势":
             return "TS"
         return "ZC"
@@ -191,10 +197,16 @@ def write_inventory(path: str, entries) -> None:
 
 
 def mark_of(before: str, after: str) -> str:
-    if ONTOLOGY_TERM in before and ONTOLOGY_TERM in after:
-        return "KEEP (R2 本体论术语)"
-    if "ZC-TS" in after:
-        return "RISK (R3 相邻缩写，写作 ZC-TS)"
+    """
+    标注一条清单条目的性质。
+
+    现在**没有任何术语豁免**，所以"被改过"的行只有两种：常规替换，以及把上一轮写下的
+    `ZC-TS` 归一为 `ZCTS`。后者单独标出来，便于核对规则变更是否覆盖完整。
+    "没被改但含原词"的行只可能是 keep 标记区间里的说明文字——那一种在 main 里标成
+    `KEEP (标记区间)`，不经过本函数，否则会被误读成普通替换。
+    """
+    if "ZC-TS" in before and "ZCTS" in after:
+        return "归一 (ZC-TS → ZCTS)"
     return "-"
 
 
@@ -222,7 +234,13 @@ def main():
                 original = fh.read()
         except (OSError, UnicodeDecodeError):
             continue
-        if "态势" not in original and "战场" not in original:
+        # 预筛必须用**模式本身**，不能写死 "态势"/"战场"。
+        #
+        # 踩过的坑：加上 `ZC-TS → ZCTS` 归一规则后，预筛仍只查那两个中文词，于是
+        # 「已经替换过、里面只剩 ZC-TS」的文件（README/index.html/app.js）被直接跳过，
+        # 归一规则形同虚设——报告显示"待改写 2 个文件"，产品名却原封不动。
+        # 用 _PAT.search 之后，以后再加规则也不会漏。
+        if not _PAT.search(original):
             continue
         updated = convert(original)
         hits = 0
@@ -241,9 +259,9 @@ def main():
         new_lines = updated.splitlines()
         for i, a in enumerate(orig_lines, start=1):
             b = new_lines[i - 1] if i - 1 < len(new_lines) else a
-            if ("态势" in a or "战场" in a) and a == b:
-                # 走到这里说明这一行**有意没改**：要么是 R2 豁免，要么夹在 keep 标记
-                # 区间里。两者都不是"漏改"，标记要如实区分，否则读者会把保留当成遗漏。
+            if _PAT.search(a) and a == b:
+                # 走到这里说明这一行**有意没改**：夹在 keep 标记区间里（现在没有术语
+                # 豁免了，这是唯一的保留原因）。标记要如实写出，否则读者会把保留当成遗漏。
                 entries.append((rel, i, a, a, mark_of(a, a) if mark_of(a, a) != "-"
                                 else "KEEP (标记区间)"))
         if not hits:
