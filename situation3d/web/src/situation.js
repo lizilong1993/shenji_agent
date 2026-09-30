@@ -1,16 +1,16 @@
-/* situation3d — 态势：输入 / 管理 / 数据下载
+/* situation3d — TS：输入 / 管理 / 数据下载
  *
- * 三件事都围绕"当前态势"，所以共用一个三标签页模态框，而不是三个入口。
+ * 三件事都围绕"当前TS"，所以共用一个三标签页模态框，而不是三个入口。
  *
  * 设计要点
  * --------
- * 1. **战场范围支持两种确定方式**：在地球上框选，或直接输入 AOI 经纬度。
+ * 1. **ZC范围支持两种确定方式**：在地球上框选，或直接输入 AOI 经纬度。
  *    框选用的是 `getPickRay` + `globe.pick` 取地面点，与"光标位置信息"同源。
- * 2. **生成的自建态势与案例走完全同一条装载管线**：`SituationHost.applySituationData()`。
- *    案例是 Python 侧离线生成的，自建态势是前端即时生成的，但装载逻辑只有一份，
- *    不会出现"案例能跑、自建态势少初始化了某样东西"。
+ * 2. **生成的自建TS与案例走完全同一条装载管线**：`SituationHost.applySituationData()`。
+ *    案例是 Python 侧离线生成的，自建TS是前端即时生成的，但装载逻辑只有一份，
+ *    不会出现"案例能跑、自建TS少初始化了某样东西"。
  * 3. **目标运动是匀速直线**：起点 → 终点按帧线性插值，航向取两点间的真方位角，
- *    航速由距离与总时长反算。这足以驱动三维态势的全部显示与推理链路。
+ *    航速由距离与总时长反算。这足以驱动三维TS的全部显示与推理链路。
  *
  * 依赖 app.js 暴露的 `window.SituationHost`。
  */
@@ -70,15 +70,15 @@
   function round4(v) { return Math.round(v * 10000) / 10000; }
 
   /**
-   * 从当前态势派生草稿：把已有目标的起止位置与属性带过来，便于"改一改再生成"。
-   * 没有态势时给一个台海的两目标最小样例。
+   * 从当前TS派生草稿：把已有目标的起止位置与属性带过来，便于"改一改再生成"。
+   * 没有TS时给一个台海的两目标最小样例。
    */
   function draftFromCurrent() {
     const h = host();
     const data = h.state.data;
     if (!data || !data.targets || !data.targets.length) {
       return {
-        name: '自建态势',
+        name: '自建TS',
         aoi: [117.5, 23.0, 121.0, 26.0],
         hours: DEFAULT_HOURS,
         targets: [blankTarget(1, 'red'), blankTarget(1, 'blue')],
@@ -105,7 +105,7 @@
     const bbox = (data.hotspots && data.hotspots.length)
       ? data.hotspots[0].bbox : [117.5, 23.0, 121.0, 26.0];
     return {
-      name: (data.case_name || '态势') + '（副本）',
+      name: (data.case_name || 'TS') + '（副本）',
       aoi: bbox.slice(),
       hours: DEFAULT_HOURS,
       targets: targets,
@@ -118,7 +118,7 @@
   }
 
   // ------------------------------------------------------------------------
-  // 由草稿生成态势数据
+  // 由草稿生成TS数据
   // ------------------------------------------------------------------------
 
   function bearingDeg(a, b) {
@@ -217,26 +217,26 @@
     return {
       schema: 'situation3d.situation.v1',
       case_id: 'custom',
-      case_name: d.name || '自建态势',
-      case_description: '由态势输入在前端生成：' + targets.length + ' 个目标，' +
-        ticks + ' 帧，战场范围 ' + aoi.join(', ') + '。',
-      region: '自建战场',
+      case_name: d.name || '自建TS',
+      case_description: '由TS输入在前端生成：' + targets.length + ' 个目标，' +
+        ticks + ' 帧，ZC范围 ' + aoi.join(', ') + '。',
+      region: '自建ZC',
       scenario_id: null,
-      scenario_name: d.name || '自建态势',
+      scenario_name: d.name || '自建TS',
       provenance: 'frontend-situation-input',
-      provenance_note: '目标按起点→终点匀速直线运动，用于快速搭建态势；不代表真实航路。',
+      provenance_note: '目标按起点→终点匀速直线运动，用于快速搭建TS；不代表真实航路。',
       start_time_utc: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
       tick_seconds: TICK_SECONDS,
       tick_count: ticks + 1,
       camera: { lon: round4(cx), lat: round4(cy), height: 900000, heading: 0, pitch: -75 },
-      // 战场范围本身作为一个热点区域，右侧表格与区域级推理才有内容
+      // ZC范围本身作为一个热点区域，右侧表格与区域级推理才有内容
       hotspots: [{
-        name: (d.name || '自建战场') + ' 范围',
+        name: (d.name || '自建ZC') + ' 范围',
         bbox: aoi.slice(),
         center: [round4(cy), round4(cx)],
         span_deg: [Math.round((aoi[2] - aoi[0]) * 1000) / 1000,
                    Math.round((aoi[3] - aoi[1]) * 1000) / 1000],
-        note: '态势输入确定的战场范围',
+        note: 'TS输入确定的ZC范围',
         kind: 'custom',
       }],
       urban_aoi: [],
@@ -250,7 +250,7 @@
   }
 
   // ------------------------------------------------------------------------
-  // 框选战场范围
+  // 框选ZC范围
   // ------------------------------------------------------------------------
 
   function pickLonLat(pos) {
@@ -298,7 +298,7 @@
 
     // 关掉模态框才能看到地球；框完再自动打开
     close();
-    setHint('框选战场范围：在地球上按住左键拖出一个矩形（Esc 取消）');
+    setHint('框选ZC范围：在地球上按住左键拖出一个矩形（Esc 取消）');
     v.scene.canvas.classList.add('sit-picking');
 
     const handler = new Cesium.ScreenSpaceEventHandler(v.scene.canvas);
@@ -322,7 +322,7 @@
       ];
       stopPicking();
       open('input');
-      setHint('战场范围已框选：' + d.aoi.join(', '));
+      setHint('ZC范围已框选：' + d.aoi.join(', '));
     }, Cesium.ScreenSpaceEventType.LEFT_UP);
     pickHandler = handler;
 
@@ -420,20 +420,20 @@
     return i;
   }
 
-  // ---- 标签页 1：态势输入 ----
+  // ---- 标签页 1：TS输入 ----
   function renderInput(body) {
     const d = ensureDraft();
 
-    // 数据来源一行：草稿是从当前态势派生的还是最小样例，一眼能看出来
+    // 数据来源一行：草稿是从当前TS派生的还是最小样例，一眼能看出来
     const src = el('div', 'sit-hint');
     const data = host().state.data;
     src.textContent = '草稿来源：' + (data
-      ? '当前态势「' + data.case_name + '」（' + data.targets.length + ' 个目标）'
-      : '最小样例（当前未加载态势）') + ' · 草稿目标 ' + d.targets.length + ' 个';
+      ? '当前TS「' + data.case_name + '」（' + data.targets.length + ' 个目标）'
+      : '最小样例（当前未加载TS）') + ' · 草稿目标 ' + d.targets.length + ' 个';
     body.appendChild(src);
 
-    // 战场范围
-    const s1 = section(body, '战场范围');
+    // ZC范围
+    const s1 = section(body, 'ZC范围');
     const row1 = el('div', 'sit-row');
     const btnPick = el('button', 'mini', '在地图上框选');
     btnPick.type = 'button';
@@ -459,8 +459,8 @@
       '当前：' + d.aoi.join(', ') + '（跨度 ' +
       (d.aoi[2] - d.aoi[0]).toFixed(2) + '° × ' + (d.aoi[3] - d.aoi[1]).toFixed(2) + '°）'));
 
-    // 态势名称与时长
-    const s2 = section(body, '态势参数');
+    // TS名称与时长
+    const s2 = section(body, 'TS参数');
     const rowN = el('div', 'sit-row');
     const nameLab = el('label', null, '名称');
     const nameInp = textInput(d.name);
@@ -535,7 +535,7 @@
     // 图层
     const s4 = section(body, '图层');
     s4.appendChild(el('div', 'sit-hint',
-      '新态势生成后按这里的勾选初始化图层。也可随时在左栏「图层管理」里改。'));
+      '新TS生成后按这里的勾选初始化图层。也可随时在左栏「图层管理」里改。'));
     const rowL = el('div', 'sit-row');
     [['layerHotspots', '热点区域'], ['layerRoutes', '计划航路'],
      ['layerTracks', '历史轨迹'], ['layerLabels', '目标标牌'],
@@ -554,10 +554,10 @@
 
     // 动作
     const acts = el('div', 'sit-actions');
-    const gen = el('button', 'primary', '生成并初始化双方态势');
+    const gen = el('button', 'primary', '生成并初始化双方TS');
     gen.type = 'button';
     gen.addEventListener('click', function () { generate(); });
-    const reset = el('button', 'mini', '重置为当前态势');
+    const reset = el('button', 'mini', '重置为当前TS');
     reset.type = 'button';
     reset.addEventListener('click', function () { draft = draftFromCurrent(); render(); });
     acts.appendChild(gen);
@@ -591,22 +591,22 @@
     return s;
   }
 
-  // ---- 标签页 2：态势管理 ----
+  // ---- 标签页 2：TS管理 ----
   function renderManage(body) {
     const h = host();
     const data = h.state.data;
-    const s1 = section(body, '当前态势');
+    const s1 = section(body, '当前TS');
     if (!data) {
-      s1.appendChild(el('div', 'sit-hint', '未加载态势。到「态势输入」生成一个，或从顶栏「态势案例」选一个。'));
+      s1.appendChild(el('div', 'sit-hint', '未加载TS。到「TS输入」生成一个，或从顶栏「TS案例」选一个。'));
       return;
     }
     const info = [
       ['名称', data.case_name],
-      ['来源', data.provenance === 'frontend-situation-input' ? '态势输入（前端生成）' : ('案例 ' + (data.case_id || ''))],
+      ['来源', data.provenance === 'frontend-situation-input' ? 'TS输入（前端生成）' : ('案例 ' + (data.case_id || ''))],
       ['目标数', data.targets.length],
       ['帧数', (data.frames.length - 1) + '（步长 ' + data.tick_seconds + ' s）'],
       ['热点区域', (data.hotspots || []).length],
-      ['战场范围', (data.hotspots && data.hotspots[0]) ? data.hotspots[0].bbox.join(', ') : '—'],
+      ['ZC范围', (data.hotspots && data.hotspots[0]) ? data.hotspots[0].bbox.join(', ') : '—'],
     ];
     info.forEach(function (kv) {
       const r = el('div', 'kv');
@@ -651,10 +651,10 @@
     s2.appendChild(table);
 
     const acts = el('div', 'sit-actions');
-    const edit = el('button', 'primary', '在态势输入中编辑');
+    const edit = el('button', 'primary', '在TS输入中编辑');
     edit.type = 'button';
     edit.addEventListener('click', function () { open('input'); });
-    const clear = el('button', 'mini', '清空态势');
+    const clear = el('button', 'mini', '清空TS');
     clear.type = 'button';
     clear.addEventListener('click', function () { h.clearSituation(); close(); });
     acts.appendChild(edit);
@@ -662,9 +662,9 @@
     body.appendChild(acts);
   }
 
-  // ---- 标签页 3：态势数据下载 ----
+  // ---- 标签页 3：TS数据下载 ----
   /**
-   * 态势简报页。
+   * TS简报页。
    *
    * 简报是**引擎侧**生成的（engine/brief.py），随数据集一起下发，前端只负责呈现。
    * 不在前端重算的理由：它要引用案例与目标定义，而且必须与画面上显示的等级出自
@@ -674,26 +674,26 @@
     const h = host();
     const data = h.state.data;
     if (!data) {
-      const s = section(body, '态势简报');
+      const s = section(body, 'TS简报');
       s.appendChild(el('div', 'sit-hint',
-        '未加载态势。请先从顶栏「态势案例」选择一个案例，再回来看简报。'));
+        '未加载TS。请先从顶栏「TS案例」选择一个案例，再回来看简报。'));
       return;
     }
     const brief = data.brief;
     if (!brief) {
-      const s = section(body, '态势简报');
+      const s = section(body, 'TS简报');
       s.appendChild(el('div', 'sit-hint',
         '该数据集里没有简报字段。简报由 engine/brief.py 生成并随数据集下发，' +
         '请重新运行 scripts/gen_demo_trajectory.py 生成数据。'));
       return;
     }
     if (brief.empty) {
-      const s = section(body, '态势简报');
-      s.appendChild(el('div', 'sit-hint', brief.headline || '该态势没有可用帧。'));
+      const s = section(body, 'TS简报');
+      s.appendChild(el('div', 'sit-hint', brief.headline || '该TS没有可用帧。'));
       return;
     }
 
-    const head = section(body, brief.case_name || brief.case_id || '态势简报');
+    const head = section(body, brief.case_name || brief.case_id || 'TS简报');
     head.appendChild(el('div', 'brief-headline', brief.headline || ''));
     const meta = el('div', 'sit-hint',
       '峰值 ' + (brief.peak_level_label || '—') +
@@ -739,13 +739,13 @@
     const hasData = !!h.state.data;
 
     const items = [
-      ['当前帧 JSON', '导出当前时刻的完整态势快照：全部目标的位置、航向、航速与三级推理结果。',
+      ['当前帧 JSON', '导出当前时刻的完整TS快照：全部目标的位置、航向、航速与三级推理结果。',
         function () { h.exportFrame(); }, hasData],
       ['全帧 CSV', '把整段推演的逐帧目标状态导成表格，便于在 Excel 里做轨迹分析。',
         function () { h.exportCsv(); }, hasData],
-      ['态势定义 JSON', '导出"态势输入"的定义（战场范围 + 目标起止 + 图层），可以再导入复现。',
+      ['TS定义 JSON', '导出"TS输入"的定义（ZC范围 + 目标起止 + 图层），可以再导入复现。',
         function () { exportDefinition(); }, !!draft],
-      ['导入态势定义', '从上面导出的定义文件恢复一份态势输入草稿。',
+      ['导入TS定义', '从上面导出的定义文件恢复一份TS输入草稿。',
         function () { importDefinition(); }, true],
     ];
 
@@ -762,8 +762,8 @@
 
     const s2 = section(body, '说明');
     s2.appendChild(el('div', 'sit-hint',
-      '原来的「导出数据」按钮已并入这里——导出是态势数据的一个出口，' +
-      '和其他态势操作放在一起更好找。'));
+      '原来的「导出数据」按钮已并入这里——导出是TS数据的一个出口，' +
+      '和其他TS操作放在一起更好找。'));
   }
 
   function download(name, text, mime) {
@@ -781,7 +781,7 @@
   function exportDefinition() {
     const d = ensureDraft();
     download('situation-definition.json', JSON.stringify(d, null, 2));
-    setHint('已导出态势定义。');
+    setHint('已导出TS定义。');
   }
 
   function importDefinition() {
@@ -798,7 +798,7 @@
           if (!parsed.aoi || !Array.isArray(parsed.targets)) throw new Error('缺少 aoi 或 targets');
           draft = parsed;
           open('input');
-          setHint('已导入态势定义「' + (parsed.name || '未命名') + '」。');
+          setHint('已导入TS定义「' + (parsed.name || '未命名') + '」。');
         } catch (e) {
           setHint('导入失败：' + e.message);
         }
@@ -845,7 +845,7 @@
     try {
       host().applySituationData(data, 'custom');
       setHint('已生成并初始化「' + data.case_name + '」：' + data.targets.length +
-        ' 个目标 · ' + (data.frames.length - 1) + ' 帧 · 战场范围 ' + d.aoi.join(', '));
+        ' 个目标 · ' + (data.frames.length - 1) + ' 帧 · ZC范围 ' + d.aoi.join(', '));
     } catch (e) {
       setHint('装载失败：' + e.message);
     }

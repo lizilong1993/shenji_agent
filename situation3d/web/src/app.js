@@ -1,9 +1,9 @@
 /* situation3d — 三维战场态势生成系统前端
  *
  * 职责：
- *   1. 加载引擎输出的逐帧态势与三级推理结果，在 Cesium 三维地球上回放；
+ *   1. 加载引擎输出的逐帧TS与三级推理结果，在 Cesium 三维地球上回放；
  *   2. 用军标符号呈现海/陆/空三域的红蓝双方目标；
- *   3. 点击目标时在中间窗口右上角弹出信息面板（型号 / ID / 经纬高 / 三级态势）；
+ *   3. 点击目标时在中间窗口右上角弹出信息面板（型号 / ID / 经纬高 / 三级TS）；
  *   4. 热点区域按真实经纬范围绘制，点击后联动右侧"地理位置信息"；
  *   5. 模型开关逐项对应一个真实生效的渲染行为。
  *
@@ -101,8 +101,8 @@ const FALLBACK_CAMERA = { lon: 119.6, lat: 24.4, height: 900000, heading: 0, pit
 // mvLon / mvLat / mvAlt（视点三行合并为单行 mvAll）、
 // menuLayers / menuView / menuSituation（顶栏下拉）、btnOverview / btnShareScene、
 // switchNote / followNote / hint（说明性文字，按"界面不写操作说明"移除）、
-// geoLon / geoLat / geoRegion / geoLevel / hotspotBody（区域态势栏只保留案例范围的整体
-// 态势，逐热点与光标所辖区域的那些读数一并去掉）。
+// geoLon / geoLat / geoRegion / geoLevel / hotspotBody（区域TS栏只保留案例范围的整体
+// TS，逐热点与光标所辖区域的那些读数一并去掉）。
 const dom = {};
 ['statusText', 'statusDot', 'scenarioName',
  'geoSpan',
@@ -120,7 +120,7 @@ const dom = {};
 // 已移除读数的**惰性桩**。
 //
 // `selectHotspot()` / `updateGeoReadout()` 里还有若干"跟随光标/热点"的读数写入，那些
-// 元素已随区域态势栏的收敛而去掉。与其在有限的改动里逐处删（容易漏一处、漏了就是
+// 元素已随区域TS栏的收敛而去掉。与其在有限的改动里逐处删（容易漏一处、漏了就是
 // 每次移动鼠标抛一次 TypeError），不如在这里给一个显式的空对象：写入静默丢失，
 // 控制流（尤其是 selectHotspot 里的相机动作）完全不受影响。
 //
@@ -558,20 +558,20 @@ function loadCase(caseId) {
   const entry = state.caseIndex.cases.find(function (c) { return c.id === caseId; });
   if (!entry) throw new Error('未知案例: ' + caseId);
 
-  setStatus('加载态势数据…');
+  setStatus('加载TS数据…');
   return fetch('./' + entry.file, { cache: 'no-store' })
     .then(function (r) {
-      if (!r.ok) throw new Error('态势数据加载失败: HTTP ' + r.status);
+      if (!r.ok) throw new Error('TS数据加载失败: HTTP ' + r.status);
       return r.json();
     })
     .then(function (data) { return applySituationData(data, caseId); });
 }
 
 /**
- * 把一份态势数据装载进场景。
+ * 把一份TS数据装载进场景。
  *
- * 从 loadCase 里拆出来，是为了让**前端生成的态势**（态势输入）走完全同一条管线：
- * 取数据与装载数据分开，两条来源共用装载逻辑，就不会出现"案例能跑、自建态势
+ * 从 loadCase 里拆出来，是为了让**前端生成的TS**（TS输入）走完全同一条管线：
+ * 取数据与装载数据分开，两条来源共用装载逻辑，就不会出现"案例能跑、自建TS
  * 少初始化了某样东西"的偏差。
  */
 /**
@@ -699,7 +699,7 @@ function switchTheatre(theatre) {
 
 function applySituationData(data, caseId) {
   {
-      if (!data.frames || !data.frames.length) throw new Error('态势数据为空');
+      if (!data.frames || !data.frames.length) throw new Error('TS数据为空');
 
       teardownScene();
 
@@ -759,7 +759,7 @@ function applySituationData(data, caseId) {
         const cam = data.camera || {};
         if (isFinite(cam.lon) && isFinite(cam.lat)) Overview.setCenter(cam.lon, cam.lat);
       }
-      // 装载完态势后补一次建筑体块。refreshBuildings() 原本只挂在"选中热点 /
+      // 装载完TS后补一次建筑体块。refreshBuildings() 原本只挂在"选中热点 /
       // 解除跟随 / 目标高度变化"上，于是一进页面就带 `?buildings=1`（或先开开关
       // 再选案例）时体块不会出现——除非用户再去点一个热点。色带未就绪时
       // `?buildings=1` 的回调会补这一次。
@@ -770,7 +770,7 @@ function applySituationData(data, caseId) {
 
 function teardownScene() {
   if (!viewer) return;
-  detachFollow('态势已切换');
+  detachFollow('TS已切换');
   clearTargetSelection();
   viewer.entities.removeAll();
   state.targets = {};
@@ -788,7 +788,7 @@ function teardownScene() {
 // 与案例无关的基础数据（data/base.json）
 // --------------------------------------------------------------------------
 //
-// 空态（不加载任何态势）下前端仍需要两样东西：城区 AOI（生成 WSF3D 建筑体块）
+// 空态（不加载任何TS）下前端仍需要两样东西：城区 AOI（生成 WSF3D 建筑体块）
 // 与军标目录（渲染符号）。它们原本只随案例数据集下发，所以提到这里单独加载。
 
 function loadBase() {
@@ -809,12 +809,12 @@ function applyBase(base) {
   if (base && base.symbology) Symbology.setCatalog(base.symbology);
   state.urbanAoi = (base && base.urban_aoi) || [];
   state.baseCamera = (base && base.camera) || null;
-  state.baseRegion = (base && base.region) || '未加载态势';
+  state.baseRegion = (base && base.region) || '未加载TS';
   syncUrbanImagery();
 }
 
 // --------------------------------------------------------------------------
-// 空态与态势生命周期
+// 空态与TS生命周期
 // --------------------------------------------------------------------------
 
 /** 播放/步进/时间轴/导出在空态下无意义，统一在此开关。 */
@@ -827,9 +827,9 @@ function setTransportEnabled(on) {
 }
 
 /**
- * 回到空态：不加载任何态势，只保留底图 / 地形 / WSF3D / 地图组件。
+ * 回到空态：不加载任何TS，只保留底图 / 地形 / WSF3D / 地图组件。
  *
- * 幂等——启动时与「清除当前态势」共用同一条路径，避免两套清场逻辑漂移。
+ * 幂等——启动时与「清除当前TS」共用同一条路径，避免两套清场逻辑漂移。
  */
 function clearSituation() {
   if (!viewer) return;
@@ -849,7 +849,7 @@ function clearSituation() {
   state.buildingsAoi = -1;
   markScene('clearSituation');
 
-  dom.scenarioName.textContent = state.baseRegion || '未加载态势';
+  dom.scenarioName.textContent = state.baseRegion || '未加载TS';
   document.title = '三维战场态势生成系统';
 
   renderTargetCounts();
@@ -863,15 +863,15 @@ function clearSituation() {
   if (dom.followTarget) {
     dom.followTarget.disabled = true;
     dom.followTarget.checked = false;
-    dom.followTarget.title = '未加载态势';
+    dom.followTarget.title = '未加载TS';
   }
-  setFollowNote('未加载态势，无法跟随。请先从「演示案例」选择案例。');
+  setFollowNote('未加载TS，无法跟随。请先从「演示案例」选择案例。');
 
   // 机位兜底：base.json 缺失时也要回到台海，否则会停在 Cesium 的默认视图
   // （DEFAULT_VIEW_RECTANGLE 的中心在 82.5°W / 35°N，看起来像"相机飞走了"）。
   applyCamera(state.baseCamera || FALLBACK_CAMERA);
-  setStatus('空态 · 未加载态势', 'ok');
-  setSwitchNote('未加载态势：底图 / 地形 / WSF3D / 地图组件仍可用。请从顶栏「演示案例」选择案例。');
+  setStatus('空态 · 未加载TS', 'ok');
+  setSwitchNote('未加载TS：底图 / 地形 / WSF3D / 地图组件仍可用。请从顶栏「演示案例」选择案例。');
 }
 
 // --------------------------------------------------------------------------
@@ -909,13 +909,13 @@ function renderCaseMenu() {
     list.appendChild(item);
   });
 
-  // 清除当前态势，回到空态（底图/地形/WSF3D/地图组件保留）
+  // 清除当前TS，回到空态（底图/地形/WSF3D/地图组件保留）
   const sep = el('div', 'menu-sep');
   list.appendChild(sep);
   const clearItem = el('button', 'menu-item menu-item-quiet', '');
   clearItem.type = 'button';
   clearItem.setAttribute('role', 'menuitem');
-  clearItem.appendChild(el('span', 'mi-head', '清除当前态势'));
+  clearItem.appendChild(el('span', 'mi-head', '清除当前TS'));
   clearItem.appendChild(el('span', 'mi-sub', '回到空态：保留底图 / 地形 / WSF3D / 地图组件'));
   clearItem.addEventListener('click', function () {
     closeCaseMenu();
@@ -970,7 +970,7 @@ function closeCaseMenu() { closeAllMenus(); }
 // 关掉等于隐式解除跟随，语义混乱。
 
 const LAYER_GROUPS = [
-  { name: '态势图层', ids: ['layerHotspots', 'layerRoutes'] },
+  { name: 'TS图层', ids: ['layerHotspots', 'layerRoutes'] },
   { name: '目标图层', ids: ['layerTargets', 'layerLabels', 'layerTracks', 'modelSensor',
                             'layerTargetPanel', 'filterRed', 'filterBlue', 'filterSea',
                             'filterLand', 'filterAir'] },
@@ -1001,14 +1001,14 @@ function setSwitch(id, on) {
 }
 
 /**
- * cmd: 'show' 全开 | 'hide' 只关态势与目标图层 | 'default' 恢复默认。
+ * cmd: 'show' 全开 | 'hide' 只关TS与目标图层 | 'default' 恢复默认。
  *
  * 「全部隐藏」刻意不关底图与地图组件——把底图关掉只会得到一片黑球，不是用户
  * 想要的结果。
  */
 function applyLayerCommand(cmd) {
   const groups = cmd === 'hide'
-    ? LAYER_GROUPS.filter(function (g) { return g.name === '态势图层' || g.name === '目标图层'; })
+    ? LAYER_GROUPS.filter(function (g) { return g.name === 'TS图层' || g.name === '目标图层'; })
     : LAYER_GROUPS;
   groups.forEach(function (g) {
     g.ids.forEach(function (id) {
@@ -1016,7 +1016,7 @@ function applyLayerCommand(cmd) {
     });
   });
   setStatus(cmd === 'show' ? '图层已全部显示'
-    : cmd === 'hide' ? '态势与目标图层已隐藏'
+    : cmd === 'hide' ? 'TS与目标图层已隐藏'
     : '图层已恢复默认', 'ok');
 }
 
@@ -1254,7 +1254,7 @@ function syncSelection() {
 }
 
 // --------------------------------------------------------------------------
-// 三级态势推理的界面呈现
+// 三级TS推理的界面呈现
 // --------------------------------------------------------------------------
 
 function inferenceAt(tick) {
@@ -1263,7 +1263,7 @@ function inferenceAt(tick) {
 }
 
 /**
- * 当前帧出现最多的主意图（全局）。横幅用它回答"战场上在打什么"。
+ * 当前帧出现最多的主意图（全局）。横幅用它回答"ZC上在打什么"。
  *
  * 只统计**主**意图：次要意图（本体标 secondary-only 的 FIRE_SUPPORT /
  * TARGET_GUIDANCE）计入会把"火力支援"顶成主要活动，掩盖真实主任务。
@@ -1289,7 +1289,7 @@ function updateInferenceUi() {
   if (!inf) {
     if (dom.rlValue) dom.rlValue.textContent = '—';
     if (dom.rlNote) dom.rlNote.textContent = '未加载推理结果';
-    // 没有推理帧时整体态势栏仍然渲染，只是所有图标按"正常"档并在 title 里说明。
+    // 没有推理帧时整体TS栏仍然渲染，只是所有图标按"正常"档并在 title 里说明。
     if (window.StatusPanels && dom.overallBody && state.data) {
       StatusPanels.renderOverall(dom.overallBody, state.data, null);
     }
@@ -1297,7 +1297,7 @@ function updateInferenceUi() {
   }
 
   const lv = inf.overall.level;
-  // 区域态势只写在**右栏**。地图上那份「区域级态势」横幅已移除（内容与之重复，
+  // 区域TS只写在**右栏**。地图上那份「区域级TS」横幅已移除（内容与之重复，
   // 且占着地图），所以这里不再有"两份显示、需要同步"的问题——原先 rl* 是从
   // level* 复制过来的，现在直接算一份。
   const noteText = inf.overall.note +
@@ -1309,14 +1309,14 @@ function updateInferenceUi() {
   }
   if (dom.rlNote) dom.rlNote.textContent = noteText;
 
-  // 整体态势栏：红蓝双方各类型目标的整体状态（图标按告警等级着色）。
+  // 整体TS栏：红蓝双方各类型目标的整体状态（图标按告警等级着色）。
   // 只更新每个图标 `<img>` 的档位 class，结构在案例切换时才重建——见
   // statusPanels.js 的缓存说明。
   if (window.StatusPanels && dom.overallBody && state.data) {
     StatusPanels.renderOverall(dom.overallBody, state.data, inf);
   }
 
-  // 主导意图：等级回答"多紧张"，意图回答"在打什么"，两者并列才算把区域态势说全。
+  // 主导意图：等级回答"多紧张"，意图回答"在打什么"，两者并列才算把区域TS说全。
   if (dom.rlIntent) {
     const top = regionIntentCounts(inf);
     dom.rlIntent.textContent = top.length
@@ -1355,7 +1355,7 @@ function updateInferenceUi() {
       : '该战区未定义阶段';
   }
 
-  // 热点区域表格里的态势等级与意图随之刷新。
+  // 热点区域表格里的TS等级与意图随之刷新。
   state.hotspotRows.forEach(function (row, i) {
     const r = inf.regions[i];
     if (!r) return;
@@ -1466,7 +1466,7 @@ function renderTargetCounts() {
 // 热点区域表格 —— 已移除
 // --------------------------------------------------------------------------
 //
-// 「区域态势」栏按你的要求只显示**整个态势案例范围**的整体态势，不再逐热点罗列。
+// 「区域TS」栏按你的要求只显示**整个TS案例范围**的整体TS，不再逐热点罗列。
 // 表格 DOM（#hotspotBody）已从 index.html 删除，但相机联动仍然需要"点击热点区域"的
 // 能力，所以 `createHotspots()` 与 `selectHotspot()` 都保留；这里只把**建表**这一步
 // 停掉：不再构造 11~18 行 DOM，也不再把行挂进 state.hotspotRows。
@@ -1487,7 +1487,7 @@ function renderHotspotTable() {
 
   if (!hotspots.length) {
     const tr = el('tr', 'hotspot-row');
-    const td = el('td', 'hs-empty', '未加载态势');
+    const td = el('td', 'hs-empty', '未加载TS');
     td.colSpan = 5;
     tr.appendChild(td);
     body.appendChild(tr);
@@ -1561,7 +1561,7 @@ function renderHotspotIntents() {
  * 选中一个热点区域：地图飞行到该范围，并联动更新右侧"地理位置信息"。
  *
  * 这是需求里"点击某一热点区域时需联动更新地理信息位置"的实现点：面板被
- * 锁定到热点范围（中心经纬、经纬跨度、区域态势等级），直到用户点击
+ * 锁定到热点范围（中心经纬、经纬跨度、区域TS等级），直到用户点击
  * "位置信息"按钮回到光标跟随模式。
  */
 function selectHotspot(index, fly) {
@@ -1658,7 +1658,7 @@ function updateGeoReadout() {
       dom.geoLevel.className = 'lv-cell ' + (LEVEL_CLASS[r[0]] || '');
     }
   } else {
-    dom.geoRegion.textContent = state.data ? '不在热点区域内' : (state.baseRegion || '未加载态势');
+    dom.geoRegion.textContent = state.data ? '不在热点区域内' : (state.baseRegion || '未加载TS');
     dom.geoSpan.textContent = '—';
     dom.geoLevel.textContent = '—';
     dom.geoLevel.className = 'lv-cell';
@@ -1676,11 +1676,11 @@ function clearHotspotSelection() {
 }
 
 // --------------------------------------------------------------------------
-// 目标态势栏（右侧栏中段）
+// 目标TS栏（右侧栏中段）
 // --------------------------------------------------------------------------
 //
 // 原先是中部地图右上角的浮动面板 `#targetPanel`。该位置与新增的鸟瞰图重叠，且
-// 右栏已专设「目标态势栏」，因此浮动面板整体移除，内容迁到这里——目标信息只在一处。
+// 右栏已专设「目标TS栏」，因此浮动面板整体移除，内容迁到这里——目标信息只在一处。
 
 function selectTarget(id, fly) {
   state.selected = id;
@@ -1701,7 +1701,7 @@ function selectTarget(id, fly) {
   markScene('selectTarget');
 }
 
-/** 清除选中态并把目标态势栏复位成提示语。Esc 与「解除跟随」都会走到这里。 */
+/** 清除选中态并把目标TS栏复位成提示语。Esc 与「解除跟随」都会走到这里。 */
 function clearTargetSelection() {
   state.selected = null;
   syncSelection();
@@ -1715,7 +1715,7 @@ function kvRow(label, value, extraClass) {
 }
 
 /**
- * 渲染右栏目标态势栏：状态信息 / 活动规律 / 可能的意图。
+ * 渲染右栏目标TS栏：状态信息 / 活动规律 / 可能的意图。
  *
  * 渲染本身在 `statusPanels.js`，这里只负责把状态取齐（目标定义、当前帧状态、
  * 一级推理结果、帧序列）后交出去。
@@ -2414,7 +2414,7 @@ function setHotspotImagery(on) {
 // NavigationHelpButton / Timeline / Animation / FullscreenButton / VRButton /
 // InfoBox / SelectionIndicator / ProjectionPicker / CreditDisplay），三项全部自建。
 //
-// 三项都与案例无关：只用 viewer 与 state.components，因此未加载态势时同样可用。
+// 三项都与案例无关：只用 viewer 与 state.components，因此未加载TS时同样可用。
 
 const _enuM = new Cesium.Matrix4();
 const _enuInv = new Cesium.Matrix4();
@@ -2613,7 +2613,7 @@ const COMPONENT_NODES = {
  */
 function setOverview(on) {
   state.layers.overview = !!on;
-  // 顶栏的「鸟瞰图」按钮已移除，可见性改由左栏「地图组件 / 态势图层」里的
+  // 顶栏的「鸟瞰图」按钮已移除，可见性改由左栏「地图组件 / TS图层」里的
   // `#layerOverview` 复选框驱动，勾选状态与 state 保持同步。
   const box = document.getElementById('layerOverview');
   if (box) box.checked = !!on;
@@ -2825,7 +2825,7 @@ function setTick(tick) {
 function setPlaying(on) {
   state.playing = on;
   document.getElementById('btnPlay').textContent = on ? '❚❚ 暂停' : '▶ 播放';
-  document.getElementById('btnRun').textContent = on ? '推演中…' : '态势自动推演';
+  document.getElementById('btnRun').textContent = on ? '推演中…' : 'TS自动推演';
 }
 
 function loop(nowMs) {
@@ -2871,12 +2871,12 @@ function loop(nowMs) {
 /**
  * 用当前的 state.data 重建实体与面板。
  *
- * 态势管理里增删目标后要调它：目标实体是按 data.targets 建的，改了数据必须重建，
+ * TS管理里增删目标后要调它：目标实体是按 data.targets 建的，改了数据必须重建，
  * 但不需要重新取数据，也不该走 applySituationData（那会重置帧号与机位）。
  */
 function reloadSituation() {
   if (!state.data || !viewer) return;
-  detachFollow('态势已更新');
+  detachFollow('TS已更新');
   clearTargetSelection();
   viewer.entities.removeAll();
   state.targets = {};
@@ -2892,13 +2892,13 @@ function reloadSituation() {
   renderTargetCounts();
   renderTransport();
   updateInferenceUi();
-  setStatus('态势已更新 · ' + state.data.targets.length + ' 个目标', 'ok');
+  setStatus('TS已更新 · ' + state.data.targets.length + ' 个目标', 'ok');
 }
 
 /** 全帧 CSV：逐帧逐目标展开，便于在表格软件里做轨迹分析。 */
 function exportCsv() {
   if (!state.data || !state.data.frames) {
-    setStatus('未加载态势，无可导出数据', 'err');
+    setStatus('未加载TS，无可导出数据', 'err');
     return;
   }
   const d = state.data;
@@ -2931,7 +2931,7 @@ function exportCsv() {
   setStatus('已导出全帧 CSV（' + (d.frames.length - 1) + ' 帧 × ' + ids.length + ' 目标）', 'ok');
 }
 
-// 态势模块（src/situation.js）拿不到本文件的闭包，用这个接口回调。
+// TS模块（src/situation.js）拿不到本文件的闭包，用这个接口回调。
 window.SituationHost = {
   state: state,
   viewer: function () { return viewer; },
@@ -3093,7 +3093,7 @@ window.SituationHost = {
 
 function exportData() {
   if (!state.data || !state.data.frames) {
-    setStatus('未加载态势，无可导出数据', 'err');
+    setStatus('未加载TS，无可导出数据', 'err');
     return;
   }
   const frames = state.data.frames;
@@ -3178,8 +3178,8 @@ function bindUI() {
   const ovHide = document.getElementById('ovHide');
   if (ovHide) ovHide.addEventListener('click', function () { setOverview(false); });
 
-  // 地图上的「区域级态势」横幅与其开关已移除，读数只在右栏「区域态势」显示。
-  // 「目标元数据面板」开关现在控制右栏「目标态势栏」是否展开详情。
+  // 地图上的「区域级TS」横幅与其开关已移除，读数只在右栏「区域TS」显示。
+  // 「目标元数据面板」开关现在控制右栏「目标TS栏」是否展开详情。
   bindCheck('layerTargetPanel', function (v) {
     state.layers.targetPanel = v;
     if (!v) clearTargetSelection();
@@ -3219,7 +3219,7 @@ function bindUI() {
     } else if (!state.data) {
       state.follow.enabled = false;
       dom.followTarget.checked = false;
-      setFollowNote('未加载态势，无法跟随。请先从「演示案例」选择案例。');
+      setFollowNote('未加载TS，无法跟随。请先从「演示案例」选择案例。');
     } else {
       setFollowNote('已开启跟随：点击任一目标开始跟随，拖动地图即解除。');
       setStatus('目标跟随已开启 · 点击目标开始跟随', 'ok');
@@ -3270,7 +3270,7 @@ function bindUI() {
   if (window.Symbology && Symbology.verifyAssets) {
     Symbology.verifyAssets().then(function (ok) {
       if (ok) return;
-      // 退回内置生成器：已建好的 billboard 与已渲染的整体态势栏都要重画。
+      // 退回内置生成器：已建好的 billboard 与已渲染的整体TS栏都要重画。
       syncSelection();
       if (window.StatusPanels && StatusPanels._resetCache) {
         StatusPanels._resetCache();
@@ -3313,13 +3313,13 @@ function bindUI() {
   // 提示文案由 setBuildingsOnline 的成功/回落分支负责写。
   if (checkboxOn('modelBuildingsOnline')) setBuildingsOnline(true);
 
-  // 顶栏仍有两个下拉（态势案例）；态势注册/管理/下载与图层批量操作已改为直挂按钮，
+  // 顶栏仍有两个下拉（TS案例）；TS注册/管理/下载与图层批量操作已改为直挂按钮，
   // 不再需要 bindMenu。
   bindMenu('menuCase', 'menuCaseList');
   if (dom.menuCase) dom.menuCase.addEventListener('click', function () { openCaseMenu(); });
   document.addEventListener('click', function () { closeAllMenus(); });
 
-  // 态势菜单：输入 / 管理 / 数据下载，三标签页共用一个模态框
+  // TS菜单：输入 / 管理 / 数据下载，三标签页共用一个模态框
   Array.prototype.forEach.call(
     document.querySelectorAll('[data-situation-cmd]'), function (btn) {
       btn.addEventListener('click', function () {
@@ -3338,7 +3338,7 @@ function bindUI() {
       });
     });
   document.addEventListener('keydown', function (e) {
-    // 浮动目标面板已移除，Esc 改为清除选中态 + 复位目标态势栏。
+    // 浮动目标面板已移除，Esc 改为清除选中态 + 复位目标TS栏。
     if (e.key === 'Escape') { closeCaseMenu(); clearTargetSelection(); }
   });
 
@@ -3462,12 +3462,12 @@ function bindPicking() {
 // 所以 ?cam= 与 ?follow= 同时出现时 follow 胜出。
 
 function applyCaseIndependentHooks() {
-  // 态势面板：?situation=input|manage|download（取证与深链用）
+  // TS面板：?situation=input|manage|download（取证与深链用）
   if (params.has('situation') && window.SituationPanel) {
     SituationPanel.open(params.get('situation') || 'input');
   }
 
-  // 态势面板：?situation=input|manage|download（取证与深链用）
+  // TS面板：?situation=input|manage|download（取证与深链用）
   if (params.has('situation') && window.SituationPanel) {
     SituationPanel.open(params.get('situation') || 'input');
   }
@@ -3723,7 +3723,7 @@ function main() {
     const sceneDoc = window.SceneDoc ? SceneDoc.fromUrl() : null;
     const wanted = params.get('case') || (sceneDoc && sceneDoc.c) || null;
     if (!wanted) {
-      // 默认不加载任何态势：只保留底图 / 地形 / WSF3D / 地图组件。
+      // 默认不加载任何TS：只保留底图 / 地形 / WSF3D / 地图组件。
       // 注意顺序：clearSituation 里的 applyCamera(默认机位) 会覆盖 ?cam=，而
       // applyCaseIndependentHooks（含 ?cam= 钩子）在它之后跑，所以空态下
       // ?cam= 能生效。这两步的顺序不能调换——调换后空态机位永远是默认值，

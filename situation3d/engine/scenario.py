@@ -28,13 +28,13 @@ from . import geo, symbology
 # --------------------------------------------------------------------------
 
 SCENARIO_ID = "taiwan_strait_demo_20260915"
-SCENARIO_NAME = "台海方向联合态势演示"
+SCENARIO_NAME = "台海方向联合TS演示"
 REGION = "中国 台湾海峡"
 
 # 12 simulated hours at 30 s per tick.
 TICK_SECONDS = 30.0
 TICK_COUNT = 1440
-# 态势的仿真起始时刻（UTC）。提到常量：数据集里要写它，态势简报也要用它把
+# TS的仿真起始时刻（UTC）。提到常量：数据集里要写它，TS简报也要用它把
 # "第 N 帧"换算成钟点，两处必须是同一个值，否则简报里会出现对不上的时间。
 START_TIME_UTC = "2026-09-15T00:00:00Z"
 
@@ -1308,7 +1308,7 @@ def build_dataset(case=None) -> dict:
     # 不必自己抄一份 22 条码表。
     inferred["model"]["intent_ontology"] = intent_mod.ontology_summary()
 
-    # 态势简报：把逐帧的推理结果压成一份可读的叙述。
+    # TS简报：把逐帧的推理结果压成一份可读的叙述。
     # 放在这里而不是前端算，是因为它依赖 case / targets 这些只有引擎侧才有的对象，
     # 而且要保证"前端显示的等级"与"简报里的等级"出自同一份推理输出。
     from . import brief as brief_mod
@@ -1349,7 +1349,7 @@ def build_dataset(case=None) -> dict:
                    if theatre == "taiwan_strait" else []),
         "provenance": "simulated",
         "provenance_note": (
-            "基于真实地理航路构造的仿真态势；航路点取自台海真实地理位置，"
+            "基于真实地理航路构造的仿真TS；航路点取自台海真实地理位置，"
             "速度与高度取自真实装备量级。陆军航路沿 OSM 路网路由。"
             "非真实 AIS/ADS-B 观测记录。"
         ),

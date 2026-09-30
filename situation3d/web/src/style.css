@@ -13,7 +13,7 @@
   --topbar: #16202f;
   --topbar-text: #e8edf5;
 
-  /* 态势等级配色：1 和缓 → 4 高危 */
+  /* TS等级配色：1 和缓 → 4 高危 */
   --lv1: #4a9c6d;
   --lv2: #b8860b;
   --lv3: #d9772a;
@@ -189,7 +189,7 @@ body {
 .layer-groups::-webkit-scrollbar-thumb:hover { background: #53688a; }
 .layer-groups::-webkit-scrollbar-track { background: transparent; }
 
-/* 右栏承载三个分栏（整体/目标/区域态势）。整体态势栏要放"家族标签 + 图标条 + 计数"
+/* 右栏承载三个分栏（整体/目标/区域TS）。整体TS栏要放"家族标签 + 图标条 + 计数"
    三列，306px 装不下，加宽到 380px；三栏内容较长，整列纵向滚动。 */
 .panel-right {
   border-right: none;
@@ -391,7 +391,7 @@ select {
   word-break: break-word;
 }
 
-/* ---------------- 态势简报 ---------------- */
+/* ---------------- TS简报 ---------------- */
 
 .brief-headline {
   margin: 4px 0 6px;
@@ -510,7 +510,7 @@ select {
 .hotspot-table th:nth-child(4), .hotspot-table td:nth-child(4) { width: 14%; }
 .hotspot-table th:nth-child(5), .hotspot-table td:nth-child(5) { width: 19%; }
 
-/* 主导意图列：与"态势"列并列，一个说多紧张、一个说在打什么 */
+/* 主导意图列：与"TS"列并列，一个说多紧张、一个说在打什么 */
 .hs-intent { line-height: 1.35; font-size: 10.5px; color: #12325c; }
 
 .hs-range { line-height: 1.35; white-space: nowrap; font-size: 10.5px; }
@@ -593,16 +593,24 @@ select {
   color: var(--text-dim);
 }
 
-/* ---------------- 区域级态势横幅：已移除 ----------------
-   地图右下角那条横幅整个去掉了（读数移进右栏「区域态势」栏）。这里原本的
+/* ---------------- 区域级TS横幅：已移除 ----------------
+   地图右下角那条横幅整个去掉了（读数移进右栏「区域TS」栏）。这里原本的
    `.level-banner` / `.lb-*` 规则随之删除——留着一段指向不存在元素的样式，
    下一个人会以为界面上还有这个模块，改样式时白费功夫。 */
 
-/* ---------------- 右侧「目标态势栏」的样式 ----------------
+/* ---------------- 右侧「目标TS栏」的样式 ----------------
    注意：原有的 `.tp-kv` / `.tp-reason` / `.tp-intent` / `.tpi-*` / `.tp-fold`
    仍然由 intentUi.js 生成的意图集合块使用，本轮只是换了容器，因此全部保留。
    浮动的 `.target-panel` / `.tp-head` / `.tp-title` / `.tp-close` / `.tp-body`
-   已随浮动面板一起移除。 */
+   已随浮动面板一起移除。
+
+   term-replace:keep-start
+   命名提示（术语替换的遗留歧义）：下面的 `.ts-*` 前缀是「目标状态栏」的 CSS 命名
+   空间，与全局术语替换「态势 → TS」**同形但无关**——读 `.ts-head` 时不要按
+   "TS = 态势"去理解。类名保持不动：它们是选择器而不是术语出现位置，改名会牵连 JS
+   里的字符串与既有样式表，收益为零。
+   本段引用的原词是**说明文字**，不是漏改，故用标记圈起来供工具复扫时跳过。
+   term-replace:keep-end */
 
 .ts-body { display: flex; flex-direction: column; gap: 8px; }
 
@@ -649,7 +657,7 @@ select {
 .ts-fold[open] > summary::before { transform: rotate(90deg); }
 .ts-fold[open] > summary { margin-bottom: 4px; }
 
-/* ---------------- 右侧「整体态势栏」的样式 ----------------
+/* ---------------- 右侧「整体TS栏」的样式 ----------------
    图标用 CSS filter 分级降饱和压暗，而不是新建 4 套 SVG：颜色语义是告警等级
    （正常/注意/警告/严重），不是战损——见 statusPanels.js 顶部说明。 */
 
@@ -722,7 +730,7 @@ select {
 .os-sw.os-tier-2 { background: #9d6a66; }
 .os-sw.os-tier-3 { background: #8a8a8a; }
 
-/* ---------------- 右侧「区域态势栏」的样式 ---------------- */
+/* ---------------- 右侧「区域TS栏」的样式 ---------------- */
 
 .region-head { margin-bottom: 4px; }
 .region-level {
@@ -1115,7 +1123,7 @@ select {
 /* ---------------- 鸟瞰图（第二个 Cesium 2D 视图） ----------------
  *
  * 放左下角：右上被目标信息面板占用，左上被地图组件竖向栈占用，右下被区域级
- * 态势横幅占用。z-index 35 低于目标面板的 40。
+ * TS横幅占用。z-index 35 低于目标面板的 40。
  */
 
 /* 鸟瞰图：移到右上角（原在左下）。目标面板已移除，右上角空出来给它。
@@ -1196,9 +1204,9 @@ select {
   .overview-wrap { width: 180px; height: 130px; }
 }
 
-/* ---------------- 态势模态框（输入 / 管理 / 下载） ----------------
+/* ---------------- TS模态框（输入 / 管理 / 下载） ----------------
 
- * 三标签页共用一个模态框：三件事都围绕"当前态势"，拆成三个弹窗只会让人找不到。
+ * 三标签页共用一个模态框：三件事都围绕"当前TS"，拆成三个弹窗只会让人找不到。
  * 中间地球区域已有很多叠加层，所以模态框覆盖全屏并加半透明遮罩。
  */
 

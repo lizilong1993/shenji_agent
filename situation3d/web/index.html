@@ -3,6 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- term-replace:keep-start
+       产品名「三维战场态势生成系统」按术语替换的豁免规则 R1 **有意保留原样**：
+       机械替换会得到「三维ZCTS生成系统」（战场态势相邻，两个缩写黏在一起），
+       作为对外名称不可读。界面上的其它文案都已改为 TS / ZC。
+       详见 NOTES_term_replacement.md 的风险表。
+       term-replace:keep-end -->
   <title>三维战场态势生成系统</title>
   <link rel="stylesheet" href="./vendor/cesium/Widgets/widgets.css">
   <link rel="stylesheet" href="./src/style.css">
@@ -17,21 +23,21 @@
     <nav class="topbar-actions">
       <div class="menu">
         <button id="menuCase" type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false">
-          态势案例 <span class="caret">▾</span>
+          TS案例 <span class="caret">▾</span>
         </button>
         <div id="menuCaseList" class="menu-list" role="menu"></div>
       </div>
 
-      <!-- 态势三件套直接挂在顶栏，不再套二级下拉：它们各自只有一个动作，
+      <!-- TS三件套直接挂在顶栏，不再套二级下拉：它们各自只有一个动作，
            多一层展开反而慢。仍复用 [data-situation-cmd] 委托与 SituationPanel.open()。 -->
       <button type="button" class="menu-btn" data-situation-cmd="input"
-              title="框选或输入经纬度确定战场范围，添加目标与图层后生成双方态势">态势注册</button>
+              title="框选或输入经纬度确定ZC范围，添加目标与图层后生成双方TS">TS注册</button>
       <button type="button" class="menu-btn" data-situation-cmd="manage"
-              title="查看与编辑当前态势：战场范围、目标编成、图层">态势管理</button>
+              title="查看与编辑当前TS：ZC范围、目标编成、图层">TS管理</button>
       <button type="button" class="menu-btn" data-situation-cmd="download"
-              title="导出当前帧 / 全帧 CSV / 态势定义">态势下载</button>
+              title="导出当前帧 / 全帧 CSV / TS定义">TS下载</button>
 
-      <button id="btnRun" type="button" class="primary">态势自动推演</button>
+      <button id="btnRun" type="button" class="primary">TS自动推演</button>
     </nav>
 
     <div class="status">
@@ -55,7 +61,7 @@
         <button type="button" class="mini" data-layer-cmd="default" title="回到首次打开时的图层状态">恢复默认</button>
       </div>
       <details class="layer-group panel-block" open>
-        <summary>态势图层</summary>
+        <summary>TS图层</summary>
         <label class="check"><input type="checkbox" id="layerHotspots" checked> 热点区域</label>
         <label class="check"><input type="checkbox" id="layerRoutes" checked> 计划航路</label>
         <label class="check"><input type="checkbox" id="layerOverview" checked> 鸟瞰图</label>
@@ -119,9 +125,9 @@
     <section class="globe-wrap">
       <div id="cesiumContainer"></div>
 
-      <!-- 目标信息面板已移除：内容并入右栏「目标态势栏」，同时把右上角让给鸟瞰图。 -->
+      <!-- 目标信息面板已移除：内容并入右栏「目标TS栏」，同时把右上角让给鸟瞰图。 -->
 
-      <!-- 地图上的「区域级态势」横幅已移除：内容全部移到右栏「区域态势」栏。
+      <!-- 地图上的「区域级TS」横幅已移除：内容全部移到右栏「区域TS」栏。
            同一个读数不该有两份显示——地图上那份还占地、挡住地图本身。 -->
 
       <div id="legend" class="legend">
@@ -182,11 +188,11 @@
     </section>
 
     <aside class="panel panel-right">
-      <!-- 整体态势栏：全局各类型、各方目标的整体状态（图标 + 告警等级着色）。
+      <!-- 整体TS栏：全局各类型、各方目标的整体状态（图标 + 告警等级着色）。
            展示案例完整编成，不跟随地图上的红/蓝/域过滤开关。 -->
       <section class="panel-block">
-        <h2>整体态势</h2>
-        <div id="overallBody" class="os-body">未加载态势</div>
+        <h2>整体TS</h2>
+        <div id="overallBody" class="os-body">未加载TS</div>
       </section>
 
       <!-- 目标意图：选中目标后只显示它的**意图集合**（CES 候选集合）及其判据。
@@ -199,12 +205,12 @@
         </div>
       </section>
 
-      <!-- 区域态势栏：光标所在区域 + 区域级态势 + 热点区域列表。
+      <!-- 区域TS栏：光标所在区域 + 区域级TS + 热点区域列表。
            原先分散在「光标位置信息」与「热点区域」两块，现在同属一栏。 -->
       <section class="panel-block">
-        <h2>区域态势</h2>
-        <!-- 只显示**整个案例范围**的整体态势：不再逐热点罗列，也不再随光标显示
-             单个区域的态势——那两者都是"局部"，与"区域态势"这一栏要回答的问题
+        <h2>区域TS</h2>
+        <!-- 只显示**整个案例范围**的整体TS：不再逐热点罗列，也不再随光标显示
+             单个区域的TS——那两者都是"局部"，与"区域TS"这一栏要回答的问题
              （这一仗整体打到什么程度）不是一回事。 -->
         <div class="kv"><span>范围</span><b id="geoSpan">—</b></div>
         <div class="region-level">
@@ -242,15 +248,15 @@
     </div>
   </footer>
 
-  <!-- 态势输入 / 管理 / 数据下载：三标签页模态框 -->
-  <div id="situationModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="态势">
+  <!-- TS输入 / 管理 / 数据下载：三标签页模态框 -->
+  <div id="situationModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="TS">
     <div class="modal-panel">
       <div class="modal-head">
         <div class="modal-tabs" id="sitTabs">
-          <button type="button" class="modal-tab" data-sit-tab="input">态势输入</button>
-          <button type="button" class="modal-tab" data-sit-tab="manage">态势管理</button>
-          <button type="button" class="modal-tab" data-sit-tab="brief">态势简报</button>
-          <button type="button" class="modal-tab" data-sit-tab="download">态势数据下载</button>
+          <button type="button" class="modal-tab" data-sit-tab="input">TS输入</button>
+          <button type="button" class="modal-tab" data-sit-tab="manage">TS管理</button>
+          <button type="button" class="modal-tab" data-sit-tab="brief">TS简报</button>
+          <button type="button" class="modal-tab" data-sit-tab="download">TS数据下载</button>
         </div>
         <button id="sitClose" type="button" class="modal-close" aria-label="关闭">×</button>
       </div>

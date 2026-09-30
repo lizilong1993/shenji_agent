@@ -34,7 +34,7 @@ def write_json(path: str, payload) -> int:
 def write_base(out_dir: str) -> int:
     """写出与案例无关的基础数据。
 
-    空态（不加载任何态势）下，前端仍需要城区 AOI 来生成 WSF3D 建筑体块，也需要
+    空态（不加载任何TS）下，前端仍需要城区 AOI 来生成 WSF3D 建筑体块，也需要
     军标目录来渲染符号——这两样原本只随案例数据集下发。把它们提到一个启动即加载
     的 base.json，前端就不必为了底图资产先加载一个案例。
 

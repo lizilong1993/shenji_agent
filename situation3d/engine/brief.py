@@ -1,4 +1,4 @@
-"""One-click situation brief (态势简报) built from the inference output.
+"""One-click situation brief (TS简报) built from the inference output.
 
 Why this exists
 ---------------
@@ -302,7 +302,7 @@ def build_brief(frames: Sequence[dict], targets=None, hotspot_names: Sequence[st
     if not frames:
         return {
             "case_id": case_id, "case_name": case_name, "empty": True,
-            "headline": "该态势没有可用的帧数据。",
+            "headline": "该TS没有可用的帧数据。",
             "sections": [], "key_targets": [], "regions": [],
         }
 
@@ -351,8 +351,8 @@ def build_brief(frames: Sequence[dict], targets=None, hotspot_names: Sequence[st
 
     trend_word = ("升级" if peak_level > start_level
                   else ("缓和" if final_level < peak_level else "维持"))
-    headline = "%s：全程峰值%s%s，态势%s。" % (
-        case_name or case_id or "本态势",
+    headline = "%s：全程峰值%s%s，TS%s。" % (
+        case_name or case_id or "本TS",
         (" " + peak_label) if peak_label else "",
         ("（第 %d 帧%s）" % (inferred[peak_idx].get("tick", peak_idx),
                             ("，" + peak_clock) if peak_clock else "")) if inferred else "",
@@ -408,7 +408,7 @@ def build_brief(frames: Sequence[dict], targets=None, hotspot_names: Sequence[st
     if region_rows:
         prob = [r for r in region_rows if r["peak_level"] >= 2]
         sections.append({
-            "title": "区域态势",
+            "title": "区域TS",
             "kind": "regions",
             "lines": [
                 "%s：峰值%s（第 %d 帧%s），最高时红方 %d / 蓝方 %d。" % (
@@ -447,7 +447,7 @@ def render_text(brief: dict) -> str:
     if brief.get("empty"):
         return brief.get("headline") or "（无数据）"
     out = []
-    out.append("态势简报 —— %s" % (brief.get("case_name") or brief.get("case_id") or "未命名"))
+    out.append("TS简报 —— %s" % (brief.get("case_name") or brief.get("case_id") or "未命名"))
     out.append("=" * 46)
     out.append(brief.get("headline") or "")
     out.append("")

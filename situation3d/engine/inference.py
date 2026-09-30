@@ -6,9 +6,9 @@ positions, and to show the result at three levels of abstraction:
 ===== ========== ==========================================================
 Level Chinese    Question answered
 ===== ========== ==========================================================
-L1    目标级态势  What is this platform doing, and how threatened is it?
-L2    编组级态势  How do the red and blue groupings relate to each other?
-L3    区域级态势  What is the situation inside each hotspot region?
+L1    目标级TS  What is this platform doing, and how threatened is it?
+L2    编组级TS  How do the red and blue groupings relate to each other?
+L3    区域级TS  What is the situation inside each hotspot region?
 ===== ========== ==========================================================
 
 Every level is produced by an explicit, inspectable rule set -- no black box --
@@ -445,12 +445,12 @@ def infer(frames: List[dict], targets, hotspot_names: Sequence[str] = ()) -> dic
     return {
         "model": {
             "levels": [
-                {"id": "L1", "name": "目标级态势",
+                {"id": "L1", "name": "目标级TS",
                  "description": "单平台状态、意图与威胁度，由装备类别权重、与对方最近目标距离、被对方传感器覆盖数三项合成。"},
-                {"id": "L2", "name": "编组级态势",
+                {"id": "L2", "name": "编组级TS",
                  "description": "按红蓝双方与海陆空域聚合为编组，给出编队形态、编组质心、与对方同域编组的最小距离及对抗关系。"},
-                {"id": "L3", "name": "区域级态势",
-                 "description": "逐热点区域统计双方兵力存在与最高威胁，输出区域态势等级与主导方；双方共处一区即判为紧张及以上。"},
+                {"id": "L3", "name": "区域级TS",
+                 "description": "逐热点区域统计双方兵力存在与最高威胁，输出区域TS等级与主导方；双方共处一区即判为紧张及以上。"},
             ],
             "alert_codes": ALERT_CODES,
             "relation_codes": RELATION_CODES,
@@ -499,8 +499,8 @@ def _alert_to_level(max_threat: float) -> int:
 
 def _overall_note(level: int) -> str:
     return {
-        1: "双方兵力分散，未形成有效接触，整体态势和缓。",
+        1: "双方兵力分散，未形成有效接触，整体TS和缓。",
         2: "存在远距监视关系，需持续跟踪对方动向。",
-        3: "双方兵力在同一区域共处或已进入对方影响范围，态势紧张。",
+        3: "双方兵力在同一区域共处或已进入对方影响范围，TS紧张。",
         4: "存在高危接触，双方兵力距离已进入武器有效作用范围。",
     }[level]
