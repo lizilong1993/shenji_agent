@@ -134,19 +134,8 @@ body {
 .menu-item.active { border-color: var(--accent); background: #22344c; }
 
 .menu-item .mi-head { display: block; font-size: 13px; font-weight: 600; color: #eef3fa; }
-.menu-item .mi-sub { display: block; font-size: 11px; color: #8fa3bd; margin-top: 1px; }
-/* 描述限制为一行并省略：案例描述有 70+ 字，整段铺开会让菜单变成一大片文字，
-   条目之间失去层次（截图里就是这样）。完整描述放到 title 里，hover 可看。 */
-.menu-item .mi-desc {
-  display: block;
-  font-size: 11px;
-  color: #a9b8cc;
-  margin-top: 4px;
-  line-height: 1.45;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* `.mi-sub` 与 `.mi-desc` 随案例菜单的两行副文本一起删掉了（菜单现在只留案例名）。
+   留着指向不存在元素的规则，下一个人会以为菜单里还有副标题可调。 */
 
 /* ---------------- workspace ---------------- */
 

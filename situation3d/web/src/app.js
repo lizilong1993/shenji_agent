@@ -899,14 +899,12 @@ function renderCaseMenu() {
     item.dataset.caseId = c.id;
 
     const head = el('span', 'mi-head', c.name);
-    // 案例条目原先还有一行「16 个目标 · 11 个热点区域」。按反馈去掉：它既不是选择
-    // 依据（两个案例的编成一望名字即知），又把菜单撑高、挤掉了真正有用的描述。
-    // 案例名 + 一行描述足够区分，完整信息放 title。
-    const desc = el('span', 'mi-desc', c.description);
-    // 描述在菜单里只显示一行（CSS 截断），完整文字放 title，hover 可看全。
+    // 案例条目现在**只留案例名**。历史上这里还有两行副文本：编成计数
+    //（「16 个目标 · 11 个热点区域」）与案例描述，按反馈先后去掉——菜单是选案例用的，
+    // 不是读说明的地方，两行副文本把菜单撑高一倍还挤掉视线。
+    // 完整描述仍挂在 title 上：悬停可看，但不占版面（不是"显示的说明文字"）。
     if (c.description) item.title = c.name + '：' + c.description;
     item.appendChild(head);
-    item.appendChild(desc);
 
     item.addEventListener('click', function () {
       closeCaseMenu();
@@ -925,8 +923,9 @@ function renderCaseMenu() {
   const clearItem = el('button', 'menu-item menu-item-quiet', '');
   clearItem.type = 'button';
   clearItem.setAttribute('role', 'menuitem');
+  // 同样只留标题：「回到空态：保留底图 / 地形 / WSF3D / 地图组件」那行说明也去掉。
   clearItem.appendChild(el('span', 'mi-head', '清除当前TS'));
-  clearItem.appendChild(el('span', 'mi-sub', '回到空态：保留底图 / 地形 / WSF3D / 地图组件'));
+  clearItem.title = '回到空态：保留底图 / 地形 / WSF3D / 地图组件';
   clearItem.addEventListener('click', function () {
     closeCaseMenu();
     if (!state.data) return;
