@@ -57,15 +57,4 @@ R3「战场态势」相邻**无独立出现**：实测 6 处「战场态势」�
 ## 逐处清单
 
 <!-- BEGIN AUTO-INVENTORY -->
-| 文件:行 | 原文 | 替换后 | 标记 |
-|---|---|---|---|
-| `README.md:1` | # situation3d — 三维战场态势生成系统 | # situation3d — 三维战场态势生成系统 | KEEP (R1 产品名) |
-| `engine/data/intent_ontology_v2.json:65` | "name_zh": "机动态势", | "name_zh": "机动态势", | KEEP (R2 本体论术语) |
-| `engine/intent.py:69` | # `机动态势` (MANEUVER_POSTURE) is **deliberately left in the original wording** | # `机动态势` (MANEUVER_POSTURE) is **deliberately left in the original wording** | KEEP (R2 本体论术语) |
-| `web/index.html:7` | 产品名「三维战场态势生成系统」按术语替换的豁免规则 R1 **有意保留原样**： | 产品名「三维战场态势生成系统」按术语替换的豁免规则 R1 **有意保留原样**： | KEEP (R1 产品名) |
-| `web/index.html:12` | <title>三维战场态势生成系统</title> | <title>三维战场态势生成系统</title> | KEEP (R1 产品名) |
-| `web/index.html:19` | <strong>三维战场态势生成系统</strong> | <strong>三维战场态势生成系统</strong> | KEEP (R1 产品名) |
-| `web/src/app.js:1` | /* situation3d — 三维战场态势生成系统前端 | /* situation3d — 三维战场态势生成系统前端 | KEEP (R1 产品名) |
-| `web/src/app.js:733` | document.title = '三维战场态势生成系统 — ' + data.case_name; | document.title = '三维战场态势生成系统 — ' + data.case_name; | KEEP (R1 产品名) |
-| `web/src/app.js:853` | document.title = '三维战场态势生成系统'; | document.title = '三维战场态势生成系统'; | KEEP (R1 产品名) |
 <!-- END AUTO-INVENTORY -->

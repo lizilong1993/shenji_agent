@@ -12,7 +12,10 @@ R2  本体论里的「机动态势」（MANEUVER_POSTURE）原样保留。
     它是 2525/庙算术语体系的父类名称，会显示在意图集合里，且与
     code/shenji_agent/Shenji/ontology/ 下的孪生文件必须保持同一口径。
 R3  「战场态势」相邻出现时写成 `ZC-TS` 而不是 `ZCTS`——两个缩写黏在一起无法辨读。
-    （产品名内的那两处仍按 R1 保留。）
+
+R1 产品名豁免**已按用户要求取消**：产品名与网页 title 一并替换。原先保留是为了避免
+得到不可读的「三维ZCTS生成系统」，现在按 R3 的相邻规则写作「三维ZC-TS生成系统」，
+与全局术语保持一致（用户明确要求"包括网页的 title 也要换"）。
 
 其它不动的类别
 --------------
@@ -44,7 +47,7 @@ ROOT = os.path.dirname(HERE)
 TEXT_EXT = {".js", ".mjs", ".py", ".css", ".html", ".json", ".md", ".sh",
             ".yml", ".yaml", ".example", ".txt", ".toml", ".cfg"}
 
-PRODUCT = "三维战场态势生成系统"       # R1
+PRODUCT = "三维战场态势生成系统"       # R1 —— 已取消豁免，见文件头说明
 ADJACENT = "战场态势"                    # R3
 ONTOLOGY_TERM = "机动态势"               # R2
 
@@ -63,18 +66,22 @@ SKIP_FILES = {
     "NOTES_term_replacement.md",
 }
 
-# 顺序要紧：PRODUCT 含 ADJACENT，必须排在前面才不会先被 ADJACENT 吃掉。
+# 顺序要紧：长串排在前面，否则会被短规则先吃掉。
+#
+# **产品名不能放进这个模式里**。第一版把它放进来了、并在 repl 里返回 "ZC-TS"，
+# 结果是整串「三维战场态势生成系统」被替换成 "ZC-TS"——**"三维" 与 "生成系统"
+# 一起丢了**（实测 README/title/brand/document.title 全变成 "ZC-TS"）。正确做法是
+# 让模式只匹配「战场态势」这一小段：产品名因此自然变成「三维ZC-TS生成系统」，
+# 前后文字原样保留。教训：替换表里放"整句"而不是"词"，一旦返回值不是原串就会吞掉上下文。
 _PAT = re.compile("|".join(re.escape(s) for s in
-                           (PRODUCT, ADJACENT, ONTOLOGY_TERM, "态势", "战场")))
+                           (ADJACENT, ONTOLOGY_TERM, "态势", "战场")))
 
 
 def convert(text: str) -> str:
     def repl(m: "re.Match[str]") -> str:
         s = m.group(0)
-        if s == PRODUCT:
-            return s            # R1
         if s == ADJACENT:
-            return "ZC-TS"      # R3
+            return "ZC-TS"      # R3（产品名内的那一处同样走这里）
         if s == ONTOLOGY_TERM:
             return s            # R2
         if s == "态势":
@@ -184,8 +191,6 @@ def write_inventory(path: str, entries) -> None:
 
 
 def mark_of(before: str, after: str) -> str:
-    if PRODUCT in before and PRODUCT in after:
-        return "KEEP (R1 产品名)"
     if ONTOLOGY_TERM in before and ONTOLOGY_TERM in after:
         return "KEEP (R2 本体论术语)"
     if "ZC-TS" in after:
@@ -226,15 +231,21 @@ def main():
             if a != b:
                 hits += 1
                 entries.append((rel, i, a, b, mark_of(a, b)))
-        # 同时记录**未被改写**但含术语的行（R1/R2 豁免），否则清单会漏掉它们。
+        # 同时记录**未被改写**但含术语的行（R2 豁免、keep 标记区间）。
         #
-        # 注意这一遍必须在 "updated == original 就跳过" 之前完成：像
-        # engine/data/intent_ontology_v2.json 那样**整份只有豁免词**的文件，
-        # 若先跳过就会在清单里彻底消失——而"没有任何一处需要改"与"这个文件被漏掉了"
-        # 必须能区分开。
-        for i, a in enumerate(original.splitlines(), start=1):
-            if ("态势" in a or "战场" in a) and convert(a) == a:
-                entries.append((rel, i, a, a, mark_of(a, a)))
+        # 这里必须与 `updated` 的同序号行比较，**不能**再调一次 `convert(a)`：
+        # 单行调用看不到 keep 标记（标记在别行），会把标记区间内的行判成"会改"，
+        # 于是既不记为改写、也不记为保留——从清单里彻底消失。实测 style.css 里
+        # 那段说明就是因此漏掉的。
+        orig_lines = original.splitlines()
+        new_lines = updated.splitlines()
+        for i, a in enumerate(orig_lines, start=1):
+            b = new_lines[i - 1] if i - 1 < len(new_lines) else a
+            if ("态势" in a or "战场" in a) and a == b:
+                # 走到这里说明这一行**有意没改**：要么是 R2 豁免，要么夹在 keep 标记
+                # 区间里。两者都不是"漏改"，标记要如实区分，否则读者会把保留当成遗漏。
+                entries.append((rel, i, a, a, mark_of(a, a) if mark_of(a, a) != "-"
+                                else "KEEP (标记区间)"))
         if not hits:
             continue
         total_files += 1

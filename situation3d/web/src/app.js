@@ -1,4 +1,4 @@
-/* situation3d — 三维战场态势生成系统前端
+/* situation3d — 三维ZC-TS生成系统前端
  *
  * 职责：
  *   1. 加载引擎输出的逐帧TS与三级推理结果，在 Cesium 三维地球上回放；
@@ -109,7 +109,7 @@ const dom = {};
  'rlValue', 'rlNote', 'rlIntent', 'rlPhase',
  'overallBody', 'targetBody',
  'menuCase', 'menuCaseList',
- 'tdtNote', 'tickLabel', 'timeline', 'clockLabel',
+ 'tickLabel', 'timeline', 'clockLabel',
  'countRed', 'countBlue', 'countSea', 'countLand', 'countAir',
  'loadingBadge', 'loadingText',
  'mapCompass', 'compRose', 'mapViewpoint', 'mvAll', 'modelPlaces',
@@ -367,7 +367,6 @@ function initViewer() {
   // 必须用 baseLayer，否则球体只剩默认底色。下面的断言把静默退化变成显式失败。
   //
   // 图层顺序（index 0 在最底层，Cesium 由下往上叠）：
-  //   [0] 天地图影像（在线，默认底图）
   //   [0] 离线影像垫底（z=5）  →  [1] 天地图影像（z=10，在线，经 /tdt 代理）
   //   [2] 天地图中文注记（z=90，在线）
   //   离线全球 z0-6 → 战区 z0-11 → 热点 z0-12 → 城区 z13-17，全部叠在 [1] 之上
@@ -408,6 +407,17 @@ function initViewer() {
   // 但在用户的机器上很可能是清晰度的主因。代价是 GPU 负载上升；若某台机器吃不消，
   // 把这一行改回 true 即可（只是又回到发虚的状态）。
   viewer.useBrowserRecommendedResolution = false;
+
+  // 隐藏 Cesium 底部那条「Data attribution」署名条（按界面反馈：底部那道满宽的长条）。
+  //
+  // ⚠ 这不是"没有署名"：在线底图是天地图（服务端代理的 credit 见 assets.js），
+  //   离线底图是 **Esri World Imagery，其许可要求署名**（清单里记的是
+  //   "free with attribution; review before operational use"）。署名文字仍然保留在
+  //   图层的 credit 元数据里，并作为「底图」分组标题的 title 属性可查（悬停可见）。
+  //   若将来对外发布，应当把 Esri 的署名放回可见位置——那时改这一行即可。
+  if (viewer.cesiumWidget && viewer.cesiumWidget.creditContainer) {
+    viewer.cesiumWidget.creditContainer.style.display = 'none';
+  }
 
   if (viewer.imageryLayers.length === 0) {
     throw new Error('底图图层未创建：Cesium ' + Cesium.VERSION + ' 需要 baseLayer 选项');
@@ -730,7 +740,7 @@ function applySituationData(data, caseId) {
   syncUrbanImagery();
 
       dom.scenarioName.textContent = data.region + ' · ' + data.case_name;
-      document.title = '三维战场态势生成系统 — ' + data.case_name;
+      document.title = '三维ZC-TS生成系统 — ' + data.case_name;
 
       createHotspots();
       createRouteEntities();
@@ -850,7 +860,7 @@ function clearSituation() {
   markScene('clearSituation');
 
   dom.scenarioName.textContent = state.baseRegion || '未加载TS';
-  document.title = '三维战场态势生成系统';
+  document.title = '三维ZC-TS生成系统';
 
   renderTargetCounts();
   renderHotspotTable();
@@ -889,13 +899,13 @@ function renderCaseMenu() {
     item.dataset.caseId = c.id;
 
     const head = el('span', 'mi-head', c.name);
-    const sub = el('span', 'mi-sub',
-      c.target_count + ' 个目标 · ' + c.hotspot_count + ' 个热点区域');
+    // 案例条目原先还有一行「16 个目标 · 11 个热点区域」。按反馈去掉：它既不是选择
+    // 依据（两个案例的编成一望名字即知），又把菜单撑高、挤掉了真正有用的描述。
+    // 案例名 + 一行描述足够区分，完整信息放 title。
     const desc = el('span', 'mi-desc', c.description);
     // 描述在菜单里只显示一行（CSS 截断），完整文字放 title，hover 可看全。
     if (c.description) item.title = c.name + '：' + c.description;
     item.appendChild(head);
-    item.appendChild(sub);
     item.appendChild(desc);
 
     item.addEventListener('click', function () {
@@ -1849,21 +1859,21 @@ function setBuildingsOnline(on) {
   });
 }
 
-/** 把在线层状态同步到令牌输入框下方的提示，以及离线体块的可用性感知。 */
+/**
+ * 在线实景链路的状态。
+ *
+ * 原先把它写成 `#ionTokenNote` 里的一整句「状态：连接失败（无法加载在线实景：等待
+ * Cesium ion 超时（12 秒）：本机可能无法访问 Google 瓦片服务）」。按"去掉界面上的
+ * 说明性文字"的要求移除：**状态仍然可见**——输入框会在失败时标红（`.bad`），
+ * `SituationHost.debugLayers()` / `Buildings3D.debug()` 里有完整的 phase 与 detail。
+ * 留着这一句会让「底图」面板多出两行没人读的解释，而它要回答的问题只有一个：通了没有。
+ */
 function syncBuildingsOnlineNote(info) {
-  const note = document.getElementById('ionTokenNote');
-  if (!note) return;
-  const phaseText = {
-    idle: '未启用',
-    unconfigured: '未配置令牌',
-    loading: '正在连接…',
-    live: '已连接',
-    failed: '连接失败',
-  }[info.phase] || info.phase;
-  note.textContent = '状态：' + phaseText +
-    (info.detail ? '（' + info.detail + '）' : '');
   const box = document.getElementById('ionTokenInput');
   if (box) box.classList.toggle('bad', info.phase === 'failed');
+  if (info.phase === 'failed') {
+    console.warn('[ion] 在线实景连接失败：' + (info.detail || ''));
+  }
 }
 
 /**
@@ -2350,36 +2360,37 @@ function setTianditu(on) {
 }
 
 /**
- * 探测天地图是否真的可用，并把结论写进「底图」面板的 `#tdtNote`。
+ * 探测天地图是否真的可用，结论**只写控制台**。
  *
  * 为什么必须真发一次请求：`/api/tdt/status` 只能说明"服务端配了 key"，说明不了
  * "key 还能用"。配额耗尽（429）与被禁用（301005）都只有发了请求才知道——而这个项目
  * 已经吃过一次亏：旧 key 配额耗尽后底图静默变成一片深蓝，很久没人发现。
  *
- * 失败**不关闭**天地图图层：留着它，取不到瓦片的地方自然露出下面的离线影像；
- * 关掉它反而让"重试"没有入口。用户看到提示后可以在同组里自行决定。
+ * 界面上原先有一条 `#tdtNote` 把这个结论显示在「底图」面板里，按"去掉界面上的说明性
+ * 文字"的要求移除了。**失败仍然不会静默**：这里打 console.warn，服务端还有
+ * `/api/tdt/status` 与 `/tdt/` 代理的失败日志可以查。三条出口都在，只是不再占界面。
+ *
+ * 失败**不关闭**天地图图层：留着它，取不到瓦片的地方自然露出下面的离线影像。
  */
 function probeTiandituStatus() {
-  const setNote = function (text, cls) {
-    if (!dom.tdtNote) return;
-    dom.tdtNote.textContent = text;
-    dom.tdtNote.className = 'switch-note' + (cls ? ' ' + cls : '');
+  const report = function (text, level) {
+    if (level === 'warn') console.warn('[tdt] ' + text);
+    else console.info('[tdt] ' + text);
   };
   fetch('/api/tdt/status', { cache: 'no-store' })
     .then(function (r) { return r.ok ? r.json() : null; })
     .catch(function () { return null; })
     .then(function (st) {
       if (st && st.configured === false) {
-        setNote('未配置天地图 key：把 TIANDITU_KEY 写进仓库根目录的 .env，重启服务后生效。'
-          + '当前底图为离线影像。', 'warn');
+        report('未配置天地图 key：把 TIANDITU_KEY 写进仓库根目录的 .env，'
+          + '重启服务后生效。当前底图为离线影像。', 'warn');
         return null;
       }
       return OfflineAssets.probeTianditu().then(function (res) {
         if (res.ok) {
-          setNote('天地图可用（经服务端代理取瓦片，key 存于 .env，不下发到浏览器）。'
-            + '离线影像垫在下面兜底。', 'ok');
+          report('天地图可用（经服务端代理取瓦片，key 存于 .env，不下发到浏览器）。');
         } else {
-          setNote('天地图取瓦片失败（HTTP ' + res.status
+          report('天地图取瓦片失败（HTTP ' + res.status
             + (res.reason ? '：' + res.reason : '') + '）。当前显示的是离线影像。'
             + '常见原因：301005 key 已被禁用 / 429 配额耗尽 / 301012·301013 key 类型与'
             + '调用方式不符。', 'warn');
@@ -2388,7 +2399,7 @@ function probeTiandituStatus() {
       });
     })
     .catch(function (e) {
-      setNote('天地图状态检查失败：' + (e && e.message ? e.message : e), 'warn');
+      report('状态检查失败：' + (e && e.message ? e.message : e), 'warn');
     });
 }
 
@@ -2969,10 +2980,6 @@ window.SituationHost = {
       // 在线实景那条链路（默认图层）的取证：断网/无令牌/令牌过期都只能从
       // phase 与 detail 分辨，光看画面是"没有建筑"还是"建筑没加载出来"分不清。
       online: window.Buildings3D ? Buildings3D.debug() : null,
-      onlineNote: (function () {
-        const n = document.getElementById('ionTokenNote');
-        return n ? n.textContent : null;
-      })(),
     };
   },
   setStatus: setStatus,
@@ -3284,20 +3291,18 @@ function bindUI() {
   // 只是不再有顶栏按钮来生成它。
 
   // ion 令牌输入：保存到服务端 web/data/ion.json（该文件被 gitignore）。
-  // 输入框里的值**不回显**到任何提示里，保存成功后只报"已保存"。
+  // 输入框里的值**不回显**到任何提示里；成功/失败的反馈走输入框自身的 ok/bad 样式
+  // 与控制台，不再写界面文字（按"去掉说明性文字"的要求）。
   const ionSave = document.getElementById('ionTokenSave');
   const ionInput = document.getElementById('ionTokenInput');
   if (ionSave && ionInput && window.Buildings3D) {
     ionSave.addEventListener('click', function () {
-      const note = document.getElementById('ionTokenNote');
       const v = (ionInput.value || '').trim();
-      if (note) note.textContent = '正在保存…';
       window.Buildings3D.saveToken(v).then(function () {
         ionInput.value = '';
         ionInput.classList.remove('bad');
         ionInput.classList.add('ok');
-        if (note) note.textContent = '令牌已保存。重开「在线三维实景建筑」即可生效。';
-        // 令牌换了以后旧的失败状态不该继续留着，否则会一直显示上一次的报错。
+        // 令牌换了以后旧的失败状态不该继续留着，否则会一直保留上一次的报错。
         window.Buildings3D.forgetToken();
         if (checkboxOn('modelBuildingsOnline')) setBuildingsOnline(true);
       }).catch(function (e) {

@@ -527,11 +527,13 @@ select {
 .globe-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
 #cesiumContainer { position: absolute; inset: 0; }
 
-/* 图例：移到左上角 hint 下方（原在左下，bottom:12）。左下角现已让给比例尺。 */
+/* 图例：地图**右下角**（原在左下，中途挪到左上，按反馈定为右下）。
+   右下角此前被「区域级TS」横幅占着，横幅移除后空出来，正好给图例。
+   注：右上角是鸟瞰图 + 指南针，左下角是比例尺，底部居中留给视点读数。 */
 .legend {
   position: absolute;
-  left: 12px;
-  top: 46px;
+  right: 12px;
+  bottom: 12px;
   display: flex;
   gap: 14px;
   padding: 6px 10px;

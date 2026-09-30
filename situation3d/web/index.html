@@ -3,20 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <!-- term-replace:keep-start
-       产品名「三维战场态势生成系统」按术语替换的豁免规则 R1 **有意保留原样**：
-       机械替换会得到「三维ZCTS生成系统」（战场态势相邻，两个缩写黏在一起），
-       作为对外名称不可读。界面上的其它文案都已改为 TS / ZC。
-       详见 NOTES_term_replacement.md 的风险表。
-       term-replace:keep-end -->
-  <title>三维战场态势生成系统</title>
+  <title>三维ZC-TS生成系统</title>
   <link rel="stylesheet" href="./vendor/cesium/Widgets/widgets.css">
   <link rel="stylesheet" href="./src/style.css">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <strong>三维战场态势生成系统</strong>
+      <strong>三维ZC-TS生成系统</strong>
       <span class="brand-sub" id="scenarioName">加载中…</span>
     </div>
 
@@ -85,11 +79,12 @@
       </details>
 
       <details class="layer-group panel-block" open>
-        <summary>底图</summary>
+        <!-- title 里保留影像署名：Cesium 底部那条「Data attribution」长条已隐藏（按反馈），
+             而离线底图是 Esri World Imagery、其许可要求署名，所以把署名挂在这里，
+             既不占界面又随时可查。对外发布前应把它放回可见位置。 -->
+        <summary title="底图影像署名：Esri World Imagery（离线）· 天地图（在线，国家地理信息公共服务平台）">底图</summary>
         <label class="check"><input type="checkbox" id="modelTianditu" checked> 天地图（在线影像+注记）</label>
         <label class="check"><input type="checkbox" id="modelTiandituLabel" checked> 天地图注记（保证不被影像盖住）</label>
-        <!-- 在线底图状态。只说通/不通与原因，不讲操作方法（操作方法在用户手册里）。 -->
-        <div class="switch-note" id="tdtNote"></div>
         <!-- 离线影像**默认开**：它垫在天地图下面（layerRegistry z=5 < 10）。
              两者不再互斥——天地图没有瓦片的地方（离线、key 失效、瓦片在途）露出的是
              离线影像，而不是球体底色。 -->
@@ -106,7 +101,6 @@
           <input type="password" id="ionTokenInput" class="token-input"
                  placeholder="粘贴 Cesium ion access token" autocomplete="off" spellcheck="false">
           <button type="button" id="ionTokenSave" class="mini">保存令牌</button>
-          <div class="switch-note" id="ionTokenNote">未配置。</div>
         </details>
         <label class="check"><input type="checkbox" id="modelPlaces" checked> 地名</label>
         <label class="check"><input type="checkbox" id="modelWeather"> 气象模型</label>
