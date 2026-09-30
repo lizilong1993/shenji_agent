@@ -1863,13 +1863,11 @@ function setBuildingsOnline(on) {
  *
  * 原先把它写成 `#ionTokenNote` 里的一整句「状态：连接失败（无法加载在线实景：等待
  * Cesium ion 超时（12 秒）：本机可能无法访问 Google 瓦片服务）」。按"去掉界面上的
- * 说明性文字"的要求移除：**状态仍然可见**——输入框会在失败时标红（`.bad`），
- * `SituationHost.debugLayers()` / `Buildings3D.debug()` 里有完整的 phase 与 detail。
- * 留着这一句会让「底图」面板多出两行没人读的解释，而它要回答的问题只有一个：通了没有。
+ * 说明性文字"的要求移除；随后令牌输入框也整块删了（token 改由 .env 提供），
+ * 所以现在**只剩控制台一条出口**——`Buildings3D.debug()` 里有完整的 phase 与 detail。
+ * 界面上不再有"在线实景通没通"的任何指示，这是移除令牌 UI 的必然结果。
  */
 function syncBuildingsOnlineNote(info) {
-  const box = document.getElementById('ionTokenInput');
-  if (box) box.classList.toggle('bad', info.phase === 'failed');
   if (info.phase === 'failed') {
     console.warn('[ion] 在线实景连接失败：' + (info.detail || ''));
   }
@@ -2376,29 +2374,42 @@ function probeTiandituStatus() {
     if (level === 'warn') console.warn('[tdt] ' + text);
     else console.info('[tdt] ' + text);
   };
+  /**
+   * 天地图不可用时，把离线影像层**自动打开**兜底。
+   *
+   * 离线层现在默认关（默认底图是天地图 + 注记，画面才统一）。但默认关掉它就丢掉了
+   * 上一轮刚补上的兜底：key 一挂、或者断网，整张底图会重新变成球体底色 rgb(0,0,128)
+   * ——就是之前"底图变深蓝"那个症状。所以探活失败时在这里自动打开它，并把复选框
+   * 同步勾上，让界面与实际一致（否则用户会看到"没勾却在显示"的假状态）。
+   */
+  const fallbackToOffline = function (why) {
+    report('天地图不可用，已自动启用离线影像兜底：' + why, 'warn');
+    const box = document.getElementById('modelImagery');
+    if (box && !box.checked) box.checked = true;
+    setImagery(true);
+  };
   fetch('/api/tdt/status', { cache: 'no-store' })
     .then(function (r) { return r.ok ? r.json() : null; })
     .catch(function () { return null; })
     .then(function (st) {
       if (st && st.configured === false) {
-        report('未配置天地图 key：把 TIANDITU_KEY 写进仓库根目录的 .env，'
-          + '重启服务后生效。当前底图为离线影像。', 'warn');
+        fallbackToOffline('服务端未配置 TIANDITU_KEY');
         return null;
       }
       return OfflineAssets.probeTianditu().then(function (res) {
         if (res.ok) {
           report('天地图可用（经服务端代理取瓦片，key 存于 .env，不下发到浏览器）。');
         } else {
-          report('天地图取瓦片失败（HTTP ' + res.status
-            + (res.reason ? '：' + res.reason : '') + '）。当前显示的是离线影像。'
-            + '常见原因：301005 key 已被禁用 / 429 配额耗尽 / 301012·301013 key 类型与'
-            + '调用方式不符。', 'warn');
+          fallbackToOffline('HTTP ' + res.status
+            + (res.reason ? '：' + res.reason : '')
+            + '（常见原因：301005 key 已被禁用 / 429 配额耗尽 / '
+            + '301012·301013 key 类型与调用方式不符）');
         }
         return null;
       });
     })
     .catch(function (e) {
-      report('状态检查失败：' + (e && e.message ? e.message : e), 'warn');
+      fallbackToOffline('状态检查失败 ' + (e && e.message ? e.message : e));
     });
 }
 
@@ -3289,28 +3300,13 @@ function bindUI() {
   // 诊断改为按需查询 SituationHost.health()；`?scene=` 深链仍然可用（sceneDoc 未动），
   // 只是不再有顶栏按钮来生成它。
 
-  // ion 令牌输入：保存到服务端 web/data/ion.json（该文件被 gitignore）。
-  // 输入框里的值**不回显**到任何提示里；成功/失败的反馈走输入框自身的 ok/bad 样式
-  // 与控制台，不再写界面文字（按"去掉说明性文字"的要求）。
-  const ionSave = document.getElementById('ionTokenSave');
-  const ionInput = document.getElementById('ionTokenInput');
-  if (ionSave && ionInput && window.Buildings3D) {
-    ionSave.addEventListener('click', function () {
-      const v = (ionInput.value || '').trim();
-      window.Buildings3D.saveToken(v).then(function () {
-        ionInput.value = '';
-        ionInput.classList.remove('bad');
-        ionInput.classList.add('ok');
-        // 令牌换了以后旧的失败状态不该继续留着，否则会一直保留上一次的报错。
-        window.Buildings3D.forgetToken();
-        if (checkboxOn('modelBuildingsOnline')) setBuildingsOnline(true);
-      }).catch(function (e) {
-        ionInput.classList.remove('ok');
-        ionInput.classList.add('bad');
-        if (note) note.textContent = '保存失败：' + (e && e.message ? e.message : e);
-      });
-    });
-  }
+  // Cesium ion 令牌的**输入与保存**已随 UI 块一起移除：token 现在只从服务端 .env 的
+  // CESIUM_ION_TOKEN 读取，前端通过 /api/ion/token 取用（buildings3d.js 负责）。
+  // 服务端的 POST 写入接口也一并删掉——唯一的调用方就是那个按钮，留着就是死代码。
+  //
+  // 附带修掉一个潜在 ReferenceError：原处理器 catch 分支里写了 `if (note) …`，
+  // 而 `note`（#ionTokenNote）在上一轮移除说明文字时已经删掉，一旦保存失败就会抛。
+  // 整块移除后这个问题自然消失。
 
   // 在线实景是默认图层（index.html 里 checked）：HTML 的 checked 同样不会触发
   // change，而它又不像天地图那样在 initViewer 里已经建好，所以必须显式跑一次。

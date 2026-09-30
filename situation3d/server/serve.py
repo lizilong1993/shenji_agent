@@ -319,22 +319,19 @@ ION_ASSET_ID = 2275207
 ION_CONFIG_PATH = os.path.join(WEB_ROOT, "data", "ion.json")
 
 
-def _b64url_decode(seg):
-    """
-    Decode one base64url JWT segment. Standard library only (no `jwt` package).
-    """
-    seg = seg.replace("-", "+").replace("_", "/")
-    seg += "=" * (-len(seg) % 4)
-    return base64.b64decode(seg.encode("ascii"))
-
-
 def read_ion_token():
     """
     Return the configured token, or None. Never raises.
 
-    `.env` 里的 `CESIUM_ION_TOKEN` 优先于 web/data/ion.json：key 统一从 .env 读之后，
-    这里是"配置"与"界面上临时填的"两条路，前者应当赢——否则 .env 改了却不生效，
-    比没有 .env 更让人困惑。ion.json 保留为兼容路径（界面上的保存钮写的就是它）。
+    `.env` 里的 `CESIUM_ION_TOKEN` 优先于 `web/data/ion.json`：key 统一从 .env 读之后，
+    "配置"与"历史遗留文件"两条路里前者应当赢——否则 .env 改了却不生效，比没有 .env
+    更让人困惑。ion.json 保留为兼容读取（旧部署可能还在用），但界面上已经没有写它的
+    入口了（令牌输入框与保存按钮已随 UI 精简移除）。
+
+    ⚠ 这个函数被 `/api/ion/status`、`/api/ion/token` 与 `/api/health` 三处调用。
+    它曾被按行号范围删"死代码"时误删过一次（连同 `_b64url_decode` / `write_ion_token` /
+    `validate_ion_token` 一起），结果三个接口全部 NameError。**教训：删代码前先按名字
+    grep 全部调用点，不要凭"这一段看起来都是 ion 相关"就整段删。**
     """
     from_env = env("CESIUM_ION_TOKEN")
     if from_env:
@@ -346,60 +343,6 @@ def read_ion_token():
         return None
     token = data.get("token") if isinstance(data, dict) else None
     return token if isinstance(token, str) and token.strip() else None
-
-
-def write_ion_token(token):
-    """Persist the token. 0600 + best-effort directory: it is a credential."""
-    d = os.path.dirname(ION_CONFIG_PATH)
-    if not os.path.isdir(d):
-        os.makedirs(d)
-    tmp = ION_CONFIG_PATH + ".tmp"
-    # Beware umask: create with restrictive mode, then write.
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    try:
-        with os.fdopen(fd, "w") as fh:
-            json.dump({"token": token, "_comment":
-                       "Cesium ion access token for ion asset %d "
-                       "(Google Photorealistic 3D Tiles). Ignored by git." % ION_ASSET_ID,
-                       "assetId": ION_ASSET_ID}, fh, indent=2)
-    except Exception:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-    os.replace(tmp, ION_CONFIG_PATH)
-    try:
-        os.chmod(ION_CONFIG_PATH, 0o600)
-    except OSError:
-        pass
-
-
-def validate_ion_token(token):
-    """Loose sanity check: shape, issuer, and not-expired.
-
-    Deliberately does not call the ion API -- this only guards against a typo
-    or an unrelated JWT being saved. The real check is ion answering 401 when
-    the layer tries to load.
-    """
-    if not isinstance(token, str):
-        return "令牌必须是字符串"
-    parts = token.strip().split(".")
-    if len(parts) != 3 or not all(parts):
-        return "不是合法的 JWT（应为三段，用点分隔）"
-    try:
-        payload = json.loads(_b64url_decode(parts[1]).decode("utf-8"))
-    except Exception:  # noqa: BLE001 - any decode failure means "not a JWT"
-        return "JWT 载荷无法解码"
-    if not isinstance(payload, dict):
-        return "JWT 载荷不是对象"
-    iss = str(payload.get("iss") or "")
-    if "cesium.com" not in iss:
-        return "这个 JWT 的签发者不是 Cesium ion（iss=%s）" % (iss or "缺失")
-    exp = payload.get("exp")
-    if isinstance(exp, (int, float)) and exp < time.time():
-        return "令牌已过期（exp=%d）" % int(exp)
-    return None
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -655,32 +598,16 @@ class Handler(SimpleHTTPRequestHandler):
         })
 
     def _api_post(self, path):
-        if path != "/api/ion/token":
-            self._send_json({"error": "未知接口"}, 404)
-            return
-        # The server binds 0.0.0.0, and this endpoint writes a credential, so
-        # do not accept writes from the network -- only from the operator on
-        # the box itself. Remote deployments seed web/data/ion.json instead.
-        if not self._is_loopback(self.client_address[0]):
-            self._send_json({
-                "error": "仅允许本机写入令牌；远程请直接写 web/data/ion.json",
-            }, 403)
-            return
-        body = self._read_json_body()
-        token = (body or {}).get("token") if isinstance(body, dict) else None
-        if not token:
-            self._send_json({"error": "请求体缺少 token 字段"}, 400)
-            return
-        why = validate_ion_token(token)
-        if why:
-            self._send_json({"error": why}, 400)
-            return
-        try:
-            write_ion_token(token.strip())
-        except OSError as e:
-            self._send_json({"error": "写入失败：%s" % e}, 500)
-            return
-        self._send_json({"ok": True, "assetId": ION_ASSET_ID})
+        # 令牌写入接口已移除：ion token 现在只从 `.env` 的 CESIUM_ION_TOKEN 读取，
+        # 界面上那个输入框与「保存令牌」按钮也已删掉。唯一的调用方消失后，这条写入
+        # 路径就是死代码——留着它等于留一个能改凭据的接口，没有必要。
+        #
+        # GET /api/ion/token **保留**：前端 buildings3d.js 靠它取 token。
+        # 换 token 的方式：改 .env 的 CESIUM_ION_TOKEN，重启服务。
+        self._send_json({
+            "error": "令牌写入接口已移除：请改 .env 的 CESIUM_ION_TOKEN 后重启服务",
+        }, 404)
+        return
 
     def _tdt_tile(self):
         """
