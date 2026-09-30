@@ -105,133 +105,43 @@
   }
 
   /**
-   * 目标面板顶部的「意图摘要」块。
+   * 目标意图栏的内容：**只有意图集合与每个意图的置信度**。
    *
-   * 这是本次 UI 改造的核心：ZHY 关注的是"这个目标在干什么"，所以意图集合放在
-   * 面板最上方、用最大字号；一/二/三级细节降级到下方折叠区。
+   * 按反馈收敛。这里原先还有：模型版本与 |C|、证据不足度 u 与判定阈值 δ、
+   * 「多个意图证据强度相当…」的叙述、状态徽章（存在歧义等）、「判定依据」折叠块，
+   * 以及按父类分组的主/次列表。那些是给算法调试看的；这一栏要回答的只有两件事——
+   * **可能是哪几个意图、各有多可信**。
+   *
+   * 完整判据没有丢：仍在数据集的 `intent_set[].evidence` 里，需要时从 API 或
+   * `SituationHost` 取，不占界面。
+   *
+   * 空集合仍要显式说明一句，否则一片空白会被当成界面坏了。那不是"说明性文字"，
+   * 而是结论本身：22 种意图里有 6 种因缺战场态字段（bridge_* 恒为 0）无法推导。
    */
   function renderIntentBlock(entry, def) {
-    if (!entry) {
-      return '<div class="tp-intent"><div class="tpi-head">意图</div>' +
-        '<div class="tpi-empty">该帧没有该目标的意图判定数据。</div></div>';
+    var set = (entry && entry.intent_set) || [];
+    if (!set.length) {
+      return '<div class="tpi-empty">无可支持的意图</div>';
     }
-    var set = entry.intent_set || [];
-    var st = entry.intent_status;
-    var prim = set.filter(function (e) { return e.role !== 'secondary' && !isSecondaryOnly(e.code); });
-    var sec = set.filter(function (e) { return e.role === 'secondary' || isSecondaryOnly(e.code); });
-
-    // 模型与规则两条链路给分数字段不同名：CES 模型给 `score`（概率），
-    // 规则给 `weight`。早先只读 `weight`，于是走模型时置信度永远显示 0%——
-    // 一个看起来"没坏"但完全错误的读数。这里两者都认。
+    // 模型链路给 `score`（概率），规则链路给 `weight`；两者都认——早先只读 weight，
+    // 于是走模型时置信度永远显示 0%，是个看起来没坏、实际完全错误的读数。
     function scoreOf(e) {
       if (!e) return 0;
       if (typeof e.score === 'number') return e.score;
       if (typeof e.weight === 'number') return e.weight;
       return 0;
     }
-
-    var isModel = entry.intent_source === 'model';
-    var setSize = (typeof entry.intent_set_size === 'number')
-      ? entry.intent_set_size : set.length;
-
-    var html = '<div class="tp-intent">';
-
-    // ---- 主导意图：一行，最大字号 ----
-    html += '<div class="tpi-head">战术意图'
-      + '<span class="tpi-src">'
-      + (isModel
-          ? '模型 ' + esc(entry.model_version || '') + ' · |C|=' + setSize
-          : '规则（模型未加载）')
-      + '</span></div>';
-
-    if (prim.length) {
-      var top = prim[0];
-      html += '<div class="tpi-primary">' + esc(nameZh(top.code)) + '</div>';
-      html += '<div class="tpi-sub">' + esc(parentZh(top.code))
-        + ' · ' + (isModel ? '模型概率 ' : '规则权重 ')
-        + Math.round(scoreOf(top) * 100) + '%'
-        + (top.approximated ? ' · 近似判据' : '') + '</div>';
-    } else if (setSize > 1) {
-      // 集合非空但都是次要意图：说清"还没有主意图"，而不是显示"未判定"。
-      html += '<div class="tpi-primary tpi-primary-none">尚未确定主意图</div>';
-      html += '<div class="tpi-sub">|C|=' + setSize + '，当前只有次要意图候选</div>';
-    } else if (st) {
-      var si = statusInfo(st);
-      html += '<div class="tpi-primary tpi-primary-none">'
-        + esc(si ? si.zh : st) + '</div>';
-      html += '<div class="tpi-sub">' + esc(si ? si.note : '') + '</div>';
-    } else {
-      html += '<div class="tpi-primary tpi-primary-none">未判定</div>';
-    }
-
-    // ---- 集合收缩：|C| 越小越接近结论 ----
-    if (isModel) {
-      html += '<div class="tpi-setbar">候选集合 <b>|C| = ' + setSize + '</b>';
-      if (setSize === 0) {
-        html += '（证据不足，无可支持意图）';
-      } else if (setSize === 1) {
-        html += '（已收敛到唯一意图）';
-      } else {
-        html += '（' + setSize + ' 个候选仍无法区分）';
-      }
-      html += '</div>';
-      if (typeof entry.insufficiency === 'number') {
-        html += '<div class="tpi-sub">证据不足度 u = '
-          + entry.insufficiency.toFixed(3)
-          + ' · 判定阈值 δ = '
-          + (typeof entry.delta === 'number' ? entry.delta.toFixed(3) : '—')
-          + '</div>';
-      }
-      if (entry.intent_carried) {
-        // 步长采样：这一帧沿用上一次评分。不标注会让人以为每帧都在重新判定。
-        html += '<div class="tpi-carry">沿用第 '
-          + (entry.intent_eval_tick !== undefined ? entry.intent_eval_tick : '?')
-          + ' 帧的判定（按步长采样）</div>';
-      }
-    }
-
-    // ---- 状态徽章（与威胁度配色分开） ----
-    if (st) {
-      var si2 = statusInfo(st);
-      html += '<span class="tpi-badge ' + esc(si2 ? si2.cls : 'ist-unknown') + '">'
-        + esc(si2 ? si2.zh : st) + '</span>';
-      if (st === 'AMBIGUOUS') {
-        html += '<div class="tpi-note">多个意图证据强度相当。等决定性证据出现后集合会收缩，'
-          + '这与模型结论一致。</div>';
-      }
-    }
-
-    // ---- 意图集合，按父类分组 ----
-    if (set.length > 1) {
-      html += '<div class="tpi-set-title">意图集合（' + set.length + '）</div>';
-      html += renderGrouped(prim, sec);
-    } else if (set.length === 1 && prim.length) {
-      html += '<div class="tpi-set-title">意图集合（1）</div>';
-      html += renderGrouped(prim, sec);
-    }
-
-    // ---- 证据 ----
-    var all = prim.concat(sec);
-    if (all.length) {
-      html += '<details class="tpi-evidence"><summary>判定依据</summary>';
-      all.forEach(function (e) {
-        html += '<div class="tpi-ev-item"><b>' + esc(nameZh(e.code)) + '</b>';
-        (e.evidence || []).forEach(function (line) {
-          html += '<div class="tpi-ev-line">· ' + esc(line) + '</div>';
-        });
-        html += '</div>';
-      });
-      html += '</details>';
-    }
-
-    // ---- 判不出来时，说清缺什么 ----
-    var miss = entry.missing_evidence || [];
-    if (!set.length) {
-      html += '<div class="tpi-missing">本系统无法判定该类意图所需证据';
-      if (miss.length) html += '：' + esc(miss.join('；'));
-      html += '。</div>';
-    }
-    html += '</div>';
+    // 按置信度降序：读的人第一个看到的应该是最可能的那个。
+    var rows = set.slice().sort(function (a, b) { return scoreOf(b) - scoreOf(a); });
+    var html = '';
+    rows.forEach(function (e) {
+      var pct = Math.round(scoreOf(e) * 100);
+      html += '<div class="tpi-row">'
+        + '<span class="tpi-name">' + esc(nameZh(e.code)) + '</span>'
+        + '<span class="tpi-bar"><i style="width:' + pct + '%"></i></span>'
+        + '<span class="tpi-pct">' + pct + '%</span>'
+        + '</div>';
+    });
     return html;
   }
 

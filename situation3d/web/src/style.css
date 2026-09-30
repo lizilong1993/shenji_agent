@@ -1375,5 +1375,44 @@ select {
   margin-left: 3px;
 }
 
+/* ---------------- 目标意图栏：只有「意图 + 置信度」的紧凑列表 ----------------
+   按反馈把这一栏收敛成"可能是哪几个意图、各有多可信"两件事。每行 = 意图名 +
+   置信度条 + 百分比，按置信度降序。 */
+.tpi-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2.5px 0;
+}
+.tpi-row .tpi-name {
+  flex: 0 0 auto;
+  min-width: 62px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.tpi-row .tpi-bar {
+  flex: 1 1 auto;
+  height: 7px;
+  border-radius: 3px;
+  background: #e6ecf4;
+  overflow: hidden;
+}
+.tpi-row .tpi-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+.tpi-row .tpi-pct {
+  flex: 0 0 34px;
+  text-align: right;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  margin-left: 0;
+}
+
 /* 作战阶段（.rl-phase）的配色在 .region-level 那一节里定义——横幅移除后这里不再有
    第二份 .lb-phase 规则。 */
