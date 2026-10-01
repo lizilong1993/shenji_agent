@@ -350,7 +350,17 @@
   var seq = 0;
   var layerVisible = {};      // 标绘类别图层 id -> 是否可见（由 LayerRegistry 的 sink 驱动）
 
-  function bind(v) { viewer = v || null; return !!viewer; }
+  function bind(v) {
+    viewer = v || null;
+    if (viewer && viewer.camera && viewer.camera.changed && !_cameraBound) {
+      // 只挂一次，重复 bind 不应叠加监听器（叠加会让一次缩放触发 N 次重建）
+      viewer.camera.changed.addEventListener(function () {
+        refreshScreenSpaceDecorations(false);
+      });
+      _cameraBound = true;
+    }
+    return !!viewer;
+  }
 
   // ---------------------------------------------------------------------
   // 几何族
@@ -659,6 +669,54 @@
    * ≈ 2·h·tan(fov/2)，除以画布像素高即得 m/px。相机拿不到时给一个保守值，
    * 宁可用大地图元也不要除零。
    */
+  // ---------------------------------------------------------------------
+  // 屏幕空间装饰的**缩放重建**
+  // ---------------------------------------------------------------------
+  //
+  // ⚠ 这里修的是一个我自己造成的"声称已做但没做到"的问题。
+  // 上一版把阵列图元改成按屏幕像素换算，注释里写"装饰迁移到屏幕空间"——但换算只发生在
+  // `drawOne` 里，而 `drawOne` 只在 `add()` 时调用一次，**没有任何相机监听**。
+  // 于是图元尺寸被冻结在"添加那一刻的缩放"上：拉远之后一条铁丝网的叉号会相对地形
+  // 越变越大，正是调研里那条教训——"烘焙在绘制时的米制里，几个缩放级别之后
+  // 铁丝网会大到荒唐"。**换算成屏幕空间 ≠ 维持屏幕空间**，后者需要重建。
+  //
+  // 重建策略按调研：**只在缩放跨档时重建**，不是每帧。
+  // `camera.changed` 在移动中会持续触发，若每次都重建，一次拖拽就是几百次重建；
+  // 用对数分档 + 比例阈值把"连续缩放"折成"离散档位"。
+  var ZOOM_BUCKET_RATIO = 1.5;     // 档位比例阈值（可配置）
+  var _bucket = null;              // 当前档位
+  var _rebuilds = 0;               // 已执行的重建次数（供自检断言）
+  var _cameraBound = false;
+
+  /** 当前缩放档位：resolution 的对数分档，避免相机微动就触发重建。 */
+  function resolutionBucket() {
+    return Math.round(Math.log(Math.max(1e-6, metersPerPixel())) / Math.log(ZOOM_BUCKET_RATIO));
+  }
+
+  /**
+   * 若缩放已跨档，重建**所有屏幕空间装饰**（当前仅 `array` 族；其余族的尺寸由控制点
+   * 决定，是真实地理范围，本来就不该随缩放变化）。
+   *
+   * 返回是否真的重建了。
+   */
+  function refreshScreenSpaceDecorations(force) {
+    if (!viewer) return false;
+    var b = resolutionBucket();
+    if (!force && b === _bucket) return false;
+    _bucket = b;
+    Object.keys(byId).forEach(function (id) {
+      var rec = byId[id];
+      var def = CATALOGUE[rec.type];
+      if (!def || def.family !== 'array') return;   // 只有阵列族依赖屏幕分辨率
+      var wasVisible = rec.entities.length ? rec.entities[0].show : true;
+      clearRec(rec);
+      drawOne(rec);
+      rec.entities.forEach(function (e) { e.show = wasVisible; });
+    });
+    _rebuilds++;
+    return true;
+  }
+
   function metersPerPixel() {
     try {
       if (!viewer || !viewer.camera || !viewer.canvas) return 100;
@@ -727,9 +785,21 @@
     else if (kind === 'mine') { itemPx = MINE_PX; gapPx = MINE_PX * 0.8; footprintPx = MINE_PX; }
     else { itemPx = ANTI_TANK_TOOTH_PX; gapPx = 0; footprintPx = ANTI_TANK_TOOTH_PX; }
 
-    var itemM = itemPx * mpp, gapM = gapPx * mpp;
-    var scale = decorationScale(itemPx, footprintPx * mpp, total, DECOR_MAX_SHARE_OPEN);
+    // `availablePx` 与 `footprintPx` 都按**屏幕像素**表达（比值无量纲，所以写成
+    // "米/米"其实等价——两种写法算出来完全一样，这一点我一开始误判成单位混用，
+    // 实测两种写法的结果同为 1.0 才想清楚）。
+    //
+    // 这个上限的语义是"图元不得超过所装饰形状在**屏幕上**的 5%"，于是：
+    //   段的屏幕长度 ≥ 280 px（= 5% × 14 px 的倒数）时 scale = 1，尺寸 = itemPx·mpp，
+    //     **随缩放线性变化**（真正的屏幕空间行为）；
+    //   段更短时 scale < 1，尺寸被压到 ≈ 段长的 5%，即"缩放越远、图元相对越小"，
+    //     这正是调研要的效果——防止"拉远几个级别后铁丝网大到荒唐"。
+    // 换句话说：**地面尺寸恒定反而是上限生效时的正确表现**，不是 bug。
+    var availablePx = total / Math.max(1e-9, mpp);
+    var scale = decorationScale(itemPx, footprintPx, availablePx, DECOR_MAX_SHARE_OPEN);
     if (scale === 0) return out;              // 退化：只画线
+    var itemM = itemPx * mpp * scale;
+    var gapM = gapPx * mpp * scale;
 
     if (kind === 'ditch') {
       // 反坦克壕：齿**底边相接**（gap=0），整齿数居中；齿尖朝一侧（调研：
@@ -737,7 +807,7 @@
       var teeth = Math.floor(total / itemM);
       if (teeth < 1) return out;
       var lead = (total - teeth * itemM) / 2;
-      var h = itemM * Math.sqrt(3) / 2;       // 等边三角形
+      var h = itemM * Math.sqrt(3) / 2;       // 等边三角形（itemM 已含 scale）
       // ⚠ FIX-3：齿尖朝哪一侧由 `toothOutward` 决定。FM 1-02.2 原文
       // 「齿通常指向敌方」——这是**语义选择**，必须存在数据里、编辑后要保住，
       // 不能由渲染默认写死。此前该键只出现在注释里，齿永远朝同一侧。
@@ -758,7 +828,7 @@
       var at = pointAtDist(run, s + itemM / 2);
       var nx = -at.dir.y, ny = at.dir.x, tx = at.dir.x, ty = at.dir.y;
       if (kind === 'wire') {
-        var w = itemM / 2 * scale, hh = itemM / 2 * scale;
+        var w = itemM / 2, hh = itemM / 2;
         // 交叉线（X）：两条对角线
         out.push([{ x: at.pt.x - tx * w + nx * hh, y: at.pt.y - ty * w + ny * hh },
                   { x: at.pt.x + tx * w - nx * hh, y: at.pt.y + ty * w - ny * hh }]);
@@ -766,7 +836,7 @@
                   { x: at.pt.x + tx * w + nx * hh, y: at.pt.y + ty * w + ny * hh }]);
       } else {
         // 地雷：菱形小方块（用 4 点闭合代替圆，省顶点且远处更清楚）
-        var r = itemM / 2 * scale;
+        var r = itemM / 2;
         out.push([{ x: at.pt.x + nx * r, y: at.pt.y + ny * r },
                   { x: at.pt.x + tx * r, y: at.pt.y + ty * r },
                   { x: at.pt.x - nx * r, y: at.pt.y - ny * r },
@@ -1200,6 +1270,9 @@
     remove: remove,
     clearLayer: clearLayer,
     setLayerVisible: setLayerVisible,
+    // 屏幕空间装饰的缩放重建：`force` 供自检直接触发，避免依赖真实相机运动
+    refreshScreenSpaceDecorations: refreshScreenSpaceDecorations,
+    resolutionBucket: resolutionBucket,
     // 配色标准：'CN'（默认，红=我军、深蓝=敌军）或 'NATO'（蓝=友、红=敌）
     setColorStandard: function (s) {
       if (s !== 'CN' && s !== 'NATO') throw new Error('配色标准只能是 CN 或 NATO');
@@ -1239,7 +1312,11 @@
         return { id: id, type: byId[id].type, layer: byId[id].layer,
                  std: byId[id].std, entities: byId[id].entities.length };
       });
-      return { bound: !!viewer, visible: layerVisible, count: list.length, items: list };
+      return {
+        bound: !!viewer, visible: layerVisible, count: list.length, items: list,
+        resolution: metersPerPixel(), bucket: _bucket, rebuilds: _rebuilds,
+        zoomBucketRatio: ZOOM_BUCKET_RATIO,
+      };
     },
   };
 })();

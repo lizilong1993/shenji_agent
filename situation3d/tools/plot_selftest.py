@@ -246,6 +246,53 @@ PROBE = r"""
       return { dashed: matOf('phase_line', true), solid: matOf('phase_line', false) };
     })()
   };
+  // 8. OPT-3 回归：屏幕空间装饰的缩放重建
+  out.screen = (function () {
+    var A = [119.4, 24.2], B = [120.6, 25.0];
+    var origin = G.toPlane([A], A)[0];
+    var run = G.toPlane([A, B], A);
+    function markSpan(mpp) {
+      var marks = G.decorAlongRun(run, 'wire', mpp, {});
+      if (!marks.length) return null;
+      var m = marks[0];
+      return Math.hypot(m[1].x - m[0].x, m[1].y - m[0].y);
+    }
+    // 两个区间都要测，因为 `share` 上限在长段上会生效、在短段上不生效：
+    //   mpp = 200/400 时段长约 750/376 px，5% 上限 > 图元像素尺寸 → 不触顶
+    //   mpp = 1000/2000 时段长约 150/75 px → 触顶，地面尺寸被压住
+    var sA = markSpan(200), sB = markSpan(400);
+    var sC = markSpan(1000), sD = markSpan(2000);
+    var runM = 0;
+    for (var i = 1; i < run.length; i++) runM += Math.hypot(run[i].x - run[i - 1].x, run[i].y - run[i - 1].y);
+    return {
+      mpp_finite: (function () { var v = G.metersPerPixel(); return isFinite(v) && v > 0; })(),
+      uncapped_ratio: (sA && sB) ? (sB / sA) : null,
+      run_m: runM,
+      // 触顶时：屏幕尺寸应 ≈ 段长屏幕像素的 5%
+      capped_px_at_2000: sD ? (sD / 2000) : null,
+      // ⚠ 期望值要乘 √2：`markSpan` 量的是铁丝网 **X 的一条对角线**，而
+      // `itemPx * scale` 是那条边的分量（w = itemM/2, hh = itemM/2）——
+      // 对角线长 = 2·√(w²+hh²) = itemM·√2。第一版漏了这个因子，把正确的实现判成失败。
+      capped_expected_px_at_2000: (runM / 2000) * 0.05 * Math.SQRT2,
+      // 同一档位内重复调用不应重建；强制重建应生效并计数
+      no_rebuild_same_bucket: Plotting.refreshScreenSpaceDecorations(false) === false,
+      forced_rebuild: Plotting.refreshScreenSpaceDecorations(true) === true,
+      debug_has_bucket: (function () {
+        var d = Plotting.debug();
+        return typeof d.bucket === 'number' && typeof d.rebuilds === 'number' && d.rebuilds >= 1;
+      })(),
+      // 强制重建后，已存在实例的图元数不应变化（重建是幂等的）
+      idempotent: (function () {
+        var r = Plotting.add({ type: 'wire_fence', layer: 'plot.defense',
+                               points: [[119.4, 24.2], [120.6, 25.0]] });
+        var before = r.entities.length;
+        Plotting.refreshScreenSpaceDecorations(true);
+        var after = r.entities.length;
+        Plotting.remove(r.id);
+        return { before: before, after: after };
+      })()
+    };
+  })();
   return out;
 })()
 """
@@ -372,6 +419,29 @@ def main() -> int:
           lm.get("dashed") is True, "got %r" % lm.get("dashed"))
     check("FIX-2: no dash -> NOT dashed material",
           lm.get("solid") is False, "got %r" % lm.get("solid"))
+
+    print("8. OPT-3 -- screen-space decorations rebuild on zoom")
+    sc = d.get("screen") or {}
+    check("OPT-3: metersPerPixel finite and positive",
+          sc.get("mpp_finite") is True, "got %r" % sc.get("mpp_finite"))
+    ur = sc.get("uncapped_ratio")
+    check("OPT-3: below the cap, ground size scales with resolution (x2 -> ~2x)",
+          ur is not None and 1.8 <= ur <= 2.2, "ratio %r" % ur)
+    got_px = sc.get("capped_px_at_2000")
+    want_px = sc.get("capped_expected_px_at_2000")
+    check("OPT-3: above the cap, screen size is held to ~5% of the run",
+          got_px is not None and want_px and abs(got_px - want_px) / want_px < 0.15,
+          "got %.3f px, expected %.3f px" % (got_px or -1, want_px or -1))
+    check("OPT-3: no rebuild while inside the same zoom bucket",
+          sc.get("no_rebuild_same_bucket") is True, "got %r" % sc.get("no_rebuild_same_bucket"))
+    check("OPT-3: forced rebuild reports true",
+          sc.get("forced_rebuild") is True, "got %r" % sc.get("forced_rebuild"))
+    check("OPT-3: debug exposes bucket and rebuild count",
+          sc.get("debug_has_bucket") is True, "got %r" % sc.get("debug_has_bucket"))
+    idem = sc.get("idempotent") or {}
+    check("OPT-3: rebuild is idempotent (entity count unchanged)",
+          idem.get("before") is not None and idem.get("before") == idem.get("after"),
+          "before=%r after=%r" % (idem.get("before"), idem.get("after")))
 
     print()
     if FAILURES:
