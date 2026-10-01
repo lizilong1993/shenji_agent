@@ -33,11 +33,10 @@ window.genSymbols = function (specs) {
   var out = {};
   for (var i = 0; i < specs.length; i++) {
     var s = specs[i];
-    var opts = { size: s.size || 40, padding: (s.padding === undefined ? 12 : s.padding) };
-    if (s.selected) {
-      opts.outlineWidth = 6;
-      opts.outlineColor = '#ffd400';
-    }
+    // 样式完全由 gen_symbols.py 通过 s.opts 传入：配色、线宽、是否画帧内图形
+    // （`icon:false` —— 帧内图形改用 game-icons 的专业绘制件，由 Python 侧注入）
+    // 都在这一个对象里，页面本身不再持有任何"审美决定"。
+    var opts = s.opts || { size: s.size || 40 };
     var sym = new window.ms.Symbol(s.sidc, opts);
     out[s.name] = {
       svg: sym.asSVG(),

@@ -85,6 +85,94 @@ AFFILIATIONS = {"red": "6", "blue": "3"}
 SIZE = 40
 PADDING = 12
 
+# ---------------------------------------------------------------------------
+# 观感：帧形用标准、配色用应用自己的、帧内用专业绘制的图形
+# ---------------------------------------------------------------------------
+# 为什么不再用 milsymbol 的默认外观（三个实测出来的原因）：
+#   1. 默认是北约淡彩（友方 rgb(128,224,255)、敌方 rgb(255,128,128)），在卫星影像上
+#      发白，而且与应用其它地方的 #1f5fbf / #d0342c 不一致；
+#   2. 驱逐舰/战斗机/预警机在标准里是靠**文字**辨认的（生成物里是 Arial 的 "DD"、
+#      "F"、"AEW"），不是图形；
+#   3. 整体态势栏图标只有 16px，那行文字在 16px 下约 4px 高，完全是糊的。
+#
+# 所以：**帧形仍由 milsymbol 出**（它是标准权威，帧形已实测正确：敌方菱形／友方
+# 方・圆・拱／空中敌方五角形），但 `icon:false` 不画帧内图形，改由下面这张表把
+# game-icons（CC-BY-3.0）的专业绘制件注入帧内，配色换成应用自身的饱和红蓝。
+FRAME_FILL = {"blue": "#1f5fbf", "red": "#d0342c"}
+FRAME_EDGE = "#0f1720"        # 近黑描边：亮/暗影像上都能把符号从背景里分离出来
+GLYPH_FILL = "#ffffff"        # 饱和帧上，白色图形的对比最强
+
+# 平台 → game-icons 键。全部**实测存在**（game-icons 4137 个图标里查过）。
+# 注：game-icons **没有** frigate / destroyer / patrol，所以舰船四型从
+# battleship / iron-hulled-warship / interceptor-ship / cargo-ship 里各取其一；
+# 补给舰用 cargo-ship 语义上反而更贴。
+ICON_PARTS = {
+    "destroyer": "battleship",
+    "frigate": "iron-hulled-warship",
+    "replenishment": "cargo-ship",
+    "corvette": "interceptor-ship",
+    "coastal_missile": "missile-launcher",
+    "sam_battalion": "missile-pod",
+    "armor": "tank",
+    "artillery": "field-gun",
+    "fighter": "jet-fighter",
+    "aew": "radar-dish",
+}
+
+GAME_ICONS_TARBALL = "/tmp/iconprobe/gi.tgz"   # tools/fetch_icons.py 会下到这里
+
+# 帧内图形的方框（milsymbol 的画布坐标）。取 74×74 居中于 (100,100)：
+# 已按三种帧形验算：菱形在 y=63 处的半宽是 72-37=35 > 37? 临界，故取 74 略留余量；
+# 圆的半径 60 > 37√2≈52 —— 圆帧会限制到 ~84，但菱形更紧，所以以菱形为准。
+# 第一版取 56 偏保守，实测 20 个符号里 5 个白像素不足 16（火炮、岸舰导弹几乎看不见）。
+GLYPH_BOX = 74.0
+GLYPH_SRC = 512.0             # game-icons 的源坐标系
+GLYPH_ORIGIN = 100.0 - GLYPH_BOX / 2.0
+
+
+def load_icon_bodies():
+    """从 game-icons 包里读出需要的 path 数据。只用标准库（容器无 npm）。"""
+    import tarfile
+    try:
+        tar = tarfile.open(GAME_ICONS_TARBALL)
+    except OSError:
+        raise SystemExit(
+            "[gen] 缺少图标包 %s\n"
+            "      跑 tools/fetch_icons.py 下载（容器可直连 registry.npmjs.org），"
+            "或手工把 @iconify-json/game-icons 的 tgz 放到该路径。" % GAME_ICONS_TARBALL)
+    name = [n for n in tar.getnames() if n.endswith("icons.json")][0]
+    data = json.loads(tar.extractfile(name).read())
+    icons = data.get("icons", {})
+    bodies, missing = {}, []
+    for platform, key in ICON_PARTS.items():
+        node = icons.get(key)
+        if not node:
+            missing.append("%s(%s)" % (platform, key))
+            continue
+        bodies[platform] = node["body"]
+    if missing:
+        raise SystemExit("[gen] game-icons 里找不到：%s" % ", ".join(missing))
+    return bodies
+
+
+def inject_glyph(svg, body):
+    """
+    把图形塞进帧内。
+
+    game-icons 的 path 是 0 0 512 512 坐标系；用 translate+scale 映射到 GLYPH_BOX
+    的方框里。整体一个 `<g>` 设 fill，省得逐个 path 改属性。
+    """
+    s = GLYPH_BOX / GLYPH_SRC
+    # **必须替换 body 里的 `fill="currentColor"`**：Iconify 的 body 自带这个属性，
+    # 它优先级高于我加在 `<g>` 上的 fill，而没有 CSS `color` 时 currentColor 解析成
+    # **黑色**——于是图形画成黑压在饱和红蓝帧上，几乎看不见。
+    # 实测：20 个符号的白色像素数全是 0，黑色像素却有 330~510 个，就是这个原因。
+    # 同时给 `<g>` 加 `color`，把残留的 currentColor 也兜住。
+    body = body.replace('fill="currentColor"', 'fill="%s"' % GLYPH_FILL)
+    g = ('<g transform="translate(%.3f,%.3f) scale(%.6f)" fill="%s" color="%s" '
+         'stroke="none">%s</g>'
+         % (GLYPH_ORIGIN, GLYPH_ORIGIN, s, GLYPH_FILL, GLYPH_FILL, body))
+    return svg.replace("</svg>", g + "</svg>", 1)
 SVG_TAG = re.compile(r"<svg\b[^>]*>", re.I)
 VIEWBOX = re.compile(r'viewBox="([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)"', re.I)
 WH = re.compile(r'\b(width|height)="([\d.]+)"', re.I)
@@ -109,12 +197,24 @@ def specs():
     for icon, (symbol_set, entity) in PLATFORMS.items():
         for aff, digit in AFFILIATIONS.items():
             code = _sidc(digit, symbol_set, entity)
+            # 基础外观：只画帧（`icon:false`，帧内图形由 inject_glyph 注入）、
+            # 不画文字放大器（`infoFields:false`，"DD"/"F" 那些字母就是丑的根源之一）、
+            # 饱和填充 + 近黑描边。
+            base = {
+                "size": SIZE, "padding": PADDING,
+                "icon": False, "infoFields": False,
+                "fillColor": FRAME_FILL[aff],
+                "strokeWidth": 4,
+                "outlineColor": FRAME_EDGE, "outlineWidth": 2,
+            }
+            sel = dict(base)
+            # 选中态：黄色高亮环（与应用其它地方的选中色一致）
+            sel["outlineColor"] = "#ffd400"
+            sel["outlineWidth"] = 6
             out.append({"name": "%s_%s" % (icon, aff), "icon": icon,
-                        "sidc": code, "selected": False, "size": SIZE,
-                        "padding": PADDING})
+                        "sidc": code, "selected": False, "opts": base})
             out.append({"name": "%s_%s_sel" % (icon, aff), "icon": icon,
-                        "sidc": code, "selected": True, "size": SIZE,
-                        "padding": PADDING})
+                        "sidc": code, "selected": True, "opts": sel})
     return out
 
 
@@ -239,6 +339,7 @@ def main():
         raise SystemExit("[gen] 缺少 web/vendor/milsymbol/milsymbol.js，"
                          "先跑 python3 tools/fetch_milsymbol.py")
 
+    bodies = load_icon_bodies()
     spec_list = specs()
     # 生成结果是 milsymbol 的对象（svg/anchor/size/valid），不回带我们传入的 sidc，
     # 所以这里自己留一份 name -> sidc 的映射写进 manifest。
@@ -256,7 +357,10 @@ def main():
             n, s = results[nkey], results[skey]
             if not n.get("valid") or not s.get("valid"):
                 raise SystemExit("[gen] SIDC 无效：%s" % nkey)
-            nsvg, ssvg, side = normalize_pair(n["svg"], s["svg"])
+            # 先把专业图形注进帧内，再归一化两套变体的画布
+            nsvg = inject_glyph(n["svg"], bodies[icon])
+            ssvg = inject_glyph(s["svg"], bodies[icon])
+            nsvg, ssvg, side = normalize_pair(nsvg, ssvg)
             for name, svg in ((nkey, nsvg), (skey, ssvg)):
                 if not args.dry_run:
                     with open(os.path.join(OUT_DIR, name + ".svg"), "w",
