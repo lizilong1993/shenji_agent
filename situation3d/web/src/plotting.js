@@ -215,7 +215,9 @@
       algorithmFamily: 'boundary-symbolised',
       cnImplRef: '中文六仓库**均只输出裸折线**，无边界符号化实现',
       usEquivalent: { name: 'Boundary', code: '110100', spec: 'FM 1-02.2 + APP-06' },
-      params: { dash: false, teeth: false },
+      // 符号化参数：段长/短划长（米）。中文规定的分界线形制未公开，取值参考
+      // FM 1-02.2 Boundaries 的观感，可配置。
+      params: { symbolised: true, segLen: 9000, tickLen: 4500 },
     },
     coordination_line: {
       zh: '协调线', family: 'line', sourceStandard: 'CN',
@@ -545,6 +547,91 @@
     return ring;
   }
 
+  // ---------------------------------------------------------------------
+  // 边界符号化（族 H 的符号化变体）
+  // ---------------------------------------------------------------------
+  //
+  // 战斗分界线**不是一条虚线**：它按等长段交替着色（表示两侧归属），并在段的分界处
+  // 向一侧打垂直短划。调研结论：**六个中文开源仓库全部只输出裸折线，没有任何一个
+  // 实现符号化**，所以这一部分是自研；样式规则参考 FM 1-02.2 的 Boundaries（APP-06
+  // 110100）。中式《作战标图规定》对分界线形制的规定未公开，此处同样标在
+  // `sourceConfidence` 里。
+  //
+  // 关键工程点：**段长必须"贴合"整条线的长度**（dash fitting）——直接固定段长会在
+  // 末端留一段长短不一的残段，看起来像画错了。这里先求段数 n = round(L/segLen)，
+  // 再用 actual = L/n 作为实际段长，保证首尾对齐。
+
+  /** 沿折线走 d 米，返回该点与切线方向（平面坐标）。 */
+  function pointAtDist(p, d) {
+    var acc = 0;
+    for (var i = 1; i < p.length; i++) {
+      var seg = distance(p[i - 1], p[i]);
+      if (acc + seg >= d || i === p.length - 1) {
+        var t = seg > 1e-9 ? (d - acc) / seg : 0;
+        t = Math.max(0, Math.min(1, t));
+        return {
+          pt: { x: p[i - 1].x + (p[i].x - p[i - 1].x) * t,
+                y: p[i - 1].y + (p[i].y - p[i - 1].y) * t },
+          dir: seg > 1e-9 ? { x: (p[i].x - p[i - 1].x) / seg, y: (p[i].y - p[i - 1].y) / seg }
+                          : { x: 1, y: 0 },
+        };
+      }
+      acc += seg;
+    }
+    return { pt: p[p.length - 1], dir: { x: 1, y: 0 } };
+  }
+
+  /** 取折线上 [d0, d1] 区间的子折线。 */
+  function subLine(p, d0, d1) {
+    var out = [pointAtDist(p, d0).pt];
+    var acc = 0;
+    for (var i = 1; i < p.length; i++) {
+      acc += distance(p[i - 1], p[i]);
+      if (acc > d0 && acc < d1) out.push(p[i]);
+    }
+    out.push(pointAtDist(p, d1).pt);
+    return out;
+  }
+
+  /**
+   * 生成符号化边界的分件。
+   *
+   * 返回 `{ bars: [{pts, side}], ticks: [{pts, side}] }`：
+   *   bars  交替着色的实线段，`side = i % 2`（0=红方、1=蓝方）
+   *   ticks 段分界处的垂直短划，画在左侧（法向 +）
+   */
+  function symbolisedPieces(p, params) {
+    var total = wholeDistance(p);
+    var segLen = params.segLen || 8000;
+    var tickLen = params.tickLen || 4000;
+    var n = Math.max(1, Math.round(total / segLen));
+    var actual = total / n;
+    var bars = [], ticks = [];
+    for (var i = 0; i < n; i++) {
+      bars.push({ pts: subLine(p, i * actual, (i + 1) * actual), side: i % 2 });
+    }
+    // 内部段界打短划（首尾端点不打：那是端点标注的位置，另行处理）
+    for (var k = 1; k < n; k++) {
+      var at = pointAtDist(p, k * actual);
+      var nx = -at.dir.y, ny = at.dir.x;          // 左法向
+      ticks.push({ pts: [at.pt,
+        { x: at.pt.x + nx * tickLen, y: at.pt.y + ny * tickLen }], side: k % 2 });
+    }
+    return { bars: bars, ticks: ticks };
+  }
+
+  /** 在平面里算分件，再投回经纬度。 */
+  function piecesFor(typeId, lonLatPts) {
+    var def = CATALOGUE[typeId];
+    if (!def) throw new Error('未知标绘类型：' + typeId);
+    var origin = lonLatPts[0];
+    var p = toPlane(lonLatPts, origin);
+    var pcs = symbolisedPieces(p, def.params || {});
+    return {
+      bars: pcs.bars.map(function (b) { return { pts: fromPlane(b.pts, origin), side: b.side }; }),
+      ticks: pcs.ticks.map(function (b) { return { pts: fromPlane(b.pts, origin), side: b.side }; }),
+    };
+  }
   /** 在平面里按族生成环，再投回经纬度。 */
   function ringsFor(typeId, lonLatPts) {
     var def = CATALOGUE[typeId];
@@ -588,10 +675,39 @@
   function drawOne(rec) {
     if (!viewer) return 0;
     var def = CATALOGUE[rec.type];
-    var rings = ringsFor(rec.type, rec.points);
     var color = Cesium.Color.fromCssColorString(rec.color || COLOR.red);
     var isLine = def.family === 'line';
     var n = 0;
+
+    // 符号化边界：不是一条线，而是「交替色段 + 垂直短划」两组分件。必须单独走一条
+    // 渲染分支——按普通折线画会退化成一条单色线，符号化信息全丢。
+    if (isLine && def.params && def.params.symbolised) {
+      var pcs = piecesFor(rec.type, rec.points);
+      var sides = [Cesium.Color.fromCssColorString(COLOR.red),
+                   Cesium.Color.fromCssColorString(COLOR.blue)];
+      pcs.bars.forEach(function (bar) {
+        rec.entities.push(viewer.entities.add({
+          polyline: {
+            positions: bar.pts.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); }),
+            width: 4, clampToGround: true, material: sides[bar.side],
+          },
+        }));
+        n++;
+      });
+      pcs.ticks.forEach(function (tk) {
+        rec.entities.push(viewer.entities.add({
+          polyline: {
+            positions: tk.pts.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); }),
+            width: 3, clampToGround: true, material: sides[tk.side],
+          },
+        }));
+        n++;
+      });
+      if (rec.label) n += addLabel(rec);
+      return n;
+    }
+
+    var rings = ringsFor(rec.type, rec.points);
 
     rings.forEach(function (ring) {
       var positions = ring.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); });
@@ -621,23 +737,28 @@
       n++;
     });
 
-    if (rec.label) {
-      var mid = rec.points[Math.floor(rec.points.length / 2)];
-      rec.entities.push(viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(mid[0], mid[1]),
-        label: {
-          text: rec.label,
-          font: 'bold 14px "Microsoft YaHei", sans-serif',
-          fillColor: Cesium.Color.WHITE,
-          outlineColor: Cesium.Color.fromCssColorString('#0f1720'),
-          outlineWidth: 3,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        },
-      }));
-    }
+    if (rec.label) n += addLabel(rec);
     return n;
+  }
+
+  /** 控制点中点处放一个标注。抽出来是因为符号化边界分支也要用同一份样式。 */
+  function addLabel(rec) {
+    if (!viewer || !rec.label) return 0;
+    var mid = rec.points[Math.floor(rec.points.length / 2)];
+    rec.entities.push(viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(mid[0], mid[1]),
+      label: {
+        text: rec.label,
+        font: 'bold 14px "Microsoft YaHei", sans-serif',
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.fromCssColorString('#0f1720'),
+        outlineWidth: 3,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    }));
+    return 1;
   }
 
   function clearRec(rec) {
@@ -744,6 +865,9 @@
       getThirdPoint: getThirdPoint,
       getBaseLength: getBaseLength,
       getAzimuth: getAzimuth,
+      symbolisedPieces: symbolisedPieces,
+      piecesFor: piecesFor,
+      pointAtDist: pointAtDist,
     },
     debug: function () {
       var list = Object.keys(byId).map(function (id) {
