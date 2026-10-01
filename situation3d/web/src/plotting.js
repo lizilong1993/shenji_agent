@@ -162,6 +162,37 @@
       usEquivalent: { name: 'Battle Position', code: '151200', spec: 'FM 1-02.2 + APP-06' },
       params: {},
     },
+    // ---- 障碍/工程类 · 重复图元阵列族（调研：中文六仓库**全部没有实现**） ----
+    wire_fence: {
+      zh: '铁丝网', family: 'array', sourceStandard: 'CN+US',
+      sourceDoc: CN_DOC + '（图形与命名）；图元间距规则借 FM 1-02.2 / APP-06',
+      sourceConfidence: '中式分类可溯源；**间距与图元尺寸无公开规范**，取 FM 1-02.2 观感约定',
+      algorithmFamily: 'repeated-glyph-array',
+      cnImplRef: '中文六仓库均无重复图元阵列实现',
+      usEquivalent: { name: 'Wire, Single Fence', code: '290302', spec: 'FM 1-02.2 + APP-06' },
+      params: { decor: 'wire' },
+    },
+    anti_tank_ditch: {
+      zh: '反坦克壕', family: 'array', sourceStandard: 'CN+US',
+      sourceDoc: CN_DOC + '（图形与命名）；齿形与朝向借 FM 1-02.2',
+      sourceConfidence: '中式分类可溯源；齿距/齿高无公开规范（等边三角形取自美式实现）',
+      algorithmFamily: 'repeated-glyph-array',
+      cnImplRef: '中文六仓库均无实现',
+      // FM 1-02.2 原文：「齿通常指向敌方」——所以朝向是**语义选择**，
+      // 由 toothOutward 决定，必须在数据里存下来，不能由渲染默认。
+      usEquivalent: { name: 'Anti-Tank Ditch (Completed)', code: '290202', spec: 'FM 1-02.2 + APP-06' },
+      params: { decor: 'ditch', toothOutward: true },
+    },
+    mineline: {
+      zh: '布雷线', family: 'array', sourceStandard: 'CN+US',
+      sourceDoc: CN_DOC + '（图形与命名）；雷距借 APP-06',
+      sourceConfidence: '中式分类可溯源；**雷距无公开规范**（FM 1-02.2 原文明确"布设可有可无规律"，'
+        + '规范并不规定固定雷距，任何规则排布都只是图示约定）',
+      algorithmFamily: 'repeated-glyph-array',
+      cnImplRef: '中文六仓库均无实现',
+      usEquivalent: { name: 'Mineline', code: '290101', spec: 'FM 1-02.2 + APP-06' },
+      params: { decor: 'mine' },
+    },
     mined_area: {
       zh: '雷场（障碍区）', family: 'zone', sourceStandard: 'CN',
       sourceDoc: CN_DOC, sourceConfidence: CONV_CN,
@@ -582,6 +613,164 @@
   }
 
   // ---------------------------------------------------------------------
+  // 重复图元阵列（雷场 / 铁丝网 / 反坦克壕）
+  // ---------------------------------------------------------------------
+  //
+  // 三条规则全部来自调研，且都不是"好看"而是**踩过坑才定下来的**：
+  //
+  // 1. **整数量居中排布**，不用固定间距。固定间距"末端会留一段不齐的尾巴，
+  //    而且相位取决于用户当初点在哪里"——同一个障碍物画两次，纹理不一样。
+  //    做法：`count = floor((total + gap) / (item + gap))`，再把剩余量对半分到两端。
+  // 2. **在真正的转角处切段**（30° 阈值）。不切的话，转角上的图元是"按一段的走向
+  //    建的，却骑在两段的接缝上"——两边都不属于。阈值 30° 是因为矢量化出来的椭圆
+  //    是 ~50 段短弦，逐弦切段会让一个筑垒地域**一个雉堞都画不出来**。
+  // 3. **尺寸按屏幕像素算，再带一个"低于几像素就不画"的下限**。否则缩放到战区级时
+  //    图元会被放大到荒唐的程度；但**绝不能整体消失**——调研原话：
+  //    "低于几像素，齿/雉堞/波峰就不再是符号，而是笔画上的纹理，
+  //     一排 2px 的凸起读起来是毛边，不是障碍物"，
+  //    同时"图形整体消失会让用户找不到自己画的东西"，所以线本身永远画。
+  var DECOR_MIN_PX = 3;             // 低于此像素数的装饰不画（素线保留）
+  var DECOR_MAX_SHARE_OPEN = 0.05;  // 沿折线：单个图元不得超过全长的 5%
+  var DECOR_MAX_SHARE_CLOSED = 0.10; // 闭合多边形：不得超过较短边的 10%
+  var WIRE_MARK_PX = 14;            // 铁丝网图元宽度（屏幕像素）
+  var ANTI_TANK_TOOTH_PX = 30;      // 反坦克壕齿底宽（屏幕像素）
+  var MINE_PX = 18;                 // 地雷符号直径（屏幕像素）
+
+  /**
+   * 当前每屏幕像素对应多少米。
+   *
+   * 屏幕空间装饰的换算基准。用相机离地高度与画布高度推：透视相机的可视高度
+   * ≈ 2·h·tan(fov/2)，除以画布像素高即得 m/px。相机拿不到时给一个保守值，
+   * 宁可用大地图元也不要除零。
+   */
+  function metersPerPixel() {
+    try {
+      if (!viewer || !viewer.camera || !viewer.canvas) return 100;
+      var carto = viewer.camera.positionCartographic;
+      var h = carto ? carto.height : 0;
+      if (!(h > 0)) h = 100000;
+      var fovy = viewer.camera.frustum && viewer.camera.frustum.fovy
+        ? viewer.camera.frustum.fovy : (Math.PI / 3);
+      var canvasH = viewer.canvas.clientHeight || viewer.canvas.height || 800;
+      return Math.max(0.01, (2 * h * Math.tan(fovy / 2)) / canvasH);
+    } catch (e) { return 100; }
+  }
+
+  /**
+   * 沿长度 `total` 居中排布整数个图元，返回每个图元的起点。
+   * `gap` 只算图元**之间**的空隙，不算两端——这正是"居中"的含义。
+   */
+  function centredRun(total, itemLength, gap) {
+    var unit = itemLength + gap;
+    if (!(unit > 0) || !(itemLength > 0) || !(total > 0)) return [];
+    var count = Math.floor((total + gap) / unit);
+    if (count < 1) return [];
+    var startAt = (total - (count * itemLength + (count - 1) * gap)) / 2;
+    var out = [];
+    for (var i = 0; i < count; i++) out.push(startAt + i * unit);
+    return out;
+  }
+
+  /** 把折线在真正的转角处切成若干"段"，转角阈值默认 30°。 */
+  function splitAtCorners(p, cornerDeg) {
+    var th = (cornerDeg === undefined ? 30 : cornerDeg) * Math.PI / 180;
+    if (p.length < 3) return [p.slice()];
+    var runs = [], cur = [p[0]];
+    for (var i = 1; i < p.length - 1; i++) {
+      var a = p[i - 1], b = p[i], c = p[i + 1];
+      var v1 = { x: b.x - a.x, y: b.y - a.y }, v2 = { x: c.x - b.x, y: c.y - b.y };
+      var l1 = Math.hypot(v1.x, v1.y) || 1e-9, l2 = Math.hypot(v2.x, v2.y) || 1e-9;
+      var cosT = (v1.x * v2.x + v1.y * v2.y) / (l1 * l2);
+      cosT = Math.max(-1, Math.min(1, cosT));
+      if (Math.acos(cosT) > th) { cur.push(b); runs.push(cur); cur = [b]; }
+      else cur.push(b);
+    }
+    cur.push(p[p.length - 1]);
+    runs.push(cur);
+    return runs;
+  }
+
+  /**
+   * 图元缩放：按屏幕像素定基准尺寸，再按"它装饰的东西有多大"设上限，
+   * 低于可见下限返回 0（调用方据此退化为素线，而不是画一堆糊在一起的疙瘩）。
+   */
+  function decorationScale(itemPx, footprintPx, availablePx, share) {
+    if (!(availablePx > 0)) return 0;
+    var cap = (availablePx * share) / Math.max(1e-6, footprintPx);
+    var scale = Math.min(1, cap);
+    if (itemPx * scale < DECOR_MIN_PX) return 0;
+    return scale;
+  }
+
+  /** 沿一条段（平面米制）按屏幕尺寸排布图元，返回图元折线数组。 */
+  function decorAlongRun(run, kind, mpp) {
+    var total = wholeDistance(run);
+    var out = [];
+    var gapPx, itemPx, footprintPx;
+    if (kind === 'wire') { itemPx = WIRE_MARK_PX; gapPx = WIRE_MARK_PX * 1.5; footprintPx = WIRE_MARK_PX; }
+    else if (kind === 'mine') { itemPx = MINE_PX; gapPx = MINE_PX * 0.8; footprintPx = MINE_PX; }
+    else { itemPx = ANTI_TANK_TOOTH_PX; gapPx = 0; footprintPx = ANTI_TANK_TOOTH_PX; }
+
+    var itemM = itemPx * mpp, gapM = gapPx * mpp;
+    var scale = decorationScale(itemPx, footprintPx * mpp, total, DECOR_MAX_SHARE_OPEN);
+    if (scale === 0) return out;              // 退化：只画线
+
+    if (kind === 'ditch') {
+      // 反坦克壕：齿**底边相接**（gap=0），整齿数居中；齿尖朝一侧（调研：
+      // "齿通常指向敌方"，所以这是**语义选择**，由 params.toothOutward 决定）。
+      var teeth = Math.floor(total / itemM);
+      if (teeth < 1) return out;
+      var lead = (total - teeth * itemM) / 2;
+      var h = itemM * Math.sqrt(3) / 2;       // 等边三角形
+      for (var i = 0; i < teeth; i++) {
+        var a = pointAtDist(run, lead + i * itemM);
+        var b = pointAtDist(run, lead + (i + 1) * itemM);
+        var nx = -a.dir.y, ny = a.dir.x;
+        var apex = { x: (a.pt.x + b.pt.x) / 2 + nx * h, y: (a.pt.y + b.pt.y) / 2 + ny * h };
+        out.push([a.pt, b.pt, apex]);
+      }
+      return out;
+    }
+
+    // 铁丝网 / 地雷：整数量居中排布
+    var starts = centredRun(total, itemM, gapM);
+    starts.forEach(function (s) {
+      var at = pointAtDist(run, s + itemM / 2);
+      var nx = -at.dir.y, ny = at.dir.x, tx = at.dir.x, ty = at.dir.y;
+      if (kind === 'wire') {
+        var w = itemM / 2 * scale, hh = itemM / 2 * scale;
+        // 交叉线（X）：两条对角线
+        out.push([{ x: at.pt.x - tx * w + nx * hh, y: at.pt.y - ty * w + ny * hh },
+                  { x: at.pt.x + tx * w - nx * hh, y: at.pt.y + ty * w - ny * hh }]);
+        out.push([{ x: at.pt.x - tx * w - nx * hh, y: at.pt.y - ty * w - ny * hh },
+                  { x: at.pt.x + tx * w + nx * hh, y: at.pt.y + ty * w + ny * hh }]);
+      } else {
+        // 地雷：菱形小方块（用 4 点闭合代替圆，省顶点且远处更清楚）
+        var r = itemM / 2 * scale;
+        out.push([{ x: at.pt.x + nx * r, y: at.pt.y + ny * r },
+                  { x: at.pt.x + tx * r, y: at.pt.y + ty * r },
+                  { x: at.pt.x - nx * r, y: at.pt.y - ny * r },
+                  { x: at.pt.x - tx * r, y: at.pt.y - ty * r }]);
+      }
+    });
+    return out;
+  }
+
+  /** 对整条折线（按转角切段）生成装饰图元，投回经纬度。 */
+  function arrayPieces(typeId, lonLatPts) {
+    var def = CATALOGUE[typeId];
+    if (!def) throw new Error('未知标绘类型：' + typeId);
+    var kind = (def.params && def.params.decor) || 'wire';
+    var origin = lonLatPts[0];
+    var plane = toPlane(lonLatPts, origin);
+    var mpp = metersPerPixel();
+    var marks = [];
+    splitAtCorners(plane).forEach(function (run) {
+      decorAlongRun(run, kind, mpp).forEach(function (mk) { marks.push(fromPlane(mk, origin)); });
+    });
+    return { marks: marks, mpp: mpp, kind: kind, runs: splitAtCorners(plane).length };
+  }
+  // ---------------------------------------------------------------------
   // 边界符号化（族 H 的符号化变体）
   // ---------------------------------------------------------------------
   //
@@ -705,6 +894,11 @@
       case 'band': rings = [bandRing(p, params)]; break;
       case 'zone': rings = [p.slice()]; break;
       case 'line': rings = [p.slice()]; break;
+      // `array` 族没有"环"：它的图元由 arrayPieces() 沿折线生成，不由 ringsFor 产出。
+      // 这里返回空数组而不是抛错——否则任何"遍历所有类型取几何"的调用方
+      // （测试、导出、批量校验）都会在这里炸掉。实测第一轮验证就是这样报的
+      // `未知几何族：array`，而实际上三种阵列都工作正常。
+      case 'array': rings = []; break;
       default: throw new Error('未知几何族：' + fam);
     }
     return rings.map(function (r) { return fromPlane(r, origin); });
@@ -790,6 +984,39 @@
       if (rec.label) n += addLabel(rec);
       return n;
     }
+    // 重复图元阵列：线 + 沿线的图元（铁丝网 X / 反坦克壕齿 / 布雷线雷点）。
+    // **图元在绘制时按当前屏幕分辨率生成**，不烘焙进数据——烘焙会让缩放到战区级时
+    // 图元被放大到荒唐的程度（调研里那条"冻结在绘制时的米制里"的教训）。
+    if (def.family === 'array') {
+      var arr = arrayPieces(rec.type, rec.points);
+      var lineCol = Cesium.Color.fromCssColorString(palette().unknown);   // 障碍物按 APP-06 用绿色
+      if (rec.points.length >= 2) {
+        rec.entities.push(viewer.entities.add({
+          polyline: {
+            positions: rec.points.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); }),
+            width: 2, clampToGround: true, material: lineCol,
+          },
+        }));
+        n++;
+      }
+      arr.marks.forEach(function (mk) {
+        var pos = mk.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); });
+        if (pos.length >= 3) {
+          rec.entities.push(viewer.entities.add({
+            polygon: { hierarchy: new Cesium.PolygonHierarchy(pos), material: lineCol.withAlpha(0.85),
+                       classificationType: Cesium.ClassificationType.BOTH },
+          }));
+        } else {
+          rec.entities.push(viewer.entities.add({
+            polyline: { positions: pos, width: 2, clampToGround: true, material: lineCol },
+          }));
+        }
+        n++;
+      });
+      if (rec.label) n += addLabel(rec);
+      return n;
+    }
+
     var rings = ringsFor(rec.type, rec.points);
 
     rings.forEach(function (ring) {
@@ -959,6 +1186,12 @@
       getBaseLength: getBaseLength,
       getAzimuth: getAzimuth,
       boundaryPieces: boundaryPieces,
+      arrayPieces: arrayPieces,
+      centredRun: centredRun,
+      splitAtCorners: splitAtCorners,
+      decorationScale: decorationScale,
+      decorAlongRun: decorAlongRun,
+      metersPerPixel: metersPerPixel,
       piecesFor: piecesFor,
       pointAtDist: pointAtDist,
     },
