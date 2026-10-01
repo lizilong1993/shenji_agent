@@ -941,6 +941,21 @@ THEATRE_BBOXES = {
     "india_china": (77.0, 31.5, 81.5, 36.5),
 }
 
+# 战区的**人类可读名称**，与 THEATRE_BBOXES 一一对应、同样按 theatre 键索引。
+#
+# 为什么需要这张表：`region` 原先直接取模块级 `REGION`（台海），于是中印案例的数据集里
+# `region` 写的是「中国 台湾海峡」——**实测确认**：`web/data/india_china_west.json`
+# 与台海案例的 region 完全相同。根因是"模块级默认值泄漏进按案例生成的数据"，
+# 不是某处写错了一个字符串——同一个文件里 `theatre` 是**按案例**求值的，而 region 是
+# **按模块**取的，两者不同源，所以无论加多少案例都不会自己好。
+#
+# 与 THEATRE_BBOXES 放在一起，是为了让"一个战区一套参数"只有一个出处：
+# 将来加战区时 bbox 与 region 必须一起加，漏一个会立刻互相矛盾。
+THEATRE_REGIONS = {
+    "taiwan_strait": REGION,
+    "india_china": INDIA_CHINA_REGION,
+}
+
 # Landing operation phases, as (id, name, first_tick). The phases are a property
 # of the *operation*, not of a single platform: every unit is somewhere in the same
 # six-stage narrative at any moment, which is what lets the UI say "the operation
@@ -1331,7 +1346,10 @@ def build_dataset(case=None) -> dict:
         "case_description": case.description,
         "scenario_id": SCENARIO_ID,
         "scenario_name": SCENARIO_NAME,
-        "region": REGION,
+        # 按**战区**取名，不是按模块默认值。见 THEATRE_REGIONS 的说明：
+        # 以前这里写 REGION，于是中印案例的数据集里 region 是「中国 台湾海峡」。
+        # `theatre` 为 None（旧调用方没给战区）时回落到模块级 REGION，行为与以前一致。
+        "region": THEATRE_REGIONS.get(theatre, REGION),
         "theatre": theatre,
         # True only when every *land* target was actually routed on the network.
         # `road_selftest` checks the tracks when this is set and skips them
