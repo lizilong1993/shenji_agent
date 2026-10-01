@@ -480,7 +480,17 @@ function initViewer() {
     label: function (id, want) {
       if (id === 'places.labels' && window.Places) Places.setEnabled(!!want);
     },
+    // 标绘：与其它栈一样，注册表只说"该不该显示"，怎么显示由 sink 决定。
+    // 标绘实例的增删/几何在 Plotting 里，这里只切它所属类别图层的显隐。
+    plot: function (id, want) {
+      if (window.Plotting) Plotting.setLayerVisible(id, !!want);
+    },
   });
+
+  // Plotting 需要 viewer 才能建实体。**必须在 bind 之后显式交进去**——
+  // 漏了这一步的表现是"add() 成功、但场景里没有任何东西"（实测 0 个实体），
+  // 而且不报错：drawOne 里的 `if (!viewer) return 0` 是静默返回。
+  if (window.Plotting) Plotting.bind(viewer);
 
   // 常驻 imagery 槽位登记（动态层在挂载时登记，见 registerImagerySlot）。
   registerImagerySlot('tianditu.base', state.tiandituLayer);
@@ -501,6 +511,12 @@ function initViewer() {
   LayerRegistry.setDesired('buildings.blocks', checkboxOn('modelBuildings'));
   LayerRegistry.setDesired('tiles.google3d', checkboxOn('modelBuildingsOnline'));
   LayerRegistry.setDesired('places.labels', checkboxOn('modelPlaces'));
+  // 标绘图层：同样**遍历注册表**取初值，不逐个写死。
+  // 注意：这里只取初值；change 处理器的绑定在 bindUI() 里（bindCheck 在那儿才有定义）。
+  // 曾经把这两件事混为一谈，结果复选框点了没反应——初值读了，但没人接 change。
+  LayerRegistry.list('plot').forEach(function (d) {
+    if (d.checkbox) LayerRegistry.setDesired(d.id, checkboxOn(d.checkbox));
+  });
   // 立刻应用一次：把 imagery 的 index 按 LAYERS 的 z 排好。这一步取代了以前那句
   // raiseToTop(tiandituLabelLayer)——注记现在由 z=90 直接排到最上。
   applyLayers();
@@ -3174,6 +3190,19 @@ function bindUI() {
     dom[id] = node;
     node.addEventListener('change', function (e) { handler(e.target.checked); });
   };
+
+  // 标绘图层开关：与其它图层同一套约定——只写"意图"，由渲染治理器合并到下一帧的
+  // applyLayers，再由 plot sink 落到 Plotting.setLayerVisible。不新起通路。
+  LayerRegistry.list('plot').forEach(function (d) {
+    if (!d.checkbox) return;
+    bindCheck(d.checkbox, function (v) {
+      LayerRegistry.setDesired(d.id, v);
+      // 图层可见性变化**直接调 applyLayers()**，与 setImagery / setTianditu 同一约定。
+      // 不要只 markScene()：RenderGovernor.take() 只驱动 syncEntities()（目标实体），
+      // 不含图层栈，只标记的话 plot sink 根本不会被调用——复选框点了画面不变（实测如此）。
+      applyLayers();
+    });
+  });
 
   bindCheck('layerTargets', function (v) { state.layers.targets = v; markScene('layerTargets'); guardFollow(); });
   bindCheck('layerTracks', function (v) { state.layers.tracks = v; markScene('layerTracks'); });
