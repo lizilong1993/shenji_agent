@@ -215,9 +215,11 @@
       algorithmFamily: 'boundary-symbolised',
       cnImplRef: '中文六仓库**均只输出裸折线**，无边界符号化实现',
       usEquivalent: { name: 'Boundary', code: '110100', spec: 'FM 1-02.2 + APP-06' },
-      // 符号化参数：段长/短划长（米）。中文规定的分界线形制未公开，取值参考
-      // FM 1-02.2 Boundaries 的观感，可配置。
-      params: { symbolised: true, segLen: 9000, tickLen: 4500 },
+      // 教范构造的参数。等级代字用**中式代字**（表 2.9：J军 S师 U旅 T团 Y营 L连 P排 B班 Z组）；
+      // 美式对应物是点/杠/X 图形，这里不画。断口与番号距离按要图观感取值——
+      // 标准只规定"在适中位置、空以间隔、两侧等齐"，不给数值。
+      params: { symbolised: true, echelon: 'T', labelLeft: '红方', labelRight: '蓝方',
+                gapHalf: 2500, labelOffset: 6000, dashed: false },
     },
     coordination_line: {
       zh: '协调线', family: 'line', sourceStandard: 'CN',
@@ -262,7 +264,39 @@
       params: { custom: true },
     },
   };
-  var COLOR = { red: '#d0342c', blue: '#1f5fbf', neutral: '#6b7a8d' };
+  // ---------------------------------------------------------------------
+  // 配色：**中式约定与北约相反，这是最容易搞错的一点**
+  // ---------------------------------------------------------------------
+  // 依据《军事标图技法》（杨晓华，解放军出版社 1995）第二章第一节「标号颜色规定」，
+  // 该书引 1981-03-19 总参《军队标号》与 1987-07-07《军队标号(增补规定)》：
+  //   红  ——**标示我军**（步兵、装甲兵、骑兵、防化、空降、铁道兵、海空军、导弹部队）；
+  //          炮兵(除自行火炮)、工程兵、通信兵、雷达、电子战用**黑**
+  //   黑  —— 我军上述兵种 + **队号注记、说明注记、表格、图名、密级、图廓、签署、时间、
+  //          指北矢标、框线一律用黑**
+  //   深蓝——**标示敌军（全部）**
+  //   深绿——不明国籍的舰船飞机、海战范围、水面漂浮物
+  //   深黄——核化生武器及相关内容（在轮廓线内侧加衬）
+  //   单色标图时：**我军队标用单线，敌军用双线**
+  // 即 **蓝在解放军用法里是"敌"、红是"我"**，与 NATO 的 blue=friendly 正好相反。
+  // 本文件此前按 NATO 约定写（红=敌、蓝=友），对中式标图是错的——现以中式为默认。
+  var CN_COLOR = {
+    friendly: '#c8102e',    // 我军：红
+    enemy: '#123a6b',       // 敌军：深蓝
+    unknown: '#1f5c3a',     // 不明国籍：深绿
+    nbc: '#b8860b',         // 核化生：深黄
+    annotation: '#101418',  // 注记/图廓/框线：黑
+  };
+  var NATO_COLOR = { friendly: '#1f5fbf', enemy: '#d0342c', unknown: '#6b7a8d',
+                     nbc: '#b8860b', annotation: '#101418' };
+  var colorStandard = 'CN';
+  function palette() { return colorStandard === 'NATO' ? NATO_COLOR : CN_COLOR; }
+
+  // 兼容旧调用点：按"红/蓝"**字面**取色（注意这**不等于**友/敌，友敌请用 palette()）。
+  var COLOR = {
+    get red() { return NATO_COLOR.enemy; },
+    get blue() { return NATO_COLOR.friendly; },
+    neutral: '#6b7a8d',
+  };
 
   var viewer = null;
   var byId = {};              // 标绘实例 id -> 记录
@@ -593,46 +627,69 @@
     return out;
   }
 
-  /**
-   * 生成符号化边界的分件。
+    /**
+   * 生成战斗分界线的分件。
    *
-   * 返回 `{ bars: [{pts, side}], ticks: [{pts, side}] }`：
-   *   bars  交替着色的实线段，`side = i % 2`（0=红方、1=蓝方）
-   *   ticks 段分界处的垂直短划，画在左侧（法向 +）
+   * ⚠ **这里推翻了我自己上一版的实现，原因要记下来。**
+   * 上一版按"交替色段 + 段界垂直短划"画，并把依据写成 FM 1-02.2 Boundaries。
+   * 复核原始文献后发现**不成立**：美军 ADRP 1-02 表 8-1、FM 1-02.2 §5-14、
+   * 中文《军事标图技法》、台湾国防部《聯合作戰符號與國軍軍隊符號之差異》——
+   * 四处**没有任何一处**用交替色或垂直短划画分界线。那是自定样式，
+   * 上一版的注释等于**把自己的约定冒充成了标准**。
+   *
+   * 教范构造（中美一致）：
+   *   1. **一条线**：实线=现行，虚线=计划/待命。《军事标图技法》第二章第五节原文：
+   *      「标示军队的实际配置和行动的队标用实线，标示计划（预定）、预备的配置和行动……
+   *      用虚线」，并明确「**……战斗分界线等不便使用虚线的队标可用实线**」；
+   *   2. 在**线中点断开一次**；
+   *   3. 断口里放**部队等级**标记；
+   *   4. 两侧**垂直于线**各放一个番号（番号朝北/上方）。台湾国防部文本：
+   *      「標記於戰鬥地境線上之符號或註記，須在地境線上適中位置，空以間隔，註記部隊等級
+   *      符號，並於等級符號兩側等齊註記部隊番號（番號須朝北或上方）」。
+   *
+   * **中式用"代字"而非美式点/杠/X 图形**：《军事标图技法》表 2.9 给的是文字代字
+   * （`J`军 `S`师 `U`旅 `T`团 `Y`营 `L`连 `P`排 `B`班 `Z`组），所以断口里放**文字**，
+   * 不必去画美式那套点杠图形——反而更简单。
+   *
+   * 等级标记**保持黑色不随归属着色**（参考实现的理由：分界线分隔两个建制，
+   * 等级标记不属于任何一方）；线本身用归属色。
    */
-  function symbolisedPieces(p, params) {
+  function boundaryPieces(p, params) {
     var total = wholeDistance(p);
-    var segLen = params.segLen || 8000;
-    var tickLen = params.tickLen || 4000;
-    var n = Math.max(1, Math.round(total / segLen));
-    var actual = total / n;
-    var bars = [], ticks = [];
-    for (var i = 0; i < n; i++) {
-      bars.push({ pts: subLine(p, i * actual, (i + 1) * actual), side: i % 2 });
-    }
-    // 内部段界打短划（首尾端点不打：那是端点标注的位置，另行处理）
-    for (var k = 1; k < n; k++) {
-      var at = pointAtDist(p, k * actual);
-      var nx = -at.dir.y, ny = at.dir.x;          // 左法向
-      ticks.push({ pts: [at.pt,
-        { x: at.pt.x + nx * tickLen, y: at.pt.y + ny * tickLen }], side: k % 2 });
-    }
-    return { bars: bars, ticks: ticks };
+    var midD = total / 2;
+    var gapHalf = params.gapHalf || 2500;
+    var at = pointAtDist(p, midD);
+    var rotDeg = Math.atan2(at.dir.y, at.dir.x) * 180 / Math.PI;
+    var upright = (rotDeg > 90 || rotDeg < -90) ? rotDeg + 180 : rotDeg;  // 番号保持正立
+    var nx = -at.dir.y, ny = at.dir.x;
+    var off = params.labelOffset || 6000;
+    return {
+      lines: [subLine(p, 0, Math.max(0, midD - gapHalf)),
+              subLine(p, Math.min(total, midD + gapHalf), total)],
+      glyph: { pt: at.pt, rotDeg: upright, text: params.echelon || 'T' },
+      labels: [
+        { pt: { x: at.pt.x + nx * off, y: at.pt.y + ny * off }, rotDeg: upright, text: params.labelLeft || '' },
+        { pt: { x: at.pt.x - nx * off, y: at.pt.y - ny * off }, rotDeg: upright, text: params.labelRight || '' },
+      ],
+    };
   }
 
-  /** 在平面里算分件，再投回经纬度。 */
+  /** 在平面里算分界线分件，再投回经纬度。 */
   function piecesFor(typeId, lonLatPts) {
     var def = CATALOGUE[typeId];
     if (!def) throw new Error('未知标绘类型：' + typeId);
     var origin = lonLatPts[0];
     var p = toPlane(lonLatPts, origin);
-    var pcs = symbolisedPieces(p, def.params || {});
+    var b = boundaryPieces(p, def.params || {});
     return {
-      bars: pcs.bars.map(function (b) { return { pts: fromPlane(b.pts, origin), side: b.side }; }),
-      ticks: pcs.ticks.map(function (b) { return { pts: fromPlane(b.pts, origin), side: b.side }; }),
+      lines: b.lines.map(function (l) { return fromPlane(l, origin); }),
+      glyph: { pt: fromPlane([b.glyph.pt], origin)[0], rotDeg: b.glyph.rotDeg, text: b.glyph.text },
+      labels: b.labels.map(function (l) {
+        return { pt: fromPlane([l.pt], origin)[0], rotDeg: l.rotDeg, text: l.text };
+      }),
     };
   }
-  /** 在平面里按族生成环，再投回经纬度。 */
+/** 在平面里按族生成环，再投回经纬度。 */
   function ringsFor(typeId, lonLatPts) {
     var def = CATALOGUE[typeId];
     if (!def) throw new Error('未知标绘类型：' + typeId);
@@ -675,30 +732,57 @@
   function drawOne(rec) {
     if (!viewer) return 0;
     var def = CATALOGUE[rec.type];
-    var color = Cesium.Color.fromCssColorString(rec.color || COLOR.red);
+    var color = Cesium.Color.fromCssColorString(rec.color || palette()[rec.hostility === 'enemy' ? 'enemy' : 'friendly']);
     var isLine = def.family === 'line';
     var n = 0;
 
-    // 符号化边界：不是一条线，而是「交替色段 + 垂直短划」两组分件。必须单独走一条
-    // 渲染分支——按普通折线画会退化成一条单色线，符号化信息全丢。
+    // 战斗分界线：**一条线 + 中点断口 + 断口里的等级代字 + 两侧垂直番号**。
+    // 不是"交替色段 + 短划"（那是自定样式，见 boundaryPieces 的说明）。
     if (isLine && def.params && def.params.symbolised) {
-      var pcs = piecesFor(rec.type, rec.points);
-      var sides = [Cesium.Color.fromCssColorString(COLOR.red),
-                   Cesium.Color.fromCssColorString(COLOR.blue)];
-      pcs.bars.forEach(function (bar) {
+      var pc = piecesFor(rec.type, rec.points);
+      var pal = palette();
+      var lineColor = Cesium.Color.fromCssColorString(pal[rec.hostility === 'enemy' ? 'enemy' : 'friendly']);
+      var planned = !!def.params.dashed;
+      pc.lines.forEach(function (seg) {
+        if (seg.length < 2) return;
+        var positions = seg.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); });
         rec.entities.push(viewer.entities.add({
           polyline: {
-            positions: bar.pts.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); }),
-            width: 4, clampToGround: true, material: sides[bar.side],
+            positions: positions, width: 4, clampToGround: true,
+            // 实线=现行、虚线=计划/待命（《军事标图技法》第二章第五节）
+            material: planned
+              ? new Cesium.PolylineDashMaterialProperty({ color: lineColor, dashLength: 16 })
+              : lineColor,
           },
         }));
         n++;
       });
-      pcs.ticks.forEach(function (tk) {
+      // 断口里的等级代字：**黑色，不随归属着色**（它不属于任何一方）
+      rec.entities.push(viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(pc.glyph.pt[0], pc.glyph.pt[1]),
+        label: {
+          text: pc.glyph.text,
+          font: 'bold 15px "Microsoft YaHei", sans-serif',
+          fillColor: Cesium.Color.fromCssColorString(pal.annotation),
+          outlineColor: Cesium.Color.WHITE, outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          rotation: -pc.glyph.rotDeg * Math.PI / 180,   // Cesium 的 rotation 是逆时针
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      }));
+      n++;
+      pc.labels.forEach(function (lb) {
+        if (!lb.text) return;
         rec.entities.push(viewer.entities.add({
-          polyline: {
-            positions: tk.pts.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); }),
-            width: 3, clampToGround: true, material: sides[tk.side],
+          position: Cesium.Cartesian3.fromDegrees(lb.pt[0], lb.pt[1]),
+          label: {
+            text: lb.text,
+            font: 'bold 13px "Microsoft YaHei", sans-serif',
+            fillColor: lineColor,
+            outlineColor: Cesium.Color.WHITE, outlineWidth: 3,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            rotation: -lb.rotDeg * Math.PI / 180,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
           },
         }));
         n++;
@@ -706,7 +790,6 @@
       if (rec.label) n += addLabel(rec);
       return n;
     }
-
     var rings = ringsFor(rec.type, rec.points);
 
     rings.forEach(function (ring) {
@@ -789,7 +872,10 @@
       id: id, type: spec.type, layer: spec.layer || 'plot.offense',
       std: def.std, ref: def.ref,
       points: spec.points.map(function (c) { return [c[0], c[1]]; }),
-      color: spec.color || (spec.hostility === 'blue' ? COLOR.blue : COLOR.red),
+      // 颜色**不在这里定**：存归属，取色留给渲染时按当前配色标准解析，
+      // 否则 setColorStandard('NATO') 之后已有标绘不会跟着变。
+      color: spec.color || null,
+      hostility: spec.hostility === 'enemy' ? 'enemy' : 'friendly',
       label: spec.label || null,
       entities: [],
     };
@@ -848,6 +934,13 @@
     remove: remove,
     clearLayer: clearLayer,
     setLayerVisible: setLayerVisible,
+    // 配色标准：'CN'（默认，红=我军、深蓝=敌军）或 'NATO'（蓝=友、红=敌）
+    setColorStandard: function (s) {
+      if (s !== 'CN' && s !== 'NATO') throw new Error('配色标准只能是 CN 或 NATO');
+      colorStandard = s; return s;
+    },
+    colorStandard: function () { return colorStandard; },
+    palette: palette,
     // 供测试直接验证几何族（不依赖 Cesium 场景）
     //
     // ⚠ 这里导出的函数名必须与上面**实际定义的名字**一致。改几何函数时最容易漏掉
@@ -865,7 +958,7 @@
       getThirdPoint: getThirdPoint,
       getBaseLength: getBaseLength,
       getAzimuth: getAzimuth,
-      symbolisedPieces: symbolisedPieces,
+      boundaryPieces: boundaryPieces,
       piecesFor: piecesFor,
       pointAtDist: pointAtDist,
     },
