@@ -175,6 +175,77 @@ PROBE = r"""
     } catch (e) { bad.push(c.type + ':' + e.message); }
   });
   out.sweep = { total: entries.length, bad: bad };
+
+  // 7. FIX 回归：修复项各自的可判定断言
+  var cat = {};
+  entries.forEach(function (c) { cat[c.type] = c; });
+  out.fixes = {
+    // FIX-1：元数据如实（不再声称未实现的算法族）+ custom 标记可读
+    assembly_family: cat['assembly_area'] ? cat['assembly_area'].algorithmFamily : null,
+    mined_family: cat['mined_area'] ? cat['mined_area'].algorithmFamily : null,
+    custom_flag: cat['maritime_blockade'] ? cat['maritime_blockade'].custom : null,
+    noncustom_flag: cat['assembly_area'] ? cat['assembly_area'].custom : null,
+    // FIX-3：齿朝向两种取值下的首齿尖有向距离（应符号相反、绝对值相等）
+    tooth: (function () {
+      function apexSign(flag) {
+        var orig = Plotting.CATALOGUE['anti_tank_ditch'].params.toothOutward;
+        Plotting.CATALOGUE['anti_tank_ditch'].params.toothOutward = flag;
+        var a = G.arrayPieces('anti_tank_ditch', [[119.4, 24.2], [120.6, 25.0]]);
+        Plotting.CATALOGUE['anti_tank_ditch'].params.toothOutward = orig;
+        if (!a.marks.length) return null;
+        var tri = a.marks[0];
+        // 有向面积符号：>0 与 <0 表示齿尖在主线两侧
+        var cross = (tri[1][0] - tri[0][0]) * (tri[2][1] - tri[0][1])
+                  - (tri[1][1] - tri[0][1]) * (tri[2][0] - tri[0][0]);
+        return cross;
+      }
+      return { outward: apexSign(true), inward: apexSign(false) };
+    })(),
+    // FIX-4：不传 sideLabels 不产生空标签；传了就渲染两个
+    boundary_plain: (function () {
+      var r = Plotting.add({ type: 'boundary', layer: 'plot.defense',
+                             points: [[119.4, 24.2], [120.6, 25.0]] });
+      var n = r.entities.length; Plotting.remove(r.id); return n;
+    })(),
+    boundary_labelled: (function () {
+      var r = Plotting.add({ type: 'boundary', layer: 'plot.defense',
+                             points: [[119.4, 24.2], [120.6, 25.0]],
+                             sideLabels: ['甲', '乙'] });
+      var n = r.entities.length;
+      var texts = r.entities.map(function (e) {
+        return e.label && e.label.text ? e.label.text.getValue() : null;
+      }).filter(Boolean);
+      Plotting.remove(r.id);
+      return { n: n, texts: texts };
+    })(),
+    // FIX-2：线型由 params.dash 决定
+    line_materials: (function () {
+      // 目录里**没有**一个应当画实线的 `family:'line'` 类型（coordination_line 与
+      // phase_line 都是 dash:true），所以不能挑一个"现成的实线类型"来对比——
+      // 第一版就是这么写的，结果拿 phase_line 当实线基准，必然失败。
+      // 改为**直接翻转参数**来验证因果：同一个类型，dash 开关一开一关，材质应当跟着变。
+      function matOf(type, dashOverride) {
+        var def = Plotting.CATALOGUE[type];
+        var orig = def.params.dash;
+        if (dashOverride !== undefined) def.params.dash = dashOverride;
+        var r = Plotting.add({ type: type, layer: 'plot.fire',
+                               points: [[119.4, 24.2], [120.6, 25.0]] });
+        // ⚠ 不能用 `constructor.name` 判材质类型：vendored Cesium 是**压缩过的**，
+        // 类名被改成 `x1` 之类，按名字比对必然得到假失败（第一版就是这样）。
+        // `instanceof` 不受压缩影响，是唯一可靠的判法。
+        var dashed = null;
+        r.entities.forEach(function (e) {
+          if (e.polyline && e.polyline.material) {
+            dashed = e.polyline.material instanceof Cesium.PolylineDashMaterialProperty;
+          }
+        });
+        Plotting.remove(r.id);
+        if (dashOverride !== undefined) def.params.dash = orig;
+        return dashed;
+      }
+      return { dashed: matOf('phase_line', true), solid: matOf('phase_line', false) };
+    })()
+  };
   return out;
 })()
 """
@@ -274,6 +345,33 @@ def main() -> int:
     sw = d["sweep"]
     check("24 types present", sw["total"] == 24, "got %s" % sw["total"])
     check("no NaN / missing ring", not sw["bad"], "bad=%s" % ", ".join(sw["bad"][:6]))
+
+    print("7. FIX regression -- metadata honesty, line style, tooth side, instance labels")
+    fx = d.get("fixes") or {}
+    check("FIX-1: assembly_area no longer claims closed-spline",
+          fx.get("assembly_family") == "area", "got %r" % fx.get("assembly_family"))
+    check("FIX-1: mined_area no longer claims repeated-glyph",
+          fx.get("mined_family") == "area", "got %r" % fx.get("mined_family"))
+    check("FIX-1: custom marker readable",
+          fx.get("custom_flag") is True and fx.get("noncustom_flag") is False,
+          "custom=%r noncustom=%r" % (fx.get("custom_flag"), fx.get("noncustom_flag")))
+    tc = fx.get("tooth") or {}
+    check("FIX-3: tooth side flips with toothOutward",
+          tc.get("outward") and tc.get("inward") and
+          (tc["outward"] > 0) != (tc["inward"] > 0),
+          "outward=%r inward=%r" % (tc.get("outward"), tc.get("inward")))
+    check("FIX-4: no side labels -> 3 entities (2 lines + glyph)",
+          fx.get("boundary_plain") == 3, "got %s" % fx.get("boundary_plain"))
+    bl = fx.get("boundary_labelled") or {}
+    # 5 = 2 段线 + 1 等级代字 + 2 侧番号；等级代字也是 label 实体，所以要期望三个文本。
+    check("FIX-4: sideLabels -> 5 entities, glyph + both side texts",
+          bl.get("n") == 5 and sorted(bl.get("texts") or []) == ["T", "乙", "甲"],
+          "n=%s texts=%s" % (bl.get("n"), bl.get("texts")))
+    lm = fx.get("line_materials") or {}
+    check("FIX-2: dash:true -> dashed material",
+          lm.get("dashed") is True, "got %r" % lm.get("dashed"))
+    check("FIX-2: no dash -> NOT dashed material",
+          lm.get("solid") is False, "got %r" % lm.get("solid"))
 
     print()
     if FAILURES:

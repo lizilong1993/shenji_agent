@@ -140,18 +140,24 @@
     assembly_area: {
       zh: '集结地域', family: 'zone', sourceStandard: 'CN',
       sourceDoc: CN_DOC, sourceConfidence: CONV_CN,
-      algorithmFamily: 'closed-spline-area',
-      cnImplRef: 'c-lei-en/cesiumPlot:areaDraw/algorithm.ts#getGatheringPlacePositions',
+      // ⚠ FIX-1：这里原先写 `closed-spline-area`，但 `ringsFor` 的 zone 分支只做
+      // `p.slice()` —— **裸多边形，没有样条**。元数据声称了没实现的算法，
+      // 属于"文档比实现好看"，已改为如实描述。
+      algorithmFamily: 'area',
+      sourceConfidence: CONV_CN + '；**当前实现为裸多边形，未做闭合样条平滑**'
+        + '（中文开源有 getGatheringPlacePositions 实现，本项目尚未移植）',
+      cnImplRef: 'c-lei-en/cesiumPlot:areaDraw/algorithm.ts#getGatheringPlacePositions（未移植）',
       usEquivalent: { name: 'Assembly Area', code: '150200', spec: 'FM 1-02.2 + APP-06' },
-      params: { splineT: 0.4 },
+      params: {},
     },
     waiting_area: {
       zh: '待机地域', family: 'zone', sourceStandard: 'CN',
       sourceDoc: CN_DOC, sourceConfidence: CONV_CN,
-      algorithmFamily: 'closed-spline-area',
-      cnImplRef: '复用集结地域算法',
+      algorithmFamily: 'area',
+      sourceConfidence: CONV_CN + '；**当前实现为裸多边形，未做闭合样条平滑**',
+      cnImplRef: '复用集结地域算法（未移植）',
       usEquivalent: { name: 'Attack Position', code: '151600', spec: 'FM 1-02.2 + APP-06' },
-      params: { splineT: 0.4 },
+      params: {},
     },
     // ---- 防御/障碍类 ----
     battle_position: {
@@ -196,10 +202,14 @@
     mined_area: {
       zh: '雷场（障碍区）', family: 'zone', sourceStandard: 'CN',
       sourceDoc: CN_DOC, sourceConfidence: CONV_CN,
-      algorithmFamily: 'area+repeated-glyph',
-      cnImplRef: '无中文开源实现；重复图元阵列需自行实现',
+      // ⚠ FIX-1：原先写 `area+repeated-glyph` + `glyphArray: true`，但 zone 分支只画
+      // 多边形，**没有任何图元阵列**。区域内的雷符号阵列尚未实现（线状阵列见
+      // `mineline`），元数据与死配置一并改正。
+      algorithmFamily: 'area',
+      sourceConfidence: CONV_CN + '；**区域内的雷符号阵列尚未实现**，当前只画多边形轮廓',
+      cnImplRef: '无中文开源实现；区域阵列需自行实现（尚未做）',
       usEquivalent: { name: 'Mined Area', code: '270800', spec: 'FM 1-02.2 + APP-06' },
-      params: { glyphArray: true },
+      params: { hatch: true },
     },
     // ---- 火力类（族 D：扇面） ----
     fire_range: {
@@ -249,7 +259,10 @@
       // 教范构造的参数。等级代字用**中式代字**（表 2.9：J军 S师 U旅 T团 Y营 L连 P排 B班 Z组）；
       // 美式对应物是点/杠/X 图形，这里不画。断口与番号距离按要图观感取值——
       // 标准只规定"在适中位置、空以间隔、两侧等齐"，不给数值。
-      params: { symbolised: true, echelon: 'T', labelLeft: '红方', labelRight: '蓝方',
+      // ⚠ FIX-4：`labelLeft/labelRight` 原先写死为 '红方'/'蓝方' —— 那是**实例数据混进了
+      // 类型定义**，而且 `add()` 当时没有任何途径覆盖它们，等于把两个演示用番号
+      // 固化成了所有分界线的默认值。现改为空默认，实例通过 `sideLabels` 传入。
+      params: { symbolised: true, echelon: 'T', labelLeft: '', labelRight: '',
                 gapHalf: 2500, labelOffset: 6000, dashed: false },
     },
     coordination_line: {
@@ -292,7 +305,10 @@
       algorithmFamily: 'area',
       cnImplRef: '无',
       usEquivalent: { name: '（无直接对应）最接近 Submarine Action Area', code: '150502', spec: 'FM 1-02.2 + APP-06' },
-      params: { custom: true },
+      // `custom` 不是渲染参数，而是**语义标记**：它表示"本图形是自建的、不对应任何
+      // 标准图形"。放到 params 里没人读就等于没标。改由 debug()/catalogue() 透出。
+      custom: true,
+      params: {},
     },
   };
   // ---------------------------------------------------------------------
@@ -703,7 +719,7 @@
   }
 
   /** 沿一条段（平面米制）按屏幕尺寸排布图元，返回图元折线数组。 */
-  function decorAlongRun(run, kind, mpp) {
+  function decorAlongRun(run, kind, mpp, params) {
     var total = wholeDistance(run);
     var out = [];
     var gapPx, itemPx, footprintPx;
@@ -722,10 +738,14 @@
       if (teeth < 1) return out;
       var lead = (total - teeth * itemM) / 2;
       var h = itemM * Math.sqrt(3) / 2;       // 等边三角形
+      // ⚠ FIX-3：齿尖朝哪一侧由 `toothOutward` 决定。FM 1-02.2 原文
+      // 「齿通常指向敌方」——这是**语义选择**，必须存在数据里、编辑后要保住，
+      // 不能由渲染默认写死。此前该键只出现在注释里，齿永远朝同一侧。
+      var sign = (params && params.toothOutward === false) ? -1 : 1;
       for (var i = 0; i < teeth; i++) {
         var a = pointAtDist(run, lead + i * itemM);
         var b = pointAtDist(run, lead + (i + 1) * itemM);
-        var nx = -a.dir.y, ny = a.dir.x;
+        var nx = -a.dir.y * sign, ny = a.dir.x * sign;
         var apex = { x: (a.pt.x + b.pt.x) / 2 + nx * h, y: (a.pt.y + b.pt.y) / 2 + ny * h };
         out.push([a.pt, b.pt, apex]);
       }
@@ -766,7 +786,7 @@
     var mpp = metersPerPixel();
     var marks = [];
     splitAtCorners(plane).forEach(function (run) {
-      decorAlongRun(run, kind, mpp).forEach(function (mk) { marks.push(fromPlane(mk, origin)); });
+      decorAlongRun(run, kind, mpp, def.params).forEach(function (mk) { marks.push(fromPlane(mk, origin)); });
     });
     return { marks: marks, mpp: mpp, kind: kind, runs: splitAtCorners(plane).length };
   }
@@ -864,12 +884,20 @@
   }
 
   /** 在平面里算分界线分件，再投回经纬度。 */
-  function piecesFor(typeId, lonLatPts) {
+  function piecesFor(typeId, lonLatPts, override) {
     var def = CATALOGUE[typeId];
     if (!def) throw new Error('未知标绘类型：' + typeId);
     var origin = lonLatPts[0];
     var p = toPlane(lonLatPts, origin);
-    var b = boundaryPieces(p, def.params || {});
+    // 按实例覆盖类型默认值。只做浅合并：这里要覆盖的都是标量/字符串
+    // （番号文本、等级代字），没有需要深合并的嵌套结构。
+    var merged = {};
+    var base = def.params || {};
+    Object.keys(base).forEach(function (k) { merged[k] = base[k]; });
+    if (override) Object.keys(override).forEach(function (k) {
+      if (override[k] !== undefined && override[k] !== null) merged[k] = override[k];
+    });
+    var b = boundaryPieces(p, merged);
     return {
       lines: b.lines.map(function (l) { return fromPlane(l, origin); }),
       glyph: { pt: fromPlane([b.glyph.pt], origin)[0], rotDeg: b.glyph.rotDeg, text: b.glyph.text },
@@ -933,7 +961,10 @@
     // 战斗分界线：**一条线 + 中点断口 + 断口里的等级代字 + 两侧垂直番号**。
     // 不是"交替色段 + 短划"（那是自定样式，见 boundaryPieces 的说明）。
     if (isLine && def.params && def.params.symbolised) {
-      var pc = piecesFor(rec.type, rec.points);
+      var pc = piecesFor(rec.type, rec.points, {
+        labelLeft: (rec.sideLabels && rec.sideLabels[0]) || '',
+        labelRight: (rec.sideLabels && rec.sideLabels[1]) || '',
+      });
       var pal = palette();
       var lineColor = Cesium.Color.fromCssColorString(pal[rec.hostility === 'enemy' ? 'enemy' : 'friendly']);
       var planned = !!def.params.dashed;
@@ -1022,14 +1053,17 @@
     rings.forEach(function (ring) {
       var positions = ring.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); });
       if (isLine) {
+        // ⚠ FIX-2：这里原先**无条件**用虚线材质，于是 `params.dash` 从来没被读过，
+        // 所有线型都是虚线。教范是"实线=现行、虚线=计划/待命"，写死虚线会让每一个
+        // 新增的实线型图形默认表达**错误的状态**。
         rec.entities.push(viewer.entities.add({
           polyline: {
             positions: positions,
             width: 3,
-            material: new Cesium.PolylineDashMaterialProperty({
-              color: color, dashLength: 16,
-            }),
             clampToGround: true,
+            material: (def.params && def.params.dash)
+              ? new Cesium.PolylineDashMaterialProperty({ color: color, dashLength: 16 })
+              : color,
           },
         }));
       } else {
@@ -1104,6 +1138,8 @@
       color: spec.color || null,
       hostility: spec.hostility === 'enemy' ? 'enemy' : 'friendly',
       label: spec.label || null,
+      // 分界线两侧的番号：**按实例**传入，不放在类型定义里（见 FIX-4 的说明）。
+      sideLabels: spec.sideLabels || null,
       entities: [],
     };
     byId[id] = rec;
@@ -1149,6 +1185,9 @@
         sourceStandard: d.sourceStandard, sourceDoc: d.sourceDoc,
         sourceConfidence: d.sourceConfidence, algorithmFamily: d.algorithmFamily,
         cnImplRef: d.cnImplRef || null, usEquivalent: d.usEquivalent || null,
+        // `custom` 表示"本图形自建、不对应任何标准图形"。必须能被外部读到——
+        // 放在 params 里没人读就等于没标（FIX-1c）。
+        custom: !!d.custom,
       };
     });
   }
