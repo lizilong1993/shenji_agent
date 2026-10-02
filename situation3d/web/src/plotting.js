@@ -386,6 +386,37 @@
   //
   // 参数取自中文开源实现的实测常量，**不是规范值**——见 CATALOGUE 的 sourceConfidence。
 
+  // ---------------------------------------------------------------------
+  // 顶点预算（OPT-4）
+  // ---------------------------------------------------------------------
+  // 多层扇面（OPT-1）会让顶点数成倍增长：每带两条弧 × 每弧 (steps+1) 点，
+  // 带数一多就上千。这里给每个环设一个上限并降采样。
+  //
+  // **降采样必须保住外接盒**，否则形状会肉眼可见地缩小/变形——所以除了等间隔抽点，
+  // 还强制保留首尾与四个极值点。这样"外接盒不变"是**构造保证**而不是近似。
+  var MAX_RING_VERTS = 512;        // 单环顶点上限（可配置）
+
+  /** 等间隔抽点 + 强制保留首尾与四极值点，保证外接盒逐点不变。 */
+  function decimateRing(ring, maxVerts) {
+    if (!ring || ring.length <= maxVerts) return ring;
+    var step = Math.ceil(ring.length / maxVerts);
+    var keep = {};
+    for (var i = 0; i < ring.length; i += step) keep[i] = true;
+    keep[0] = true;
+    keep[ring.length - 1] = true;
+    var ix = 0, ax = 0, iy = 0, ay = 0;
+    for (var j = 1; j < ring.length; j++) {
+      if (ring[j][0] < ring[ix][0]) ix = j;
+      if (ring[j][0] > ring[ax][0]) ax = j;
+      if (ring[j][1] < ring[iy][1]) iy = j;
+      if (ring[j][1] > ring[ay][1]) ay = j;
+    }
+    keep[ix] = keep[ax] = keep[iy] = keep[ay] = true;
+    var out = [];
+    for (var k = 0; k < ring.length; k++) if (keep[k]) out.push(ring[k]);
+    return out;
+  }
+
   var FITTING_COUNT = 30;          // 每段曲线采样数。中文库用 100；30 在视觉上已足够且顶点数降 70%
   var BASE_LEN_EXP = 0.99;         // getBaseLength 的经验指数，保留可配置
 
@@ -1076,7 +1107,11 @@
       case 'array': rings = []; break;
       default: throw new Error('未知几何族：' + fam);
     }
-    return rings.map(function (r) { return fromPlane(r, origin); });
+    // 投回经纬度后统一过一遍顶点预算（OPT-4）。放在最后是为了让各族只关心几何本身，
+    // 预算是一层横切约束。
+    return rings.map(function (r) {
+      return decimateRing(fromPlane(r, origin), MAX_RING_VERTS);
+    });
   }
 
   /** 走廊/双侧平行线（族 G）：中文开源完全缺失，此处按美式走廊做法逐顶点法向偏移。 */
@@ -1417,6 +1452,8 @@
       pincerRings: pincerRings,
       fanRings: fanRings,
       formatAltitude: formatAltitude,
+      decimateRing: decimateRing,
+      MAX_RING_VERTS: MAX_RING_VERTS,
       parseAltLayer: parseAltLayer,
       bandRing: bandRing,
       ringsFor: ringsFor,

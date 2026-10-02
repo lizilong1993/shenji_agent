@@ -398,6 +398,53 @@ PROBE = r"""
       })()
     };
   })();
+  // 11. OPT-4 回归：顶点预算
+  out.budget = (function () {
+    var A = [119.6, 24.3];
+    var sector = [A, [120.05, 24.3], [119.9, 23.9]];
+    var circ = [A, [120.05, 24.3], [120.05, 24.3]];
+    function bbox(pts) {
+      var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      pts.forEach(function (q) {
+        if (q[0] < x0) x0 = q[0];
+        if (q[0] > x1) x1 = q[0];
+        if (q[1] < y0) y0 = q[1];
+        if (q[1] > y1) y1 = q[1];
+      });
+      return [x0, x1, y0, y1];
+    }
+    function worst(type, bands, spread) {
+      var def = Plotting.CATALOGUE[type];
+      var ob = def.params.rangeBands, os = def.params.spreadDeg;
+      def.params.rangeBands = bands;
+      if (spread !== undefined) def.params.spreadDeg = spread;
+      var pts = (spread >= 360) ? circ : sector;
+      var rings = G.ringsFor(type, pts);
+      // 直接调 decimateRing 前后对比外接盒（同一条环）
+      var raw = G.ringsFor(type, pts).map(function (r) { return r; });
+      var maxV = 0;
+      rings.forEach(function (r) { if (r.length > maxV) maxV = r.length; });
+      def.params.rangeBands = ob;
+      if (spread !== undefined) def.params.spreadDeg = os;
+      return { max_verts: maxV, bbox: rings.length ? bbox(rings[0]) : null, nrings: rings.length };
+    }
+    var many = worst('circular_range', [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], 360);
+    // 外接盒保持：对同一条环，降采样后 bbox 应逐位相同
+    var ring = [];
+    for (var i = 0; i < 4000; i++) {
+      var t = i / 4000 * Math.PI * 2;
+      ring.push([119.6 + Math.cos(t) * 0.5 * (1 + 0.3 * Math.sin(7 * t)),
+                 24.3 + Math.sin(t) * 0.5]);
+    }
+    var d = G.decimateRing(ring, 512);
+    var b0 = bbox(ring), b1 = bbox(d);
+    return {
+      many_rings: many.nrings, many_max_verts: many.max_verts,
+      cap: G.MAX_RING_VERTS,
+      decimated_from: ring.length, decimated_to: d.length,
+      bbox_same: b0.every(function (v, k) { return v === b1[k]; })
+    };
+  })();
   return out;
 })()
 """
@@ -601,6 +648,17 @@ def main() -> int:
     check("OPT-2: altLayer[1] <= altLayer[0] is rejected (no negative volume)",
           ill.get("has_volume") is False and ill.get("parsed") is None,
           "has_volume=%r parsed=%r" % (ill.get("has_volume"), ill.get("parsed")))
+
+    print("11. OPT-4 -- vertex budget")
+    bg = d.get("budget") or {}
+    check("OPT-4: every ring respects the vertex cap",
+          bg.get("many_max_verts") is not None and bg.get("many_max_verts") <= bg.get("cap"),
+          "max=%r cap=%r" % (bg.get("many_max_verts"), bg.get("cap")))
+    check("OPT-4: decimation actually triggers",
+          bg.get("decimated_to") is not None and bg.get("decimated_to") < bg.get("decimated_from"),
+          "%r -> %r" % (bg.get("decimated_from"), bg.get("decimated_to")))
+    check("OPT-4: bounding box preserved bit-for-bit",
+          bg.get("bbox_same") is True, "got %r" % bg.get("bbox_same"))
 
     print()
     if FAILURES:
