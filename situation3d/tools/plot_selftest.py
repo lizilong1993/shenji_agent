@@ -293,6 +293,61 @@ PROBE = r"""
       })()
     };
   })();
+  // 9. OPT-1 回归：多层火力扇面环带
+  out.fan = (function () {
+    var A = [119.6, 24.3];
+    // 控制点 2 定半径（约 50 km），控制点 3 定张角
+    var sector = [A, [120.05, 24.3], [119.9, 23.9]];
+    var circ = [A, [120.05, 24.3], [120.05, 24.3]];
+    var mLat = 110540, mLon = 111320 * Math.cos(A[1] * Math.PI / 180);
+    function metres(a, b) { return Math.hypot((b[0] - a[0]) * mLon, (b[1] - a[1]) * mLat); }
+    function profile(pts) {          // 每环到圆心距离的最小/最大值
+      var c = pts[0], lo = Infinity, hi = -Infinity;
+      // 圆心是控制点 A，不是 ring[0]（多带时 ring[0] 在外弧上）
+      pts.forEach(function (q) {
+        var d = metres(A, q);
+        if (d < lo) lo = d;
+        if (d > hi) hi = d;
+      });
+      return { lo: lo, hi: hi };
+    }
+    function run(type, bands, spread) {
+      var def = Plotting.CATALOGUE[type];
+      var ob = def.params.rangeBands, os = def.params.spreadDeg;
+      def.params.rangeBands = bands;
+      if (spread !== undefined) def.params.spreadDeg = spread;
+      var pts = (spread !== undefined && spread >= 360) ? circ : sector;
+      var rings = G.ringsFor(type, pts).map(profile);
+      def.params.rangeBands = ob;
+      if (spread !== undefined) def.params.spreadDeg = os;
+      return rings;
+    }
+    var one = run('fire_range', [1.0], 70);
+    var three = run('fire_range', [0.4, 0.7, 1.0], 70);
+    var full = run('circular_range', [0.5, 1.0], 360);
+    return {
+      single_rings: one.length,
+      single_hi: one[0] ? one[0].hi : null,
+      single_lo: one[0] ? one[0].lo : null,
+      three_rings: three.length,
+      three_lo: three.map(function (r) { return r.lo; }),
+      three_hi: three.map(function (r) { return r.hi; }),
+      full_rings: full.length,
+      full_lo: full.map(function (r) { return r.lo; }),
+      full_hi: full.map(function (r) { return r.hi; }),
+      // 非法输入不得产生退化环
+      bad_input_rings: run('fire_range', [0, -1, NaN], 70).length,
+      // 圆形单带：首尾弧点应重合（同一角度、同一半径）
+      circ_closed_m: (function () {
+        var def = Plotting.CATALOGUE['circular_range'];
+        var ob = def.params.rangeBands;
+        def.params.rangeBands = [1.0];
+        var r = G.ringsFor('circular_range', circ)[0];
+        def.params.rangeBands = ob;
+        return metres(r[1], r[r.length - 1]);
+      })()
+    };
+  })();
   return out;
 })()
 """
@@ -442,6 +497,32 @@ def main() -> int:
     check("OPT-3: rebuild is idempotent (entity count unchanged)",
           idem.get("before") is not None and idem.get("before") == idem.get("after"),
           "before=%r after=%r" % (idem.get("before"), idem.get("after")))
+
+    print("9. OPT-1 -- multi-band range fan")
+    fn = d.get("fan") or {}
+    check("OPT-1: single band -> 1 ring", fn.get("single_rings") == 1,
+          "got %r" % fn.get("single_rings"))
+    check("OPT-1: single band spans centre..radius", fn.get("single_lo") is not None
+          and fn.get("single_lo") < 100, "lo=%r" % fn.get("single_lo"))
+    check("OPT-1: 3 bands -> 3 rings", fn.get("three_rings") == 3,
+          "got %r" % fn.get("three_rings"))
+    lo3, hi3 = fn.get("three_lo") or [], fn.get("three_hi") or []
+    check("OPT-1: bands nest without gaps (lo[k] == hi[k-1])",
+          len(lo3) == 3 and abs(lo3[1] - hi3[0]) / max(hi3[0], 1) < 1e-6
+          and abs(lo3[2] - hi3[1]) / max(hi3[1], 1) < 1e-6,
+          "lo=%s hi=%s" % (lo3, hi3))
+    check("OPT-1: band radii increase outward",
+          len(hi3) == 3 and hi3[0] < hi3[1] < hi3[2], "hi=%s" % hi3)
+    check("OPT-1: circular -> one ring per band", fn.get("full_rings") == 2,
+          "got %r" % fn.get("full_rings"))
+    # ⚠ 不能用 `x or default`：闭合距离的正确值是 **0**，而 `0 or 1e9` 会取 1e9，
+    # 于是"完全闭合"被报成失败。用 `is None` 显式判缺，不要靠真值判断。
+    closed = fn.get("circ_closed_m")
+    check("OPT-1: circular single band closes (first arc point == last)",
+          closed is not None and closed < 1.0,
+          "%s m" % ("None" if closed is None else "%.3f" % closed))
+    check("OPT-1: zero/negative/NaN bands are filtered out",
+          fn.get("bad_input_rings") == 1, "got %r" % fn.get("bad_input_rings"))
 
     print()
     if FAILURES:

@@ -218,7 +218,9 @@
       algorithmFamily: 'sector-3pt',
       cnImplRef: 'c-lei-en/cesiumPlot:areaDraw/algorithm.ts#getSectorPositions',
       usEquivalent: { name: 'Weapon/Sensor Range Fan, Sector', code: '242200', spec: 'FM 1-02.2 + APP-06' },
-      // 中式需"多层不同半径环带"（最大/有效/直瞄），中文开源均无 → 这里用 rangeBands
+      // 中式需"多层不同半径环带"（最大/有效/直瞄射程），中文六仓库**均无实现**。
+      // `rangeBands` 是**相对绘制半径的比例**（可配置）：[1.0] 单带（默认，向后兼容），
+      // 例如 [0.4, 0.7, 1.0] 三层；**最内圈 = 最小射程，外圈依次 = 最大射程**。
       params: { rangeBands: [1.0], spreadDeg: 70 },
     },
     circular_range: {
@@ -622,20 +624,60 @@
   // ---------------------------------------------------------------------
   // 族 D：扇面（3 控制点：圆心 + 定半径点 + 定张角点）
   // ---------------------------------------------------------------------
-  function fanRing(p, params) {
+  /**
+   * 火力/探测范围的**多层环带**（OPT-1）。
+   *
+   * `params.rangeBands` 是**相对绘制半径的比例**数组（可配置，默认 `[1.0]` 单带）：
+   *   `[1.0]`          → 一带，半径 = 控制点决定的 radius，几何与单带版逐点相同
+   *   `[0.4,0.7,1.0]`  → 三层环带；**最内圈是最小射程，外圈依次为最大射程**
+   *
+   * 每带是**独立的环形扇片**（外弧 + 内弧 + 两条边线），不是"一个大扇多根辐条"——
+   * 调研明确指出后者会让各带互相穿插。内弧与外弧反向相接，两条径向边线就是
+   * 外弧终点→内弧起点、内弧终点→外弧起点的连接段，由环的闭合隐式给出。
+   *
+   * 圆形（`spreadDeg >= 360`）时每带是一个完整圆环；最内带是实心圆。
+   *
+   * 返回**环数组**（每带一个环），因此调用方按普通多边形逐个渲染即可。
+   */
+  function fanRings(p, params) {
     var center = p[0];
     var radius = p.length >= 2 ? distance(p[1], center) : 50000;
+    var raw = (params.rangeBands && params.rangeBands.length) ? params.rangeBands : [1.0];
+    // 过滤非法值再升序：0 或负半径会产生退化环，NaN 会污染整条几何。
+    var fr = raw.filter(function (b) { return typeof b === 'number' && isFinite(b) && b > 0; });
+    if (!fr.length) fr = [1.0];
+    fr = fr.slice().sort(function (a, b) { return a - b; });
+
     var spread = params.spreadDeg === undefined ? 60 : params.spreadDeg;
     var start;
     if (spread >= 360) { spread = 360; start = 0; }
     else { start = p.length >= 3 ? getAzimuth(p[2], center) * 180 / Math.PI : -spread / 2; }
     var steps = Math.max(8, Math.round(spread / 6));
-    var ring = [center];
-    for (var i = 0; i <= steps; i++) {
-      var brg = (start + spread * i / steps) * Math.PI / 180;
-      ring.push({ x: center.x + Math.sin(brg) * radius, y: center.y + Math.cos(brg) * radius });
+
+    function arc(r, reverse) {
+      var out = [];
+      for (var k = 0; k <= steps; k++) {
+        var idx = reverse ? (steps - k) : k;
+        var brg = (start + spread * idx / steps) * Math.PI / 180;
+        out.push({ x: center.x + Math.sin(brg) * r, y: center.y + Math.cos(brg) * r });
+      }
+      return out;
     }
-    return ring;
+
+    var rings = [], prev = 0;
+    fr.forEach(function (f) {
+      var rOut = radius * f, rIn = radius * prev;
+      var ring;
+      if (rIn <= 1e-6) {
+        // 最内带：圆心 + 外弧。**顺序保持与单带版一致**，这样默认配置下几何逐点不变。
+        ring = [center].concat(arc(rOut, false));
+      } else {
+        ring = arc(rOut, false).concat(arc(rIn, true));
+      }
+      rings.push(ring);
+      prev = f;
+    });
+    return rings;
   }
 
   // ---------------------------------------------------------------------
@@ -988,7 +1030,7 @@
       case 'arrow2': rings = [arrow2Ring(p, params)]; break;
       case 'arrowN': rings = [arrowNRing(p, params, typeId === 'tailed_attack_arrow')]; break;
       case 'pincer': rings = pincerRings(p, params); break;
-      case 'fan': rings = [fanRing(p, params)]; break;
+      case 'fan': rings = fanRings(p, params); break;
       case 'band': rings = [bandRing(p, params)]; break;
       case 'zone': rings = [p.slice()]; break;
       case 'line': rings = [p.slice()]; break;
@@ -1289,7 +1331,7 @@
       arrow2Ring: arrow2Ring,
       arrowNRing: arrowNRing,
       pincerRings: pincerRings,
-      fanRing: fanRing,
+      fanRings: fanRings,
       bandRing: bandRing,
       ringsFor: ringsFor,
       toPlane: toPlane,
