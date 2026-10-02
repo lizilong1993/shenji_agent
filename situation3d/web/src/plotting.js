@@ -298,7 +298,9 @@
       algorithmFamily: 'area+altitude-layer',
       cnImplRef: '无中文开源实现',
       usEquivalent: { name: 'Airspace Coordination Area (Irregular)', code: '240101', spec: 'FM 1-02.2 + APP-06' },
-      params: { hatch: true, altLayer: [0, 10000] },
+      // `altLayer` = [下限, 上限]，单位**米**（可配置默认）。`altDatum` 是高度基准，
+      // **独立字段**，不从数值反推（调研：飞行高度层不是英尺数、基准不是单位）。
+      params: { hatch: true, altLayer: [0, 10000], altDatum: 'AGL' },
     },
     maritime_blockade: {
       zh: '海上封锁区', family: 'zone', sourceStandard: 'US',
@@ -678,6 +680,39 @@
       prev = f;
     });
     return rings;
+  }
+
+  // ---------------------------------------------------------------------
+  // 高度层（OPT-2）
+  // ---------------------------------------------------------------------
+  //
+  // 空域类图形（禁飞区/空域协调区）在语义上**必须有高度上下限**，否则它只是贴地平面。
+  // `params.altLayer` 是 `[下限, 上限]`，单位**米**（可配置默认 `[0, 10000]`）。
+  // `altDatum` 是高度基准（`'AGL'` / `'MSL'` / `'FL'`），**作为独立字段存**，
+  // 不从数值反推——调研特别强调这点："飞行高度层不是英尺数、基准不是单位"。
+  var ALT_SUFFIX = 'FT';
+
+  /**
+   * 高度文本。**非数值一律原样透出**（`FL150`、`1500MSL` 都是合法输入），
+   * 格式化它们等于毁掉它们携带的信息。
+   */
+  function formatAltitude(value, datum) {
+    var text = String(value === undefined || value === null ? '' : value).trim();
+    var num = Number(text);
+    if (text === '' || !isFinite(num)) return text;
+    if (datum === 'FL') return 'FL' + Math.round(num);      // 飞行高度层：前缀，无单位
+    var written = Math.round(num) + ALT_SUFFIX;
+    return datum ? written + ' ' + datum : written;          // "1500FT AGL"
+  }
+
+  /** 解析 altLayer，返回 `{min, max}` 或 null。上限必须大于下限，否则视为非法。 */
+  function parseAltLayer(params) {
+    var a = params && params.altLayer;
+    if (!a || a.length < 2) return null;
+    var lo = Number(a[0]), hi = Number(a[1]);
+    if (!isFinite(lo) || !isFinite(hi)) return null;
+    if (hi <= lo) return null;          // 非法：不产生负体积，退化为贴地图元
+    return { min: lo, max: hi, datum: params.altDatum || null };
   }
 
   // ---------------------------------------------------------------------
@@ -1179,6 +1214,55 @@
           },
         }));
       } else {
+        // OPT-2：声明了 `altLayer` 的图形走**高度夹层**。
+        // `height` + `extrudedHeight` + `perPositionHeight:false` 就是"从下限定到上限"的
+        // 体积，对任意环都成立（含扇面）。注意这条路是 Geometry/Primitive 管线，
+        // **不能与 `classificationType`（贴地）同时用**——悬空体积本来也不该贴地，
+        // 所以这里刻意不设 classificationType。
+        var alt = parseAltLayer(def.params);
+        if (alt) {
+          rec.entities.push(viewer.entities.add({
+            polygon: {
+              hierarchy: new Cesium.PolygonHierarchy(positions),
+              height: alt.min,
+              extrudedHeight: alt.max,
+              perPositionHeight: false,
+              material: color.withAlpha(0.28),
+              outline: true,
+              outlineColor: color,
+              outlineWidth: 2,
+            },
+          }));
+          // 侧面：逐点高度数组。`minimumHeights`/`maximumHeights` 的长度必须与
+          // `positions` 相等，否则运行期报错——这里按环顶点数填充。
+          var lows = [], highs = [];
+          for (var wi = 0; wi < positions.length; wi++) { lows.push(alt.min); highs.push(alt.max); }
+          rec.entities.push(viewer.entities.add({
+            wall: {
+              positions: positions,
+              minimumHeights: lows,
+              maximumHeights: highs,
+              material: color.withAlpha(0.16),
+            },
+          }));
+          n++;                       // 体积已计入，墙是它的侧面
+          // 高度标注：锚在体积中高，文本经统一格式化
+          rec.entities.push(viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(
+              rec.points[0][0], rec.points[0][1], (alt.min + alt.max) / 2),
+            label: {
+              text: formatAltitude(alt.min, alt.datum) + ' ~ ' + formatAltitude(alt.max, alt.datum),
+              font: 'bold 12px "Microsoft YaHei", sans-serif',
+              fillColor: Cesium.Color.WHITE,
+              outlineColor: Cesium.Color.fromCssColorString('#0f1720'),
+              outlineWidth: 3,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            },
+          }));
+          n++;
+          return n;
+        }
         rec.entities.push(viewer.entities.add({
           polygon: {
             hierarchy: new Cesium.PolygonHierarchy(positions),
@@ -1332,6 +1416,8 @@
       arrowNRing: arrowNRing,
       pincerRings: pincerRings,
       fanRings: fanRings,
+      formatAltitude: formatAltitude,
+      parseAltLayer: parseAltLayer,
       bandRing: bandRing,
       ringsFor: ringsFor,
       toPlane: toPlane,

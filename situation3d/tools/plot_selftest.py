@@ -348,6 +348,56 @@ PROBE = r"""
       })()
     };
   })();
+  // 10. OPT-2 回归：高度层空域
+  out.alt = (function () {
+    var P4 = [[119.3, 24.1], [119.55, 24.1], [119.55, 24.28], [119.3, 24.28]];
+    function addOne(type) {
+      var r = Plotting.add({ type: type, layer: 'plot.intel', points: P4 });
+      var poly = null, wall = null, labelText = null;
+      r.entities.forEach(function (e) {
+        if (e.polygon) poly = e.polygon;
+        if (e.wall) wall = e.wall;
+        if (e.label && e.label.text) labelText = e.label.text.getValue();
+      });
+      var out = {
+        n: r.entities.length,
+        has_height: !!(poly && poly.height !== undefined),
+        height: poly && poly.height !== undefined ? poly.height.getValue() : null,
+        extruded: poly && poly.extrudedHeight !== undefined ? poly.extrudedHeight.getValue() : null,
+        // ⚠ Cesium 把传入的数组包成 Property，`minimumHeights.length` 是 undefined
+        // （JSON 里直接消失，读出来像"墙没建"）。必须 `.getValue()` 再取长度。
+        wall_lows: wall && wall.minimumHeights ? wall.minimumHeights.getValue().length : null,
+        wall_highs: wall && wall.maximumHeights ? wall.maximumHeights.getValue().length : null,
+        ring_pts: G.ringsFor(type, P4)[0].length,
+        label: labelText
+      };
+      Plotting.remove(r.id);
+      return out;
+    }
+    var nfz = addOne('no_fly_zone');
+    var plain = addOne('battle_position');       // 无 altLayer，应走贴地分支
+    return {
+      nofly: nfz, plain: plain,
+      fmt: {
+        msl: G.formatAltitude(1500, 'MSL'),
+        fl: G.formatAltitude(150, 'FL'),
+        bare: G.formatAltitude(3000, null),
+        passthrough_num: G.formatAltitude('FL150', 'MSL'),
+        passthrough_txt: G.formatAltitude('1500MSL', null),
+        blank: G.formatAltitude('', 'AGL')
+      },
+      illegal: (function () {
+        var def = Plotting.CATALOGUE['no_fly_zone'];
+        var orig = def.params.altLayer;
+        def.params.altLayer = [10000, 0];        // 上限 <= 下限
+        var r = Plotting.add({ type: 'no_fly_zone', layer: 'plot.intel', points: P4 });
+        var hasVol = r.entities.some(function (e) { return e.polygon && e.polygon.extrudedHeight; });
+        Plotting.remove(r.id);
+        def.params.altLayer = orig;
+        return { has_volume: hasVol, parsed: G.parseAltLayer({ altLayer: [10000, 0] }) };
+      })()
+    };
+  })();
   return out;
 })()
 """
@@ -523,6 +573,34 @@ def main() -> int:
           "%s m" % ("None" if closed is None else "%.3f" % closed))
     check("OPT-1: zero/negative/NaN bands are filtered out",
           fn.get("bad_input_rings") == 1, "got %r" % fn.get("bad_input_rings"))
+
+    print("10. OPT-2 -- airspace with altitude layers")
+    al = d.get("alt") or {}
+    nz = al.get("nofly") or {}
+    pl = al.get("plain") or {}
+    check("OPT-2: no_fly_zone has height/extrudedHeight",
+          nz.get("has_height") is True and nz.get("height") == 0 and nz.get("extruded") == 10000,
+          "height=%r extruded=%r" % (nz.get("height"), nz.get("extruded")))
+    check("OPT-2: wall arrays match ring vertex count",
+          nz.get("wall_lows") == nz.get("ring_pts") and nz.get("wall_highs") == nz.get("ring_pts"),
+          "lows=%r highs=%r ring=%r" % (nz.get("wall_lows"), nz.get("wall_highs"), nz.get("ring_pts")))
+    check("OPT-2: altitude label formatted from datum",
+          nz.get("label") == "0FT AGL ~ 10000FT AGL", "got %r" % nz.get("label"))
+    check("OPT-2: type without altLayer stays a ground polygon",
+          pl.get("has_height") is False and pl.get("wall_lows") is None,
+          "has_height=%r wall=%r" % (pl.get("has_height"), pl.get("wall_lows")))
+    fmt = al.get("fmt") or {}
+    check("OPT-2: formatAltitude MSL / FL / bare",
+          fmt.get("msl") == "1500FT MSL" and fmt.get("fl") == "FL150" and fmt.get("bare") == "3000FT",
+          "msl=%r fl=%r bare=%r" % (fmt.get("msl"), fmt.get("fl"), fmt.get("bare")))
+    check("OPT-2: non-numeric altitudes pass through untouched",
+          fmt.get("passthrough_num") == "FL150" and fmt.get("passthrough_txt") == "1500MSL"
+          and fmt.get("blank") == "",
+          "num=%r txt=%r blank=%r" % (fmt.get("passthrough_num"), fmt.get("passthrough_txt"), fmt.get("blank")))
+    ill = al.get("illegal") or {}
+    check("OPT-2: altLayer[1] <= altLayer[0] is rejected (no negative volume)",
+          ill.get("has_volume") is False and ill.get("parsed") is None,
+          "has_volume=%r parsed=%r" % (ill.get("has_volume"), ill.get("parsed")))
 
     print()
     if FAILURES:
