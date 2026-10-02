@@ -445,6 +445,42 @@ PROBE = r"""
       bbox_same: b0.every(function (v, k) { return v === b1[k]; })
     };
   })();
+  // 12. FIX-5 回归：阵列图元合并为批量图元（数量与图元数无关）
+  out.batch = await (async function () {
+    function frames(n) {
+      return new Promise(function (res) {
+        var k = 0;
+        function step() { if (++k >= n) return res(); requestAnimationFrame(step); }
+        requestAnimationFrame(step);
+      });
+    }
+    var scene = SituationHost.viewer().scene;
+    var A = [119.4, 24.2];
+    // 同一条线上取长短两种跨度：marks 数差很多，批量图元数应完全相同
+    // `tiny` 是**明确低于可见下限**的段：图元会被丢弃、只剩线（DECOR_MIN_PX=3）。
+    // `long` 是明显高于下限的段：应有大量图元但仍只有 1 个批量图元。
+    // 第一版拿 `tiny` 当"图元较少"的对照组，结果 marks=0，把正确的下限行为
+    // 判成了失败——所以现在把这两种情形分开断言。
+    var tiny = [A, [119.42, 24.215]];
+    var long = [A, [120.6, 25.0]];
+    function probe(pts, type) {
+      var before = scene.primitives.length;
+      var r = Plotting.add({ type: type, layer: 'plot.defense', points: pts });
+      return frames(25).then(function () {
+        var d = Plotting.debug().items.filter(function (i) { return i.id === r.id; })[0] || {};
+        var ready = r.primitives.map(function (pr) { return pr.ready === true; });
+        Plotting.remove(r.id);
+        return frames(3).then(function () {
+          return { marks: d.marks, entities: d.entities, primitives: d.primitives,
+                   ready: ready, leaked: scene.primitives.length - before };
+        });
+      });
+    }
+    var s = await probe(tiny, 'wire_fence');
+    var l = await probe(long, 'wire_fence');
+    var f = await probe(long, 'anti_tank_ditch');
+    return { wire_tiny: s, wire_long: l, fill_long: f, min_px: 3 };
+  })();
   return out;
 })()
 """
@@ -659,6 +695,28 @@ def main() -> int:
           "%r -> %r" % (bg.get("decimated_from"), bg.get("decimated_to")))
     check("OPT-4: bounding box preserved bit-for-bit",
           bg.get("bbox_same") is True, "got %r" % bg.get("bbox_same"))
+
+    print("12. FIX-5 -- array marks batched into primitives")
+    bt = d.get("batch") or {}
+    wt, wl, fl = bt.get("wire_tiny") or {}, bt.get("wire_long") or {}, bt.get("fill_long") or {}
+    # 不变式：有图元 → 恰好 1 个批量图元；无图元 → 0 个。与 marks 数量无关。
+    check("FIX-5: primitive count is 1 iff there are marks (never grows with marks)",
+          (wt.get("primitives") == (1 if (wt.get("marks") or 0) > 0 else 0)) and
+          wl.get("primitives") == 1 and (wl.get("marks") or 0) > 0,
+          "tiny marks=%r prim=%r | long marks=%r prim=%r" % (
+              wt.get("marks"), wt.get("primitives"), wl.get("marks"), wl.get("primitives")))
+    check("FIX-5: marks below the visibility floor still leave the line drawn",
+          (wt.get("marks") or 0) == 0 and (wt.get("entities") or 0) >= 1,
+          "marks=%r entities=%r" % (wt.get("marks"), wt.get("entities")))
+    check("FIX-5: batched primitive actually builds (ready)",
+          wl.get("ready") == [True], "long=%r" % wl.get("ready"))
+    check("FIX-5: filled marks (ditch teeth) also batch to 1 primitive",
+          fl.get("primitives") == 1, "got %r" % fl.get("primitives"))
+    check("FIX-5: removing a record leaks no scene primitives",
+          wt.get("leaked") == 0 and wl.get("leaked") == 0 and fl.get("leaked") == 0,
+          "tiny=%r long=%r fill=%r" % (wt.get("leaked"), wl.get("leaked"), fl.get("leaked")))
+    check("FIX-5: marks no longer created as one entity each",
+          (wl.get("entities") or 0) <= 2, "entities=%r marks=%r" % (wl.get("entities"), wl.get("marks")))
 
     print()
     if FAILURES:

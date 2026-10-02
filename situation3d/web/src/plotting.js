@@ -1212,20 +1212,55 @@
         }));
         n++;
       }
-      arr.marks.forEach(function (mk) {
-        var pos = mk.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); });
-        if (pos.length >= 3) {
-          rec.entities.push(viewer.entities.add({
-            polygon: { hierarchy: new Cesium.PolygonHierarchy(pos), material: lineCol.withAlpha(0.85),
-                       classificationType: Cesium.ClassificationType.BOTH },
-          }));
-        } else {
-          rec.entities.push(viewer.entities.add({
-            polyline: { positions: pos, width: 2, clampToGround: true, material: lineCol },
-          }));
-        }
+      // ---- FIX-5：图元合并进批量图元，而不是一图元一个 Entity ----
+      //
+      // 实测确有问题：一条 150 km 的铁丝网在近景（mpp=10）会产生 **430 个叉号**，
+      // 一图元一个 Entity 就是 **862 个实体**（远景只有 18 个，所以不测就发现不了）。
+      //
+      // 用 **Ground 系列**批量图元而不是普通 Primitive：标绘是画在地表上的，
+      // 换成一米不差地浮在椭球面上的 `PolylineCollection`/`Primitive`，
+      // 打开地形模型（`modelTerrain`）后图元就会悬空或陷进地形。
+      // `GroundPolylinePrimitive` 与 `GroundPrimitive` 支持 `geometryInstances` 数组，
+      // 是"贴地 + 批量"的唯一正确组合。
+      var strokes = [], fills = [];
+      arr.marks.forEach(function (mk) { (mk.length >= 3 ? fills : strokes).push(mk); });
+
+      if (strokes.length && Cesium.GroundPolylinePrimitive) {
+        var sInst = strokes.map(function (mk) {
+          return new Cesium.GeometryInstance({
+            geometry: new Cesium.GroundPolylineGeometry({
+              positions: mk.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); }),
+              width: 2,
+            }),
+            attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(lineCol) },
+          });
+        });
+        rec.primitives.push(viewer.scene.primitives.add(new Cesium.GroundPolylinePrimitive({
+          geometryInstances: sInst,
+          appearance: new Cesium.PolylineColorAppearance({ translucent: false }),
+        })));
         n++;
-      });
+      }
+      if (fills.length && Cesium.GroundPrimitive) {
+        var fInst = fills.map(function (mk) {
+          return new Cesium.GeometryInstance({
+            geometry: new Cesium.PolygonGeometry({
+              polygonHierarchy: new Cesium.PolygonHierarchy(
+                mk.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); })),
+              vertexFormat: Cesium.PerInstanceColorAppearance.VERTEX_FORMAT,
+            }),
+            attributes: {
+              color: Cesium.ColorGeometryInstanceAttribute.fromColor(lineCol.withAlpha(0.85)),
+            },
+          });
+        });
+        rec.primitives.push(viewer.scene.primitives.add(new Cesium.GroundPrimitive({
+          geometryInstances: fInst,
+          appearance: new Cesium.PerInstanceColorAppearance({ flat: true, translucent: true }),
+        })));
+        n++;
+      }
+      rec.markCount = arr.marks.length;
       if (rec.label) n += addLabel(rec);
       return n;
     }
@@ -1342,6 +1377,10 @@
       try { viewer.entities.remove(e); } catch (err) { /* 已随场景销毁 */ }
     });
     rec.entities.length = 0;
+    (rec.primitives || []).forEach(function (pr) {
+      try { viewer.scene.primitives.remove(pr); } catch (err) { /* 已随场景销毁 */ }
+    });
+    if (rec.primitives) rec.primitives.length = 0;
   }
 
   // ---------------------------------------------------------------------
@@ -1372,6 +1411,9 @@
       // 分界线两侧的番号：**按实例**传入，不放在类型定义里（见 FIX-4 的说明）。
       sideLabels: spec.sideLabels || null,
       entities: [],
+      // 批量图元通道（FIX-5）：阵列族的图元合并进 scene.primitives，
+      // 与逐实体通道分开存，生命周期一起管。
+      primitives: [],
     };
     byId[id] = rec;
     drawOne(rec);
@@ -1404,6 +1446,7 @@
       var rec = byId[id];
       var on = layerVisible[rec.layer] !== false;   // 未声明过就默认可见
       rec.entities.forEach(function (e) { e.show = on; });
+      (rec.primitives || []).forEach(function (pr) { pr.show = on; });
     });
   }
 
@@ -1475,7 +1518,9 @@
     debug: function () {
       var list = Object.keys(byId).map(function (id) {
         return { id: id, type: byId[id].type, layer: byId[id].layer,
-                 std: byId[id].std, entities: byId[id].entities.length };
+                 std: byId[id].std, entities: byId[id].entities.length,
+                 primitives: (byId[id].primitives || []).length,
+                 marks: byId[id].markCount || 0 };
       });
       return {
         bound: !!viewer, visible: layerVisible, count: list.length, items: list,
