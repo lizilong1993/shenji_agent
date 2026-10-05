@@ -112,6 +112,30 @@
         <label class="check"><input type="checkbox" id="plotDefense" checked> 防御与障碍</label>
         <label class="check"><input type="checkbox" id="plotFire" checked> 火力</label>
         <label class="check"><input type="checkbox" id="plotIntel" checked> 侦察与空域</label>
+
+        <!-- 添加标绘：两条路径共用同一组「类型 / 归属 / 图层」选择。
+             「地图绘制」在地图上逐点落控制点（绘制期间左键不选中目标）；
+             「按坐标添加」直接粘贴坐标行。 -->
+        <div class="plot-add">
+          <select id="plotType" class="plot-sel" title="标绘类型"></select>
+          <div class="plot-row">
+            <select id="plotSide" class="plot-sel">
+              <option value="friendly">红方</option>
+              <option value="enemy">蓝方</option>
+            </select>
+            <select id="plotLayer" class="plot-sel" title="归属图层"></select>
+          </div>
+          <input id="plotLabel" class="plot-input" type="text" placeholder="标注" maxlength="40">
+          <textarea id="plotPoints" class="plot-input" rows="2"
+                    placeholder="控制点：每行 经度, 纬度"></textarea>
+          <div class="plot-row">
+            <button type="button" id="plotDraw" class="mini">地图绘制</button>
+            <button type="button" id="plotAddByText" class="mini">按坐标添加</button>
+            <button type="button" id="plotCancel" class="mini">取消</button>
+          </div>
+          <div id="plotHint" class="switch-note"></div>
+          <div id="plotList" class="plot-list"></div>
+        </div>
       </details>
 
       <details class="layer-group panel-block" open>

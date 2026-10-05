@@ -1092,6 +1092,42 @@ select {
   font-variant-numeric: tabular-nums;
 }
 
+/* 标绘添加面板：与左栏其它控件同一套观感（复用 .mini / .switch-note）。
+   两条路径共用上面这组选择，所以放在同一块里。 */
+.plot-add {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+.plot-row { display: flex; gap: 4px; }
+.plot-row > * { flex: 1 1 0; min-width: 0; }
+.plot-sel,
+.plot-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #fff;
+  color: var(--text);
+}
+.plot-input { resize: vertical; }
+.plot-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.plot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.plot-empty { font-size: 11px; color: var(--text-dim); padding: 2px 0; }
+
 .sb-bar {
   width: var(--sb-width);
   height: 7px;

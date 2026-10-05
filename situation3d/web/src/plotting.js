@@ -343,6 +343,53 @@
   function palette() { return colorStandard === 'NATO' ? NATO_COLOR : CN_COLOR; }
 
   // 兼容旧调用点：按"红/蓝"**字面**取色（注意这**不等于**友/敌，友敌请用 palette()）。
+  // ---------------------------------------------------------------------
+  // 界面所需的元数据：控制点数 + 默认归属图层
+  // ---------------------------------------------------------------------
+  //
+  // 为什么放在这里而不是逐条写进 CATALOGUE：族已经唯一决定了点数语义
+  // （见各族的构造函数），逐条写 24 遍既啰嗦又容易写错。UI 通过
+  // `Plotting.catalogue()` 拿到这两项，用来提示"还需点几个点"和默认勾选图层。
+
+  /** 每族需要几个控制点。`max: null` 表示不设上限（折线骨架可任意长）。 */
+  var CTRL_BY_FAMILY = {
+    arrow2: { min: 2, max: 2 },      // 尾点 + 头点
+    arrowN: { min: 3, max: null },   // 两个尾角 + 骨架点
+    pincer: { min: 3, max: null },   // 两翼根部 + 箭头尖（可再补左尖/连接点）
+    zone:   { min: 3, max: null },   // 闭合区域至少 3 点
+    fan:    { min: 2, max: 3 },      // 圆心 + 定半径点（+ 定张角点）
+    band:   { min: 2, max: null },   // 中心线
+    line:   { min: 2, max: null },   // 折线
+    array:  { min: 2, max: null },   // 沿线阵列的走向线
+  };
+
+  /**
+   * 类型 → 默认归属的标绘图层。
+   *
+   * `add()` 此前硬编码回落 `plot.offense`，与类型完全无关 —— 于是"集结地域"会落到
+   * "进攻"图层下、关掉进攻图层它也跟着消失。这里按类别给出真实归属。
+   */
+  var LAYER_BY_TYPE = {
+    // 进攻
+    assault_direction: 'plot.offense', fine_arrow: 'plot.offense',
+    straight_arrow: 'plot.offense', attack_arrow: 'plot.offense',
+    tailed_attack_arrow: 'plot.offense', squad_combat: 'plot.offense',
+    pincer: 'plot.offense',
+    // 机动与集结
+    assembly_area: 'plot.mobility', waiting_area: 'plot.mobility',
+    air_corridor: 'plot.mobility', mobility_corridor: 'plot.mobility',
+    // 防御与障碍
+    battle_position: 'plot.defense', boundary: 'plot.defense',
+    wire_fence: 'plot.defense', anti_tank_ditch: 'plot.defense',
+    mineline: 'plot.defense', mined_area: 'plot.defense',
+    // 火力
+    fire_range: 'plot.fire', circular_range: 'plot.fire',
+    coordination_line: 'plot.fire', phase_line: 'plot.fire',
+    // 侦察与空域
+    recon_area: 'plot.intel', no_fly_zone: 'plot.intel',
+    maritime_blockade: 'plot.intel',
+  };
+
   var COLOR = {
     get red() { return NATO_COLOR.enemy; },
     get blue() { return NATO_COLOR.friendly; },
@@ -1459,6 +1506,9 @@
         sourceStandard: d.sourceStandard, sourceDoc: d.sourceDoc,
         sourceConfidence: d.sourceConfidence, algorithmFamily: d.algorithmFamily,
         cnImplRef: d.cnImplRef || null, usEquivalent: d.usEquivalent || null,
+        // 界面所需：需要几个控制点、默认落在哪个标绘图层
+        ctrl: CTRL_BY_FAMILY[d.family] || { min: 2, max: null },
+        defaultLayer: LAYER_BY_TYPE[k] || 'plot.offense',
         // `custom` 表示"本图形自建、不对应任何标准图形"。必须能被外部读到——
         // 放在 params 里没人读就等于没标（FIX-1c）。
         custom: !!d.custom,
@@ -1495,6 +1545,8 @@
       pincerRings: pincerRings,
       fanRings: fanRings,
       formatAltitude: formatAltitude,
+      CTRL_BY_FAMILY: CTRL_BY_FAMILY,
+      LAYER_BY_TYPE: LAYER_BY_TYPE,
       decimateRing: decimateRing,
       MAX_RING_VERTS: MAX_RING_VERTS,
       parseAltLayer: parseAltLayer,

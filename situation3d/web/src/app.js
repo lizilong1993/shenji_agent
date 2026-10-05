@@ -3031,6 +3031,10 @@ window.SituationHost = {
     };
   },
   setStatus: setStatus,
+  // 标绘绘制模式是否激活。**必须能读到**：绘制模式下左键被改成"落控制点"，
+  // 若模式退不出去，用户就再也选不中目标了；而这件事从界面上只能间接看出来
+  // （按钮文案变回来），从外部断言不了。
+  plotDrawActive: function () { return !!plotDraw; },
   // 图层顺序取证：imagery 的真实 index 顺序 + 每个图层的意图/事实。
   // 「哪个层压在哪个层上面」光看画面猜不出来，必须能读到 index。
   debugLayers: debugLayers,
@@ -3437,6 +3441,7 @@ function bindUI() {
   captureLayerDefaults();
 
   bindPicking();
+  bindPlotPanel();
   bindFollowInput();
 
   // 跟随相机挂在 preRender：Scene.render 的顺序是 preUpdate → update →
@@ -3480,6 +3485,290 @@ function bindUI() {
   });
 }
 
+// --------------------------------------------------------------------------
+// 标绘面板：地图手动绘制 + 按坐标添加
+// --------------------------------------------------------------------------
+//
+// 为什么需要这一块：`plotting.js` 的引擎与 24 类几何早就完成了，但**没有任何界面入口**
+// —— `Plotting.add()` 只能在控制台里调。人工介入的标绘（分界线、火力扇面、禁飞区…）
+// 一条也落不了图。这里补上两条路径，共用同一套「类型 / 归属 / 图层」选择。
+//
+// 参数录入**没有**放进 TS注册 模态框：绘制按钮必须紧挨图层开关，而两条路径共用同一组
+// 控件，分到两处等于把类型/归属/图层各写一遍。要挪过去是一处 DOM 搬家。
+
+let plotDraw = null;         // {type, layer, side, label, points:[Carto], previewId}
+let plotDraftEntities = [];
+
+function plotCatalogue() {
+  return (window.Plotting && Plotting.catalogue()) || [];
+}
+
+function plotDef(type) {
+  return plotCatalogue().filter(function (c) { return c.type === type; })[0] || null;
+}
+
+function setPlotHint(text, cls) {
+  const el = document.getElementById('plotHint');
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = 'switch-note' + (cls ? ' ' + cls : '');
+}
+
+/** 草稿控制点标记。用普通 point 图元，不走 Plotting —— 它们不是标绘的一部分。 */
+function clearPlotDraft() {
+  plotDraftEntities.forEach(function (e) {
+    try { viewer.entities.remove(e); } catch (err) { /* 已随场景销毁 */ }
+  });
+  plotDraftEntities = [];
+  if (plotDraw && plotDraw.previewId && window.Plotting) {
+    try { Plotting.remove(plotDraw.previewId); } catch (err) { /* 已移除 */ }
+    plotDraw.previewId = null;
+  }
+}
+
+function plotDrawReset() {
+  clearPlotDraft();
+  plotDraw = null;
+  const btn = document.getElementById('plotDraw');
+  const cancel = document.getElementById('plotCancel');
+  if (btn) btn.textContent = '地图绘制';
+  if (cancel) cancel.style.display = 'none';
+  setPlotHint('');
+}
+
+/** 已落点数 → 提示文案。把「还需几个点」说清楚，否则用户不知道什么时候能完成。 */
+function syncPlotHint() {
+  if (!plotDraw) return;
+  const def = plotDef(plotDraw.type);
+  const ctrl = (def && def.ctrl) || { min: 2, max: null };
+  const n = plotDraw.points.length;
+  const btn = document.getElementById('plotDraw');
+  if (n < ctrl.min) {
+    setPlotHint('还需 ' + (ctrl.min - n) + ' 个控制点（已点 ' + n + '）', 'warn');
+    if (btn) btn.textContent = '绘制中…';
+  } else {
+    const maxTxt = ctrl.max ? ('／' + ctrl.max) : '';
+    setPlotHint('已点 ' + n + maxTxt + ' 个，可「完成」', 'ok');
+    if (btn) btn.textContent = '完成绘制';
+  }
+}
+
+/** 点数够了下限就生成一次预览，让用户看到形状再决定是否完成。 */
+function syncPlotPreview() {
+  if (!plotDraw || !window.Plotting) return;
+  const def = plotDef(plotDraw.type);
+  const ctrl = (def && def.ctrl) || { min: 2, max: null };
+  if (plotDraw.previewId) {
+    try { Plotting.remove(plotDraw.previewId); } catch (err) { /* 已移除 */ }
+    plotDraw.previewId = null;
+  }
+  if (plotDraw.points.length < ctrl.min) return;
+  try {
+    const rec = Plotting.add({
+      type: plotDraw.type, layer: plotDraw.layer, points: plotDraw.points,
+      hostility: plotDraw.side, label: plotDraw.label || null,
+    });
+    plotDraw.previewId = rec.id;
+  } catch (err) { /* 预览失败不打断绘制，完成时会再报一次 */ }
+}
+
+function plotCartoToLonLat(c) {
+  return [Cesium.Math.toDegrees(c.longitude), Cesium.Math.toDegrees(c.latitude)];
+}
+
+function addPlotPoint(carto) {
+  if (!plotDraw || !carto) return;
+  plotDraw.points.push(plotCartoToLonLat(carto));
+  const def = plotDef(plotDraw.type);
+  const ctrl = (def && def.ctrl) || { min: 2, max: null };
+  const pal = (window.Plotting && Plotting.palette) ? Plotting.palette() : { friendly: '#c8102e', enemy: '#123a6b' };
+  const col = Cesium.Color.fromCssColorString(plotDraw.side === 'enemy' ? pal.enemy : pal.friendly);
+  plotDraftEntities.push(viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(plotDraw.points[plotDraw.points.length - 1][0],
+                                            plotDraw.points[plotDraw.points.length - 1][1]),
+    point: {
+      pixelSize: 9, color: col, outlineColor: Cesium.Color.WHITE, outlineWidth: 2,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    },
+  }));
+  if (ctrl.max && plotDraw.points.length >= ctrl.max) { syncPlotPreview(); syncPlotHint(); finishPlotDraw(); return; }
+  syncPlotPreview();
+  syncPlotHint();
+}
+
+function finishPlotDraw() {
+  if (!plotDraw) return;
+  const def = plotDef(plotDraw.type);
+  const ctrl = (def && def.ctrl) || { min: 2, max: null };
+  if (plotDraw.points.length < ctrl.min) {
+    setPlotHint('控制点不足：' + plotDraw.type + ' 至少需要 ' + ctrl.min + ' 个', 'warn');
+    return;
+  }
+  const pts = plotDraw.points.slice();
+  const spec = {
+    type: plotDraw.type, layer: plotDraw.layer, points: pts,
+    hostility: plotDraw.side, label: plotDraw.label || null,
+  };
+  // 预览已经是一份真标绘；完成时先撤掉预览再正式落一条，避免重复
+  if (plotDraw.previewId) {
+    try { Plotting.remove(plotDraw.previewId); } catch (err) { /* 已移除 */ }
+    plotDraw.previewId = null;
+  }
+  try {
+    Plotting.add(spec);
+    setPlotHint('已添加 ' + (def ? def.zh : plotDraw.type) + '（' + pts.length + ' 个控制点）', 'ok');
+  } catch (err) {
+    setPlotHint('添加失败：' + err.message, 'warn');
+  }
+  plotDraftEntities.forEach(function (e) { try { viewer.entities.remove(e); } catch (err) {} });
+  plotDraftEntities = [];
+  plotDraw = null;
+  const btn = document.getElementById('plotDraw');
+  const cancel = document.getElementById('plotCancel');
+  if (btn) btn.textContent = '地图绘制';
+  if (cancel) cancel.style.display = 'none';
+  renderPlotList();
+}
+
+/**
+ * 解析坐标文本：每行一个点，`lon, lat`（逗号或空白分隔）。
+ * 逐条报错而不是只报第一条 —— 粘一份大清单时反复试是最烦的。
+ */
+function parsePlotPoints(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  const pts = [];
+  const errs = [];
+  lines.forEach(function (raw, i) {
+    const s = raw.trim();
+    if (!s || s.charAt(0) === '#') return;
+    const parts = s.split(/[,\s]+/).filter(Boolean);
+    if (parts.length !== 2) { errs.push('第 ' + (i + 1) + ' 行：需要两个数（经度, 纬度）'); return; }
+    const lon = Number(parts[0]);
+    const lat = Number(parts[1]);
+    if (!isFinite(lon) || !isFinite(lat)) { errs.push('第 ' + (i + 1) + ' 行：不是有效数字'); return; }
+    if (lon < -180 || lon > 180 || lat < -90 || lat > 90) {
+      errs.push('第 ' + (i + 1) + ' 行：坐标越界（' + lon + ', ' + lat + '）'); return;
+    }
+    pts.push([lon, lat]);
+  });
+  return { points: pts, errors: errs };
+}
+
+function renderPlotList() {
+  const host = document.getElementById('plotList');
+  if (!host || !window.Plotting) return;
+  const items = (Plotting.debug().items || []).filter(function (it) {
+    // 绘制预览也是一条**真标绘**（渲染要靠它），但它还没「完成」，不该出现在列表里
+    // —— 否则一边画一边就能看到一个"半成品条目"，完成后又换成正式条目，像是闪了一下。
+    if (plotDraw && plotDraw.previewId && it.id === plotDraw.previewId) return false;
+    return it.type && plotDef(it.type);
+  });
+  host.innerHTML = '';
+  if (!items.length) {
+    host.appendChild(Object.assign(document.createElement('div'), {
+      className: 'plot-empty', textContent: '尚未添加标绘',
+    }));
+    return;
+  }
+  items.forEach(function (it) {
+    const def = plotDef(it.type);
+    const row = document.createElement('div');
+    row.className = 'plot-item';
+    const txt = document.createElement('span');
+    txt.textContent = (def ? def.zh : it.type) + ' · ' + (def ? (def.sourceStandard || '') : '')
+      + ' · ' + it.layer.replace('plot.', '');
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'mini';
+    del.textContent = '删除';
+    del.addEventListener('click', function () {
+      Plotting.remove(it.id);
+      renderPlotList();
+    });
+    row.appendChild(txt);
+    row.appendChild(del);
+    host.appendChild(row);
+  });
+}
+
+function bindPlotPanel() {
+  const typeSel = document.getElementById('plotType');
+  const layerSel = document.getElementById('plotLayer');
+  const sideSel = document.getElementById('plotSide');
+  const labelIn = document.getElementById('plotLabel');
+  const pointsIn = document.getElementById('plotPoints');
+  const drawBtn = document.getElementById('plotDraw');
+  const cancelBtn = document.getElementById('plotCancel');
+  const addBtn = document.getElementById('plotAddByText');
+  if (!typeSel || !window.Plotting) return;
+
+  const cat = plotCatalogue();
+  typeSel.innerHTML = '';
+  cat.forEach(function (c) {
+    const o = document.createElement('option');
+    o.value = c.type;
+    // 标准来源直接写在选项里 —— 每个类型是中式还是美式补齐，选的时候就该看见
+    o.textContent = c.zh + '（' + (c.sourceStandard || '?') + '）';
+    typeSel.appendChild(o);
+  });
+  layerSel.innerHTML = '';
+  LayerRegistry.list('plot').forEach(function (l) {
+    const o = document.createElement('option');
+    o.value = l.id; o.textContent = l.label.replace('标绘·', '');
+    layerSel.appendChild(o);
+  });
+  const syncLayerDefault = function () {
+    const d = plotDef(typeSel.value);
+    if (d && d.defaultLayer) layerSel.value = d.defaultLayer;
+  };
+  typeSel.addEventListener('change', syncLayerDefault);
+  syncLayerDefault();
+
+  drawBtn.addEventListener('click', function () {
+    if (plotDraw) { finishPlotDraw(); return; }
+    const d = plotDef(typeSel.value);
+    if (!d) return;
+    plotDraw = {
+      type: typeSel.value, layer: layerSel.value,
+      side: sideSel.value === 'enemy' ? 'enemy' : 'friendly',
+      label: (labelIn.value || '').trim(), points: [], previewId: null,
+    };
+    if (cancelBtn) cancelBtn.style.display = '';
+    syncPlotHint();
+  });
+
+  if (cancelBtn) {
+    cancelBtn.style.display = 'none';
+    cancelBtn.addEventListener('click', function () {
+      plotDrawReset();
+      setPlotHint('已取消绘制');
+    });
+  }
+
+  addBtn.addEventListener('click', function () {
+    const res = parsePlotPoints(pointsIn.value);
+    if (res.errors.length) { setPlotHint('坐标有误：' + res.errors.join('；'), 'warn'); return; }
+    const d = plotDef(typeSel.value);
+    const ctrl = (d && d.ctrl) || { min: 2, max: null };
+    if (res.points.length < ctrl.min) {
+      setPlotHint('控制点不足：' + (d ? d.zh : typeSel.value) + ' 至少需要 ' + ctrl.min + ' 个（当前 ' + res.points.length + '）', 'warn');
+      return;
+    }
+    try {
+      Plotting.add({
+        type: typeSel.value, layer: layerSel.value, points: res.points,
+        hostility: sideSel.value === 'enemy' ? 'enemy' : 'friendly',
+        label: (labelIn.value || '').trim() || null,
+      });
+      setPlotHint('已按坐标添加 ' + (d ? d.zh : typeSel.value) + '（' + res.points.length + ' 个控制点）', 'ok');
+      renderPlotList();
+    } catch (err) {
+      setPlotHint('添加失败：' + err.message, 'warn');
+    }
+  });
+
+  renderPlotList();
+}
 function bindPicking() {
   const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
 
@@ -3492,6 +3781,13 @@ function bindPicking() {
   }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
   handler.setInputAction(function (click) {
+    // 绘制模式下左键**只落控制点，不选中目标**：否则点在地图上会误切换选中，
+    // 把正在画的标绘打断。模式退出后恢复原有拾取行为。
+    if (plotDraw) {
+      const carto = groundCartoAt(click.position.x, click.position.y);
+      if (carto) addPlotPoint(carto);
+      return;
+    }
     const picked = viewer.scene.pick(click.position);
     const id = picked && picked.id && typeof picked.id.id === 'string' ? picked.id.id : null;
     if (!id) return;
