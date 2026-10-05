@@ -261,19 +261,20 @@
   }
 
   /**
-   * 目标意图栏：**只显示意图集合**（CES 候选集合）与它的判据。
+   * 目标TS栏：**三个分区** —— 目标状态信息 / 目标活动规律 / 目标意图。
    *
-   * 按你的要求把标题从「可能的意图」改成「目标意图」，内容收敛为意图集合本身，
-   * 去掉了状态信息 / 活动规律 / 装备参数——这一栏要回答的是"这个目标想干什么"，
-   * 其余读数会把它淹掉（`deriveActivity` 与 `headingStd` 因此暂时没有调用方，
-   * 保留实现以便将来需要时挂回来）。
+   * 为什么是三个分区而不是揉成一段：上一轮曾按"别堆说明性文字"把状态与活动整体摘掉，
+   * 但这一栏要回答的其实是三个不同的问题——**它现在处于什么状态**（读数）、
+   * **它一贯怎么活动**（规律）、**它想干什么**（意图）。三者混排会让意图被读数淹掉，
+   * 所以各自独立成区、意图区保持最小化（只要集合与置信度）。
    *
-   * 意图集合那块**直接复用** `IntentUi.renderIntentBlock`，不重写：集合大小、概率、
-   * 状态徽章、判据的呈现已有既定实现与验收，重写只会引入分歧。
-   *
-   * 头部只保留"这是哪个目标"的识别信息（军标 + 编号 + 名称）——没有它，意图集合
-   * 就不知道是谁的。
+   * `deriveActivity` 与 `headingStd` 自上一轮起就没有调用方，`kv` / `fmtDeg` 同样
+   * 未被使用——实现一直在，这里把它们挂回来。取数不用改：`app.js` 早就把
+   * `frameState` / `l1` / `frames` / `tick` 全传进来了，只是此前被忽略。
    */
+  var DOMAIN_ZH = { sea: '水面', land: '陆上', air: '空中' };
+  var AFFIL_ZH = { red: '红方', blue: '蓝方' };
+
   function renderTargetStatus(hostEl, def, frameState, l1, entry, frames, tick) {
     if (!hostEl) return;
     if (!def) {
@@ -282,11 +283,56 @@
     }
 
     var html = '<div class="ts-head">'
-      + '<img class="ts-sym" src="' + Symbology.symbolUri(def.icon, def.affiliation, {}) + '" alt="">'
+      + '<img class="ts-sym" src=' + JSON.stringify(Symbology.symbolUri(def.icon, def.affiliation, {})) + ' alt="">'
       + '<div class="ts-id"><b>' + esc(def.id) + '</b>'
       + '<span>' + esc(def.name) + '</span></div></div>';
 
-    html += '<div class="ts-sec">';
+    // ---- 1. 目标状态信息：这一帧的读数 ----
+    var st = frameState || {};
+    html += '<div class="ts-sec">'
+      + '<h4>目标状态信息</h4>';
+    if (frameState) {
+      html += kv('经度', fmtDeg(st.lon, 'E', 'W'))
+        + kv('纬度', fmtDeg(st.lat, 'N', 'S'))
+        + kv('高度', typeof st.alt === 'number' ? Math.round(st.alt) + ' m' : '—')
+        + kv('航向', typeof st.heading === 'number' ? st.heading.toFixed(1) + '°' : '—')
+        + kv('航速', typeof st.speed_kn === 'number' ? st.speed_kn + ' 节' : '—')
+        + kv('已航程', typeof st.travelled_m === 'number'
+            ? (st.travelled_m / 1000).toFixed(1) + ' km' : '—')
+        + kv('状态', st.reached_end ? '已到达终点' : '航渡中')
+        + kv('阵营', AFFIL_ZH[def.affiliation] || def.affiliation || '—')
+        + kv('域', DOMAIN_ZH[def.domain] || def.domain || '—')
+        + kv('装备', def.icon_label || def.icon || '—');
+    } else {
+      // 当前帧取不到该目标（数据未加载完 / 帧越界）：说清是"没有"，不要留一片空
+      html += '<div class="ts-empty">当前帧没有该目标的状态</div>';
+    }
+    html += '</div>';
+
+    // ---- 2. 目标活动规律：从帧序列尾窗推导 ----
+    html += '<div class="ts-sec">'
+      + '<h4>目标活动规律</h4>';
+    var act = deriveActivity(frames, tick, def);
+    if (act && act.insufficient) {
+      // 与意图集合同一个原则：证据不够就说不够，不硬给结论。
+      html += '<div class="ts-empty">样本不足（' + (act.samples || 0) + ' 帧）</div>';
+    } else if (act) {
+      html += kv('活动模式', act.mode)
+        + kv('航向稳定性', act.stability + '（σ ' + act.headingStdDeg + '°）')
+        + kv('平均航速', act.avgSpeedKn + ' 节')
+        + kv('窗口航程', act.pathKm + ' km')
+        + kv('净位移', act.netKm + ' km');
+      if (act.travelledKm !== null) html += kv('累计航程', act.travelledKm + ' km');
+      if (act.laps !== null) html += kv('巡逻圈数', act.laps + ' 圈');
+      html += kv('样本', act.samples + ' / ' + act.windowFrames + ' 帧');
+    } else {
+      html += '<div class="ts-empty">无活动数据</div>';
+    }
+    html += '</div>';
+
+    // ---- 3. 目标意图：保持最小化（只要集合与置信度） ----
+    html += '<div class="ts-sec">'
+      + '<h4>目标意图</h4>';
     if (window.IntentUi) {
       html += IntentUi.renderIntentBlock(entry, def);
     } else {

@@ -1070,6 +1070,11 @@ select {
 
 /* 比例尺：左下角（原在左上）。 */
 .map-scalebar {
+  /* 横条**宽度固定**（可配置默认值）。原先是 JS 按 `meters / mPerPx` 写宽度，
+     条长来回伸缩，读数时反而更难对照。条长固定后，标签就是唯一定义比例的东西，
+     所以 app.js 那边改用精确距离而不是 1/2/5 取整 —— 取整会让"条长 ⇔ 文本"
+     最多差约 ±40%（n 略低于 3.5 时取 2），那对一个测量参照是不能接受的。 */
+  --sb-width: 100px;
   position: absolute;
   left: 12px;
   bottom: 12px;
@@ -1088,12 +1093,12 @@ select {
 }
 
 .sb-bar {
+  width: var(--sb-width);
   height: 7px;
   box-sizing: border-box;
   border: 1px solid #4c5866;
   border-top: none;
   background: rgba(255, 255, 255, .6);
-  min-width: 24px;
 }
 
 .map-comp.hidden,

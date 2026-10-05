@@ -59,7 +59,8 @@
   let mainViewer = null;      // 主 3D Viewer
   let footprintEntity = null;
   let lastFootprintAt = 0;
-  let lastFootprintKey = 'init';   // 'init' | 'none' | 'set'，用于跳过无变化的重复赋值
+  let lastFootprintKey = 'init';   // 'init' | 'none' | 四个交点的实际坐标
+  let footprintUpdates = 0;        // 黄框真正被重画的次数（诊断与自检用）
   let created = false;
 
   function container() { return document.getElementById('overviewContainer'); }
@@ -138,9 +139,20 @@
     if (!footprintEntity) return;
 
     // 状态没变就不重复赋值与重绘。
-    const key = pts ? 'set' : 'none';
+    //
+    // ⚠ 这个 key 原先只编码 `'set'`/`'none'` —— **不含黄框的实际坐标**。于是首次
+    // 成功赋值后 `lastFootprintKey` 恒为 `'set'`，此后每一次同步都在下一行提前返回：
+    // **黄框只画了第一次，之后永久冻结**。症状就是"主视图怎么动，鸟瞰图都不变"，
+    // 看起来像设计如此，实际是"无变化就跳过"这个优化把变化一起跳掉了。
+    // 现在 key 由四个交点的实际坐标（按米取整，避免浮点末位抖动）构成。
+    const key = pts
+      ? pts.map(function (p) {
+          return Math.round(p.x) + ',' + Math.round(p.y) + ',' + Math.round(p.z);
+        }).join(';')
+      : 'none';
     if (key === lastFootprintKey && !force) return;
     lastFootprintKey = key;
+    footprintUpdates++;
 
     // 直接赋普通数组（ConstantProperty），不要用 CallbackProperty —— 见文件头第 3 条
     if (pts) {
@@ -286,9 +298,32 @@
            '  visible ' + isVisible();
   }
 
+  /**
+   * 黄框的取证读数。**必须能从这里读到**：黄框是否在更新，只有把 key 与重画次数
+   * 暴露出来才能从外部断言 —— 否则"鸟瞰图不变"这种 bug 只能靠肉眼看。
+   */
+  function footprintDebug() {
+    const c = viewer ? viewer.camera.positionCartographic : null;
+    return {
+      updates: footprintUpdates,
+      keyLen: lastFootprintKey.length,
+      // key 前 60 字符：自检据此断言"几何真的变了"，而不只是次数增加
+      keyHead: lastFootprintKey.slice(0, 60),
+      shown: !!(footprintEntity && footprintEntity.show),
+      // 黄框顶点数：0 表示当前没有框（相机过低或打不到地面）
+      vertices: footprintEntity && footprintEntity.polyline.positions
+        ? (footprintEntity.polyline.positions.getValue() || []).length : 0,
+      // 鸟瞰图自身机位 —— 断言它在主视图移动时**保持不变**（固定全图设计）
+      cameraLon: c ? c.longitude : null,
+      cameraLat: c ? c.latitude : null,
+      cameraHeight: c ? c.height : null,
+    };
+  }
+
   global.Overview = {
     init: function (main) { mainViewer = main; },
     debugInfo: debugInfo,
+    footprintDebug: footprintDebug,
     ensure: ensure,
     show: show,
     hide: hide,

@@ -2575,12 +2575,35 @@ function groundCartoAt(px, py) {
 const SCALE_PROBE_PX = 100;
 
 /**
- * 比例尺：在**比例尺实际绘制处**取两个屏幕点量地面距离，换算每像素米数，
- * 再按 1/2/5×10ⁿ 取整到人类友好的刻度。
+ * 比例尺标签的取值方式。
+ *
+ *   'exact' —— 取横条实际代表的地面距离（2 位有效数字）。**默认**。
+ *   'nice'  —— 取 1/2/5×10ⁿ 的整数档。
+ *
+ * 为什么默认精确：横条宽度现在是**固定**的（`style.css` 的 `--sb-width`），
+ * 于是标签是唯一定义比例的东西。若取整数档，条长与文本最多可差约 ±40%
+ * （`n` 略低于 3.5 时取 2，偏差 43%），而比例尺是测量参照，差这么多不能用。
+ * 整数档读起来更顺口，所以留成开关备选。
+ */
+const SCALE_LABEL_MODE = 'exact';
+
+/** 地面距离 → 比例尺文本。≥1 km 用 km，否则用 m；保留 2 位有效数字。 */
+function formatScaleDistance(meters) {
+  if (!isFinite(meters) || meters <= 0) return '—';
+  if (meters >= 1000) {
+    const km = meters / 1000;
+    return (km >= 10 ? km.toFixed(0) : km.toFixed(1)) + ' km';
+  }
+  return (meters >= 10 ? Math.round(meters) : meters.toFixed(1)) + ' m';
+}
+
+/**
+ * 比例尺：在**比例尺实际绘制处**取两个屏幕点量地面距离，换算每像素米数。
  *
  * 取样点不能用屏幕中心：3D 倾斜视图下近端与远端的每像素米数可差数倍，
- * 用中心值会让画在左上的横条与实际地面长度对不上。
- * 探针跨度固定 100 px（与待求的 sbBar 宽度解耦），单趟即可算出结果。
+ * 用中心值会让画在左下的横条与实际地面长度对不上。
+ * 探针跨度固定 100 px（与横条的固定宽度解耦），单趟即可算出每像素米数；
+ * 横条代表的距离再用它**自己的实际宽度**换算 —— 这样改了 CSS 宽度也不必同步改探针。
  */
 function updateScalebar() {
   if (!dom.sbBar || !dom.sbLabel) return;
@@ -2607,16 +2630,15 @@ function updateScalebar() {
   }
   if (!isFinite(mPerPx) || mPerPx <= 0) return;
 
-  const raw = mPerPx * SCALE_PROBE_PX;
-  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
-  const n = raw / pow;
-  const nice = n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10;
-  const meters = nice * pow;
-
-  dom.sbBar.style.width = Math.max(24, Math.round(meters / mPerPx)) + 'px';
-  dom.sbLabel.textContent = meters >= 1000
-    ? (meters / 1000).toFixed(meters % 1000 === 0 ? 0 : 1) + ' km'
-    : Math.round(meters) + ' m';
+  // 横条代表的距离 = 每像素米数 × 横条**自己的**宽度（不写宽度，宽度由 CSS 定）。
+  const span = mPerPx * br.width;
+  let meters = span;
+  if (SCALE_LABEL_MODE === 'nice') {
+    const pow = Math.pow(10, Math.floor(Math.log10(span)));
+    const n = span / pow;
+    meters = (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * pow;
+  }
+  dom.sbLabel.textContent = formatScaleDistance(meters);
 }
 
 let compTick = 0;
