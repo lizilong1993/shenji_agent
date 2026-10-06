@@ -1554,6 +1554,49 @@
   }
 
   /**
+   * 导出全部标绘为**可序列化的普通对象**，供 TS 定义持久化。
+   *
+   * 导出的是**控制点**，不是派生出来的环/线：派生几何展开后动辄几百个顶点，
+   * 存下来就再也回不到"这是一条分界线、由两个点定义"的语义了。
+   * `points` 做**深拷贝** —— 直接把内部数组交出去，调用方一改就把记录改了。
+   */
+  function exportAll() {
+    return Object.keys(byId).map(function (id) {
+      var rec = byId[id];
+      return {
+        type: rec.type,
+        layer: rec.layer,
+        hostility: rec.hostility,
+        label: rec.label || null,
+        points: rec.points.map(function (c) { return [c[0], c[1]]; }),
+      };
+    });
+  }
+
+  /**
+   * 批量导入。逐条走既有的 `add()`，所以类型校验、点数校验都沿用同一份实现。
+   * **逐条收集错误**而不是遇到第一条就抛：一份定义里有两三条坏的，用户应该一次
+   * 看全，而不是改一条试一次。
+   */
+  function importAll(list, opts) {
+    if (!Array.isArray(list)) return { added: 0, errors: ['plots 必须是数组'] };
+    if (opts && opts.replace) {
+      Object.keys(byId).forEach(function (id) { remove(id); });
+    }
+    var errors = [], added = 0;
+    list.forEach(function (p, i) {
+      try {
+        add({ type: p && p.type, layer: p && p.layer, points: p && p.points,
+              hostility: p && p.hostility, label: (p && p.label) || null });
+        added++;
+      } catch (e) {
+        errors.push('plots[' + i + ']：' + e.message);
+      }
+    });
+    return { added: added, errors: errors };
+  }
+
+  /**
    * 把视野移到某条标绘上（面板「定位」用）。
    *
    * 只动相机，**不做视觉强调**：强调需要给每类几何加轮廓/加粗，而 24 类几何的
@@ -1620,6 +1663,8 @@
     setVisible: setVisible,
     update: update,
     focus: focus,
+    exportAll: exportAll,
+    importAll: importAll,
     // 屏幕空间装饰的缩放重建：`force` 供自检直接触发，避免依赖真实相机运动
     refreshScreenSpaceDecorations: refreshScreenSpaceDecorations,
     resolutionBucket: resolutionBucket,
@@ -1671,6 +1716,9 @@
                  hostility: byId[id].hostility || null,
                  visible: byId[id].visible !== false,
                  points: byId[id].points.length,
+                 // 实际控制点：面板与持久化都要用（上面那个 `points` 是**数量**，
+                 // 保留它是因为已有代码在读，不要改名）
+                 controlPoints: byId[id].points.map(function (c) { return [c[0], c[1]]; }),
                  std: byId[id].std, entities: byId[id].entities.length,
                  primitives: (byId[id].primitives || []).length,
                  marks: byId[id].markCount || 0 };

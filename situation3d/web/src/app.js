@@ -38,6 +38,9 @@ const state = {
   hiddenTargets: {},
   removedTargets: {},
   targetOverrides: {},
+  // 航路与热点同理：整层开关回答"这一类看不看"，单个要素开关回答"这一条看不看"。
+  hiddenRoutes: {},
+  hiddenHotspots: {},
   caseIndex: null,
   caseId: null,
   data: null,
@@ -893,6 +896,15 @@ function clearSituation() {
   state.geoPinned = false;
   state.buildingsKey = null;
   state.buildingsAoi = -1;
+  // **单要素状态必须一起清掉**。它们是按**目标 id** 索引的，而 id 在不同案例里会重名
+  // （每个案例都有自己的 R01）。不清的话：在台海把 R01 隐藏/移除，切到中印再切回来，
+  // R01 仍然是隐藏的 —— 用户从没在新案例里动过它，却怎么也找不到。
+  // 这里**原地清键**而不是换新对象：万一有地方捕获了这些对象的引用，换对象会让它
+  // 继续读写旧的那份，状态就分叉了。
+  [state.hiddenTargets, state.removedTargets, state.targetOverrides,
+   state.hiddenRoutes, state.hiddenHotspots].forEach(function (bag) {
+    Object.keys(bag).forEach(function (k) { delete bag[k]; });
+  });
   markScene('clearSituation');
 
   dom.scenarioName.textContent = state.baseRegion || '未加载TS';
@@ -1329,8 +1341,18 @@ function syncEntities() {
     rec.entity.polyline.show = visible && state.layers.tracks && rec.trail.length > 1;
   });
 
-  state.routeEntities.forEach(function (e) { e.show = state.layers.routes; });
-  state.hotspotEntities.forEach(function (e) { e.show = state.layers.hotspots; });
+  // 图层开关 ∩ 该要素未被单独关掉。实体 id 里带着身份（`route-<目标id>` /
+  // `hotspot-<序号>`），直接从中解析，不再另存一份映射 —— 另存一份就多一处会不同步。
+  state.routeEntities.forEach(function (e) {
+    var id = typeof e.id === 'string' ? e.id : '';
+    var key = id.indexOf('route-') === 0 ? id.slice(6) : null;
+    e.show = !!state.layers.routes && !(key && state.hiddenRoutes[key]);
+  });
+  state.hotspotEntities.forEach(function (e) {
+    var id = typeof e.id === 'string' ? e.id : '';
+    var key = id.indexOf('hotspot-') === 0 ? id.slice(8) : null;
+    e.show = !!state.layers.hotspots && !(key && state.hiddenHotspots[key]);
+  });
 }
 
 function syncSelection() {
@@ -3407,9 +3429,14 @@ function registerLayerProviders() {
           key: t.id,
           label: '航路 ' + t.id,
           sub: DOM_ZH[t.domain] || t.domain,
-          visible: !!(state.layers.routes && !state.hiddenTargets[t.id]
-                      && !state.removedTargets[t.id]),
-          actions: ['locate'],
+          visible: !!state.layers.routes && !state.hiddenRoutes[t.id]
+                   && !state.removedTargets[t.id],
+          actions: ['toggle', 'locate'],
+          onToggle: function (on) {
+            if (on) delete state.hiddenRoutes[t.id]; else state.hiddenRoutes[t.id] = true;
+            markScene('singleRoute');
+            touch();
+          },
           onLocate: function () { selectTarget(t.id, false); },
         };
       });
@@ -3424,11 +3451,65 @@ function registerLayerProviders() {
         key: 'hotspot-' + i,
         label: h.name || ('热点 ' + (i + 1)),
         sub: h.level_label || '',
-        visible: !!state.layers.hotspots,
-        actions: ['locate'],
+        visible: !!state.layers.hotspots && !state.hiddenHotspots[i],
+        actions: ['toggle', 'locate'],
+        onToggle: function (on) {
+          if (on) delete state.hiddenHotspots[i]; else state.hiddenHotspots[i] = true;
+          markScene('singleHotspot');
+          touch();
+        },
         onLocate: function () { selectHotspot(i, false); },
       };
     });
+  });
+
+  // ---- 地名：只读统计 -----------------------------------------------------
+  // 不逐个列出候选词条：地名是**按相机高度分级 + 屏幕空间去重**后动态增删的
+  // （`Places` 内部有一个对象池），逐条列出来的话数量每帧都在跳，既没用又费。
+  // 这里给"加载了多少、当前高度下有多少候选、实际放了多少个"三个数。
+  LayerRegistry.setProvider('places.labels', function () {
+    if (!window.Places || typeof Places.debugPlaces !== 'function') return null;
+    var d = Places.debugPlaces();
+    if (!d || !d.loaded) return null;
+    return [{
+      key: 'places-summary',
+      label: '离线地名',
+      sub: '候选 ' + (d.candidates || 0) + ' / 已放置 ' + (d.shown || 0) + ' / 共 ' + (d.total || 0),
+      visible: !!state.layers.labels,
+      actions: [],
+    }];
+  });
+
+  // ---- 建筑：只读统计 -----------------------------------------------------
+  //
+  // 两个图层来自**两套不同实现**，取证入口也不一样，不能共用一个：
+  //   buildings.blocks  离线体块，由 assets.js 挤出后挂在 `state.buildingsPrimitive`
+  //   tiles.google3d    在线实景，状态在 `Buildings3D.debug()`（注意它**没有**
+  //                     blocksLive/onlineLive 这类字段，实测返回的是
+  //                     enabled/phase/hasTileset/tilesetReady/tilesetShow/primitiveCount）
+  LayerRegistry.setProvider('buildings.blocks', function () {
+    var prim = state.buildingsPrimitive;
+    if (!prim) return null;
+    // `geometryInstances` 可能是数组，也可能被包成 Cesium Property，两种都要能数。
+    var gi = prim.geometryInstances;
+    if (gi && typeof gi.getValue === 'function') gi = gi.getValue();
+    var n = Array.isArray(gi) ? gi.length : (gi ? 1 : 0);
+    if (!n) return null;
+    return [{ key: 'offline-blocks', label: '离线建筑体块',
+              sub: n + ' 个几何体', visible: !!prim.show, actions: [] }];
+  });
+  LayerRegistry.setProvider('tiles.google3d', function () {
+    if (!window.Buildings3D || typeof Buildings3D.debug !== 'function') return null;
+    var d = Buildings3D.debug();
+    if (!d || !d.hasTileset) return null;
+    return [{
+      key: 'online-tileset',
+      label: '在线三维实景瓦片集',
+      sub: '就绪 ' + (d.tilesetReady ? '是' : '否') + ' / 显示 ' + (d.tilesetShow ? '是' : '否')
+           + ' / globe ' + (d.globeShowing ? '开' : '关'),
+      visible: !!d.tilesetShow,
+      actions: [],
+    }];
   });
 
   // ---- 影像：一层可能多实例（热点影像一个热点框一个 provider）------------
@@ -3517,6 +3598,9 @@ function bindUI() {
       if (!v) clearTargetSelection();
       else if (state.selected) renderTargetStatus(state.selected);
     }],
+    ['compCompass', function (v) { setComponent('compass', v); }],
+    ['compScalebar', function (v) { setComponent('scalebar', v); }],
+    ['compViewpoint', function (v) { setComponent('viewpoint', v); }],
   ].forEach(function (pair) {
     var d = LayerRegistry.def(pair[0]);
     if (d) d.handler = function (id, want) { pair[1](want); };
@@ -3561,9 +3645,9 @@ function bindUI() {
                     : '城区高清影像已关闭。');
   });
 
-  bindCheck('compCompass', function (v) { setComponent('compass', v); });
-  bindCheck('compScalebar', function (v) { setComponent('scalebar', v); });
-  bindCheck('compViewpoint', function (v) { setComponent('viewpoint', v); });
+  // 地图组件的三个开关已迁移进注册表（上面的 handler 数组），静态复选框也已从
+  // index.html 删除 —— 这里不能再 bindCheck，否则面板里点了没反应（节点不存在时
+  // bindCheck 直接 return，不报错）。
 
   bindCheck('followTarget', function (v) {
     state.follow.enabled = !!v;
@@ -4112,30 +4196,28 @@ function applyCaseIndependentHooks() {
   // 地图组件：?components=0|1 全关/全开；?components=a,b 白名单；?components=-a 排除
   if (params.has('components')) {
     const raw = params.get('components');
+    // 一律走 setSwitch：它会在有 DOM 节点时派发 change，没有节点时改注册表意图。
+    // 直接调 setComponent 会**绕过注册表**，面板上的复选框仍显示旧状态 ——
+    // 就是"界面与事实不符"。
+    const CIDS = ['compCompass', 'compScalebar', 'compViewpoint'];
+    const CNAMES = ['compass', 'scalebar', 'viewpoint'];
     if (raw === '0') {
-      ['compass', 'scalebar', 'viewpoint'].forEach(function (n) { setComponent(n, false); });
-      if (dom.compCompass) dom.compCompass.checked = false;
-      if (dom.compScalebar) dom.compScalebar.checked = false;
-      if (dom.compViewpoint) dom.compViewpoint.checked = false;
+      CIDS.forEach(function (id) { setSwitch(id, false); });
     } else if (raw === '1' || raw === '') {
-      ['compass', 'scalebar', 'viewpoint'].forEach(function (n) { setComponent(n, true); });
+      CIDS.forEach(function (id) { setSwitch(id, true); });
     } else {
       const parts = raw.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
       const exclude = parts.length && parts[0].charAt(0) === '-';
-      ['compass', 'scalebar', 'viewpoint'].forEach(function (n) {
-        const on = exclude ? parts.indexOf('-' + n) < 0 : parts.indexOf(n) >= 0;
-        setComponent(n, on);
-        const box = document.getElementById('comp' + n.charAt(0).toUpperCase() + n.slice(1));
-        if (box) box.checked = on;
+      CNAMES.forEach(function (nm, k) {
+        setSwitch(CIDS[k], exclude ? parts.indexOf('-' + nm) < 0 : parts.indexOf(nm) >= 0);
       });
     }
   }
   [['compass', 'compass'], ['scalebar', 'scalebar'], ['viewpoint', 'viewpoint']].forEach(function (pair) {
     if (!params.has(pair[0])) return;
     const on = params.get(pair[0]) !== '0';
-    setComponent(pair[1], on);
-    const box = document.getElementById('comp' + pair[0].charAt(0).toUpperCase() + pair[0].slice(1));
-    if (box) box.checked = on;
+    // 同上：走 setSwitch，保证注册表意图与面板一致
+    setSwitch('comp' + pair[0].charAt(0).toUpperCase() + pair[1].slice(1), on);
   });
 
   if (params.get('imagery') === '0') {

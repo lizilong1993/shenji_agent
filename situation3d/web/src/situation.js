@@ -109,6 +109,9 @@
       aoi: bbox.slice(),
       hours: DEFAULT_HOURS,
       targets: targets,
+      // 草稿是"当前TS的副本"，那么**屏幕上已经画着的标绘也属于它**。不带上就会
+      // 出现"重置草稿之后标绘全没了"——用户没删任何东西，却丢了。
+      plots: (window.Plotting && Plotting.exportAll) ? Plotting.exportAll() : [],
     };
   }
 
@@ -502,6 +505,23 @@
           end: en ? [en.getAttribute('lon'), en.getAttribute('lat')] : null,
         });
       }
+      // <plots><plot type=".." layer=".." hostility=".." label=".."><point lon lat/>…</plot></plots>
+      // 与 JSON 的 plots 一一对应 —— 两种格式必须能互相转换，否则"支持 XML"就是空话。
+      raw.plots = [];
+      var plEls = root.getElementsByTagName('plot');
+      for (var q = 0; q < plEls.length; q++) {
+        var pe = plEls[q];
+        var pts = [];
+        var ptEls = pe.getElementsByTagName('point');
+        for (var w = 0; w < ptEls.length; w++) {
+          pts.push([ptEls[w].getAttribute('lon'), ptEls[w].getAttribute('lat')]);
+        }
+        raw.plots.push({
+          type: pe.getAttribute('type'), layer: pe.getAttribute('layer') || undefined,
+          hostility: pe.getAttribute('hostility') || undefined,
+          label: pe.getAttribute('label') || undefined, points: pts,
+        });
+      }
     } else {
       try {
         raw = JSON.parse(String(text));
@@ -571,9 +591,76 @@
       }
     });
 
+    // ---- plots（可选）----
+    //
+    // **缺失时视为空列表**：这是必须的向后兼容 —— 本轮之前导出的所有 TS 定义都没有
+    // 这个字段，不能因为加了一个可选项就让旧文件全部打不开。
+    var plotsOut = [];
+    var plotCat = {};
+    if (window.Plotting && Plotting.catalogue) {
+      Plotting.catalogue().forEach(function (c) { plotCat[c.type] = c; });
+    }
+    var plotLayers = null;
+    if (window.LayerRegistry && LayerRegistry.list) {
+      plotLayers = LayerRegistry.list('plot').map(function (l) { return l.id; });
+    }
+    if (raw.plots !== undefined && raw.plots !== null) {
+      if (!Array.isArray(raw.plots)) {
+        errors.push('plots 必须是数组');
+      } else {
+        raw.plots.forEach(function (pl, i) {
+          var where = 'plots[' + i + ']';
+          if (!pl || typeof pl !== 'object') { errors.push(where + '：不是对象'); return; }
+          var cat = plotCat[pl.type];
+          if (!cat) { errors.push(where + '：未知标绘类型「' + pl.type + '」'); return; }
+          var ctrl = cat.ctrl || { min: 2, max: null };
+          if (!Array.isArray(pl.points) || pl.points.length < ctrl.min) {
+            errors.push(where + '（' + pl.type + '）：至少需要 ' + ctrl.min + ' 个控制点');
+            return;
+          }
+          if (ctrl.max && pl.points.length > ctrl.max) {
+            errors.push(where + '（' + pl.type + '）：最多 ' + ctrl.max + ' 个控制点');
+            return;
+          }
+          var pts = [], bad = false;
+          pl.points.forEach(function (c, k) {
+            if (!Array.isArray(c) || c.length !== 2) {
+              errors.push(where + ' 第 ' + (k + 1) + ' 个点：需要 [经度, 纬度]'); bad = true; return;
+            }
+            var lo = num(c[0]), la = num(c[1]);
+            if (!isFinite(lo) || !isFinite(la)) {
+              errors.push(where + ' 第 ' + (k + 1) + ' 个点：不是有效数字'); bad = true; return;
+            }
+            if (lo < -180 || lo > 180 || la < -90 || la > 90) {
+              errors.push(where + ' 第 ' + (k + 1) + ' 个点：坐标越界（' + lo + ', ' + la + '）');
+              bad = true; return;
+            }
+            pts.push([lo, la]);
+          });
+          if (bad) return;
+          var layer = pl.layer;
+          // 图层不在册 → 回落该类型的默认图层并**警告**（与未知 icon 同一策略：
+          // 可恢复的问题不该硬失败，但必须让用户看见）
+          if (layer && plotLayers && plotLayers.indexOf(layer) < 0) {
+            warnings.push(where + '：图层「' + layer + '」不在册，已回落 '
+              + (cat.defaultLayer || 'plot.offense'));
+            layer = cat.defaultLayer;
+          }
+          plotsOut.push({
+            type: pl.type,
+            layer: layer || cat.defaultLayer || 'plot.offense',
+            hostility: pl.hostility === 'enemy' ? 'enemy' : 'friendly',
+            label: pl.label || null,
+            points: pts,
+          });
+        });
+      }
+    }
+
     if (errors.length) return { draft: null, errors: errors, warnings: warnings };
     return {
-      draft: { name: String(raw.name || '结构化注册TS'), aoi: aoi, hours: hours, targets: out },
+      draft: { name: String(raw.name || '结构化注册TS'), aoi: aoi, hours: hours,
+               targets: out, plots: plotsOut },
       errors: [], warnings: warnings,
     };
   }
@@ -1088,6 +1175,15 @@
     close();
     try {
       host().applySituationData(data, 'custom');
+
+    // **重放标绘**：生成的 dataset 是引擎产出的，里面没有 plots 字段（标绘属于
+    // 草稿，不属于数据集）。而 `applySituationData` 会清场重建，屏幕上的标绘会被
+    // 一起清掉 —— 不重放的话"改个参数点生成，画好的标绘全没了"。
+    if (window.Plotting && Plotting.importAll) {
+      var rp = Plotting.importAll(d.plots || [], { replace: true });
+      if (rp.errors.length) setHint('标绘未能全部还原：' + rp.errors.join('；'));
+      if (window.LayerPanel) LayerPanel.invalidate();
+    }
       setHint('已生成并初始化「' + data.case_name + '」：' + data.targets.length +
         ' 个目标 · ' + (data.frames.length - 1) + ' 帧 · ZC范围 ' + d.aoi.join(', '));
     } catch (e) {

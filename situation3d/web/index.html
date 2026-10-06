@@ -82,6 +82,9 @@
         <button type="button" class="mini" data-layer-cmd="default" title="回到首次打开时的图层状态">恢复默认</button>
       </div>
 
+      <!-- 目标过滤：阵营/域过滤器与「目标跟随」。它们**不是图层**，所以留在
+           图层面板之外 —— 混进去会让"开关"的语义变模糊（一个开关是该不该画，
+           另一个是该不该显示这一类）。 -->
       <details class="layer-group panel-block" open>
         <summary>目标过滤</summary>
         <div class="domain-row">
@@ -99,16 +102,7 @@
            每行带实时数量徽标，展开即是该层的要素列表（增删即时反映）。
            见 web/src/layerPanel.js。 -->
       <div id="layerPanel"></div>
-
-
-      <details class="layer-group panel-block" open>
-        <summary>地图组件</summary>
-        <label class="check"><input type="checkbox" id="compCompass" checked> 指南针</label>
-        <label class="check"><input type="checkbox" id="compScalebar" checked> 比例尺</label>
-        <label class="check"><input type="checkbox" id="compViewpoint" checked> 视点坐标</label>
-      </details>
-
-      </div>
+    </div>
     </aside>
 
     <section class="globe-wrap">
