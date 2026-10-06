@@ -1105,8 +1105,58 @@ select {
   border: 1px solid var(--border); border-radius: 3px; background: #fff; color: var(--text);
 }
 
-.plot-add {
-  display: flex;
+/* 动态图层管理面板（web/src/layerPanel.js 生成）。
+   沿用 .layer-group / .check 的既有观感，只补"数量徽标 / 展开箭头 / 要素行"。 */
+.lp-row { display: flex; align-items: center; gap: 4px; }
+.lp-check { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 5px; }
+.lp-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-count {
+  flex: 0 0 auto; min-width: 18px; text-align: center;
+  padding: 0 4px; border-radius: 8px;
+  background: #e8eef7; color: #47566b;
+  font-size: 10px; font-variant-numeric: tabular-nums;
+}
+.lp-count[data-zero="1"] { opacity: .45; }
+.lp-feed {
+  flex: 0 0 auto; padding: 0 4px; border-radius: 3px;
+  font-size: 10px; color: #fff; cursor: help;
+}
+.lp-feed-hidden { background: #8a94a6; }
+.lp-feed-failed { background: #c0392b; }
+.lp-feed-pending { background: #d68910; }
+.lp-feed-unsupported { background: #7f8c8d; }
+.lp-expand {
+  flex: 0 0 auto; width: 18px; height: 18px; padding: 0; line-height: 1;
+  border: 1px solid var(--border); border-radius: 3px;
+  background: #fff; color: var(--text-dim); cursor: pointer; font-size: 10px;
+}
+.lp-expand:hover { background: #eef2f8; }
+
+/* 要素列表：左侧缩进一条细线，表示"属于上面那一层" */
+.lp-elems {
+  margin: 2px 0 4px 10px; padding-left: 8px;
+  border-left: 2px solid var(--border);
+  display: flex; flex-direction: column; gap: 1px;
+}
+.lp-elem { display: flex; align-items: center; gap: 4px; font-size: 11px; }
+.lp-elem-toggle { flex: 0 0 auto; width: 12px; height: 12px; margin: 0; }
+.lp-elem-text { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 5px; }
+.lp-elem-text b {
+  font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lp-elem-sub, .lp-elem-note {
+  flex: 0 0 auto; font-style: normal; font-size: 10px; color: var(--text-dim);
+}
+.lp-elem-note { color: #b06a00; }
+.lp-act {
+  flex: 0 0 auto; width: 18px; height: 18px; padding: 0; line-height: 1;
+  border: 1px solid transparent; border-radius: 3px;
+  background: transparent; color: var(--text-dim); cursor: pointer; font-size: 11px;
+}
+.lp-act:hover { background: #eef2f8; border-color: var(--border); color: var(--text); }
+.lp-empty { font-size: 10px; color: var(--text-dim); padding: 1px 0; }
+
+.plot-add {  display: flex;
   flex-direction: column;
   gap: 4px;
   margin-top: 6px;

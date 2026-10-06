@@ -501,21 +501,14 @@ function initViewer() {
   // 热点影像是**一层多实例**（每个热点框一个 provider），必须全部登记。
   registerImagerySlot('hotspot.imagery', state.hotspotLayers);
 
-  // 初始意图：与 index.html 里各复选框的 checked 一致。HTML 的 checked 只是初始
-  // 显示，不会触发 change，所以必须在这里显式同步一次，否则注册表会以为全都关着。
-  LayerRegistry.setDesired('tianditu.base', checkboxOn('modelTianditu'));
-  LayerRegistry.setDesired('tianditu.label', checkboxOn('modelTiandituLabel'));
-  LayerRegistry.setDesired('imagery.offline', checkboxOn('modelImagery'));
-  LayerRegistry.setDesired('hotspot.imagery', checkboxOn('modelHotspotImagery'));
-  LayerRegistry.setDesired('wsf3d.overlay', checkboxOn('modelWsf3dOverlay'));
-  LayerRegistry.setDesired('buildings.blocks', checkboxOn('modelBuildings'));
-  LayerRegistry.setDesired('tiles.google3d', checkboxOn('modelBuildingsOnline'));
-  LayerRegistry.setDesired('places.labels', checkboxOn('modelPlaces'));
-  // 标绘图层：同样**遍历注册表**取初值，不逐个写死。
-  // 注意：这里只取初值；change 处理器的绑定在 bindUI() 里（bindCheck 在那儿才有定义）。
-  // 曾经把这两件事混为一谈，结果复选框点了没反应——初值读了，但没人接 change。
-  LayerRegistry.list('plot').forEach(function (d) {
-    if (d.checkbox) LayerRegistry.setDesired(d.id, checkboxOn(d.checkbox));
+  // 初始意图：**遍历注册表**取 `default`，不再逐个去读 HTML 复选框。
+  //
+  // 面板改由注册表生成之后，HTML 里已经没有这些复选框了；默认值的唯一来源必须是
+  // 注册表，否则就会出现"面板画出来是关的、而代码以为它开着"这类两边不一致。
+  // 原先逐个 `checkboxOn('modelXxx')` 的写法还漏过一个：`urban.imagery` 从头到尾
+  // 没被同步过，HTML 里勾着、注册表里却是关的。
+  LayerRegistry.LAYERS.forEach(function (d) {
+    LayerRegistry.setDesired(d.id, d.default === true);
   });
   // 立刻应用一次：把 imagery 的 index 按 LAYERS 的 z 排好。这一步取代了以前那句
   // raiseToTop(tiandituLabelLayer)——注记现在由 z=90 直接排到最上。
@@ -1025,21 +1018,52 @@ const LAYER_GROUPS = [
 
 const LAYER_DEFAULTS = {};
 
+/**
+ * 记录每个开关的默认值，供「恢复默认」用。
+ *
+ * 默认值现在有**两个来源**，必须都读：
+ *   1. 仍在 HTML 里的开关（TS图层/目标图层/地图组件）→ 读 DOM 的 checked；
+ *   2. 已由面板生成的图层（底图/标绘）→ 读注册表的 `default`。
+ *
+ * 以前只有来源 1。底图/标绘搬进生成式面板之后，`getElementById` 一律返回 null，
+ * `LAYER_DEFAULTS` 里就没有这些条目，「恢复默认」会取到 `!!undefined === false` ——
+ * 那不是"恢复默认"，是把底图和标绘**全部关掉**。这类"移除 DOM 之后批量功能静默
+ * 失效"的问题不会报错，只会表现为"按钮点了没反应"。
+ */
 function captureLayerDefaults() {
+  LayerRegistry.LAYERS.forEach(function (d) {
+    const node = d.checkbox ? document.getElementById(d.checkbox) : null;
+    LAYER_DEFAULTS[d.id] = node ? node.checked : (d.default === true);
+  });
+  // 非图层注册表的开关（阵营/域过滤等）仍按 DOM 取。
   LAYER_GROUPS.forEach(function (g) {
     g.ids.forEach(function (id) {
+      if (id in LAYER_DEFAULTS) return;
       const node = document.getElementById(id);
       if (node) LAYER_DEFAULTS[id] = node.checked;
     });
   });
 }
 
-/** 以编程方式切换开关，并派发 change 事件复用既有 handler。 */
+/**
+ * 以编程方式切换开关。
+ *
+ * 有 DOM 节点就派发 change 复用既有 handler；**没有节点说明这一行由面板生成**，
+ * 此时必须走注册表那条路 —— 否则批量命令（全部显示/隐藏/恢复默认）对底图与标绘
+ * 会**静默无效**，表现为"点了没反应"。
+ */
 function setSwitch(id, on) {
   const node = document.getElementById(id);
-  if (!node || node.disabled || node.checked === on) return;
-  node.checked = on;
-  node.dispatchEvent(new Event('change', { bubbles: true }));
+  if (node) {
+    if (node.disabled || node.checked === on) return;
+    node.checked = on;
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+    return;
+  }
+  if (LayerRegistry.def(id)) {
+    LayerRegistry.setDesired(id, on);
+    applyLayers();
+  }
 }
 
 /**
@@ -1049,13 +1073,20 @@ function setSwitch(id, on) {
  * 想要的结果。
  */
 function applyLayerCommand(cmd) {
-  const groups = cmd === 'hide'
-    ? LAYER_GROUPS.filter(function (g) { return g.name === 'TS图层' || g.name === '目标图层'; })
-    : LAYER_GROUPS;
-  groups.forEach(function (g) {
-    g.ids.forEach(function (id) {
-      setSwitch(id, cmd === 'show' ? true : cmd === 'hide' ? false : !!LAYER_DEFAULTS[id]);
-    });
+  const only = cmd === 'hide' ? ['TS图层', '目标图层'] : null;
+  const ids = [];
+  LAYER_GROUPS.forEach(function (g) {
+    if (only && only.indexOf(g.name) < 0) return;
+    g.ids.forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); });
+  });
+  // 面板生成的图层（底图/标绘）不在 LAYER_GROUPS 里，必须按 `group` 一并纳入，
+  // 否则「全部显示」对它们无效 —— 这类漏项不会报错，只会表现为按钮没反应。
+  LayerRegistry.LAYERS.forEach(function (d) {
+    if (only && only.indexOf(d.group) < 0) return;
+    if (ids.indexOf(d.id) < 0) ids.push(d.id);
+  });
+  ids.forEach(function (id) {
+    setSwitch(id, cmd === 'show' ? true : cmd === 'hide' ? false : !!LAYER_DEFAULTS[id]);
   });
   setStatus(cmd === 'show' ? '图层已全部显示'
     : cmd === 'hide' ? 'TS与目标图层已隐藏'
@@ -2910,6 +2941,10 @@ function loop(nowMs) {
 
   if (!viewer) { requestAnimationFrame(loop); return; }
 
+  // 图层管理面板：**每帧比对签名，变了才重建**。放在帧循环里而不是定时器里，
+  // 是为了让"加了标绘/切了案例"这类外部变化在同一帧就反映出来，不用等下一次轮询。
+  if (window.LayerPanel) LayerPanel.tick();
+
   if (state.playing && state.data) {
     state.tickFloat += dt * state.ticksPerSecond;
     const max = state.data.frames.length - 1;
@@ -3234,18 +3269,23 @@ function bindUI() {
     node.addEventListener('change', function (e) { handler(e.target.checked); });
   };
 
-  // 标绘图层开关：与其它图层同一套约定——只写"意图"，由渲染治理器合并到下一帧的
-  // applyLayers，再由 plot sink 落到 Plotting.setLayerVisible。不新起通路。
-  LayerRegistry.list('plot').forEach(function (d) {
-    if (!d.checkbox) return;
-    bindCheck(d.checkbox, function (v) {
-      LayerRegistry.setDesired(d.id, v);
-      // 图层可见性变化**直接调 applyLayers()**，与 setImagery / setTianditu 同一约定。
-      // 不要只 markScene()：RenderGovernor.take() 只驱动 syncEntities()（目标实体），
-      // 不含图层栈，只标记的话 plot sink 根本不会被调用——复选框点了画面不变（实测如此）。
-      applyLayers();
+  // 图层管理面板：**由注册表生成**（见 web/src/layerPanel.js）。
+  //
+  // 它取代了原先"每个图层在 HTML 里写一个复选框 + 在这里 bindCheck 一次"的写法 ——
+  // 那种写法有两个真相来源，注册表里加了图层面板上看不到。现在面板只是注册表的
+  // 投影：开关写回 setDesired，可见性走同一条 applyLayers()。
+  //
+  // 图层可见性变化**直接调 applyLayers()**，与 setImagery / setTianditu 同一约定。
+  // 不要只 markScene()：RenderGovernor.take() 只驱动 syncEntities()（目标实体），
+  // 不含图层栈，只标记的话 sink 根本不会被调用——开关点了画面不变（实测如此）。
+  if (window.LayerPanel) {
+    LayerPanel.bind(document.getElementById('layerPanel'), {
+      onChange: function (id, want) {
+        LayerRegistry.setDesired(id, want);
+        applyLayers();
+      },
     });
-  });
+  }
 
   bindCheck('layerTargets', function (v) { state.layers.targets = v; markScene('layerTargets'); guardFollow(); });
   bindCheck('layerTracks', function (v) { state.layers.tracks = v; markScene('layerTracks'); });

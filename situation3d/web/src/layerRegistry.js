@@ -52,6 +52,9 @@
    *   在线底图 → 离线底图 → 热点/城区高清影像 → 建筑高度覆盖 → 三维实景/体块
    *   → TS几何（航迹/计划路线）→ 热点区域面 → 目标/标牌 → 地名 → 目标元数据面板
    */
+  // `default` 是该图层的**初始意图**。面板由本表生成之后，HTML 的 `checked`
+  // 不再是默认值的来源（那些复选框已经删掉了）；用同一份声明，才不会出现
+  // "HTML 里勾着、注册表里以为关着"这种两边不一致。
   var LAYERS = [
     // ---- imagery 栈：序号即 imageryLayers 的 index，越大越靠上 ----
     // 离线底图**垫在天地图下面**（z=5 < z=10），两者不再互斥。
@@ -65,37 +68,37 @@
     // key 失效、瓦片还在路上）露出离线影像，而不是露出球体底色。代价是天地图加载
     // 期间会短暂看到较粗的离线影像——这比看到空洞好。
     {
-      id: 'imagery.offline', kind: 'imagery', z: 5,
+      id: 'imagery.offline', kind: 'imagery', z: 5, default: false,
       label: '影像底图（离线）', group: '底图', checkbox: 'modelImagery',
       exclusives: [],
     },
     {
-      id: 'tianditu.base', kind: 'imagery', z: 10,
+      id: 'tianditu.base', kind: 'imagery', z: 10, default: true,
       label: '天地图影像', group: '底图', checkbox: 'modelTianditu',
       exclusives: [],
     },
     {
-      id: 'hotspot.imagery', kind: 'imagery', z: 30,
+      id: 'hotspot.imagery', kind: 'imagery', z: 30, default: true,
       label: '热点区域高清影像', group: '底图', checkbox: 'modelHotspotImagery',
     },
     {
-      id: 'urban.imagery', kind: 'imagery', z: 40,
+      id: 'urban.imagery', kind: 'imagery', z: 40, default: true,
       label: '城区高清影像（米级）', group: '底图', checkbox: 'modelUrbanImagery',
     },
     {
-      id: 'wsf3d.overlay', kind: 'imagery', z: 50,
+      id: 'wsf3d.overlay', kind: 'imagery', z: 50, default: false,
       label: '建筑高度图层（WSF3D）', group: '底图', checkbox: 'modelWsf3dOverlay',
     },
     // 注记是栅格影像，必须在**所有**底图/高清影像之上——否则就会被盖住。
     // 以前靠一次 raiseToTop 抢救，现在由 z 序号直接决定，不再需要事后调整。
     {
-      id: 'tianditu.label', kind: 'imagery', z: 90,
+      id: 'tianditu.label', kind: 'imagery', z: 90, default: true,
       label: '天地图注记', group: '底图', checkbox: 'modelTiandituLabel',
     },
 
     // ---- scene primitive 栈：mesh 类，两两互斥（同一块地面不能同时铺两套网格）
     {
-      id: 'tiles.google3d', kind: 'primitive', z: 10,
+      id: 'tiles.google3d', kind: 'primitive', z: 10, default: true,
       label: '在线三维实景建筑（Google 3D Tiles）', group: '底图',
       checkbox: 'modelBuildingsOnline',
       // 实测：Google 实景瓦片与本机离线 DEM 几何冲突，启用时必须关掉 globe。
@@ -103,7 +106,7 @@
       exclusives: ['buildings.blocks'],
     },
     {
-      id: 'buildings.blocks', kind: 'primitive', z: 30,
+      id: 'buildings.blocks', kind: 'primitive', z: 30, default: false,
       label: '建筑体块（三维，本机离线）', group: '底图',
       checkbox: 'modelBuildings',
       exclusives: ['tiles.google3d'],
@@ -111,7 +114,7 @@
 
     // ---- 标签栈：不贴地，靠 disableDepthTestDistance 保证在几何之上 ----
     {
-      id: 'places.labels', kind: 'label', z: 20,
+      id: 'places.labels', kind: 'label', z: 20, default: true,
       label: '地名', group: '底图', checkbox: 'modelPlaces',
     },
 
@@ -126,23 +129,23 @@
     //
     // 默认**开**：标绘是"开了就该看到"的东西，没有数据时自然什么都没有，不会误导。
     {
-      id: 'plot.mobility', kind: 'plot', z: 10,
+      id: 'plot.mobility', kind: 'plot', z: 10, default: true,
       label: '标绘·机动与集结', group: '标绘', checkbox: 'plotMobility',
     },
     {
-      id: 'plot.offense', kind: 'plot', z: 20,
+      id: 'plot.offense', kind: 'plot', z: 20, default: true,
       label: '标绘·进攻', group: '标绘', checkbox: 'plotOffense',
     },
     {
-      id: 'plot.defense', kind: 'plot', z: 30,
+      id: 'plot.defense', kind: 'plot', z: 30, default: true,
       label: '标绘·防御与障碍', group: '标绘', checkbox: 'plotDefense',
     },
     {
-      id: 'plot.fire', kind: 'plot', z: 40,
+      id: 'plot.fire', kind: 'plot', z: 40, default: true,
       label: '标绘·火力', group: '标绘', checkbox: 'plotFire',
     },
     {
-      id: 'plot.intel', kind: 'plot', z: 50,
+      id: 'plot.intel', kind: 'plot', z: 50, default: true,
       label: '标绘·侦察与空域', group: '标绘', checkbox: 'plotIntel',
     },
   ];
@@ -152,6 +155,76 @@
 
   var registry = {};
 
+  // ------------------------------------------------------------------------
+  // 修订号与要素提供者（动态图层管理的基础）
+  // ------------------------------------------------------------------------
+  //
+  // 面板（`layerPanel.js`）需要在"图层或要素变了"时重建 DOM。做法是**每帧比对
+  // 一个签名**，签名里带修订号与各层要素数量 —— 所以这里只要能廉价地回答
+  // "变过没有"，不需要事件总线。
+  //
+  // 修订号覆盖注册表自己的改动；要素数量覆盖**外部数据**的改动（标绘增删、案例
+  // 切换、影像层随相机高度挂载/卸载）—— 后者不经过注册表，只有靠数量比对才发现，
+  // 这正是签名里要带 count 的原因。
+
+  var revSeq = 0;
+  var providers = {};   // layerId -> () => [element] | null
+
+  /** 记一次"变了"。注册表内所有改动都会调它，外部改动靠面板的数量比对兜底。 */
+  function notify() { revSeq++; return revSeq; }
+
+  function revision() { return revSeq; }
+
+  /**
+   * 注册某层的**要素提供者**。
+   *
+   * 提供者形如 `() => [{key, label, sub, visible, actions}]`，返回 `null` 表示该层
+   * 没有要素列表（面板不显示展开箭头）。
+   */
+  function setProvider(layerId, fn) {
+    if (fn) providers[layerId] = fn; else delete providers[layerId];
+    notify();
+    return fn || null;
+  }
+
+  /**
+   * 取某层的要素列表。
+   *
+   * **必须兜住异常**：面板跑在帧循环里，一个提供者抛错就会变成每帧一次的未捕获
+   * 错误，把整个渲染循环和状态栏一起污染（这个仓库已经在 `positionFor` 上踩过一次）。
+   * 出错时返回空数组并把原因记进该层的 feedDetail，面板照常渲染其余行。
+   */
+  function elements(layerId) {
+    var fn = providers[layerId];
+    if (!fn) return [];
+    try {
+      var out = fn();
+      return Array.isArray(out) ? out : [];
+    } catch (e) {
+      var r = registry[layerId];
+      if (r) { r.feed = 'failed'; r.feedDetail = '要素枚举失败：' + e.message; }
+      return [];
+    }
+  }
+
+  function hasProvider(layerId) { return !!providers[layerId]; }
+
+  /** 要素级显隐：转交给该要素描述符声明的 `onToggle`。 */
+  function setElementVisible(layerId, key, on) {
+    var fn = providers[layerId];
+    if (!fn) return false;
+    var list = elements(layerId);
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].key === key) {
+        if (typeof list[i].onToggle !== 'function') return false;
+        list[i].onToggle(!!on);
+        notify();
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * 注册一个图层。重复 id 直接报错——静默覆盖会让"顺序看起来对但实际用了旧定义"，
    * 比直接失败难查得多。
@@ -160,7 +233,44 @@
     if (byId[def.id]) throw new Error('图层 id 重复注册：' + def.id);
     byId[def.id] = def;
     LAYERS.push(def);
+    registry[def.id] = newRuntime(def);
+    notify();
     return def;
+  }
+
+  /**
+   * 注销一个图层。
+   *
+   * 若该层还有**已挂载的 imagery 实例**则拒绝并抛错：那些 Cesium.ImageryLayer 已经
+   * 进了 viewer.imageryLayers，悄悄把定义删掉会留下无主图层 —— 它继续渲染、继续
+   * 参与重排，但面板里已经没有对应的开关，用户再也关不掉它。宁可报错让调用方先卸载。
+   */
+  function unregister(id) {
+    var def = byId[id];
+    if (!def) return null;
+    if (imagerySlots[id] && imagerySlots[id].length) {
+      throw new Error('图层 ' + id + ' 还有 ' + imagerySlots[id].length
+        + ' 个已挂载的影像实例，请先卸载再注销');
+    }
+    delete byId[id];
+    delete registry[id];
+    delete providers[id];
+    for (var i = LAYERS.length - 1; i >= 0; i--) {
+      if (LAYERS[i].id === id) LAYERS.splice(i, 1);
+    }
+    notify();
+    return def;
+  }
+
+  /** runtime 行的构造抽出来，register 与初始化共用一份，避免两处字段漂移。 */
+  function newRuntime(def) {
+    return {
+      def: def,
+      desired: false,
+      feed: 'ok',
+      feedDetail: null,
+      stamp: 0,
+    };
   }
 
   function list(kind) {
@@ -182,23 +292,13 @@
 
   // 把定义同步到 runtime，runtime 里保存「意图」与「事实」。
   var seq = 0;
-  LAYERS.forEach(function (l) {
-    registry[l.id] = {
-      def: l,
-      // 用户意图：开关想让它开还是关
-      desired: false,
-      // 事实：数据在当前时刻到底能不能显示
-      //   ok        正常
-      //   pending   数据还没到（加载中）
-      //   failed    加载失败
-      //   hidden    被上层互斥层顶掉了（不是出错，是设计如此）
-      //   unsupported 该图层在当前部署下不可用（例如没有令牌的在线层）
-      feed: 'ok',
-      feedDetail: null,
-      // 意图最后一次被改动的时间序号。互斥冲突时**后动的一方赢**。
-      stamp: 0,
-    };
-  });
+  // 事实（feed）的取值：
+  //   ok          正常
+  //   pending     数据还没到（加载中）
+  //   failed      加载失败
+  //   hidden      被上层互斥层顶掉了（不是出错，是设计如此）
+  //   unsupported 该图层在当前部署下不可用（例如没有令牌的在线层）
+  LAYERS.forEach(function (l) { registry[l.id] = newRuntime(l); });
 
   // -- 意图 ---------------------------------------------------------------
 
@@ -211,6 +311,7 @@
     if (!r) return null;
     r.desired = !!on;
     r.stamp = ++seq;
+    notify();
     return r;
   }
 
@@ -296,6 +397,9 @@
     var effective = resolve();
     return LAYERS.map(function (l) {
       var r = registry[l.id];
+      // 数量只在**有提供者**时才算；没有提供者返回 null 而不是 0 ——
+      // 0 会被读成"这一层是空的"，那和"这一层没有要素列表"是两件事。
+      var expandable = hasProvider(l.id);
       return {
         id: l.id, kind: l.kind, z: l.z, label: l.label, group: l.group,
         checkbox: l.checkbox || null,
@@ -303,6 +407,8 @@
         effective: !!effective[l.id],
         feed: r.feed,
         feedDetail: r.feedDetail,
+        expandable: expandable,
+        count: expandable ? elements(l.id).length : null,
       };
     });
   }
@@ -421,12 +527,23 @@
       var r = registry[l.id];
       if (r.desired) out.desired++;
 
+      // 分派顺序：**逐层 handler 优先**，否则按 kind 找 sink。
+      //
+      // 为什么要有 handler：TS图层/目标图层/地图组件那几行各有一次性动作
+      // （`state.layers.x = v; markScene(...)`、`setTerrain(v)`、`setComponent(n,v)`…），
+      // 为它们各造一个 kind 与 sink 只是把同一段代码换个地方写。给它们一个
+      // handler 就能**和其它图层共用同一条 apply 通路**，而不是在面板之外再维护
+      // 一份开关绑定 —— 那正是"第二套图层管理通路"。
+      //
       // 未挂载的 imagery（城区/热点在低空才挂）也走 sink：sink 里判空跳过即可，
       // 把"没挂载"和"该隐藏"分开处理是 sink 的责任，注册表不猜。
-      var sink = sinks[l.kind];
-      if (!sink) { out.skipped.push(l.id + '(no sink for ' + l.kind + ')'); return; }
+      var write = (typeof l.handler === 'function') ? l.handler : sinks[l.kind];
+      if (!write) {
+        out.skipped.push(l.id + '(no handler/sink for ' + l.kind + ')');
+        return;
+      }
       try {
-        sink(l.id, !!effective[l.id], r);
+        write(l.id, !!effective[l.id], r);
         out.applied++;
       } catch (e) {
         out.skipped.push(l.id + '(' + e.message + ')');
@@ -445,7 +562,15 @@
     def: function (id) { return byId[id] || null; },
     orderOf: orderOf,
     register: register,
+    unregister: unregister,
     setDesired: setDesired,
+    // 动态图层管理：要素提供者 / 查询 / 显隐 / 修订号
+    setProvider: setProvider,
+    elements: elements,
+    hasProvider: hasProvider,
+    setElementVisible: setElementVisible,
+    notify: notify,
+    revision: revision,
     setFeed: setFeed,
     resolve: resolve,
     status: status,

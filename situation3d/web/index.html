@@ -48,6 +48,33 @@
       <!-- 图层管理现在独占左栏（目标列表已移除），不再需要"只让这一块滚动"的妥协，
            整列即它的滚动区。 -->
       <div class="layer-groups">
+      <!-- 标绘工具：**创建**标绘的地方，与「图层管理」分开。
+           原先它嵌在「标绘」图层组里，与图层开关混在一起 —— 开关回答"看不看"，
+           这里回答"画不画"，两件事放一块既难找也难讲清。
+           也**不放进 TS注册 模态框**：那个模态框会盖住地图，而绘制必须在图上点。 -->
+      <details class="layer-group panel-block" open>
+        <summary>标绘工具</summary>
+        <div class="plot-add">
+          <select id="plotType" class="plot-sel" title="标绘类型"></select>
+          <div class="plot-row">
+            <select id="plotSide" class="plot-sel">
+              <option value="friendly">红方</option>
+              <option value="enemy">蓝方</option>
+            </select>
+            <select id="plotLayer" class="plot-sel" title="归属图层"></select>
+          </div>
+          <input id="plotLabel" class="plot-input" type="text" placeholder="标注" maxlength="40">
+          <textarea id="plotPoints" class="plot-input" rows="2"
+                    placeholder="控制点：每行 经度, 纬度"></textarea>
+          <div class="plot-row">
+            <button type="button" id="plotDraw" class="mini">地图绘制</button>
+            <button type="button" id="plotAddByText" class="mini">按坐标添加</button>
+            <button type="button" id="plotCancel" class="mini">取消</button>
+          </div>
+          <div id="plotHint" class="switch-note"></div>
+        </div>
+      </details>
+
       <!-- 顶栏的「图层管理」下拉已移除，批量操作就近放在这里，功能不丢。 -->
       <div class="layer-cmds">
         <button type="button" class="mini" data-layer-cmd="show" title="打开四大类下所有开关（目标跟随除外）">全部显示</button>
@@ -78,65 +105,12 @@
         <label class="check"><input type="checkbox" id="followTarget"> 目标跟随</label>
       </details>
 
-      <details class="layer-group panel-block" open>
-        <!-- title 里保留影像署名：Cesium 底部那条「Data attribution」长条已隐藏（按反馈），
-             而离线底图是 Esri World Imagery、其许可要求署名，所以把署名挂在这里，
-             既不占界面又随时可查。对外发布前应把它放回可见位置。 -->
-        <summary title="底图影像署名：Esri World Imagery（离线）· 天地图（在线，国家地理信息公共服务平台）">底图</summary>
-        <label class="check"><input type="checkbox" id="modelTianditu" checked> 天地图（在线影像+注记）</label>
-        <label class="check"><input type="checkbox" id="modelTiandituLabel" checked> 天地图注记（保证不被影像盖住）</label>
-        <!-- 离线影像**默认关**：默认底图是天地图影像 + 中文注记，画面才统一
-             （两套影像来源不同、色彩不一致，叠着看是拼块）。
-             它只在天地图探活失败时**自动兜底**打开，见 app.js 的 probeTiandituStatus()。 -->
-        <label class="check"><input type="checkbox" id="modelImagery"> 影像底图（离线，兜底）</label>
-        <label class="check"><input type="checkbox" id="modelHotspotImagery" checked> 热点区域高清影像</label>
-        <label class="check"><input type="checkbox" id="modelUrbanImagery" checked> 城区高清影像（米级）</label>
-        <label class="check"><input type="checkbox" id="modelTerrain"> 地形模型（DEM 高程）</label>
-        <label class="check"><input type="checkbox" id="modelWsf3dOverlay"> 建筑高度图层（WSF3D）</label>
-        <label class="check"><input type="checkbox" id="modelBuildingsOnline" checked> 在线三维实景建筑（Google 3D Tiles）</label>
-        <label class="check"><input type="checkbox" id="modelBuildings"> 建筑体块（三维，本机离线）</label>
-        <!-- Cesium ion 令牌的输入块已移除：token 改由服务端 .env 的 CESIUM_ION_TOKEN 提供
-             （见 .env.example），前端通过 /api/ion/token 取用，界面上不再需要输入框。
-             换 token 现在要改 .env 并重启服务——入口只有这一个，别在界面上找。 -->
-        <label class="check"><input type="checkbox" id="modelPlaces" checked> 地名</label>
-        <label class="check"><input type="checkbox" id="modelWeather"> 气象模型</label>
-      </details>
+      <!-- 图层管理面板：**由 LayerRegistry 生成**，不再是写死的一堆复选框。
+           在注册表里 register/unregister 一个图层，这里立刻多一行/少一行；
+           每行带实时数量徽标，展开即是该层的要素列表（增删即时反映）。
+           见 web/src/layerPanel.js。 -->
+      <div id="layerPanel"></div>
 
-      <!-- 标绘图层组：与其它图层组同一套约定（layer-group + check），
-           开关状态由 app.js 遍历 LayerRegistry.list('plot') 自动接线，
-           这里只写 DOM。加一个标绘类别 = 往 layerRegistry 的 LAYERS 加一条 + 这里加一个复选框。 -->
-      <details class="layer-group panel-block" open>
-        <summary>标绘</summary>
-        <label class="check"><input type="checkbox" id="plotMobility" checked> 机动与集结</label>
-        <label class="check"><input type="checkbox" id="plotOffense" checked> 进攻</label>
-        <label class="check"><input type="checkbox" id="plotDefense" checked> 防御与障碍</label>
-        <label class="check"><input type="checkbox" id="plotFire" checked> 火力</label>
-        <label class="check"><input type="checkbox" id="plotIntel" checked> 侦察与空域</label>
-
-        <!-- 添加标绘：两条路径共用同一组「类型 / 归属 / 图层」选择。
-             「地图绘制」在地图上逐点落控制点（绘制期间左键不选中目标）；
-             「按坐标添加」直接粘贴坐标行。 -->
-        <div class="plot-add">
-          <select id="plotType" class="plot-sel" title="标绘类型"></select>
-          <div class="plot-row">
-            <select id="plotSide" class="plot-sel">
-              <option value="friendly">红方</option>
-              <option value="enemy">蓝方</option>
-            </select>
-            <select id="plotLayer" class="plot-sel" title="归属图层"></select>
-          </div>
-          <input id="plotLabel" class="plot-input" type="text" placeholder="标注" maxlength="40">
-          <textarea id="plotPoints" class="plot-input" rows="2"
-                    placeholder="控制点：每行 经度, 纬度"></textarea>
-          <div class="plot-row">
-            <button type="button" id="plotDraw" class="mini">地图绘制</button>
-            <button type="button" id="plotAddByText" class="mini">按坐标添加</button>
-            <button type="button" id="plotCancel" class="mini">取消</button>
-          </div>
-          <div id="plotHint" class="switch-note"></div>
-          <div id="plotList" class="plot-list"></div>
-        </div>
-      </details>
 
       <details class="layer-group panel-block" open>
         <summary>地图组件</summary>
@@ -295,6 +269,7 @@
   <script src="./src/symbology.js"></script>
   <script src="./src/assets.js"></script>
   <script src="./src/layerRegistry.js"></script>
+  <script src="./src/layerPanel.js"></script>
   <script src="./src/renderGovernor.js"></script>
   <script src="./src/dataHealth.js"></script>
   <script src="./src/sceneDoc.js"></script>
