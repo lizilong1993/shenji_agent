@@ -203,11 +203,16 @@ def theatre_report(name: str) -> None:
     # dataset generated before that feature existed has land targets on straight
     # waypoints and would fail here for a reason that says nothing about the road
     # code; the generator marks constrained datasets with `road_constrained`.
-    data_dir = os.path.join(ROOT, "web", "data")
+    #
+    # ⚠ 数据集现在住在 `web/data/situations/` 下（服务端扫描该目录生成案例清单）。
+    # 这里**必须跟着改**：否则 `os.listdir(data_dir)` 只看到 base.json / ion.json，
+    # `checked_any` 保持 False，第 5 组会以"没有找到数据集"**空过** —— 那是假通过，
+    # 路网约束坏掉也不会有人知道。子目录不存在时也要能把话说清楚。
+    data_dir = os.path.join(ROOT, "web", "data", "situations")
     checked_any = False
     skipped = []
     for fn in sorted(os.listdir(data_dir)) if os.path.isdir(data_dir) else []:
-        if not fn.endswith(".json") or fn in ("base.json", "cases.json", "ion.json"):
+        if not fn.endswith(".json"):
             continue
         p = os.path.join(data_dir, fn)
         try:

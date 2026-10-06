@@ -191,6 +191,21 @@ TDT_BASE = "http://t0.tianditu.gov.cn"
 # 允许的图层白名单：既是功能约束，也挡住把 layer 拼进 URL 造成的注入。
 TDT_LAYERS = ("img", "cia", "vec", "cva", "ter")
 TDT_CACHE_DIR = os.path.join(WEB_ROOT, "tiles", "tdt")
+
+# ---------------------------------------------------------------------------
+# TS 案例目录
+# ---------------------------------------------------------------------------
+#
+# 案例**不再靠一份硬编码清单**（`engine/cases.py` 的 `CASES` + 生成出来的
+# `web/data/cases.json`），而是扫描这个目录里的每一个 `*.json`。
+# 往目录里放一份文件就多一个案例、删掉就少一个，**不需要动任何索引文件**，
+# 也不需要跑生成器 —— 这是本次改动的核心目的。
+#
+# 用环境变量可覆盖（SITUATION_DIR），默认值即下面的路径。
+SITUATIONS_DIR = env("SITUATION_DIR") or os.path.join(WEB_ROOT, "data", "situations")
+
+# 默认案例：环境变量 SITUATION_DEFAULT 指定；不在扫描结果里时退回按 id 排序的第一个。
+SITUATION_DEFAULT = env("SITUATION_DEFAULT") or None
 TDT_TIMEOUT = 12.0
 TDT_MAX_LEVEL = 18
 # 探测到的 UA 组合（'server' = 非浏览器 UA）。默认按服务器端 key 起步，因为
@@ -458,6 +473,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/intent/ontology":
             self._api_intent_ontology()
             return
+        if path == "/api/situations":
+            self._api_situations()
+            return
         if path == "/api/health":
             self._api_health()
             return
@@ -580,6 +598,70 @@ class Handler(SimpleHTTPRequestHandler):
         payload["supported_rules"] = intent.SUPPORTED_RULES
         payload["underivable"] = intent.underivable_report()
         self._send_json(payload)
+
+    def _api_situations(self):
+        """
+        扫描 `SITUATIONS_DIR`，把目录里的每一份 TS 汇成案例索引。
+
+        **解析失败的文件不静默**：进 `errors` 并如实报出文件名与原因，其余案例照常
+        可用 —— 一份坏文件不该让整个菜单打不开。目录不存在或为空时返回空清单而不是
+        500：那是一个正常状态（还没放案例），不是服务端故障。
+
+        字段名与旧的 `web/data/cases.json` **保持一致**（含 `file`），这样前端的
+        `state.caseIndex.cases[]`、菜单渲染与 `?case=` 深链都不用改。
+        """
+        cases, errors = [], []
+        try:
+            names = sorted(os.listdir(SITUATIONS_DIR))
+        except OSError:
+            names = []
+            errors.append({"file": os.path.relpath(SITUATIONS_DIR, WEB_ROOT),
+                           "error": "目录不存在或不可读"})
+        seen = {}
+        for name in names:
+            if not name.endswith(".json"):
+                continue
+            full = os.path.join(SITUATIONS_DIR, name)
+            if not os.path.isfile(full):
+                continue
+            try:
+                with open(full, "r") as fh:
+                    doc = json.load(fh)
+            except (OSError, ValueError) as exc:
+                errors.append({"file": name, "error": str(exc)})
+                continue
+            if not isinstance(doc, dict):
+                errors.append({"file": name, "error": "顶层不是对象"})
+                continue
+            cid = doc.get("case_id") or os.path.splitext(name)[0]
+            if cid in seen:
+                # 冲突时按文件名排序取第一个（确定性），另一个如实报出来
+                errors.append({"file": name,
+                               "error": "case_id 与 %s 冲突" % seen[cid]})
+                continue
+            seen[cid] = name
+            targets = doc.get("targets") or []
+            hotspots = doc.get("hotspots") or []
+            cases.append({
+                "id": cid,
+                "name": doc.get("case_name") or cid,
+                "description": doc.get("case_description") or "",
+                "target_count": len(targets) if isinstance(targets, list) else 0,
+                "hotspot_count": len(hotspots) if isinstance(hotspots, list) else 0,
+                "file": "data/situations/" + name,
+                "region": doc.get("region"),
+                "theatre": doc.get("theatre"),
+            })
+        cases.sort(key=lambda c: c["id"])
+        ids = {c["id"] for c in cases}
+        default = SITUATION_DEFAULT if SITUATION_DEFAULT in ids else (
+            cases[0]["id"] if cases else None)
+        self._send_json({
+            "default": default,
+            "cases": cases,
+            "errors": errors,
+            "dir": os.path.relpath(SITUATIONS_DIR, WEB_ROOT),
+        })
 
     def _api_health(self):
         """Cheap liveness/config probe for the front end and for scripts."""

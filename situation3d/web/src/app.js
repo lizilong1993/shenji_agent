@@ -567,14 +567,31 @@ function applyCamera(camera) {
 // 数据加载
 // --------------------------------------------------------------------------
 
+/**
+ * 案例索引来自**服务端扫描固定目录**（`/api/situations`），不再是生成出来的
+ * `web/data/cases.json`：往目录里放一份 TS 就多一个案例、删掉就少一个，
+ * 既不用跑生成器，也不用改任何索引文件。
+ *
+ * `errors` **不吞掉**：坏文件必须报出来，否则现象只是"某个案例莫名不见了"，
+ * 而没人会想到是文件本身解析失败。空目录是正常状态，但也要说清"没有可用的 TS"，
+ * 不能让菜单一片空白还查不出原因。
+ */
 function loadCaseIndex() {
-  return fetch('./data/cases.json', { cache: 'no-store' })
+  return fetch('/api/situations', { cache: 'no-store' })
     .then(function (r) {
-      if (!r.ok) throw new Error('案例索引加载失败: HTTP ' + r.status);
+      if (!r.ok) throw new Error('TS 目录扫描失败: HTTP ' + r.status);
       return r.json();
     })
     .then(function (index) {
       state.caseIndex = index;
+      var errs = index.errors || [];
+      if (errs.length) {
+        console.warn('[situations] ' + errs.length + ' 份文件未被载入：', errs);
+      }
+      if (!index.cases || !index.cases.length) {
+        console.warn('[situations] 目录 ' + (index.dir || '')
+          + ' 下没有可用的 TS（放一份 *.json 进去即成为一个案例）');
+      }
       renderCaseMenu();
       return index;
     });
@@ -4079,8 +4096,15 @@ function main() {
     }
     applyCaseIndependentHooks();
     if (!wanted) return null;
-    const id = state.caseIndex.cases.some(function (c) { return c.id === wanted; })
-      ? wanted : state.caseIndex.default;
+    // 目录为空时 `default` 是 null —— 此时**不加载任何案例**，与"没有指定 case"
+    // 走同一条空态路径，而不是拿 null 去 loadCase 报"未知案例"。
+    const known = (state.caseIndex && state.caseIndex.cases) || [];
+    const id = known.some(function (c) { return c.id === wanted; })
+      ? wanted : (state.caseIndex.default || null);
+    if (!id) {
+      console.warn('[situations] 找不到案例「' + wanted + '」，且目录中没有默认案例');
+      return null;
+    }
     return loadCase(id);
   }).then(function () {
     applyCaseHooks();

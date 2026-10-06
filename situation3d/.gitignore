@@ -11,7 +11,10 @@ web/vendor/
 
 # Generated situation data. Deterministic output of
 # scripts/gen_demo_trajectory.py -- regenerate rather than commit.
+# `web/data/*.json` 只匹配 direct children：目录化之后 `web/data/situations/*.json`
+# **不在覆盖范围内**，数据集会变成可被误提交。两层都写死，别只靠通配符。
 web/data/*.json
+web/data/situations/
 
 # Offline tile set (~10k files, ~200 MB), rebuilt by tools/fetch_assets.py and
 # tools/fetch_urban_wsf3d.sh. Never commit this.
