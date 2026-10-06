@@ -31,6 +31,7 @@
   var root = null;
   var opts = {};
   var expanded = {};      // layerId -> true
+  var editing = {};       // layerId|key -> true
   var lastSig = null;
 
   /** 组的显示顺序。注册表里出现但不在表内的组，排在最后。 */
@@ -127,8 +128,68 @@
     return row;
   }
 
+  /**
+   * 行内编辑表单。
+   *
+   * 为什么内联在要素行下面而不是弹模态框：改一个名称/归属却要盖住整张地图，
+   * 用户没法一边看态势一边改。内联表单保持地图可见。
+   */
+  function editForm(layerId, item) {
+    var wrap = el('div', 'lp-form');
+    var inputs = {};
+    (item.editFields || []).forEach(function (f) {
+      var row = el('label', 'lp-form-row');
+      row.appendChild(el('span', null, f.label));
+      var inp;
+      if (f.options) {
+        inp = document.createElement('select');
+        inp.className = 'plot-sel';
+        f.options.forEach(function (o) {
+          var op = document.createElement('option');
+          op.value = String(o[0]); op.textContent = o[1];
+          if (String(o[0]) === String(f.value)) op.selected = true;
+          inp.appendChild(op);
+        });
+      } else {
+        inp = document.createElement('input');
+        inp.className = 'plot-input';
+        inp.type = f.type || 'text';
+        inp.value = (f.value === null || f.value === undefined) ? '' : f.value;
+      }
+      inputs[f.key] = inp;
+      row.appendChild(inp);
+      wrap.appendChild(row);
+    });
+    var btns = el('div', 'plot-row');
+    var ok = el('button', 'mini', '保存');
+    var no = el('button', 'mini', '取消');
+    ok.type = 'button'; no.type = 'button';
+    ok.addEventListener('click', function () {
+      var values = {};
+      Object.keys(inputs).forEach(function (k) { values[k] = inputs[k].value; });
+      // onSave 会做真正的写入（`Plotting.update` 会对控制点数、合法性抛错）。
+      // 这里必须兜住：面板的点击处理器一旦抛错就是未捕获错误，而用户的操作
+      // （点保存）看起来"没反应"，实际错误只在控制台里。
+      try {
+        item.onSave(values);
+        editing[layerId + '|' + item.key] = false;
+      } catch (e) {
+        alert('保存失败：' + e.message);
+      }
+      invalidate();
+    });
+    no.addEventListener('click', function () {
+      editing[layerId + '|' + item.key] = false;
+      invalidate();
+    });
+    btns.appendChild(ok); btns.appendChild(no);
+    wrap.appendChild(btns);
+    return wrap;
+  }
+
   /** 一行要素：名称 + 副标题 + 该要素支持的操作。 */
   function elementRow(layerId, item) {
+    var box = el('div', 'lp-elem-box');
     var row = el('div', 'lp-elem');
 
     if (item.actions && item.actions.indexOf('toggle') >= 0 && typeof item.onToggle === 'function') {
@@ -161,17 +222,34 @@
     (item.actions || []).forEach(function (a) {
       if (a === 'toggle') return;
       var m = ACTIONS[a];
-      if (!m || typeof item[m[2]] !== 'function') return;
+      if (!m) return;
+      // 「编辑」有两种形态：带 `editFields` 的走行内表单（由面板渲染），
+      // 没有表单的才要求提供者给 `onEdit`。**只按 `onEdit` 判存在会把表单形态的
+      // 编辑按钮整个漏掉** —— 表现为"标绘能看不能改"，而且不报错。
+      var hasForm = (a === 'edit' && item.editFields && item.editFields.length);
+      if (!hasForm && typeof item[m[2]] !== 'function') return;
       var btn = el('button', 'lp-act', m[0]);
       btn.type = 'button';
       btn.title = m[1];
       btn.addEventListener('click', function () {
+        // 「编辑」优先走**行内表单**（要素自带 editFields 时）；没有表单的才交给
+        // 要素自己的 onEdit —— 这样"能编辑什么"由提供者声明，面板不必知道细节。
+        if (a === 'edit' && item.editFields) {
+          var k = layerId + '|' + item.key;
+          editing[k] = !editing[k];
+          invalidate();
+          return;
+        }
         item[m[2]]();
         invalidate();
       });
       row.appendChild(btn);
     });
-    return row;
+    box.appendChild(row);
+    if (editing[layerId + '|' + item.key] && item.editFields) {
+      box.appendChild(editForm(layerId, item));
+    }
+    return box;
   }
 
   function render() {

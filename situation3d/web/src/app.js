@@ -30,6 +30,14 @@ const params = new URLSearchParams(window.location.search);
 const LEVEL_CLASS = { 1: 'lv1', 2: 'lv2', 3: 'lv3', 4: 'lv4' };
 
 const state = {
+  // 动态图层管理的**单要素**状态。与图层开关、阵营/域过滤是三层，取与（见 isVisible）。
+  //   hiddenTargets   单独关掉某个目标（可再打开）
+  //   removedTargets  从当前TS移除（会话内；重新加载案例即恢复，数据集文件不动）
+  //   targetOverrides 目标可改的**只有它的 TS 信息**（名称/阵营/域/装备/型号），
+  //                  几何与航迹来自数据集，改它们等于改数据
+  hiddenTargets: {},
+  removedTargets: {},
+  targetOverrides: {},
   caseIndex: null,
   caseId: null,
   data: null,
@@ -500,6 +508,8 @@ function initViewer() {
   registerImagerySlot('imagery.offline', [state.globalLayer, state.imageryLayer]);
   // 热点影像是**一层多实例**（每个热点框一个 provider），必须全部登记。
   registerImagerySlot('hotspot.imagery', state.hotspotLayers);
+
+  registerLayerProviders();
 
   // 初始意图：**遍历注册表**取 `default`，不再逐个去读 HTML 复选框。
   //
@@ -1108,6 +1118,11 @@ function positionFor(id, tick) {
 
 function isVisible(def) {
   if (!state.layers.targets) return false;
+  // 单要素层面：图层开关 → 阵营/域过滤 → **单要素开关/移除**，三层取与。
+  // 走同一条通路（实体 show）而不是另建一套隐藏机制：目标实体、标牌、航路都由
+  // isVisible/syncEntities 统一驱动，另建一套就会出现"隐藏了但航路还在"。
+  if (state.removedTargets[def.id]) return false;
+  if (state.hiddenTargets[def.id]) return false;
   if (def.affiliation === 'red' && !state.filters.red) return false;
   if (def.affiliation === 'blue' && !state.filters.blue) return false;
   if (!state.filters[def.domain]) return false;
@@ -3258,6 +3273,204 @@ function exportData() {
 // 事件绑定
 // --------------------------------------------------------------------------
 
+/**
+ * 注册各图层的**要素提供者** —— 动态图层管理的数据源。
+ *
+ * 面板只认一个契约：`() => [{key, label, sub, visible, actions, ...回调}]`。
+ * 提供者把"这一层现在有哪些要素"翻译成它，面板负责画出来。
+ * 于是**新增一类可列要素只需要加一个提供者**，不用碰面板代码。
+ *
+ * 每个提供者都要能在数据未加载时返回 `null`（空态）：面板把它显示成"没有要素列表"，
+ * 而不是 0 —— 那是两件不同的事。
+ */
+function registerLayerProviders() {
+  if (!window.LayerRegistry) return;
+
+  var plotZh = {};
+  if (window.Plotting) {
+    Plotting.catalogue().forEach(function (c) { plotZh[c.type] = c.zh; });
+  }
+  var AFF_ZH = { red: '红方', blue: '蓝方' };
+  var DOM_ZH = { sea: '水面', land: '陆上', air: '空中' };
+
+  function touch() { if (window.LayerPanel) LayerPanel.invalidate(); }
+
+  // ---- 标绘：每个类别图层一个提供者 --------------------------------------
+  //
+  // 标绘可**删除、可更改**。更改允许动控制点/标注/归属/归属图层；控制点在表单里按
+  // "每行 经度, 纬度"编辑 —— `update()` 存的是控制点本身，不是派生出来的环/线。
+  if (window.Plotting) {
+    LayerRegistry.list('plot').forEach(function (d) {
+      LayerRegistry.setProvider(d.id, function () {
+        return Plotting.debug().items.filter(function (it) { return it.layer === d.id; })
+          .map(function (it) {
+            var zh = plotZh[it.type] || it.type;
+            return {
+              key: it.id,
+              label: it.label || zh,
+              sub: zh + ' · ' + it.points + ' 点',
+              visible: it.visible !== false,
+              actions: ['toggle', 'locate', 'edit', 'delete'],
+              onToggle: function (on) { Plotting.setVisible(it.id, on); touch(); },
+              onLocate: function () { Plotting.focus(it.id); },
+              onDelete: function () { Plotting.remove(it.id); touch(); },
+              editFields: [
+                { key: 'label', label: '标注', value: it.label || '' },
+                { key: 'hostility', label: '归属', value: it.hostility || 'friendly',
+                  options: [['friendly', '红方（我军）'], ['enemy', '蓝方（敌军）']] },
+                { key: 'layer', label: '归属图层', value: it.layer,
+                  options: LayerRegistry.list('plot').map(function (l) { return [l.id, l.label]; }) },
+                { key: 'points', label: '控制点', value: '', type: 'text' },
+              ],
+              onSave: function (v) {
+                var patch = { label: v.label, hostility: v.hostility, layer: v.layer };
+                if (v.points && v.points.trim()) {
+                  var pts = v.points.split(/[;\n]+/).map(function (s) {
+                    var a = s.split(/[,\s]+/).filter(Boolean).map(Number);
+                    return (a.length === 2 && a.every(isFinite)) ? a : null;
+                  }).filter(Boolean);
+                  if (!pts.length) throw new Error('控制点格式应为「每行 经度, 纬度」');
+                  patch.points = pts;
+                }
+                Plotting.update(it.id, patch);
+                touch();
+              },
+            };
+          });
+      });
+    });
+  }
+
+  // ---- 目标：TS信息可改，可单独显隐，可从当前TS移除 -----------------------
+  LayerRegistry.setProvider('layerTargets', function () {
+    var d = state.data;
+    if (!d || !d.targets) return null;
+    return d.targets
+      .filter(function (t) { return !state.removedTargets[t.id]; })
+      .map(function (t) {
+        var ov = state.targetOverrides[t.id] || {};
+        var def = { id: t.id, name: ov.name || t.name,
+                    affiliation: ov.affiliation || t.affiliation,
+                    domain: ov.domain || t.domain };
+        return {
+          key: t.id,
+          label: t.id + ' ' + def.name,
+          sub: (AFF_ZH[def.affiliation] || def.affiliation) + ' · ' +
+               (DOM_ZH[def.domain] || def.domain),
+          visible: isVisible(t),
+          actions: ['toggle', 'locate', 'edit', 'delete'],
+          onToggle: function (on) {
+            if (on) delete state.hiddenTargets[t.id];
+            else state.hiddenTargets[t.id] = true;
+            markScene('singleTarget');
+            touch();
+          },
+          onLocate: function () { selectTarget(t.id, false); },
+          onDelete: function () {
+            // **从当前 TS 移除**：会话内状态。数据集文件不动，重新加载案例即恢复。
+            state.removedTargets[t.id] = true;
+            if (state.selected === t.id) selectTarget(null, false);
+            markScene('removeTarget');
+            touch();
+          },
+          editFields: [
+            { key: 'name', label: '名称', value: def.name },
+            { key: 'affiliation', label: '阵营', value: def.affiliation,
+              options: [['red', '红方'], ['blue', '蓝方']] },
+            { key: 'domain', label: '域', value: def.domain,
+              options: [['sea', '水面'], ['land', '陆上'], ['air', '空中']] },
+            { key: 'model', label: '型号', value: (ov.model !== undefined ? ov.model : t.model) || '' },
+          ],
+          onSave: function (v) {
+            // 只改 **TS 信息**。几何与航迹来自数据集帧，改它们等于改数据 ——
+            // 你明确要求目标要素"只有其 TS 信息可更改"。
+            state.targetOverrides[t.id] = {
+              name: v.name, affiliation: v.affiliation, domain: v.domain, model: v.model,
+            };
+            applyTargetOverrides();
+            markScene('targetOverride');
+            renderTargetStatus(state.selected);
+            touch();
+          },
+        };
+      });
+  });
+
+  // ---- 计划航路：每条航路对应一个目标 -------------------------------------
+  LayerRegistry.setProvider('layerRoutes', function () {
+    var d = state.data;
+    if (!d || !d.targets) return null;
+    return d.targets
+      .filter(function (t) { return !state.removedTargets[t.id]; })
+      .map(function (t) {
+        return {
+          key: t.id,
+          label: '航路 ' + t.id,
+          sub: DOM_ZH[t.domain] || t.domain,
+          visible: !!(state.layers.routes && !state.hiddenTargets[t.id]
+                      && !state.removedTargets[t.id]),
+          actions: ['locate'],
+          onLocate: function () { selectTarget(t.id, false); },
+        };
+      });
+  });
+
+  // ---- 热点区域 -----------------------------------------------------------
+  LayerRegistry.setProvider('layerHotspots', function () {
+    var d = state.data;
+    if (!d || !d.hotspots || !d.hotspots.length) return null;
+    return d.hotspots.map(function (h, i) {
+      return {
+        key: 'hotspot-' + i,
+        label: h.name || ('热点 ' + (i + 1)),
+        sub: h.level_label || '',
+        visible: !!state.layers.hotspots,
+        actions: ['locate'],
+        onLocate: function () { selectHotspot(i, false); },
+      };
+    });
+  });
+
+  // ---- 影像：一层可能多实例（热点影像一个热点框一个 provider）------------
+  // **只读展示**：挂载/卸载由相机高度驱动，面板不提供删除，只说清"现在挂了几个"。
+  LayerRegistry.list('imagery').forEach(function (d) {
+    LayerRegistry.setProvider(d.id, function () {
+      var rows = (LayerRegistry._debug().imagery || []).filter(function (r) {
+        return r.slot === d.id;
+      });
+      if (!rows.length) return null;
+      return rows.map(function (r, i) {
+        return {
+          key: d.id + '#' + i,
+          label: rows.length > 1 ? ('实例 ' + (i + 1)) : '底图实例',
+          sub: 'index ' + r.index + (r.show ? ' · 显示' : ' · 隐藏'),
+          visible: !!r.show,
+          actions: [],
+        };
+      });
+    });
+  });
+}
+
+/**
+ * 把目标的信息覆盖**原地写回** `state.data.targets`。
+ *
+ * 为什么不保留一张覆盖表、在每个读取点各查一次：名称/图标被左栏标牌、右栏
+ * 「整体TS」、意图面板等多处使用，逐个改查表迟早漏一处，表现就是
+ * "改了名字但某一栏还是旧的"。写回数据集对象之后，所有读取点自然一致。
+ */
+function applyTargetOverrides() {
+  var d = state.data;
+  if (!d || !d.targets) return;
+  d.targets.forEach(function (t) {
+    var ov = state.targetOverrides[t.id];
+    if (!ov) return;
+    if (ov.name) t.name = ov.name;
+    if (ov.affiliation) t.affiliation = ov.affiliation;
+    if (ov.domain) t.domain = ov.domain;
+    if (ov.model !== undefined) t.model = ov.model;
+  });
+}
 function bindUI() {
   const bindCheck = function (id, handler) {
     const node = document.getElementById(id);

@@ -1156,6 +1156,18 @@ select {
 .lp-act:hover { background: #eef2f8; border-color: var(--border); color: var(--text); }
 .lp-empty { font-size: 10px; color: var(--text-dim); padding: 1px 0; }
 
+/* 要素的行内编辑表单：保持地图可见（弹模态框会盖住整张图，没法边看态势边改）。 */
+.lp-form {
+  margin: 3px 0 4px 16px; padding: 5px 6px;
+  border: 1px solid var(--border); border-radius: 3px;
+  background: #f7f9fc;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.lp-form-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.lp-form-row > span { flex: 0 0 52px; color: var(--text-dim); }
+.lp-form-row > input,
+.lp-form-row > select { flex: 1 1 auto; min-width: 0; }
+.lp-elem-box { display: block; }
 .plot-add {  display: flex;
   flex-direction: column;
   gap: 4px;

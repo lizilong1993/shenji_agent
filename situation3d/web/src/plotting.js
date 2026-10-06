@@ -1447,8 +1447,16 @@
     var id = spec.id || ('plot-' + (++seq));
     if (byId[id]) throw new Error('标绘 id 重复：' + id);
     var rec = {
-      id: id, type: spec.type, layer: spec.layer || 'plot.offense',
-      std: def.std, ref: def.ref,
+      id: id, type: spec.type,
+      // 默认图层按**类型**给，不再硬编码回落 plot.offense（见 LAYER_BY_TYPE）
+      layer: spec.layer || LAYER_BY_TYPE[spec.type] || 'plot.offense',
+      // ⚠ 这里原先读 `def.std` / `def.ref` —— 那是**旧字段名**。目录在 FIX-1 那轮
+      // 改成 `sourceStandard` / `sourceDoc` / `sourceConfidence` 之后，这两行没跟着改，
+      // 于是每一个标绘实例的标准来源都是 `undefined`：界面上能显示"这是中式还是美式"
+      // 的信息**一直是坏的**，而且因为不报错所以没人发现。
+      std: def.sourceStandard,
+      ref: def.sourceDoc,
+      confidence: def.sourceConfidence,
       points: spec.points.map(function (c) { return [c[0], c[1]]; }),
       // 颜色**不在这里定**：存归属，取色留给渲染时按当前配色标准解析，
       // 否则 setColorStandard('NATO') 之后已有标绘不会跟着变。
@@ -1488,10 +1496,95 @@
     applyVisibility();
   }
 
+  /** 单个要素的显隐。与图层开关相互独立，见 applyVisibility 的注释。 */
+  function setVisible(id, on) {
+    var rec = byId[id];
+    if (!rec) return false;
+    rec.visible = !!on;
+    applyVisibility();
+    if (viewer) viewer.scene.requestRender();
+    return true;
+  }
+
+  /**
+   * 改一条已有标绘。
+   *
+   * 允许改：`label` / `hostility` / `layer`（换图层）/ `points`（控制点）/ `color`。
+   *
+   * **`rec.id` 不变**：面板的展开态、选中态、以及外部按 id 的引用都挂在它上面，
+   * 换个 id 等于把这条标绘当成新的一条，界面上会表现为"改了一下就跳到列表末尾"。
+   *
+   * 改控制点走"撤掉旧几何、按新控制点重画"，**存的是控制点本身**而不是派生出来的
+   * 环/线——派生几何展开后动辄几百个顶点，改一次就再也回不到控制点语义了。
+   */
+  function update(id, patch) {
+    var rec = byId[id];
+    if (!rec) throw new Error('标绘不存在：' + id);
+    if (!patch || typeof patch !== 'object') throw new Error('update 需要一个补丁对象');
+
+    if (patch.points) {
+      var def = CATALOGUE[rec.type];
+      var ctrl = CTRL_BY_FAMILY[(def && def.family) || 'line'] || { min: 2, max: null };
+      if (!patch.points.length || patch.points.length < ctrl.min) {
+        throw new Error(rec.type + ' 至少需要 ' + ctrl.min + ' 个控制点（当前 '
+          + patch.points.length + '）');
+      }
+      if (ctrl.max && patch.points.length > ctrl.max) {
+        throw new Error(rec.type + ' 最多 ' + ctrl.max + ' 个控制点（当前 '
+          + patch.points.length + '）');
+      }
+    }
+
+    var host = viewer;                       // 保存：clearRec 会清掉实体但与 viewer 无关
+    clearRec(rec);
+    if (patch.layer !== undefined) rec.layer = patch.layer;
+    if (patch.label !== undefined) rec.label = patch.label || null;
+    if (patch.hostility !== undefined) {
+      rec.hostility = patch.hostility === 'enemy' ? 'enemy' : 'friendly';
+    }
+    if (patch.color !== undefined) rec.color = patch.color || null;
+    if (patch.points) {
+      rec.points = patch.points.map(function (c) { return [c[0], c[1]]; });
+    }
+    if (rec.visible === false) rec.visible = true;   // 重建出来的默认可见，由调用方再关
+    drawOne(rec);
+    applyVisibility();
+    if (host) host.scene.requestRender();
+    return rec;
+  }
+
+  /**
+   * 把视野移到某条标绘上（面板「定位」用）。
+   *
+   * 只动相机，**不做视觉强调**：强调需要给每类几何加轮廓/加粗，而 24 类几何的
+   * 渲染路径各不相同（有的走 entity polyline、有的走批量 GroundPrimitive），
+   * 逐类实现一遍性价比很低，且容易把 FIX-5 的批量合并弄坏。
+   */
+  function focus(id) {
+    var rec = byId[id];
+    if (!rec || !viewer) return false;
+    var lons = rec.points.map(function (c) { return c[0]; });
+    var lats = rec.points.map(function (c) { return c[1]; });
+    var lon = (Math.min.apply(null, lons) + Math.max.apply(null, lons)) / 2;
+    var lat = (Math.min.apply(null, lats) + Math.max.apply(null, lats)) / 2;
+    var span = Math.max(Math.max.apply(null, lons) - Math.min.apply(null, lons),
+                        Math.max.apply(null, lats) - Math.min.apply(null, lats));
+    // 跨度 → 视高：经验值，够用即可（标绘通常几公里到几百公里）
+    var h = Math.max(30000, Math.min(3000000, span * 111000 * 6));
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(lon, lat, h),
+      duration: 0.8,
+    });
+    return true;
+  }
+
   function applyVisibility() {
     Object.keys(byId).forEach(function (id) {
       var rec = byId[id];
-      var on = layerVisible[rec.layer] !== false;   // 未声明过就默认可见
+      // 图层可见 ∩ 该要素未被单独关掉。未声明过都默认可见。
+      // 两层的语义不能合并成一个开关：图层开关回答"这一类看不看"，
+      // 要素开关回答"这一条看不看"，关掉图层不应把要素的选择也抹掉。
+      var on = (layerVisible[rec.layer] !== false) && rec.visible !== false;
       rec.entities.forEach(function (e) { e.show = on; });
       (rec.primitives || []).forEach(function (pr) { pr.show = on; });
     });
@@ -1524,6 +1617,9 @@
     remove: remove,
     clearLayer: clearLayer,
     setLayerVisible: setLayerVisible,
+    setVisible: setVisible,
+    update: update,
+    focus: focus,
     // 屏幕空间装饰的缩放重建：`force` 供自检直接触发，避免依赖真实相机运动
     refreshScreenSpaceDecorations: refreshScreenSpaceDecorations,
     resolutionBucket: resolutionBucket,
@@ -1570,6 +1666,11 @@
     debug: function () {
       var list = Object.keys(byId).map(function (id) {
         return { id: id, type: byId[id].type, layer: byId[id].layer,
+                 // 面板要显示这几项：标绘清单里"哪一条"靠 label + 类型 + 归属
+                 label: byId[id].label || null,
+                 hostility: byId[id].hostility || null,
+                 visible: byId[id].visible !== false,
+                 points: byId[id].points.length,
                  std: byId[id].std, entities: byId[id].entities.length,
                  primitives: (byId[id].primitives || []).length,
                  marks: byId[id].markCount || 0 };
