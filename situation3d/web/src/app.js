@@ -321,9 +321,47 @@ window.addEventListener('unhandledrejection', function (e) {
  * （`isConnected === false`），于是"开关是开的"被读成"关的"，建筑体块一路静默
  * 短路——不报错、没有任何提示，看起来就是"这个功能没做"。
  */
+/**
+ * 读一个开关的当前状态。
+ *
+ * **两个来源**：DOM 里还有节点就读它；节点已经没有（已迁进注册表的
+ * `modelImagery`/`modelTerrain`/`modelWsf3dOverlay`/`modelSensor`/`modelWeather`/
+ * `modelBuildings`）就读注册表的**意图**。
+ *
+ * 不这样做的话这些 id 会一律返回 `false`，而本函数有 8 处调用点在问
+ * `checkboxOn('modelBuildings')` —— 后果是 WSF3D 建筑体块**整条链路静默死掉**
+ * （`refreshBuildings()` 的每个入口都被它挡着），而且不报错。
+ */
+/**
+ * 复选框 DOM id → 图层 id。
+ *
+ * **这两个不是一回事**：图层 id 是 `buildings.blocks`，它的复选框 id 是
+ * `modelBuildings`。`LayerRegistry.def()` 只按**图层 id** 查，所以拿复选框 id 去问
+ * 它永远得到 null —— 一开始我就是这么写的，结果 `?buildings=1` 与
+ * `checkboxOn('modelBuildings')` 全都静默失效（不报错，只是没反应）。
+ */
+function layerIdForCheckbox(id) {
+  if (!window.LayerRegistry || !LayerRegistry.LAYERS) return null;
+  const hit = LayerRegistry.LAYERS.filter(function (l) { return l.checkbox === id; })[0];
+  return hit ? hit.id : null;
+}
+
+/**
+ * 读一个开关的当前状态。
+ *
+ * **两个来源**：DOM 里还有节点就读它；节点已经没有（例如 `modelBuildings`，
+ * 它的复选框已经不在 HTML 里）就按复选框 id 反查图层、读注册表的**意图**。
+ *
+ * 否则这些 id 会一律返回 `false`，而本函数有 8 处调用点在问
+ * `checkboxOn('modelBuildings')` —— 后果是 WSF3D 建筑体块**整条链路静默死掉**
+ * （`refreshBuildings()` 的每个入口都被它挡着），而且不报错。
+ */
 function checkboxOn(id) {
   const node = document.getElementById(id);
-  return !!(node && node.checked);
+  if (node) return !!node.checked;
+  const lid = layerIdForCheckbox(id);
+  if (lid) return !!LayerRegistry.runtime[lid].desired;
+  return false;
 }
 
 function setStatus(text, kind) {
@@ -817,6 +855,26 @@ function applySituationData(data, caseId) {
   }
 }
 
+/**
+ * 清空**单要素**状态：逐个目标的隐藏/移除/信息覆盖，以及逐条航路 / 热点。
+ *
+ * 必须挂在 `teardownScene()` 上，**不能只挂在 `clearSituation()` 上**：换案例走的是
+ * `loadCase → applySituationData → teardownScene()`，这条路**不经过** clearSituation。
+ * 只清在 clearSituation 里的话，"在台海把 R01 隐藏、R02 移除 → 切到中印"之后这两条
+ * 仍然留着（实测：切案例后 `hiddenTargets` 里还有 R01、`removedTargets` 里还有 R02）。
+ * 而 id 在不同案例里会重名（每个案例都有自己的 R01），一旦撞上，用户从没在新案例里
+ * 动过那个目标，它却怎么也找不到 —— 正是"切了案例状态还在"的那类幽灵 bug。
+ *
+ * 这里**原地清键**而不是换新对象：万一有地方捕获了这些对象的引用，换对象会让它
+ * 继续读写旧的那份，状态就分叉了。
+ */
+function resetElementState() {
+  [state.hiddenTargets, state.removedTargets, state.targetOverrides,
+   state.hiddenRoutes, state.hiddenHotspots].forEach(function (bag) {
+    Object.keys(bag).forEach(function (k) { delete bag[k]; });
+  });
+}
+
 function teardownScene() {
   if (!viewer) return;
   detachFollow('TS已切换');
@@ -826,6 +884,8 @@ function teardownScene() {
   state.hotspotEntities = [];
   state.hotspotRows = [];
   state.routeEntities = [];
+  // 场景都拆了，单要素状态自然跟着作废（换案例 / 回空态两条路都经过这里）。
+  resetElementState();
   if (state.buildingsPrimitive) {
     viewer.scene.primitives.remove(state.buildingsPrimitive);
     state.buildingsPrimitive = null;
@@ -896,15 +956,9 @@ function clearSituation() {
   state.geoPinned = false;
   state.buildingsKey = null;
   state.buildingsAoi = -1;
-  // **单要素状态必须一起清掉**。它们是按**目标 id** 索引的，而 id 在不同案例里会重名
-  // （每个案例都有自己的 R01）。不清的话：在台海把 R01 隐藏/移除，切到中印再切回来，
-  // R01 仍然是隐藏的 —— 用户从没在新案例里动过它，却怎么也找不到。
-  // 这里**原地清键**而不是换新对象：万一有地方捕获了这些对象的引用，换对象会让它
-  // 继续读写旧的那份，状态就分叉了。
-  [state.hiddenTargets, state.removedTargets, state.targetOverrides,
-   state.hiddenRoutes, state.hiddenHotspots].forEach(function (bag) {
-    Object.keys(bag).forEach(function (k) { delete bag[k]; });
-  });
+  // 单要素状态（hiddenTargets / removedTargets / targetOverrides / hiddenRoutes /
+  // hiddenHotspots）由上面的 teardownScene() → resetElementState() 一并清掉。放在那里
+  // 而不是这里，是因为**换案例不走 clearSituation**，只清这里等于没清（见该函数说明）。
   markScene('clearSituation');
 
   dom.scenarioName.textContent = state.baseRegion || '未加载TS';
@@ -1082,8 +1136,11 @@ function setSwitch(id, on) {
     node.dispatchEvent(new Event('change', { bubbles: true }));
     return;
   }
-  if (LayerRegistry.def(id)) {
-    LayerRegistry.setDesired(id, on);
+  // 按**复选框 id 反查**图层再写意图 —— 直接用 id 问 def() 是查不到的（见
+  // layerIdForCheckbox 的说明）
+  const lid = layerIdForCheckbox(id);
+  if (lid) {
+    LayerRegistry.setDesired(lid, on);
     applyLayers();
   }
 }
@@ -4220,32 +4277,40 @@ function applyCaseIndependentHooks() {
     setSwitch('comp' + pair[0].charAt(0).toUpperCase() + pair[1].slice(1), on);
   });
 
+  // ⚠ 这些开关的 DOM 复选框**已经不存在**（都迁进了注册表面板）。原先这里直接写
+  // `.checked`，对 null 取属性会抛 TypeError；而它跑在启动链里，异常被最外层的
+  // `.catch` 吞掉 —— 症状是**整个案例都不加载**（`state.data` 始终为 null、机位停在
+  // Cesium 默认值），`#statusText` 才写着"启动失败"，而 `pageErrors` 是**空的**。
+  // 用 `setSwitch` 走"有节点派发 change / 没节点改注册表意图"这条统一通路。
+  // 下面紧跟的显式 setter 保留：两者幂等，且 setter 可能还做了别的事。
   if (params.get('imagery') === '0') {
-    document.getElementById('modelImagery').checked = false;
+    setSwitch('modelImagery', false);
     setImagery(false);
   }
   if (params.get('terrain') === '1') {
-    document.getElementById('modelTerrain').checked = true;
+    setSwitch('modelTerrain', true);
     setTerrain(true);
   }
   if (params.get('overlay') === '1') {
-    document.getElementById('modelWsf3dOverlay').checked = true;
+    setSwitch('modelWsf3dOverlay', true);
     setWsf3dOverlay(true);
   }
   if (params.get('sensors') === '1') {
-    document.getElementById('modelSensor').checked = true;
+    setSwitch('modelSensor', true);
     setSensors(true);
   }
   if (params.get('weather') === '0') {
-    document.getElementById('modelWeather').checked = false;
+    setSwitch('modelWeather', false);
     setWeather(false);
   }
   if (params.get('weather') === '1') {
-    document.getElementById('modelWeather').checked = true;
+    setSwitch('modelWeather', true);
     setWeather(true);
   }
   if (params.get('buildings') === '1') {
-    document.getElementById('modelBuildings').checked = true;
+    // 原先只写 `.checked`、**不调 setter**，靠 change 事件驱动。节点没了之后
+    // 这一条等于什么都没做 —— 现在走 setSwitch，注册表的 handler 会把体块打开。
+    setSwitch('modelBuildings', true);
   }
   // 诊断/取证用的机位钩子：?cam=lon,lat,height[,pitch]
   if (params.has('cam')) {
