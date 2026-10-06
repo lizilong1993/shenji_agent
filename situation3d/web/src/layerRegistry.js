@@ -148,8 +148,34 @@
       id: 'plot.intel', kind: 'plot', z: 50, default: true,
       label: '标绘·侦察与空域', group: '标绘', checkbox: 'plotIntel',
     },
-  ];
+    // ---- TS图层 / 目标图层：原先只存在于 index.html，注册表里没有 ----
+    //
+    // 它们用**逐层 `handler`**（在 app.js 里挂上）而不是 kind sink：各自是一次性动作
+    // （写 state.layers.*、setSensors、setOverview…），为每个造一个 kind 只是把同一段
+    // 代码换个地方写。有了 handler 就能与其它图层**共用同一条 apply 通路**，
+    // 面板也才能把它们当成普通图层行来渲染与计数。
+    //
+    // `default` 与迁移前 HTML 的 checked 一致（`layerOverview` 例外：它由
+    // `setOverview` 在启动时按可用性决定，这里给 false 避免"声明开着但实际没挂"）。
+    { id: 'layerHotspots', kind: 'situation', z: 10, label: '热点区域',
+      group: 'TS图层', default: true },
+    { id: 'layerRoutes', kind: 'situation', z: 20, label: '计划航路',
+      group: 'TS图层', default: true },
+    { id: 'layerOverview', kind: 'situation', z: 30, label: '鸟瞰图',
+      group: 'TS图层', default: false },
 
+    { id: 'layerTargets', kind: 'target', z: 10, label: '可见目标',
+      group: '目标图层', default: true },
+    { id: 'layerLabels', kind: 'target', z: 20, label: '目标标牌',
+      group: '目标图层', default: true },
+    { id: 'layerTracks', kind: 'target', z: 30, label: '历史轨迹',
+      group: '目标图层', default: true },
+    { id: 'modelSensor', kind: 'target', z: 40, label: '传感器覆盖',
+      group: '目标图层', default: false },
+    { id: 'layerTargetPanel', kind: 'target', z: 50, label: '目标元数据面板',
+      group: '目标图层', default: true },
+
+  ];
   var byId = {};
   LAYERS.forEach(function (l) { byId[l.id] = l; });
 

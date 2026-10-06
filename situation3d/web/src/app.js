@@ -3500,11 +3500,27 @@ function bindUI() {
     });
   }
 
-  bindCheck('layerTargets', function (v) { state.layers.targets = v; markScene('layerTargets'); guardFollow(); });
-  bindCheck('layerTracks', function (v) { state.layers.tracks = v; markScene('layerTracks'); });
-  bindCheck('layerRoutes', function (v) { state.layers.routes = v; markScene('layerRoutes'); });
-  bindCheck('layerHotspots', function (v) { state.layers.hotspots = v; markScene('layerHotspots'); });
-  bindCheck('layerLabels', function (v) { state.layers.labels = v; markScene('layerLabels'); });
+  // 迁移进注册表的图层行：**不再逐个 bindCheck**，改为把回调体挂成逐层 `handler`。
+  //
+  // 这样它们与底图/标绘走**同一条 apply 通路**，面板才能把它们当普通图层行渲染并
+  // 统计要素数量。回调体是从这里原样搬过去的，行为不变。
+  [
+    ['layerHotspots', function (v) { state.layers.hotspots = v; markScene('layerHotspots'); }],
+    ['layerRoutes', function (v) { state.layers.routes = v; markScene('layerRoutes'); }],
+    ['layerTargets', function (v) { state.layers.targets = v; markScene('layerTargets'); guardFollow(); }],
+    ['layerLabels', function (v) { state.layers.labels = v; markScene('layerLabels'); }],
+    ['layerTracks', function (v) { state.layers.tracks = v; markScene('layerTracks'); }],
+    ['modelSensor', function (v) { setSensors(v); }],
+    ['layerOverview', function (v) { setOverview(v); }],
+    ['layerTargetPanel', function (v) {
+      state.layers.targetPanel = v;
+      if (!v) clearTargetSelection();
+      else if (state.selected) renderTargetStatus(state.selected);
+    }],
+  ].forEach(function (pair) {
+    var d = LayerRegistry.def(pair[0]);
+    if (d) d.handler = function (id, want) { pair[1](want); };
+  });
 
   const refilter = function () { renderTargetCounts(); markScene('filter'); guardFollow(); };
   bindCheck('filterRed', function (v) { state.filters.red = v; refilter(); });
@@ -3513,7 +3529,6 @@ function bindUI() {
   bindCheck('filterLand', function (v) { state.filters.land = v; refilter(); });
   bindCheck('filterAir', function (v) { state.filters.air = v; refilter(); });
 
-  bindCheck('layerOverview', setOverview);
 
   // 顶栏「鸟瞰图」按钮已移除，改由上面的 #layerOverview 复选框控制；
   // 组件自带的 × 仍可关闭。
@@ -3522,11 +3537,7 @@ function bindUI() {
 
   // 地图上的「区域级TS」横幅与其开关已移除，读数只在右栏「区域TS」显示。
   // 「目标元数据面板」开关现在控制右栏「目标TS栏」是否展开详情。
-  bindCheck('layerTargetPanel', function (v) {
-    state.layers.targetPanel = v;
-    if (!v) clearTargetSelection();
-    else if (state.selected) renderTargetStatus(state.selected);
-  });
+
   bindCheck('modelPlaces', function (v) {
     LayerRegistry.setDesired('places.labels', !!v);
     applyLayers();
@@ -3589,7 +3600,6 @@ function bindUI() {
   bindCheck('modelBuildings', setBuildings);
   bindCheck('modelBuildingsOnline', setBuildingsOnline);
   bindCheck('modelWeather', setWeather);
-  bindCheck('modelSensor', setSensors);
   bindCheck('modelImagery', setImagery);
   bindCheck('modelTianditu', setTianditu);
   bindCheck('modelTiandituLabel', setTiandituLabel);
