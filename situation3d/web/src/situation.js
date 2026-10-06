@@ -82,6 +82,10 @@
         aoi: [117.5, 23.0, 121.0, 26.0],
         hours: DEFAULT_HOURS,
         targets: [blankTarget(1, 'red'), blankTarget(1, 'blue')],
+        // 没有TS时**同样**把屏幕上的标绘收进来。两个分支必须一致：否则
+        // "先画标绘、后打开TS面板"走的就是这一条，标绘会在导出里凭空消失 ——
+        // 这正是本轮要消灭的那类静默丢失（见下面有TS分支的说明）。
+        plots: (window.Plotting && Plotting.exportAll) ? Plotting.exportAll() : [],
       };
     }
     const frames = data.frames;
@@ -436,6 +440,14 @@
   // 校验**一次报全**：粘一份大清单时只报第一条，用户要反复试很多轮。
 
   var iconKeysCache = null;
+
+  // 结构化注册区的**待显示提示**。
+  //
+  // 为什么需要它：追加/替换之后要 `open('input')` 重刷草稿（来源行与目标表都要更新），
+  // 而 `open()` 会**重建整个输入面板的 DOM** —— 先写进旧提示元素的文案连元素一起被丢掉，
+  // 用户一个字都看不到。把文案存下来、由重建后的区域自己取走显示。
+  // （同一类问题在本文件里已出现过一次：生成TS 的成功提示把还原失败提示覆盖掉了。）
+  var pendingStructHint = null;
   function iconKeys() {
     if (iconKeysCache) return iconKeysCache;
     var m = {};
@@ -698,6 +710,8 @@
     [bPrev, bAdd, bRep].forEach(function (x) { row2.appendChild(x); });
     s.appendChild(row2);
     const out = el('div', 'sit-hint');
+    // 面板刚被重建时，把上一次操作留下的提示接过来显示（见 pendingStructHint 的说明）
+    if (pendingStructHint) { out.textContent = pendingStructHint; pendingStructHint = null; }
     s.appendChild(out);
 
     function report(res) {
@@ -712,6 +726,9 @@
       d.targets.forEach(function (x) { aff[x.affiliation]++; });
       out.textContent = '解析成功：' + d.targets.length + ' 个目标（红 ' + aff.red + ' / 蓝 ' + aff.blue
         + '；海 ' + (cnt.sea || 0) + ' 陆 ' + (cnt.land || 0) + ' 空 ' + (cnt.air || 0) + '）'
+        // 标绘条数也要报出来：不报的话"解析成功"只证明了目标那半边，
+        // 用户没法从预览看出标绘到底有没有被读到。
+        + '，标绘 ' + ((d.plots && d.plots.length) || 0) + ' 条'
         + '，AOI ' + d.aoi.join(', ') + '，时长 ' + d.hours + ' h'
         + (res.warnings.length ? '。警告：' + res.warnings.join('；') : '');
       return d;
@@ -736,14 +753,23 @@
         return;
       }
       d.targets = d.targets.concat(nd.targets);
-      out.textContent = '已追加 ' + nd.targets.length + ' 个目标，草稿现共 ' + d.targets.length + ' 个。';
+      // 标绘跟着一起追加：`nd` 是一份**完整定义**，它的 plots 若在这里丢掉，
+      // 就是"预览说读到了 N 条、追加完却一条都没有"。标绘没有 id，直接拼接即可
+      // （生成时的 importAll 会重新发 id，不会与已有标绘冲突）。
+      if (nd.plots && nd.plots.length) d.plots = (d.plots || []).concat(nd.plots);
+      // 先存后刷：`open()` 会重建面板，直接写 out 的文案会随之消失（见 pendingStructHint）
+      pendingStructHint = '已追加 ' + nd.targets.length + ' 个目标'
+        + (nd.plots && nd.plots.length ? '、' + nd.plots.length + ' 条标绘' : '')
+        + '，草稿现共 ' + d.targets.length + ' 个目标、'
+        + ((d.plots && d.plots.length) || 0) + ' 条标绘。';
       open('input');
     });
     bRep.addEventListener('click', function () {
       const nd = parsed();
       if (!nd) return;
       draft = nd;
-      out.textContent = '已替换草稿：' + nd.targets.length + ' 个目标。';
+      pendingStructHint = '已替换草稿：' + nd.targets.length + ' 个目标、'
+        + ((nd.plots && nd.plots.length) || 0) + ' 条标绘。';
       open('input');
     });
   }
@@ -1116,7 +1142,12 @@
   function importDefinition() {
     const inp = document.createElement('input');
     inp.type = 'file';
-    // 粘贴与文件走**同一条归一化路径**，避免两种入口对同一份文件给出不同结果\n    inp.accept = '.json,.xml,application/json,application/xml,text/xml';
+    // 粘贴与文件走**同一条归一化路径**，避免两种入口对同一份文件给出不同结果。
+    //
+    // ⚠ 这里原先写的是 `…给出不同结果\n    inp.accept = '…'`，那个 `\n` 是**字面反斜杠 n**
+    // 而不是换行，于是整条赋值被吃进 `//` 注释里 —— 文件选择框一直**没有任何过滤器**，
+    // 而且不报错，只能从"选文件时能选到 .txt"这种间接现象发现。
+    inp.accept = '.json,.xml,application/json,application/xml,text/xml';
     inp.addEventListener('change', function () {
       const f = inp.files && inp.files[0];
       if (!f) return;
@@ -1176,16 +1207,30 @@
     try {
       host().applySituationData(data, 'custom');
 
-    // **重放标绘**：生成的 dataset 是引擎产出的，里面没有 plots 字段（标绘属于
-    // 草稿，不属于数据集）。而 `applySituationData` 会清场重建，屏幕上的标绘会被
-    // 一起清掉 —— 不重放的话"改个参数点生成，画好的标绘全没了"。
-    if (window.Plotting && Plotting.importAll) {
-      var rp = Plotting.importAll(d.plots || [], { replace: true });
-      if (rp.errors.length) setHint('标绘未能全部还原：' + rp.errors.join('；'));
-      if (window.LayerPanel) LayerPanel.invalidate();
-    }
+      // **重放标绘**：生成的 dataset 是引擎产出的，里面没有 plots 字段（标绘属于
+      // 草稿，不属于数据集）。而 `applySituationData` 会清场重建，屏幕上的标绘会被
+      // 一起清掉 —— 不重放的话"改个参数点生成，画好的标绘全没了"。
+      //
+      // 为什么不是"把 plots 塞进 data"：dataset 的字段集由引擎（engine/、离线数据集）
+      // 定义，前端往里加一个它不认识的字段，只会让"前端自建TS"和"离线案例"两种数据集
+      // 出现结构差异，装载管线就不再是同一份了。标绘留在草稿里、生成后重放，才与
+      // "草稿=当前态势的一份副本"这个定义一致。
+      //
+      // ⚠ 这一步的失败**必须说出来**：原先写的是先 setHint('标绘未能全部还原…')、
+      // 紧接着无条件 setHint('已生成并初始化…')，后一句把前一句立刻覆盖掉，
+      // 标绘少了几条时用户一个字都看不到。现在并进同一条提示。
+      let plotNote = '';
+      if (window.Plotting && Plotting.importAll) {
+        const rp = Plotting.importAll(d.plots || [], { replace: true });
+        plotNote = ' · 标绘 ' + rp.added + ' 条';
+        if (rp.errors.length) {
+          plotNote += '（' + rp.errors.length + ' 条未能还原：' + rp.errors.join('；') + '）';
+        }
+        if (window.LayerPanel) LayerPanel.invalidate();
+      }
+
       setHint('已生成并初始化「' + data.case_name + '」：' + data.targets.length +
-        ' 个目标 · ' + (data.frames.length - 1) + ' 帧 · ZC范围 ' + d.aoi.join(', '));
+        ' 个目标 · ' + (data.frames.length - 1) + ' 帧 · ZC范围 ' + d.aoi.join(', ') + plotNote);
     } catch (e) {
       setHint('装载失败：' + e.message);
     }
