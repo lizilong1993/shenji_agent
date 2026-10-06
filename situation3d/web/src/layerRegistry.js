@@ -164,16 +164,6 @@
     { id: 'layerOverview', kind: 'situation', z: 30, label: '鸟瞰图',
       group: 'TS图层', default: false },
 
-    // ---- 地图组件 ----
-    //
-    // 与 TS图层/目标图层同一套：逐层 `handler`（在 app.js 里挂 `setComponent`），
-    // `default: true` 与迁移前 HTML 的 checked 一致。
-    { id: 'compCompass', kind: 'component', z: 10, label: '指南针',
-      group: '地图组件', default: true },
-    { id: 'compScalebar', kind: 'component', z: 20, label: '比例尺',
-      group: '地图组件', default: true },
-    { id: 'compViewpoint', kind: 'component', z: 30, label: '视点读数',
-      group: '地图组件', default: true },
     { id: 'layerTargets', kind: 'target', z: 10, label: '可见目标',
       group: '目标图层', default: true },
     { id: 'layerLabels', kind: 'target', z: 20, label: '目标标牌',
@@ -184,6 +174,17 @@
       group: '目标图层', default: false },
     { id: 'layerTargetPanel', kind: 'target', z: 50, label: '目标元数据面板',
       group: '目标图层', default: true },
+
+    // ---- 地图组件 ----
+    //
+    // 与 TS图层/目标图层同一套：逐层 `handler`（在 app.js 里挂 `setComponent`），
+    // `default: true` 与迁移前 HTML 的 checked 一致。
+    { id: 'compCompass', kind: 'component', z: 10, label: '指南针',
+      group: '地图组件', default: true },
+    { id: 'compScalebar', kind: 'component', z: 20, label: '比例尺',
+      group: '地图组件', default: true },
+    { id: 'compViewpoint', kind: 'component', z: 30, label: '视点读数',
+      group: '地图组件', default: true },
 
   ];
   var byId = {};
