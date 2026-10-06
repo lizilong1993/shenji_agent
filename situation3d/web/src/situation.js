@@ -421,6 +421,245 @@
   }
 
   // ---- 标签页 1：TS输入 ----
+  // ------------------------------------------------------------------------
+  // 结构化文本注册（JSON / XML）
+  // ------------------------------------------------------------------------
+  //
+  // 两种格式走**同一个归一化函数**，输出与草稿完全同构的对象。这是"JSON 与 XML
+  // 真正等价"的保证 —— 自检里直接断言同一份定义的两种写法归一化后深度相等，
+  // 而不是分别测各自能跑通（那样两种格式可以悄悄漂移）。
+  // XML 用浏览器原生 DOMParser，**不引入任何依赖**。
+  //
+  // 校验**一次报全**：粘一份大清单时只报第一条，用户要反复试很多轮。
+
+  var iconKeysCache = null;
+  function iconKeys() {
+    if (iconKeysCache) return iconKeysCache;
+    var m = {};
+    (typeof ICONS !== 'undefined' ? ICONS : []).forEach(function (p) { m[p[0]] = p[1]; });
+    iconKeysCache = m;
+    return m;
+  }
+
+  function num(v) {
+    if (v === null || v === undefined || v === '') return NaN;
+    return Number(v);
+  }
+
+  function parseCoordPair(lon, lat, where, errors, list) {
+    var a = num(lon), b = num(lat);
+    if (!isFinite(a) || !isFinite(b)) { errors.push(where + '：经纬度不是有效数字'); return; }
+    if (a < -180 || a > 180 || b < -90 || b > 90) {
+      errors.push(where + '：坐标越界（' + a + ', ' + b + '）'); return;
+    }
+    list.push([a, b]);
+  }
+
+  /**
+   * 把 JSON 或 XML 文本归一化成草稿对象。
+   * 返回 `{draft, errors, warnings}`；`errors` 非空时不要应用。
+   */
+  function normalizeStructured(text, format) {
+    var errors = [], warnings = [], raw = null;
+
+    if (format === 'xml') {
+      var doc, perr;
+      try {
+        doc = new DOMParser().parseFromString(String(text), 'application/xml');
+      } catch (e) {
+        return { draft: null, errors: ['XML 解析失败：' + e.message], warnings: [] };
+      }
+      perr = doc.getElementsByTagName('parsererror')[0];
+      if (perr) {
+        var msg = (perr.textContent || '').replace(/\s+/g, ' ').trim();
+        return { draft: null, errors: ['XML 解析失败：' + msg.slice(0, 160)], warnings: [] };
+      }
+      var root = doc.documentElement;
+      if (!root || root.nodeName !== 'situation') {
+        return { draft: null,
+                 errors: ['根元素应为 <situation>，实际是 <' + (root ? root.nodeName : '空') + '>'],
+                 warnings: [] };
+      }
+      raw = { name: root.getAttribute('name') || undefined,
+              hours: root.getAttribute('hours') || undefined,
+              aoi: null, targets: [] };
+      var aoiEl = root.getElementsByTagName('aoi')[0];
+      if (aoiEl) {
+        raw.aoi = [aoiEl.getAttribute('west'), aoiEl.getAttribute('south'),
+                   aoiEl.getAttribute('east'), aoiEl.getAttribute('north')];
+      }
+      var tEls = root.getElementsByTagName('target');
+      for (var i = 0; i < tEls.length; i++) {
+        var te = tEls[i];
+        var st = te.getElementsByTagName('start')[0];
+        var en = te.getElementsByTagName('end')[0];
+        raw.targets.push({
+          id: te.getAttribute('id'), name: te.getAttribute('name'),
+          affiliation: te.getAttribute('affiliation'), domain: te.getAttribute('domain'),
+          icon: te.getAttribute('icon'), model: te.getAttribute('model') || '',
+          altitude: te.getAttribute('altitude') || 0,
+          start: st ? [st.getAttribute('lon'), st.getAttribute('lat')] : null,
+          end: en ? [en.getAttribute('lon'), en.getAttribute('lat')] : null,
+        });
+      }
+    } else {
+      try {
+        raw = JSON.parse(String(text));
+      } catch (e) {
+        return { draft: null, errors: ['JSON 解析失败：' + e.message], warnings: [] };
+      }
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return { draft: null, errors: ['顶层必须是一个对象'], warnings: [] };
+      }
+    }
+
+    // ---- 以下校验与字段处理对两种格式完全相同 ----
+    if (!Array.isArray(raw.aoi) || raw.aoi.length !== 4) {
+      errors.push('缺少 aoi（需要 west, south, east, north 四个数）');
+    }
+    var aoi = null;
+    if (Array.isArray(raw.aoi) && raw.aoi.length === 4) {
+      aoi = raw.aoi.map(num);
+      if (aoi.some(function (v) { return !isFinite(v); })) {
+        errors.push('aoi 含非数字'); aoi = null;
+      } else if (aoi[0] >= aoi[2] || aoi[1] >= aoi[3]) {
+        errors.push('aoi 需满足 west < east 且 south < north'); aoi = null;
+      }
+    }
+    if (!Array.isArray(raw.targets) || !raw.targets.length) {
+      errors.push('targets 必须是非空数组');
+      return { draft: null, errors: errors, warnings: warnings };
+    }
+
+    var hours = num(raw.hours);
+    if (raw.hours === undefined || raw.hours === null || raw.hours === '') hours = DEFAULT_HOURS;
+    else if (!isFinite(hours) || hours <= 0) { errors.push('hours 必须是正数'); }
+
+    var seen = {}, keys = iconKeys(), out = [];
+    raw.targets.forEach(function (tg, i) {
+      var where = 'targets[' + i + ']' + (tg && tg.id ? '（' + tg.id + '）' : '');
+      if (!tg || typeof tg !== 'object') { errors.push(where + '：不是对象'); return; }
+      var id = String(tg.id === undefined || tg.id === null ? '' : tg.id).trim();
+      if (!id) { errors.push(where + '：缺少 id'); return; }
+      if (seen[id]) { errors.push(where + '：id 重复（' + id + '）'); return; }
+      seen[id] = true;
+      var aff = tg.affiliation === 'blue' ? 'blue' : (tg.affiliation === 'red' ? 'red' : null);
+      if (!aff) errors.push(where + '：affiliation 必须是 red 或 blue');
+      var dom = (tg.domain === 'sea' || tg.domain === 'land' || tg.domain === 'air') ? tg.domain : null;
+      if (!dom) errors.push(where + '：domain 必须是 sea / land / air');
+      var icon = tg.icon ? String(tg.icon) : '';
+      if (icon && !keys[icon]) {
+        warnings.push(where + '：图标「' + icon + '」不在册，已回落按域的默认图标');
+        icon = '';
+      }
+      if (!icon && dom) icon = DEFAULT_ICON_BY_DOMAIN[dom] || 'armor';
+      if (!icon) icon = 'armor';
+      var start = [], end = [];
+      if (!Array.isArray(tg.start) || tg.start.length !== 2) errors.push(where + '：缺少 start');
+      else parseCoordPair(tg.start[0], tg.start[1], where + ' 的 start', errors, start);
+      if (!Array.isArray(tg.end) || tg.end.length !== 2) errors.push(where + '：缺少 end');
+      else parseCoordPair(tg.end[0], tg.end[1], where + ' 的 end', errors, end);
+      var alt = num(tg.altitude);
+      if (tg.altitude !== undefined && tg.altitude !== null && tg.altitude !== '' && !isFinite(alt)) {
+        errors.push(where + '：altitude 不是数字');
+      }
+      if (start.length && end.length) {
+        out.push({ id: id, name: String(tg.name || id), affiliation: aff || 'red',
+                   domain: dom || 'land', icon: icon, model: String(tg.model || ''),
+                   start: start[0], end: end[0],
+                   altitude: isFinite(alt) ? alt : 0 });
+      }
+    });
+
+    if (errors.length) return { draft: null, errors: errors, warnings: warnings };
+    return {
+      draft: { name: String(raw.name || '结构化注册TS'), aoi: aoi, hours: hours, targets: out },
+      errors: [], warnings: warnings,
+    };
+  }
+
+  /** 结构化注册区：粘贴 JSON 或 XML → 预览 → 追加/替换草稿。 */
+  function structuredSection(body) {
+    const s = section(body, '结构化文本注册（JSON / XML）');
+    const row = el('div', 'sit-row');
+    const fmt = el('select', 'sit-select');
+    [['json', 'JSON'], ['xml', 'XML']].forEach(function (o) {
+      const op = document.createElement('option');
+      op.value = o[0]; op.textContent = o[1];
+      fmt.appendChild(op);
+    });
+    row.appendChild(fmt);
+    row.appendChild(el('span', 'sit-hint',
+      '粘贴一份完整定义（与「导出TS定义」同构）。两种格式等价，可互相转换。'));
+    s.appendChild(row);
+
+    const ta = document.createElement('textarea');
+    ta.className = 'sit-textarea';
+    ta.rows = 6;
+    ta.placeholder = '{\n  "name": "……",\n  "aoi": [119.0, 23.0, 121.0, 26.0],\n'
+      + '  "hours": 12,\n  "targets": [\n    {"id":"R01","name":"…","affiliation":"red",\n'
+      + '     "domain":"sea","icon":"destroyer","start":[119.6,24.4],"end":[119.6,23.5]}\n  ]\n}';
+    s.appendChild(ta);
+
+    const row2 = el('div', 'sit-row');
+    const bPrev = el('button', 'mini', '解析并预览');
+    bPrev.type = 'button';
+    const bAdd = el('button', 'mini', '追加到草稿');
+    bAdd.type = 'button';
+    const bRep = el('button', 'mini', '替换草稿');
+    bRep.type = 'button';
+    [bPrev, bAdd, bRep].forEach(function (x) { row2.appendChild(x); });
+    s.appendChild(row2);
+    const out = el('div', 'sit-hint');
+    s.appendChild(out);
+
+    function report(res) {
+      if (res.errors.length) {
+        out.textContent = '解析失败（' + res.errors.length + ' 项）：' + res.errors.join('；');
+        return null;
+      }
+      const d = res.draft;
+      const cnt = {};
+      d.targets.forEach(function (x) { cnt[x.domain] = (cnt[x.domain] || 0) + 1; });
+      const aff = { red: 0, blue: 0 };
+      d.targets.forEach(function (x) { aff[x.affiliation]++; });
+      out.textContent = '解析成功：' + d.targets.length + ' 个目标（红 ' + aff.red + ' / 蓝 ' + aff.blue
+        + '；海 ' + (cnt.sea || 0) + ' 陆 ' + (cnt.land || 0) + ' 空 ' + (cnt.air || 0) + '）'
+        + '，AOI ' + d.aoi.join(', ') + '，时长 ' + d.hours + ' h'
+        + (res.warnings.length ? '。警告：' + res.warnings.join('；') : '');
+      return d;
+    }
+
+    function parsed() {
+      if (!ta.value.trim()) { out.textContent = '请先粘贴 JSON 或 XML 文本。'; return null; }
+      return report(normalizeStructured(ta.value, fmt.value));
+    }
+
+    bPrev.addEventListener('click', function () { parsed(); });
+    bAdd.addEventListener('click', function () {
+      const nd = parsed();
+      if (!nd) return;
+      const d = ensureDraft();
+      const have = {};
+      d.targets.forEach(function (x) { have[x.id] = true; });
+      const dup = nd.targets.filter(function (x) { return have[x.id]; }).map(function (x) { return x.id; });
+      if (dup.length) {
+        out.textContent = '追加失败：草稿里已有同 id 目标 ' + dup.join(', ')
+          + '。请先改 id，或用「替换草稿」。';
+        return;
+      }
+      d.targets = d.targets.concat(nd.targets);
+      out.textContent = '已追加 ' + nd.targets.length + ' 个目标，草稿现共 ' + d.targets.length + ' 个。';
+      open('input');
+    });
+    bRep.addEventListener('click', function () {
+      const nd = parsed();
+      if (!nd) return;
+      draft = nd;
+      out.textContent = '已替换草稿：' + nd.targets.length + ' 个目标。';
+      open('input');
+    });
+  }
   function renderInput(body) {
     const d = ensureDraft();
 
@@ -431,6 +670,9 @@
       ? '当前TS「' + data.case_name + '」（' + data.targets.length + ' 个目标）'
       : '最小样例（当前未加载TS）') + ' · 草稿目标 ' + d.targets.length + ' 个';
     body.appendChild(src);
+
+    // 结构化文本注册：与手工录入并列的**第二条入口**，两条都落到同一份草稿上。
+    structuredSection(body);
 
     // ZC范围
     const s1 = section(body, 'ZC范围');
@@ -787,21 +1029,23 @@
   function importDefinition() {
     const inp = document.createElement('input');
     inp.type = 'file';
-    inp.accept = '.json,application/json';
+    // 粘贴与文件走**同一条归一化路径**，避免两种入口对同一份文件给出不同结果\n    inp.accept = '.json,.xml,application/json,application/xml,text/xml';
     inp.addEventListener('change', function () {
       const f = inp.files && inp.files[0];
       if (!f) return;
       const reader = new FileReader();
       reader.onload = function () {
-        try {
-          const parsed = JSON.parse(String(reader.result));
-          if (!parsed.aoi || !Array.isArray(parsed.targets)) throw new Error('缺少 aoi 或 targets');
-          draft = parsed;
-          open('input');
-          setHint('已导入TS定义「' + (parsed.name || '未命名') + '」。');
-        } catch (e) {
-          setHint('导入失败：' + e.message);
+        const text = String(reader.result);
+        const isXml = /\.xml$/i.test(f.name) || /^\s*</.test(text);
+        const res = normalizeStructured(text, isXml ? 'xml' : 'json');
+        if (res.errors.length) {
+          setHint('导入失败：' + res.errors.join('；'));
+          return;
         }
+        draft = res.draft;
+        open('input');
+        setHint('已导入TS定义「' + (res.draft.name || '未命名') + '」（' + res.draft.targets.length
+          + ' 个目标）' + (res.warnings.length ? '；' + res.warnings.join('；') : ''));
       };
       reader.readAsText(f);
     });
@@ -881,5 +1125,14 @@
     }
   }
 
-  global.SituationPanel = { bind: bind, open: open, close: close };
+  global.SituationPanel = {
+    bind: bind, open: open, close: close,
+    // 结构化注册的取证入口：**必须能从外部调到归一化函数**，否则"JSON 与 XML
+    // 等价"这条只能分别测各自能跑通 —— 而两种格式可以悄悄漂移还不被发现。
+    _normalize: normalizeStructured,
+    _draftCount: function () { return draft && draft.targets ? draft.targets.length : 0; },
+    _draftIds: function () {
+      return draft && draft.targets ? draft.targets.map(function (x) { return x.id; }) : [];
+    },
+  };
 })(window);

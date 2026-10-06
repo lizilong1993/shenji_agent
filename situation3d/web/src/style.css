@@ -1094,6 +1094,17 @@ select {
 
 /* 标绘添加面板：与左栏其它控件同一套观感（复用 .mini / .switch-note）。
    两条路径共用上面这组选择，所以放在同一块里。 */
+/* 结构化文本注册：粘贴框与格式下拉。与左栏标绘面板同一套观感。 */
+.sit-select {
+  font: inherit; font-size: 11px; padding: 2px 4px;
+  border: 1px solid var(--border); border-radius: 3px; background: #fff; color: var(--text);
+}
+.sit-textarea {
+  width: 100%; box-sizing: border-box; font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px; line-height: 1.4; padding: 4px 6px; resize: vertical;
+  border: 1px solid var(--border); border-radius: 3px; background: #fff; color: var(--text);
+}
+
 .plot-add {
   display: flex;
   flex-direction: column;
