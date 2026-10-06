@@ -332,6 +332,54 @@ def _build_targets() -> List[Target]:
         (25.40, 122.10),   # 闭环
     ]
 
+    def _t(tid, name, klass, dom, aff, wps, kn, **kw):
+        return Target(
+            target_id=tid, name=name, platform_class=klass, domain=dom,
+            affiliation=aff, waypoints=wps, speed_kn=kn,
+            altitude_m=kw.pop("altitude_m", 0.0),
+            role=kw.pop("role", ""), model=kw.pop("model", ""),
+            model_note=kw.pop("model_note", ""), icon=kw.pop("icon", "unknown"),
+            sensor_name=kw.pop("sensor_name", ""),
+            sensor_range_km=kw.pop("sensor_range_km", 0.0),
+            influence_km=kw.pop("influence_km", 0.0),
+            engage_km=kw.pop("engage_km", 15.0),
+            loop=kw.pop("loop", False),
+            road_bound=kw.pop("road_bound", True),
+            attributes=kw.pop("attributes", {}) or {},
+        )
+
+    shift = lambda route, dlat, dlon: [(la + dlat, lo + dlon) for la, lo in route]
+
+    # -- 红方：加一个水面编队、一个岸防火力群、一个陆上机动群 -----------------
+    red_escort_route = shift(destroyer_route, 0.16, -0.05)
+    red_patrol_route = shift(destroyer_route, 0.30, 0.22)
+    red_lst_route = shift(destroyer_route, -0.30, -0.55)
+    # ⚠ 陆上机动单位的路线**绝不能从 `coastal_route` 派生**：那条线是给 R04
+    # （岸舰导弹营）用的，而 R04 是 `road_bound=False` 的**阵地** —— 它的点位根本
+    # 不必在路边，实测其中一个点还在海里。拿它平移出来的装甲/炮兵直接路由失败
+    # （"more than 25 km from any road"），而且会让整个数据集的 `road_constrained`
+    # 变成 False，`road_selftest` 随即**跳过**整组检查 —— 一个坐标错误就这样把
+    # 一整项验证悄悄关掉了。
+    # 改成从**已经在路网上的**两栖分队环线（R09/B06，实测 routed）做 2~3 km 的
+    # 极小平移：偏移远小于路由器 25 km 的吸附半径，必然落在同一段路上。
+    red_armor_route = [(23.02, 120.17), (23.10, 120.22), (23.04, 120.28),
+                       (22.97, 120.22), (23.02, 120.17)]
+    # R16 用 R09 的顶点做 ≈500 m 的平移。先前用 2 km 平移时点位虽然吸附到了路上，
+    # 但**吸附后落在不连通的路网分量里**，报的是 "no road route from A to B" ——
+    # 与拉达克那段注释是同一件事：路网是碎的，偏移一大就跨了分量。
+    # 500 m 远小于分量尺度，必然落到同一段路上。
+    red_artillery_route = [(22.995, 120.155), (23.075, 120.205), (23.015, 120.265),
+                           (22.945, 120.205), (22.995, 120.155)]
+
+    # -- 蓝方：加一个水面编队、一个陆上机动群 -------------------------------
+    blue_destroyer_route = shift(blue_frigate_route, 0.12, 0.26)
+    blue_supply_route = shift(blue_frigate_route, -0.10, 0.36)
+    # 同上：从 B06（实测 routed）的环线做极小平移，而不是从阵地路线派生。
+    blue_armor_route = [(23.225, 120.215), (23.125, 120.295), (23.005, 120.145),
+                        (23.105, 120.175), (23.225, 120.215)]
+    blue_artillery_route = [(23.22, 120.25), (23.12, 120.33), (23.00, 120.18),
+                            (23.10, 120.21), (23.22, 120.25)]
+
     return [
         # ================= red surface =================
         Target(
@@ -641,6 +689,142 @@ def _build_targets() -> List[Target]:
                 "实用升限": "10500 m",
                 "续航时间": "约 6 h",
             },
+        ),
+
+        # ------------------------------------------------------------------
+        # 编成扩充（本轮）：原 12 个平台 → 22 个。
+        #
+        # 新增项统一由下面的 `_t()` 构造，避免十几份逐字重复的字段列表；**字段语义与
+        # 上面的条目完全一致**，属性只保留最关键的两三项（型号信息在 `model` 里）。
+        #
+        # 路线一律由既有航线做**小量平移**派生：同一战区里各编队本来就沿相近走廊
+        # 机动，没必要手工再编一套坐标；平移量刻意互不相同，避免新目标与旧目标重合
+        # 而让"编成"看起来只有几个平台。两条约束照旧适用：
+        #   ① 陆上机动单位必须落在路网上（`road_constrained` 与 road_selftest 逐帧检查）；
+        #   ② 阵地类（岸舰导弹、防空）用 `road_bound=False` —— 它们由驻防位置定义，
+        #      不是由行军定义，强行寻路既不符合实际，也会让数据集的路网标志失真。
+        # ------------------------------------------------------------------
+        Target(
+            target_id="R11", name="红方第二驱逐舰", platform_class="驱逐舰",
+            domain="sea", affiliation="red", waypoints=red_escort_route,
+            speed_kn=26.0, role="编队护航", model="052D 型驱逐舰",
+            icon="destroyer", sensor_name="346A 相控阵雷达",
+            sensor_range_km=280.0, influence_km=200.0, engage_km=120.0,
+            attributes={"任务": "编队区域防空", "编成": "第二水面编队"},
+        ),
+        Target(
+            target_id="R12", name="红方第二护卫舰", platform_class="护卫舰",
+            domain="sea", affiliation="red", waypoints=shift(frigate_route, 0.20, 0.05),
+            speed_kn=27.0, role="编队护航", model="054A 型护卫舰",
+            icon="frigate", sensor_name="382 型三坐标雷达",
+            sensor_range_km=180.0, influence_km=130.0, engage_km=70.0,
+            attributes={"任务": "反潜护航", "编成": "第二水面编队"},
+        ),
+        Target(
+            target_id="R13", name="红方登陆舰编队", platform_class="登陆舰",
+            domain="sea", affiliation="red", waypoints=red_lst_route,
+            speed_kn=18.0, role="兵力投送", model="071 型综合登陆舰",
+            icon="replenishment", influence_km=90.0, engage_km=20.0,
+            attributes={"任务": "输送登陆兵与装备", "装载": "两栖合成营"},
+        ),
+        Target(
+            target_id="R14", name="红方巡逻艇分队", platform_class="巡逻舰",
+            domain="sea", affiliation="red", waypoints=red_patrol_route,
+            speed_kn=30.0, role="近岸巡逻", model="056A 型轻型护卫舰",
+            icon="corvette", sensor_range_km=90.0, influence_km=60.0, engage_km=25.0,
+            loop=True, attributes={"任务": "近岸警戒巡逻"},
+        ),
+        Target(
+            target_id="R15", name="红方装甲突击群", platform_class="装甲分队",
+            domain="land", affiliation="red", waypoints=red_armor_route,
+            speed_kn=22.0, role="地面突击", model="99A 主战坦克",
+            icon="armor", influence_km=35.0, engage_km=6.0,
+            attributes={"编成": "合成营装甲连", "任务": "沿路网向内陆推进"},
+        ),
+        Target(
+            target_id="R16", name="红方炮兵群", platform_class="炮兵分队",
+            domain="land", affiliation="red", waypoints=red_artillery_route,
+            speed_kn=20.0, role="地面火力支援", model="PLZ-05 自行加榴炮",
+            icon="artillery", sensor_range_km=50.0, influence_km=60.0, engage_km=45.0,
+            attributes={"编成": "炮兵营", "任务": "随伴火力支援"},
+        ),
+        Target(
+            target_id="R17", name="红方岸舰导弹营（第二阵地）", platform_class="岸舰导弹",
+            domain="land", affiliation="red",
+            waypoints=[(24.42, 118.62), (24.36, 118.70), (24.42, 118.62)],
+            speed_kn=6.0, role="岸防", model="鹰击-62 岸舰导弹",
+            icon="coastal_missile", sensor_name="岸基超视距雷达",
+            sensor_range_km=200.0, influence_km=180.0, engage_km=150.0,
+            loop=True, road_bound=False,
+            attributes={"任务": "封控海峡南口", "部署": "机动岸防阵地"},
+        ),
+        Target(
+            target_id="R18", name="红方远程防空营（第二阵地）", platform_class="防空导弹",
+            domain="land", affiliation="red",
+            waypoints=[(25.44, 119.06), (25.52, 119.16), (25.44, 119.06)],
+            speed_kn=5.0, role="区域防空", model="红旗-9B 远程防空导弹",
+            icon="sam_battalion", sensor_name="HT-233 制导雷达",
+            sensor_range_km=300.0, influence_km=220.0, engage_km=200.0,
+            loop=True, road_bound=False,
+            attributes={"任务": "掩护登陆编队上陆", "射程": "约 200 km"},
+        ),
+        Target(
+            target_id="R19", name="红方第二战斗机编队", platform_class="战斗机",
+            domain="air", affiliation="red",
+            waypoints=shift(red_fighter_route, 0.22, 0.30),
+            speed_kn=460.0, altitude_m=7600.0, role="制空掩护",
+            model="歼-16 多用途战斗机", icon="fighter",
+            sensor_name="有源相控阵雷达", sensor_range_km=170.0,
+            influence_km=130.0, engage_km=110.0, loop=True,
+            attributes={"任务": "护航与制空", "高度层": "中空"},
+        ),
+        Target(
+            target_id="R20", name="红方第二预警机", platform_class="预警机",
+            domain="air", affiliation="red", waypoints=shift(red_aew_route, 0.18, -0.12),
+            speed_kn=300.0, altitude_m=9200.0, role="空中警戒",
+            model="空警-500 预警机", icon="aew",
+            sensor_name="数字阵列预警雷达", sensor_range_km=400.0,
+            influence_km=340.0, engage_km=15.0, loop=True,
+            attributes={"任务": "空中预警指挥", "高度层": "高空"},
+        ),
+        Target(
+            target_id="B07", name="蓝方驱逐舰", platform_class="驱逐舰",
+            domain="sea", affiliation="blue", waypoints=blue_destroyer_route,
+            speed_kn=27.0, role="舰队防空", model="基隆级驱逐舰",
+            icon="destroyer", sensor_name="AN/SPS-48E 三坐标雷达",
+            sensor_range_km=260.0, influence_km=190.0, engage_km=110.0,
+            attributes={"任务": "海上拦截", "编成": "北部舰队"},
+        ),
+        Target(
+            target_id="B08", name="蓝方补给舰", platform_class="补给舰",
+            domain="sea", affiliation="blue", waypoints=blue_supply_route,
+            speed_kn=17.0, role="海上补给", model="磐石级油弹补给舰",
+            icon="replenishment", influence_km=80.0, engage_km=10.0,
+            attributes={"任务": "舰队油弹补给"},
+        ),
+        Target(
+            target_id="B09", name="蓝方装甲营", platform_class="装甲分队",
+            domain="land", affiliation="blue", waypoints=blue_armor_route,
+            speed_kn=24.0, role="地面防御", model="M1A2T 主战坦克",
+            icon="armor", influence_km=35.0, engage_km=6.0,
+            attributes={"编成": "装甲营", "任务": "机动防御"},
+        ),
+        Target(
+            target_id="B10", name="蓝方炮兵营", platform_class="炮兵分队",
+            domain="land", affiliation="blue", waypoints=blue_artillery_route,
+            speed_kn=20.0, role="地面火力支援", model="M109A6 自行榴弹炮",
+            icon="artillery", sensor_range_km=40.0, influence_km=55.0, engage_km=30.0,
+            attributes={"编成": "炮兵营", "任务": "反登陆火力压制"},
+        ),
+        Target(
+            target_id="B11", name="蓝方第二战斗机编队", platform_class="战斗机",
+            domain="air", affiliation="blue",
+            waypoints=shift(blue_fighter_route, -0.20, -0.28),
+            speed_kn=440.0, altitude_m=8200.0, role="战斗空中巡逻",
+            model="IDF 经国号战斗机", icon="fighter",
+            sensor_name="GD-53 雷达", sensor_range_km=120.0,
+            influence_km=95.0, engage_km=75.0, loop=True,
+            attributes={"任务": "战斗空中巡逻", "高度层": "中高空"},
         ),
     ]
 
@@ -1210,6 +1394,114 @@ INDIA_CHINA_TARGETS: List[Target] = [
         influence_km=60.0,
         engage_km=0.0,
         attributes={"兵种": "无人侦察", "升限": "受高原空气密度限制"},
+    ),
+
+    # ----------------------------------------------------------------------
+    # 编成扩充（本轮）：5 → 10 个平台。
+    #
+    # 这里**刻意只加"空中平台"与"阵地类"**，不加新的陆上机动单位 ——
+    # 上面第 1258-1260 行的注释已经说明：拉达克的 OSM 路网是碎成 52 个连通分量的
+    # （Leh 在 13、Chushul/Galwan 在 16、Depsang/DBO 在 43），跨分量的链路根本
+    # 寻不了路，会被如实报成 unrouted。新增陆上机动单位如果不能确定落在既有分量
+    # 里，就会把一个"数据问题"伪装成"路网问题"。
+    # 阵地类用 `road_bound=False`：由驻防位置定义，不参与寻路。
+    # ----------------------------------------------------------------------
+    Target(
+        target_id="H06",
+        name="蓝方战斗机巡逻编队",
+        platform_class="战斗机",
+        domain="air",
+        affiliation="blue",
+        waypoints=[(34.05, 77.60), (34.30, 78.05), (34.05, 78.55), (33.75, 78.10),
+                   (34.05, 77.60)],
+        speed_kn=430.0,
+        altitude_m=9500.0,
+        role="战斗空中巡逻",
+        model="阵风战斗机",
+        model_note="高原机场起降",
+        icon="fighter",
+        loop=True,
+        sensor_name="RBE2 有源相控阵雷达",
+        sensor_range_km=160.0,
+        influence_km=120.0,
+        engage_km=95.0,
+        attributes={"任务": "争夺制空权", "高度层": "高空"},
+    ),
+    Target(
+        target_id="H07",
+        name="红方第二无人机侦察分队",
+        platform_class="无人机",
+        domain="air",
+        affiliation="red",
+        waypoints=[(33.90, 78.35), (34.25, 78.85), (34.55, 79.35), (34.25, 78.85),
+                   (33.90, 78.35)],
+        speed_kn=120.0,
+        altitude_m=8000.0,
+        role="侦察监视",
+        model="中高空长航时无人机",
+        model_note="DBO 走廊方向",
+        icon="aew",
+        loop=True,
+        sensor_name="光电/合成孔径雷达",
+        sensor_range_km=130.0,
+        influence_km=70.0,
+        engage_km=0.0,
+        attributes={"兵种": "无人侦察", "任务": "监视 DBO 走廊"},
+    ),
+    Target(
+        target_id="H08",
+        name="蓝方炮兵阵地",
+        platform_class="炮兵分队",
+        domain="land",
+        affiliation="blue",
+        waypoints=[(34.14, 77.52), (34.20, 77.60), (34.14, 77.52)],
+        speed_kn=4.0,
+        role="地面火力支援",
+        model="M777 超轻型榴弹炮",
+        icon="artillery",
+        loop=True,
+        road_bound=False,
+        sensor_range_km=40.0,
+        influence_km=45.0,
+        engage_km=30.0,
+        attributes={"部署": "高原驻锄阵地", "任务": "火力封锁前沿"},
+    ),
+    Target(
+        target_id="H09",
+        name="红方远程防空阵地",
+        platform_class="防空导弹",
+        domain="land",
+        affiliation="red",
+        waypoints=[(33.52, 78.92), (33.58, 79.00), (33.52, 78.92)],
+        speed_kn=3.0,
+        role="区域防空",
+        model="红旗-16 中程防空导弹",
+        icon="sam_battalion",
+        loop=True,
+        road_bound=False,
+        sensor_name="搜索/制导雷达",
+        sensor_range_km=180.0,
+        influence_km=140.0,
+        engage_km=70.0,
+        attributes={"部署": "要地防空", "任务": "掩护集结地域"},
+    ),
+    Target(
+        target_id="H10",
+        name="红方远程火箭炮阵地",
+        platform_class="炮兵分队",
+        domain="land",
+        affiliation="red",
+        waypoints=[(33.62, 79.28), (33.68, 79.36), (33.62, 79.28)],
+        speed_kn=4.0,
+        role="远程火力打击",
+        model="PHL-03 远程火箭炮",
+        icon="artillery",
+        loop=True,
+        road_bound=False,
+        sensor_range_km=60.0,
+        influence_km=90.0,
+        engage_km=70.0,
+        attributes={"部署": "纵深火力阵地", "射程": "约 70 km"},
     ),
 ]
 
