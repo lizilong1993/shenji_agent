@@ -72,15 +72,28 @@ PROBE = r"""
 """
 
 
+# `inspect_remote.py` 的两个时间参数是**相加**的，不是一个：
+#   --timeout-ms  等"瓦片队列排空"的上限（默认 90000）
+#   --wait-ms     排空**之后**再静置多久
+# 早先这里的外层超时写成 `wait_ms + 60`，比 `90000 + wait_ms` 还短 ——
+# 于是像 `?terrain=1` 这种瓦片队列很长（要拉 DEM）的深链，
+# 会在 settle 还没结束时就被外层杀掉，报成"probe 无结果"。
+# 那是**测试自己的超时算错了**，与产品无关（单独跑、不设外层超时时它完全正常）。
+QUEUE_MS = 60000   # 传给 --timeout-ms：等瓦片队列排空的上限
+
+
 def run_probe(base, query, wait_ms, tmpdir, idx):
     """Load one URL and return (probe_result, page_errors)."""
     out = os.path.join(tmpdir, "dl%d.json" % idx)
     url = base + "/?" + query
     cmd = [sys.executable, INSPECT, "--url", url, "--out", out,
+           "--timeout-ms", str(QUEUE_MS),
            "--wait-ms", str(wait_ms), "--eval-async", "--eval", PROBE]
+    # 外层超时 = 队列上限 + 静置 + 浏览器启动/收尾的余量
+    budget = (QUEUE_MS + wait_ms) / 1000.0 + 45
     try:
         subprocess.run(cmd, cwd=ROOT, stdout=subprocess.DEVNULL,
-                       stderr=subprocess.DEVNULL, timeout=wait_ms / 1000.0 + 60)
+                       stderr=subprocess.DEVNULL, timeout=budget)
     except subprocess.TimeoutExpired:
         return None, ["probe timed out"]
     try:
@@ -97,7 +110,7 @@ CASES = [
     # 一条；而每跑一条就多留一个 headless 浏览器进程，越往后机器越挤 ——
     # 实测它排在中间时 26s / 41.6s / 60s 全都会超时，而单独跑 30s 就正常。
     # 顺序即预算：先跑它，机器还是干净的。
-    ("case=taiwan_landing&terrain=1", "taiwan_landing", 45000),
+    ("case=taiwan_landing&terrain=1", "taiwan_landing"),
     ("case=taiwan_landing", "taiwan_landing"),
     ("case=taiwan_landing&imagery=0", "taiwan_landing"),
 
@@ -121,7 +134,7 @@ def main(argv=None):
     # 18s 时实测它被判成"probe 无结果"，而单独给它 30s 就完全正常
     # （`hasData:true caseId:taiwan_landing targets:31 terrainOn:true pageErrors:[]`）。
     # 自检里的假失败比没有自检更糟 —— 会让人去修没坏的东西，或者干脆不再看它。
-    ap.add_argument("--wait-ms", type=int, default=20000)
+    ap.add_argument("--wait-ms", type=int, default=12000)
     args = ap.parse_args(argv)
 
     if not os.path.isfile(INSPECT):
