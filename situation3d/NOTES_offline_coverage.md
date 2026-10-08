@@ -1,3 +1,4 @@
+Warning: Permanently added 'server-10-254-1-155' (ED25519) to the list of known hosts.
 # 离线瓦片覆盖：两个战区
 
 ## 现状（2026-10-08 实测）
@@ -120,3 +121,29 @@ manifest 还会重算 `coverage`/`tile_counts`/`per_zoom` —— 手工抓取后
 台海 terrain z12 单层就有 936 MB，做全对等大约再加 **1 GB 量级**。
 需要时按需补，命令同上把 `--max-zoom` 提到 14（影像）/12（地形）——
 **先跑 `--dry-run` 拿准确瓦片数再决定**，本文两段就是这么做的。
+
+## 声明 vs 实际：全量核对（2026-10-08，已通过）
+
+把 `manifest.theatres` 里**每一条声明**逐张对照盘上文件（按 Web Mercator 算出该 bbox
+该有哪些瓦片，再逐个 `os.path.isfile`）：
+
+```
+taiwan_strait  imagery  z0-11  应有  2259  缺 0  OK
+taiwan_strait  terrain  z0-10  应有   619  缺 0  OK
+taiwan_strait  wsf3d    z0-10  应有   619  缺 0  OK
+india_china    imagery  z0-11  应有  1272  缺 0  OK
+india_china    terrain  z0-10  应有   336  缺 0  OK
+india_china    wsf3d    z0-10  应有   336  缺 0  OK
+```
+
+**这一类的缺口至此封闭**：本轮之前 `india_china` 的三项**全部声明了而一张都没有**
+（见上文），现已补齐并逐张核对。
+
+两点说明：
+* 台海 z10–11 盘上的瓦片数**多于**这里的 2259 —— 多出来的是热点/城区批次抓的，
+  战区级声明仍然满足。
+* 中印多抓了一层（`terrain` 声明 z0-10，实际抓到 z11；`imagery` 另加热点 z12），
+  属**多给不少给**，无害。
+
+复查用的脚本逻辑很短（Mercator 求 x/y 范围 + `os.path.isfile`），值得在每次改
+`manifest` 或重抓之后跑一遍 —— **声明与事实不符这类问题不会报错，只会静默 404。**
