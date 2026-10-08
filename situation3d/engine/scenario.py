@@ -138,6 +138,39 @@ URBAN_AOI = [
     {"name": "中国 福州", "bbox": [119.240, 26.020, 119.360, 26.140], "zoom": 13},
 ]
 
+# 城区 AOI **按战区**给。
+#
+# ⚠ 原先 `build_dataset` 直接写 `"urban_aoi": URBAN_AOI` —— 那是**模块级常量**，
+# 于是中印案例的数据集里列的是台北/高雄/厦门/福州四个台海城市。这与之前修过的
+# `region` 是**同一个根因**：模块级默认值泄漏进按案例生成的数据。
+#
+# 后果不小：`state.urbanAoi` 驱动城区影像的挂载、`refreshBuildings()` 用它挑
+# `nearestAoiToCamera()`。中印案例因此会挂上四个**台海**的城区影像矩形（实测层清单里
+# i=10..13 的 rect 正是这四个，且 show=true），而"最近城区"永远是福州 ——
+# 在拉达克上空按住建体块，会去生成几千公里外的台海体块。
+#
+# 中印给空表：拉达克没有预下载的高分辨率城区数据。
+#
+# ⚠ **本表的实际作用比看上去小，不要误判**：前端的 `applySituationData` 里写的是
+# `state.urbanAoi` **以 base.json 为准**（注释原文："城区 AOI 以 base.json 为准
+# （与案例无关）；旧数据集里也带一份，作为回退"）。也就是说 AOI 被设计成**部署属性**
+# ——"哪些城市烘焙了高清瓦片" —— 而不是案例属性，base.json 赢，数据集这份只是**回退**。
+# 所以把中印改成空表**不会改变运行时行为**（实测中印案例的 `state.urbanAoi` 仍是 4 条
+# 台海城市）。它修的是"数据集不该声称拥有别的战区的城区 AOI"这件事实本身。
+#
+# 取舍：改与不改都说得通。不改的话，中印数据集里列着台北/高雄/厦门/福州，读数据的人
+# 会以为拉达克有城区覆盖；改了对回退路径更诚实。选了后者。
+#
+# 顺带记一条**不打算改**的观察：中印案例的 `state.urbanAoi` 仍是台海四城，于是
+# `syncUrbanImagery` 会挂上四个台海矩形的高清影像层、`refreshBuildings` 的
+# `nearestAoiToCamera()` 永远选中福州。因为那些矩形是**按经纬度限定的**，在拉达克视角下
+# 既不可见、也不会被请求，所以是**轻微浪费而非错误**。真要收口，应当在 AOI 的**使用点**
+# 按当前战区过滤，而不是继续往数据里塞 —— 那是另一处改动，本轮没做。
+THEATRE_URBAN_AOI = {
+    "taiwan_strait": URBAN_AOI,
+    "india_china": [],
+}
+
 
 # --------------------------------------------------------------------------
 # Target definitions
@@ -1672,7 +1705,7 @@ def build_dataset(case=None) -> dict:
             h for h in (INDIA_CHINA_HOTSPOTS if theatre == "india_china" else HOTSPOTS)
             if h["name"] in set(case.hotspot_names)
         ],
-        "urban_aoi": URBAN_AOI,
+        "urban_aoi": THEATRE_URBAN_AOI.get(theatre, URBAN_AOI),
         "targets": [t.to_dataset_entry() for t in targets],
         "inference_model": inferred["model"],
         "inference_summary": inferred["summary"],
