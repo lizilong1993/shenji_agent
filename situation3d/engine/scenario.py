@@ -161,11 +161,21 @@ URBAN_AOI = [
 # 取舍：改与不改都说得通。不改的话，中印数据集里列着台北/高雄/厦门/福州，读数据的人
 # 会以为拉达克有城区覆盖；改了对回退路径更诚实。选了后者。
 #
-# 顺带记一条**不打算改**的观察：中印案例的 `state.urbanAoi` 仍是台海四城，于是
-# `syncUrbanImagery` 会挂上四个台海矩形的高清影像层、`refreshBuildings` 的
-# `nearestAoiToCamera()` 永远选中福州。因为那些矩形是**按经纬度限定的**，在拉达克视角下
-# 既不可见、也不会被请求，所以是**轻微浪费而非错误**。真要收口，应当在 AOI 的**使用点**
-# 按当前战区过滤，而不是继续往数据里塞 —— 那是另一处改动，本轮没做。
+# 顺带**订正一处我自己写错的判断**：上一版这段注释说"中印案例的 `refreshBuildings` 的
+# `nearestAoiToCamera()` 永远选中福州"——**实测是错的**。
+#
+# 该函数有 200 km 守卫（`return bestD <= 200000 ? best : -1;`，注释："AOI 边长约 13 km，
+# 200 km 外就不硬套"）。拉达克到福州约 3000 km，所以它返回 **-1**，`refreshBuildings`
+# 随即走 `aoiIdx < 0` 的空分支直接 return。
+#
+# 实测（中印案例；把相机压到战区中心 20 km、并打开体块开关）：
+#   nearestAoi = -1   nearestAoiName = null
+#   hasPrimitive = false   buildingsKey = null   buildingsStats = null
+# 即**既不会建台海体块、也不花那份 WSF3D/网格聚合的 CPU**。
+# 我不该在没跑这一下的情况下把"会去建几千公里外的体块"写进注释。
+#
+# 于是真正剩下的只有 `syncUrbanImagery` 会为台海那 4 个矩形挂上影像层：那些矩形按经纬度
+# 限定，在拉达克视角下既不渲染也不被请求 —— **可忽略的开销**，不值得为它加一层战区过滤。
 THEATRE_URBAN_AOI = {
     "taiwan_strait": URBAN_AOI,
     "india_china": [],
