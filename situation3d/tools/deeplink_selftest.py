@@ -44,6 +44,20 @@ INSPECT = os.path.join(HERE, "inspect_remote.py")
 FAILURES = []
 
 
+# URL 参数 → 它**必须**在注册表里点亮的图层 id。
+#
+# 为什么需要这张表：本会话修过两处同型 bug —— `?overview=1` 与 `?places=1` 都在
+# "绕过注册表直接改效果"，于是 **URL 上带着参数、参数实际不生效**，而且不报错。
+# 案例照样加载（所以只断言"案例加载了"是**空过**，抓不到），`pageErrors` 也照样为空。
+# 断言"注册表意图真的被翻转"才能抓到。
+LAYER_PARAM_EXPECT = {
+    "overview=1": "layerOverview",
+    "places=1": "places.labels",
+    "buildings=1": "buildings.blocks",
+    "terrain=1": "terrain.model",
+}
+
+
 def check(label, ok, detail=""):
     print(("  ok   " if ok else "  FAIL ") + label + (("  " + detail) if detail else ""))
     if not ok:
@@ -96,8 +110,17 @@ PROBE = r"""
       };
     } catch (e) { fp = { error: String(e.message || e) }; }
   }
+  // 注册表里**当前意图为开**的图层 id。用来抓一类 bug：
+  // URL 钩子绕过注册表直接改"效果"（`setOverview` / `Places.setEnabled`），
+  // 于是参数看似生效、随后被 `apply()` 按注册表改回去 —— **静默失效**。
+  // `?overview=1` 与 `?places=1` 都是这么坏的（实测），任何一处再犯都能被下面抓到。
+  var desiredTrue = (window.LayerRegistry && LayerRegistry.runtime)
+      ? Object.keys(LayerRegistry.runtime).filter(function (k) {
+          return LayerRegistry.runtime[k].desired; })
+      : null;
   return {
     footprint: fp,
+    desiredTrue: desiredTrue,
     hasHost: !!window.SituationHost,
     hasData: !!(s && s.data),
     caseId: s ? s.caseId : null,
@@ -222,6 +245,14 @@ def main(argv=None):
               % (loaded, ev.get("targets"), (ev.get("status") or "")[:40]))
         check("  └ pageErrors 为空", not page_errors,
               json.dumps(page_errors[:2], ensure_ascii=False))
+
+        # URL 参数是否真的翻转了注册表意图（见 LAYER_PARAM_EXPECT 的说明）
+        dt = ev.get("desiredTrue")
+        if dt is not None:
+            for param, layer_id in LAYER_PARAM_EXPECT.items():
+                if param in query:
+                    check("  └ ?%s 真的点亮了 %s" % (param, layer_id),
+                          layer_id in dt, "desired=True 的图层数 %d" % len(dt))
 
         # 鸟瞰图黄框（PROBE 里条件采集：只有这一行开着时才非 None）
         fp = ev.get("footprint")

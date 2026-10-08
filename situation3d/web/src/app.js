@@ -4204,13 +4204,22 @@ function applyCaseIndependentHooks() {
   }
 
   // 本地地名：?places=0|1
-  // ⚠ 上面那行注释原先写的是「鸟瞰图：?overview=0|1」，却挂在 places 这段上 ——
-  // 复制粘贴留下的错注释，会让下一个改这里的人以为自己在改鸟瞰图。
+  // （原先这行注释写的是「鸟瞰图：?overview=0|1」—— 复制粘贴留下的错注释。）
   if (params.has('places')) {
     const on = params.get('places') !== '0';
-    const box = document.getElementById('modelPlaces');
-    if (box) box.checked = on;
-    if (window.Places) Places.setEnabled(on);
+    // ⚠ **必须走注册表**，与紧邻的那批开关同理（见下面「这些开关的 DOM 复选框
+    // 已经不存在」那段注释）。原先这里两处都不对：
+    //   · `document.getElementById('modelPlaces')` —— 节点**已经不存在**
+    //     （迁进了注册表面板），恒为 null，那一行是死代码；
+    //   · `Places.setEnabled(on)` —— 它是 **label sink 的落点**（见 `sinks` 里
+    //     `if (id === 'places.labels' …) Places.setEnabled(!!want)`），**不是注册表意图**。
+    //     直接调它只改了"效果"，随后任何一次 `apply()` 都会按注册表那一行
+    //     （`places.labels`，desired 仍是 false）调 `setEnabled(false)` 关回去。
+    //
+    // 实测（`?case=taiwan_landing&places=1`）：地名**确实被加载了**
+    // （`total 7342`），但 `enabled false`、且 `runtime['places.labels'].desired === false`
+    // —— 参数**静默失效**，与 `?overview=1` 完全同型。
+    setSwitch('modelPlaces', on);
   }
 
   if (params.has('overview')) {
