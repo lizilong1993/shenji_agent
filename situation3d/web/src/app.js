@@ -3663,6 +3663,26 @@ function bindUI() {
     ['layerLabels', function (v) { state.layers.labels = v; markScene('layerLabels'); }],
     ['layerTracks', function (v) { state.layers.tracks = v; markScene('layerTracks'); }],
     ['modelSensor', function (v) { setSensors(v); }],
+    // WSF3D 建筑高度图层：**图层的创建写在 `setWsf3dOverlay` 里**，
+    // 而那个函数只有 URL 钩子会调。该行在注册表里是 `kind:'imagery'` 且
+    // **没有 handler** —— 于是面板路径（`setDesired` + `apply()`）走到 imagery sink 时，
+    // `layersOf('wsf3d.overlay')` 是**空的**（图层从未创建），什么都不做。
+    // 实测：置 desired 为 true 后，场景里仍然没有这一层（`layersOf` 返回空）
+    // —— **面板上“建筑高度图层（WSF3D）”那个复选框是空转的**。
+    //
+    // ⚠ **不能直接把 `setWsf3dOverlay` 挂成 handler**：它末尾调 `applyLayers()`，
+    // 而 handler 就是在 `apply()` 里被调用的 —— **无限递归**。
+    // 这里只做两件事：需要时创建（并登记槽位）、设 `show`。
+    // 顺序重排由 `apply()` 在所有 writer 跑完后统一做（`out.imagery = reorderImagery(...)`）。
+    ['wsf3d.overlay', function (v) {
+      if (v && !state.wsf3dOverlayLayer) {
+        state.wsf3dOverlayLayer = OfflineAssets.attachWsf3dOverlay(
+          viewer, 'buildingheight', 0.62);
+        registerImagerySlot('wsf3d.overlay', state.wsf3dOverlayLayer);
+      }
+      const L = LayerRegistry.layersOf('wsf3d.overlay') || [];
+      L.forEach(function (l) { l.show = !!v; });
+    }],
     ['layerOverview', function (v) { setOverview(v); }],
     ['layerTargetPanel', function (v) {
       state.layers.targetPanel = v;

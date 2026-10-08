@@ -23,6 +23,7 @@
 | URL 钩子是否绕过注册表 | 逐个钩子实测注册表意图 | **4 例已修**，已装通用守卫（16 条 URL） |
 | 各模块“效果入口”的调用点 | 逐入口列调用点 | 都只从各自 sink/handler 调用 |
 | **事件监听注册/注销配对** | 73 注册 vs 1 注销，逐个看调用位置与 viewer 生命周期 | **无泄漏**（见下） |
+| **模块内部状态 vs 注册表意图** | 逐对翻转 `desired`，再读模块自己的 `enabled`/`show` | `places.labels` ✓、`tiles.google3d` ✓、**`wsf3d.overlay` ✗ 已修** |
 
 ## 监听器轴的结论依据（2026-10-08）
 
@@ -44,8 +45,9 @@
 
 ## 尚未扫的轴
 
-* 各模块内部状态与注册表的一致性（例：模块自己缓存的 `enabled` 与
-  `registry.desired` 是否会长期脱节）。
+* `web/src` 之外的前端代码与 `server/serve.py` 的行为一致性。
+* 上一行本来写着“各模块内部状态与注册表的一致性”，**已于 2026-10-08 扫完**（见上表），
+  并找出 `wsf3d.overlay` 一例。
 * `web/src` 之外的前端代码与 `server/serve.py` 的行为一致性。
 
 ## 修改后该做什么
@@ -62,3 +64,26 @@ python3 tools/intent_set_selftest.py
 
 若改了 `manifest` 或重抓了瓦片，另跑一遍“声明 vs 盘上事实”
 （脚本跟随 `NOTES_offline_coverage.md`）。
+
+## `wsf3d.overlay` 一例的细节（2026-10-08）
+
+**现象**：把 `desired` 置为 true 后，`layersOf('wsf3d.overlay')` **返回空** —— 场景里
+根本没有这一层。即**面板上“建筑高度图层（WSF3D）”那个复选框是空转的**。
+
+**根因**：图层的**创建**写在 `setWsf3dOverlay(on)` 里（`if (on && !state.wsf3dOverlayLayer) { ...
+attachWsf3dOverlay ... registerImagerySlot ... }`），而那个函数**只有 URL 钩子会调**。
+该行在注册表里是 `kind:'imagery'` 且**没有 handler**，所以面板路径走到 imagery sink
+时发现“没有已登记的图层”—— 什么都不做，也不报错。
+
+**为什么 URL 钩子看上去是好的**：`?overlay=1` 同时调了 `setSwitch(...)` 与
+`setWsf3dOverlay(true)`。那段代码的注释就写着“两者幂等，**且 setter 可能还做了别的事**”
+—— 这次就是“别的事”：创建图层。所以只测钩子会得出“正常”的错结论。
+
+**修法**：给该行加一个 handler，只做两件事——需要时创建（并登记槽位）、设 `show`。
+
+⚠ **不能直接把 `setWsf3dOverlay` 挂成 handler**：它末尾调 `applyLayers()`，而 handler
+就是在 `apply()` 里被调用的 —— **无限递归**。掉头重排由 `apply()` 在所有 writer
+跑完后统一做（`out.imagery = reorderImagery(...)`），不需要在 handler 里做。
+
+**实测**：修后 `desired` 置开 → 图层创建且 `show=true`；置关 → `show=false`；
+`places.labels` 与 `tiles.google3d` 仍一致；`pageErrors` 为空。
