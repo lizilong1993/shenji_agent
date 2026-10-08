@@ -169,6 +169,40 @@ PROBE = r"""
     await frames(3);
     out.rows.push(row);
   }
+  // —— 互斥争裁与**恢复**（`exclusives` 的运行时行为）——
+  // 本会话修过互斥的对称性与默认值，但**从没验过运行时**。
+  // `resetHiddenFeed()` 的注释恰好警告过失效模式：关掉上层后下层仍标着 `hidden`，
+  // 出现“开关明明开着、状态却显示被顶掉”的假象。
+  out.exclusive = (function () {
+    function rt(id) { var r = LayerRegistry.runtime[id]; return { d: r.desired, f: r.feed }; }
+    function placesOn() {
+      var s = window.Places ? String(Places.debugInfo()) : "";
+      if (s.indexOf("not loaded") >= 0) return false;
+      var m = s.match(/enabled\s+(true|false)/);
+      return m ? (m[1] === "true") : null;
+    }
+    var r = {};
+    // 记下原始意图，最后复原
+    r.d0Label = rt("tianditu.label").d; r.d0Places = rt("places.labels").d;
+    LayerRegistry.setDesired("tianditu.label", false);
+    LayerRegistry.setDesired("places.labels", true);
+    LayerRegistry.apply();
+    r.alone = placesOn();                       // 应 true
+    LayerRegistry.setDesired("tianditu.label", true);
+    LayerRegistry.apply();
+    r.under = { placesFeed: rt("places.labels").f, placesOn: placesOn(),
+                labelFeed: rt("tianditu.label").f };   // places 应被顶掉
+    LayerRegistry.setDesired("tianditu.label", false);
+    LayerRegistry.apply();
+    r.recovered = { placesFeed: rt("places.labels").f, placesOn: placesOn() };
+    r.placesDesiredKept = rt("places.labels").d;  // 被顶掉期间 desired 不应被改写
+    // 复原
+    LayerRegistry.setDesired("tianditu.label", r.d0Label);
+    LayerRegistry.setDesired("places.labels", r.d0Places);
+    LayerRegistry.apply();
+    return r;
+  })();
+
   return out;
 })()
 """
@@ -245,6 +279,22 @@ def _one(base, case, tmpdir, ci):
         return 1
     check("案例正常加载（无启动异常）", not page_errors,
           json.dumps(page_errors[:2], ensure_ascii=False))
+
+    # 互斥争裁与恢复
+    ex = ev.get("exclusive")
+    if ex:
+        check("互斥：单独开 places 时它是可见的", ex.get("alone") is True)
+        u = ex.get("under") or {}
+        check("互斥：再开 label 后 places 被顶掉（feed=hidden）",
+              u.get("placesFeed") == "hidden", "实际 feed=%s" % u.get("placesFeed"))
+        check("互斥：被顶掉后 places 真的隐藏了", u.get("placesOn") is False)
+        check("互斥：上层 label 自己是好的", u.get("labelFeed") == "ok")
+        check("互斥：**关掉上层后下层能恢复**（这正是曾经担心的失效点）",
+              (ex.get("recovered") or {}).get("placesFeed") == "ok"
+              and (ex.get("recovered") or {}).get("placesOn") is True,
+              json.dumps(ex.get("recovered"), ensure_ascii=False))
+        check("互斥：被顶掉期间不会改写用户的意图",
+              ex.get("placesDesiredKept") is True)
 
     rows = ev.get("rows") or []
     if not rows:
