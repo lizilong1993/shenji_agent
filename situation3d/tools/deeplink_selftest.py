@@ -194,6 +194,10 @@ CASES = [
     # { … 移动相机前后各取一次 … }`，再在 main 里断言 dUpdates > 0 且 keyHead 变了。
     # 之所以值得做：overview.js 自己的注释就写着"否则'鸟瞰图不变'这种 bug 只能靠肉眼看"。
     ("case=taiwan_landing&overview=1", "taiwan_landing"),
+    # 本地地名：与 overview 同型的 bug（钩子绕过注册表 -> 参数静默失效）。
+    # 这条用例的价值全在 LAYER_PARAM_EXPECT 那条断言上：只断言"案例加载了"会**空过**
+    # （案例无论参数是否生效都会加载），这正是 `?overview=1` 上一轮骗过我的方式。
+    ("case=taiwan_landing&places=1", "taiwan_landing"),
     ("case=nope_not_here", None),   # unknown id must fall back to the default
 ]
 
