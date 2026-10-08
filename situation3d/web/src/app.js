@@ -507,6 +507,10 @@ function initViewer() {
   //   label     → Places.setEnabled（内部再做屏幕空间仲裁）
   state.layerHealth = LayerRegistry.bind(viewer, {
     imagery: function (id, want) {
+      // `state.urbanEnabled` 原先只由 `bindCheck('modelUrbanImagery', …)` 维护，而那条
+      // 绑定在复选框删除后已经不会触发 —— 于是用户在面板里关掉城区影像，相机高度
+      // 一变化它又会被挂回来（挂载判据读的正是 state.urbanEnabled）。
+      if (id === 'urban.imagery') state.urbanEnabled = !!want;
       // imagery.offline 是两级（全球 z0-6 + 战区 z7-11），都在槽位里，
       // 由下面的通用分支统一翻，不需要特判。
       // 热点层是**一层多实例**（每个热点框一个 provider 各自带 rectangle），
@@ -1992,10 +1996,9 @@ function setBuildingsOnline(on) {
         info.phase === 'unconfigured' ? 'unsupported' : 'failed', why);
       applyLayers();
       syncBuildingsOnlineNote(info);
-      if (!alreadyLocal) {
-        const box = document.getElementById('modelBuildings');
-        if (box) box.checked = true;
-      }
+      // 写 `.checked` 在节点已删除之后是**空操作**，于是"在线实景不可用就自动回落到
+      // 本机体块"这条兜底静默失效。改走 setSwitch（有节点派发 change / 没节点写注册表意图）。
+      if (!alreadyLocal) setSwitch('modelBuildings', true);
       setSwitchNote('在线三维实景不可用（' + why + '），' +
         (alreadyLocal ? '已继续使用本机建筑体块。' : '已自动回落到本机建筑体块。'));
       return;
@@ -2061,8 +2064,7 @@ function applyBuildingsVisibility(on) {
       setSwitchNote('建筑体块不可用：' + e.message +
         '（请先运行 tools/calibrate_wsf3d.py）');
       LayerRegistry.setFeed('buildings.blocks', 'failed', e.message);
-      const box = document.getElementById('modelBuildings');
-      if (box) box.checked = false;
+      setSwitch('modelBuildings', false);
     });
     return;
   }
@@ -2275,8 +2277,12 @@ function refreshBuildings() {
   // 开关状态**从 DOM 现取**。`dom.modelBuildings` 这个缓存引用实测会失效
   // （isConnected 为 false），拿它判断"开关开没开"会把已经勾上的开关读成没勾，
   // 于是整个体块功能静默不工作（现象：`?buildings=1` 完全没有体块，也不报错）。
-  const box = document.getElementById('modelBuildings');
-  if (!box || !box.checked) return;
+  // ⚠ 这里必须走 `checkboxOn()`。上面那段注释说的是"不要用 `dom.modelBuildings`
+  // 缓存引用"，于是改成了 `getElementById` 现取 —— 而**复选框本身已经随面板迁移
+  // 从 HTML 删除了**，现取同样得到 null，`if (!box …) return` 于是**恒真**：
+  // 建筑体块整条链路静默不工作，现象与注释里描述的一模一样（`?buildings=1` 没有
+  // 体块、也不报错）。`checkboxOn()` 在没有节点时会反查注册表，两种取法都不会再错。
+  if (!checkboxOn('modelBuildings')) return;
   // 不再依赖 state.data：空态下用"离相机最近的城区 AOI"生成体块。
   if (!state.ramp) return;
 
@@ -2488,11 +2494,11 @@ function setTiandituLabel(on) {
     // 实测截图里杭州/浙江/福州都能看到双份。
     //
     // 所以开 cva 时自动关掉本机地名层，并且**说出来**（不静默改用户的开关）。
-    const box = document.getElementById('modelPlaces');
-    if (box && box.checked) {
-      box.checked = false;
-      LayerRegistry.setDesired('places.labels', false);
-      extra = ' 同时关闭了本机地名层：两层都带中文地名，叠在一起会重影。'
+    // 互斥**已经交给注册表**（见 layerRegistry.js 里 tianditu.label 与 places.labels
+    // 的对称 exclusives），这里不再改写 desired。但"为什么本机地名不见了"必须**说出来**：
+    // 原先这段读 DOM 复选框，节点删除后整块不再执行，提示也就永远不显示了。
+    if (checkboxOn('modelPlaces')) {
+      extra = ' 同时隐藏了本机地名层：两层都带中文地名，叠在一起会重影。'
             + '需要本机地名（县镇更密）时，先取消勾选天地图注记。';
     }
   }
@@ -3558,15 +3564,23 @@ function registerLayerProviders() {
   //                     blocksLive/onlineLive 这类字段，实测返回的是
   //                     enabled/phase/hasTileset/tilesetReady/tilesetShow/primitiveCount）
   LayerRegistry.setProvider('buildings.blocks', function () {
-    var prim = state.buildingsPrimitive;
-    if (!prim) return null;
-    // `geometryInstances` 可能是数组，也可能被包成 Cesium Property，两种都要能数。
-    var gi = prim.geometryInstances;
-    if (gi && typeof gi.getValue === 'function') gi = gi.getValue();
-    var n = Array.isArray(gi) ? gi.length : (gi ? 1 : 0);
-    if (!n) return null;
-    return [{ key: 'offline-blocks', label: '离线建筑体块',
-              sub: n + ' 个几何体', visible: !!prim.show, actions: [] }];
+    // 计数取自 `state.lastBuildingsStats.blocks` —— 那是代码自己为取证留的结构化统计
+    // （见 refreshBuildings 末尾的注释："不再从中文提示里抠数字"）。
+    //
+    // ⚠ 别从 `state.buildingsPrimitive.geometryInstances` 去数：实测该属性是
+    // **undefined**（体块不是按 geometryInstances 建的），于是 provider 永远返回 null，
+    // 面板上这一行的数量**恒为 0** —— 而体块其实已经建出来了（`hasPrimitive: true`）。
+    // 一个"看起来是空的"图层比没有这一行更糟。
+    var st = state.lastBuildingsStats;
+    if (!st) return null;
+    return [{
+      key: 'offline-blocks',
+      label: '离线建筑体块',
+      sub: (st.aoi || '—') + ' · LOD ' + st.lod + ' · 网格 ' + st.grid + '×' + st.grid
+           + ' · ' + st.blocks + ' 个体块' + (st.fromCache ? '（缓存）' : ''),
+      visible: !!(state.buildingsPrimitive && state.buildingsPrimitive.show),
+      actions: [],
+    }];
   });
   LayerRegistry.setProvider('tiles.google3d', function () {
     if (!window.Buildings3D || typeof Buildings3D.debug !== 'function') return null;
@@ -3696,28 +3710,11 @@ function bindUI() {
   // 地图上的「区域级TS」横幅与其开关已移除，读数只在右栏「区域TS」显示。
   // 「目标元数据面板」开关现在控制右栏「目标TS栏」是否展开详情。
 
-  bindCheck('modelPlaces', function (v) {
-    LayerRegistry.setDesired('places.labels', !!v);
-    applyLayers();
-    setSwitchNote(v ? '地名图层已启用：Natural Earth 离线地名，按相机高度分级显示并做屏幕空间去重。'
-                    : '地名图层已关闭。');
-  });
   // 地名是懒加载的：初始 checked 不会触发 change，但 initViewer 里已经写过一次
   // desired 并 apply 过（label sink → Places.setEnabled），这里不再重复调用。
   // （原先这段相同代码写了两遍，属于历史重复，一并去掉。）
 
-  bindCheck('modelHotspotImagery', setHotspotImagery);
 
-  bindCheck('modelUrbanImagery', function (v) {
-    state.urbanEnabled = v;
-    LayerRegistry.setDesired('urban.imagery', !!v);
-    // 城区层不是"改了 show 就完事"：它按相机高度动态挂载/卸载，所以要走
-    // syncUrbanImagery；里面挂载后会自动 apply，让新层排到注记之下。
-    syncUrbanImagery();
-    applyLayers();
-    setSwitchNote(v ? '城区高清影像已启用（相机低于 200 km 时挂载，z13–z17，最高约 1.2 m/px）。'
-                    : '城区高清影像已关闭。');
-  });
 
   // 地图组件的三个开关已迁移进注册表（上面的 handler 数组），静态复选框也已从
   // index.html 删除 —— 这里不能再 bindCheck，否则面板里点了没反应（节点不存在时
@@ -4066,7 +4063,6 @@ function finishPlotDraw() {
   const cancel = document.getElementById('plotCancel');
   if (btn) btn.textContent = '地图绘制';
   if (cancel) cancel.style.display = 'none';
-  renderPlotList();
 }
 
 /**
@@ -4093,42 +4089,6 @@ function parsePlotPoints(text) {
   return { points: pts, errors: errs };
 }
 
-function renderPlotList() {
-  const host = document.getElementById('plotList');
-  if (!host || !window.Plotting) return;
-  const items = (Plotting.debug().items || []).filter(function (it) {
-    // 绘制预览也是一条**真标绘**（渲染要靠它），但它还没「完成」，不该出现在列表里
-    // —— 否则一边画一边就能看到一个"半成品条目"，完成后又换成正式条目，像是闪了一下。
-    if (plotDraw && plotDraw.previewId && it.id === plotDraw.previewId) return false;
-    return it.type && plotDef(it.type);
-  });
-  host.innerHTML = '';
-  if (!items.length) {
-    host.appendChild(Object.assign(document.createElement('div'), {
-      className: 'plot-empty', textContent: '尚未添加标绘',
-    }));
-    return;
-  }
-  items.forEach(function (it) {
-    const def = plotDef(it.type);
-    const row = document.createElement('div');
-    row.className = 'plot-item';
-    const txt = document.createElement('span');
-    txt.textContent = (def ? def.zh : it.type) + ' · ' + (def ? (def.sourceStandard || '') : '')
-      + ' · ' + it.layer.replace('plot.', '');
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.className = 'mini';
-    del.textContent = '删除';
-    del.addEventListener('click', function () {
-      Plotting.remove(it.id);
-      renderPlotList();
-    });
-    row.appendChild(txt);
-    row.appendChild(del);
-    host.appendChild(row);
-  });
-}
 
 function bindPlotPanel() {
   const typeSel = document.getElementById('plotType');
@@ -4200,13 +4160,11 @@ function bindPlotPanel() {
         label: (labelIn.value || '').trim() || null,
       });
       setPlotHint('已按坐标添加 ' + (d ? d.zh : typeSel.value) + '（' + res.points.length + ' 个控制点）', 'ok');
-      renderPlotList();
     } catch (err) {
       setPlotHint('添加失败：' + err.message, 'warn');
     }
   });
 
-  renderPlotList();
 }
 function bindPicking() {
   const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
