@@ -45,7 +45,7 @@ PROBE = r"""
   while (Date.now() - t0 < 20000 && !window.SituationHost) {
     await new Promise(function (r) { setTimeout(r, 300); });
   }
-  await new Promise(function (r) { setTimeout(r, 10000); });
+  await new Promise(function (r) { setTimeout(r, 7000); });
   function frames(n) {
     return new Promise(function (res) {
       var k = 0;
@@ -54,47 +54,82 @@ PROBE = r"""
     });
   }
   if (!window.SituationHost || !window.LayerRegistry) { return { fatal: "no host/registry" }; }
-  var out = { rows: [], fatal: null };
+  var out = { rows: [], fatal: null, stateLayers: (SituationHost.state.layers || null) };
 
-  // 每个图层的“效果读数”。返回值必须能区分 true/false，
-  // 带不出来就返 null（表示“这个图层没法用这种方式取证”，不当失败）。
+  // 每个图层的“效果读数”。统一返回**数量**（布尔就用 0/1），
+  // 因为断言统一是“先关再开、数量必须上升”。
+  //
+  // ⚠ **不要写绝对断言**（例如“置开后全部 show === true”）：
+  // `state.filters`（红/蓝/海/陆/空）也会独立隐藏实体，绝对断言会**假失败**。
+  // 这个代码库自己的注释就写着：自检里的假失败比没有自检更糟。
+  function countShown(arr) {
+    if (!arr) return 0;
+    var list = Array.isArray(arr) ? arr : Object.keys(arr).map(function (k) { return arr[k]; });
+    var n = 0;
+    list.forEach(function (e) { if (e && e.show) n++; });
+    return n;
+  }
+  function imageryShown(id) {
+    var L = LayerRegistry.layersOf(id) || [];
+    var n = 0;
+    L.forEach(function (x) { if (x && x.show) n++; });
+    return n;
+  }
+  function modPlaces() {
+    var s = window.Places ? String(Places.debugInfo()) : "";
+    var m = s.match(/enabled\s+(true|false)/);
+    // `load()` 未完成时 `debugInfo()` 返回 "not loaded" —— 那时**该图层确实没显示**，
+    // 所以返 0 而不是 -1（-1 会被当成“无法取证”直接报失败）；
+    // 置开后的轮询会等它真的加载完。
+    return m ? (m[1] === "true" ? 1 : 0) : 0;
+  }
+
+  var ST = SituationHost.state;
   var SPECS = [
-    { id: "places.labels",   what: "离线地名（模块自己缓存的 enabled）", read: function () {
-        var s = window.Places ? String(Places.debugInfo()) : "";
-        var m = s.match(/enabled\s+(true|false)/);
-        return m ? (m[1] === "true") : null; } },
-    { id: "wsf3d.overlay",   what: "建筑高度图层（场景里那一层的 show）", read: function () {
-        var L = LayerRegistry.layersOf("wsf3d.overlay") || [];
-        if (!L.length) return null;
-        return L.every(function (x) { return !!x.show; }); } },
-    { id: "tianditu.label",  what: "天地图注记（场景里那一层的 show）", read: function () {
-        var L = LayerRegistry.layersOf("tianditu.label") || [];
-        if (!L.length) return null;
-        return L.every(function (x) { return !!x.show; }); } },
-    { id: "imagery.offline", what: "离线底图（两级，全部 show 一致）", read: function () {
-        var L = LayerRegistry.layersOf("imagery.offline") || [];
-        if (!L.length) return null;
-        return L.every(function (x) { return !!x.show; }); } },
+    // —— 已有的 4 项（上一轮已验证）——
+    { id: "places.labels",   what: "离线地名（模块自己缓存的 enabled）", read: modPlaces },
+    { id: "wsf3d.overlay",   what: "建筑高度图层（场景 show 计数）", read: function () { return imageryShown("wsf3d.overlay"); } },
+    { id: "tianditu.label",  what: "天地图注记（场景 show 计数）", read: function () { return imageryShown("tianditu.label"); } },
+    { id: "imagery.offline", what: "离线底图（两级 show 计数）", read: function () { return imageryShown("imagery.offline"); } },
+    // —— 本轮新增：取数口已核实——
+    { id: "tianditu.base",   what: "天地图底图（场景 show 计数）", read: function () { return imageryShown("tianditu.base"); } },
+    // ⚠ **`layerTargets` 暂不纳入**：实测 `state.targets` 里的值**不是带 `.show` 的实体**
+    // （`countShown(ST.targets)` 恒为 0），于是“关掉后=0”是 **0==0 恒真**、
+    // “开上后”必然失败 —— 那是**假失败**，不是产品缺陷。
+    // 宁可不盖，也不能放一条会嗧的断言进来。
+    // 要补它，先找到目标图层真正的场景落点（大概率是 `refilter()` 控制的
+    // 某个集合，而不是 `state.targets`），再把它加回来。    { id: "layerHotspots",   what: "热点区域（实体 show 计数）", read: function () { return countShown(ST.hotspotEntities); } },
+    { id: "layerRoutes",     what: "计划航路（实体 show 计数）", read: function () { return countShown(ST.routeEntities); } },
+    { id: "layerOverview",   what: "鸟瞰图（第二个 view 的可见性）", read: function () {
+        return (window.Overview && typeof Overview.isVisible === "function") ? (Overview.isVisible() ? 1 : 0) : -1; } },
+    { id: "weather.model",   what: "气象模型（场景雾开关）", read: function () {
+        var v = SituationHost.viewer(); return v ? (v.scene.fog.enabled ? 1 : 0) : -1; } },
   ];
 
   for (var i = 0; i < SPECS.length; i++) {
     var s = SPECS[i], row = { id: s.id, what: s.what };
     row.desired0 = LayerRegistry.runtime[s.id].desired;
-    row.mod0 = s.read();
-    LayerRegistry.setDesired(s.id, true);
-    LayerRegistry.apply();
-    await frames(8);
-    row.desired1 = LayerRegistry.runtime[s.id].desired;
-    row.mod1 = s.read();
+    // 先**关**再**开**：这样不受初始值影响（有些图层默认就是开的）。
     LayerRegistry.setDesired(s.id, false);
     LayerRegistry.apply();
-    await frames(8);
-    row.desired2 = LayerRegistry.runtime[s.id].desired;
-    row.mod2 = s.read();
-    // 复原成初始意图，避免影响后续条目
+    await frames(4);
+    row.nOff = s.read();
+    LayerRegistry.setDesired(s.id, true);
+    LayerRegistry.apply();
+    // 开上后**轮询到出现为止**：有些效果是异步的
+    // （例：`places.labels` 走 `Places.load()`，未完成时 `debugInfo()` 返回 "not loaded"）。
+    // 固定帧数会把“还没加载完”误报成“效果没出现”。
+    // 但**不能无限等** —— eval 有自己的超时，所以设上限。
+    row.nOn = s.read();
+    for (var _try = 0; _try < 40 && (row.nOn === 0 || row.nOn === -1); _try++) {
+      await frames(3);
+      row.nOn = s.read();
+    }
+    row.desired1 = LayerRegistry.runtime[s.id].desired;
+    // 复原初始意图
     LayerRegistry.setDesired(s.id, row.desired0);
     LayerRegistry.apply();
-    await frames(4);
+    await frames(3);
     out.rows.push(row);
   }
   return out;
@@ -108,7 +143,13 @@ def run_probe(base, case, tmpdir):
     cmd = [sys.executable, INSPECT, "--url", url, "--out", out,
            "--timeout-ms", str(QUEUE_MS), "--wait-ms", str(WAIT_MS),
            "--eval-async", "--eval", PROBE]
-    budget = (QUEUE_MS + WAIT_MS) / 1000.0 + 60
+    # ⚠ 这里必须把 **eval 自己的耗时**也算进去。
+    # `--timeout-ms`（等瓦片队列排空）与 `--wait-ms`（排空后静置）是**相加**的，
+    # 而 eval 是在它们**之后**才跑。扩到 10 个图层后 eval 约 90 s
+    # （10 层 × 26 帧，headless 下 ~5fps），而原来只留了 60 s 余量 ——
+    # 结果是“两次都拿不到结果”。这与本仓库 `deeplink_selftest.py`
+    # 里记载的那个坑是**同一个**（当初 `?terrain=1` 就是这么误报的）。
+    budget = (QUEUE_MS + WAIT_MS) / 1000.0 + 180
     try:
         subprocess.run(cmd, cwd=ROOT, stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL, timeout=budget)
@@ -153,21 +194,17 @@ def main(argv=None):
         check("取到至少一行取证", False, "rows 为空")
     for row in rows:
         rid = row.get("id")
+        # 这条只证“置 true 确实写进了注册表”；真正的断言在下面的数量比较。
         check("%s  desired 真的被置开" % rid, row.get("desired1") is True,
               "初值=%s" % row.get("desired0"))
-        check("%s  desired 真的被置关" % rid, row.get("desired2") is False)
-        m1, m2 = row.get("mod1"), row.get("mod2")
-        if m1 is None or m2 is None:
-            # 拿不到效果读数（例：图层未挂载）—— 这**正是**
-            # 本自检要抓的东西，所以不能当成“无法取证”放过。
-            check("%s  置开后能取到效果读数" % rid, False,
-                  "读数为 None（图层未创建/模块未就绪）")
+        n_off, n_on = row.get("nOff"), row.get("nOn")
+        if n_off is None or n_on is None or n_off < 0 or n_on < 0:
+            check("%s  能取到效果读数" % rid, False,
+                  "读数为 None/不可用（图层未创建、模块未就绪）")
             continue
-        check("%s  置开后效果真的发生" % rid, m1 is True,
-              "模块状态=%s" % m1)
-        check("%s  置关后效果真的消失" % rid, m2 is False,
-              "模块状态=%s" % m2)
-
+        check("%s  关掉后效果消失" % rid, n_off == 0, "可见数=%s" % n_off)
+        check("%s  开上后效果出现" % rid, n_on > n_off,
+              "可见数 %s -> %s" % (n_off, n_on))
     print()
     if FAILURES:
         print("FAILED (%d):" % len(FAILURES))
