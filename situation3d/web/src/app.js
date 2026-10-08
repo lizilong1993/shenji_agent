@@ -4203,7 +4203,9 @@ function applyCaseIndependentHooks() {
     SituationPanel.open(params.get('situation') || 'input');
   }
 
-  // 鸟瞰图：?overview=0|1
+  // 本地地名：?places=0|1
+  // ⚠ 上面那行注释原先写的是「鸟瞰图：?overview=0|1」，却挂在 places 这段上 ——
+  // 复制粘贴留下的错注释，会让下一个改这里的人以为自己在改鸟瞰图。
   if (params.has('places')) {
     const on = params.get('places') !== '0';
     const box = document.getElementById('modelPlaces');
@@ -4211,7 +4213,22 @@ function applyCaseIndependentHooks() {
     if (window.Places) Places.setEnabled(on);
   }
 
-  if (params.has('overview')) setOverview(params.get('overview') !== '0');
+  if (params.has('overview')) {
+    const on = params.get('overview') !== '0';
+    // ⚠ **必须走注册表**。原先这里是 `setOverview(on)`，而 `setOverview` 只写
+    // `state.layers.overview` —— **绕过注册表**。随后任何一次 `apply()` 都会按注册表
+    // 那一行（`layerOverview`，desired 仍是 false）把它改回来，于是
+    // `?overview=1` **静默失效**：实测 URL 上带着 `overview=1`，而
+    // `LayerRegistry.runtime['layerOverview'].desired === false`、`Overview.isVisible() === false`。
+    //
+    // 这与下面 `components` 那段注释说的是**同一件事**（"直接调 setComponent 会绕过注册表，
+    // 面板上的复选框仍显示旧状态 —— 就是'界面与事实不符'"）—— 当时 `components` 改对了，
+    // **overview 这一处漏改了**。
+    //
+    // 走 setDesired + apply 后由该行的 handler 去调 `setOverview`，DOM/state/注册表三者一致。
+    LayerRegistry.setDesired('layerOverview', on);
+    LayerRegistry.apply();
+  }
 
   // 地图组件：?components=0|1 全关/全开；?components=a,b 白名单；?components=-a 排除
   if (params.has('components')) {

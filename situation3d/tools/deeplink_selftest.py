@@ -60,7 +60,44 @@ PROBE = r"""
   await new Promise(function (r) { setTimeout(r, 9000); });
   var s = window.SituationHost ? SituationHost.state : null;
   var st = document.getElementById('statusText');
+  // 鸟瞰图黄框：**只在它真的开着时才采**。
+  //
+  // 不能只看 `window.Overview` 存不存在 —— 模块一直被加载着，但鸟瞰图关着时
+  // `vertices` 就是 0，断言会在不相关的 URL 上误报。所以以**注册表里那一行的意图**
+  // 为准（`layerOverview`），这比猜一个 `isVisible()` 是否被导出可靠。
+  var fp = null;
+  var ov = window.LayerRegistry && LayerRegistry.runtime
+           && LayerRegistry.runtime['layerOverview'];
+  if (ov && ov.desired && window.Overview
+      && typeof Overview.footprintDebug === 'function') {
+    try {
+      var a = Overview.footprintDebug();
+      // 用 setView 平移主视图（保留高度），**不要用 camera.moveRight/moveUp**：
+      // 实测那两个在 pitch −75° 下产生的**地面足迹变化为零**
+      // （`updates 11 -> 11`、`keyChanged false`），断言会假失败。
+      // 这里连同朝向一起重置是可以接受的 —— 我们只关心足迹变没变。
+      var v = SituationHost.viewer();
+      var carto = v.camera.positionCartographic;
+      var lon = Cesium.Math.toDegrees(carto.longitude) + 0.6;
+      var lat = Cesium.Math.toDegrees(carto.latitude) + 0.4;
+      v.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(lon, lat, carto.height) });
+      for (var k = 0; k < 26; k++) {
+        await new Promise(function (r) { requestAnimationFrame(r); });
+      }
+      var b = Overview.footprintDebug();
+      fp = {
+        before: a.updates, after: b.updates,
+        // keyHead 是黄框的**几何指纹**：只断言"次数涨了"会被
+        // "重画了、但画的还是同一个框"骗过 —— 那正是这个 bug 原来的症状。
+        keyChanged: a.keyHead !== b.keyHead,
+        vertices: b.vertices, shown: b.shown,
+        // 鸟瞰图自身机位**应当不动**（固定全图设计），所以用 !camMoved 断言
+        camMoved: Math.abs((b.cameraLon || 0) - (a.cameraLon || 0)) > 1e-9,
+      };
+    } catch (e) { fp = { error: String(e.message || e) }; }
+  }
   return {
+    footprint: fp,
     hasHost: !!window.SituationHost,
     hasData: !!(s && s.data),
     caseId: s ? s.caseId : null,
@@ -185,6 +222,22 @@ def main(argv=None):
               % (loaded, ev.get("targets"), (ev.get("status") or "")[:40]))
         check("  └ pageErrors 为空", not page_errors,
               json.dumps(page_errors[:2], ensure_ascii=False))
+
+        # 鸟瞰图黄框（PROBE 里条件采集：只有这一行开着时才非 None）
+        fp = ev.get("footprint")
+        if fp is not None:
+            if fp.get("error"):
+                check("  └ 鸟瞰图黄框取件失败", False, str(fp.get("error")))
+            else:
+                check("  └ 鸟瞰图黄框：主视图移动后被重画",
+                      (fp.get("after") or 0) > (fp.get("before") or 0),
+                      "updates %s -> %s" % (fp.get("before"), fp.get("after")))
+                check("  └ 鸟瞰图黄框：几何真的变了（不只是次数涨）",
+                      fp.get("keyChanged") is True)
+                check("  └ 鸟瞰图黄框：有顶点（真的画出来了）",
+                      (fp.get("vertices") or 0) > 0, "vertices=%s" % fp.get("vertices"))
+                check("  └ 鸟瞰图：自身机位不动（固定全图设计）",
+                      fp.get("camMoved") is False)
 
     ev, _ = run_probe(args.base, "case=taiwan_landing", args.wait_ms, tmpdir, 99)
     if ev:
