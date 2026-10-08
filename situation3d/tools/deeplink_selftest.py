@@ -123,6 +123,17 @@ CASES = [
     ("case=taiwan_landing&tick=600", "taiwan_landing"),
     ("case=taiwan_landing&cam=119.6,24.4,300000,0,-60", "taiwan_landing"),
     ("case=india_china_west", "india_china_west"),
+    # 鸟瞰图：第二个 Cesium 2D 视图，本套原先**没有覆盖**它。
+    #
+    # 这里只保证"这个 URL 不炸启动"（本套的既有职责）。**黄框是否真的跟着主视图刷新
+    # 已经外部验过**（`Overview.footprintDebug()`：updates 9→12、keyHead 真的变了
+    # 而不只是次数涨、vertices=4、鸟瞰图自身机位保持不变），但**尚未变成断言** ——
+    # 这条 URL 现在至少保证它不会回归到"打不开"。
+    #
+    # 要把它做成断言：在 EVAL 里加一段 `if (window.Overview && Overview.footprintDebug)
+    # { … 移动相机前后各取一次 … }`，再在 main 里断言 dUpdates > 0 且 keyHead 变了。
+    # 之所以值得做：overview.js 自己的注释就写着"否则'鸟瞰图不变'这种 bug 只能靠肉眼看"。
+    ("case=taiwan_landing&overview=1", "taiwan_landing"),
     ("case=nope_not_here", None),   # unknown id must fall back to the default
 ]
 
