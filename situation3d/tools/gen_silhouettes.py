@@ -197,10 +197,41 @@ def geom_bbox(svg):
         xs += [cx - r, cx + r]; ys += [cy - r, cy + r]
     return (max(xs) - min(xs), max(ys) - min(ys)) if xs else (0, 0)
 
+# 已发布符号的配色与规格（从 web/assets/symbols/*.svg 里取的，不是猜的）
+AFFIL = {"red": "#d0342c", "blue": "#1f5fbf"}
+STROKE = "#0f1720"
+# 已发布符号用的是 viewBox "6 6 188 188"，而本生成器内部用 0 0 188 188。
+# **不一致就不能 drop-in** —— 这是本轮才发现的。
+VIEWBOX = "6 6 188 188"
+
+
+def dropin_svg(cls, affil, selected):
+    """方案①的 drop-in 符号：**不套帧**，整个 SVG 就是剪影。"""
+    kind = DIM[cls][0]
+    fn = {"ship": svg_ship, "air": svg_air, "ground": svg_ground}[kind]
+    parts, _ = fn(cls)
+    body = "".join(parts)
+    # 把内部 0 0 188 188 的坐标平移到 6 6 188 188
+    body = '<g transform="translate(6,6)">%s</g>' % body
+    fill = AFFIL[affil]
+    halo = ''
+    if selected:
+        # 选中变体：已发布符号用的是“外描边 stroke-width 16 + #ffd400”。
+        # 剪影是多个形状组成的，没有单一轮廓，所以**把整组先用黄色粗描一遍再叠正形**，
+        # 效果等价于光圈。
+        halo = '<g transform="translate(6,6)" fill="none" stroke="#ffd400" stroke-width="14" stroke-linejoin="round">%s</g>' % body.replace('stroke="#0f1720"', 'stroke="#ffd400"')
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny" '
+           'viewBox="%s">%s<g transform="translate(6,6)" fill="%s" stroke="%s" '
+           'stroke-width="2.2" stroke-linejoin="round">%s</g></svg>') % (
+        VIEWBOX, halo, fill, STROKE, body)
+    return svg
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="web/poc")
     ap.add_argument("--check-only", action="store_true")
+    ap.add_argument("--dropin", default=None,
+                    help="额外产出可直接替换已发布符号的剪影版（方案①）到该目录")
     args = ap.parse_args()
     if not args.check_only and not os.path.isdir(args.out):
         os.makedirs(args.out)
@@ -225,6 +256,19 @@ def main():
             cls, kind, L, H, ratio, target, "OK" if (fits and abs(ratio - target) <= 0.06) else "!! 不合格"))
     print()
     print("  溢出或比例不对的:", bad if bad else "（无）")
+    if args.dropin:
+        if not os.path.isdir(args.dropin):
+            os.makedirs(args.dropin)
+        n = 0
+        for cls in DIM:
+            for affil in ("red", "blue"):
+                for sel in (False, True):
+                    name = "%s_%s%s.svg" % (cls, affil, "_sel" if sel else "")
+                    with io.open(os.path.join(args.dropin, name), "w",
+                                 encoding="utf-8", newline="") as fh:
+                        fh.write(dropin_svg(cls, affil, sel))   # 已发布文件结尾无换行
+                    n += 1
+        print("  drop-in 符号已写出: %d 个 -> %s" % (n, args.dropin))
     return 1 if bad else 0
 
 
