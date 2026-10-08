@@ -104,6 +104,19 @@
       label: '天地图注记', group: '底图', checkbox: 'modelTiandituLabel',
     },
 
+    // ---- 地形 / 气象 ----
+    //
+    // ⚠ 这两行是**补回来的**：它们原先只是 HTML 里的复选框，在把「底图」组迁进
+    // 生成式面板时**被漏掉了** —— 于是节点没了、注册表里也没有对应行，
+    // 两个开关从界面上彻底消失（地形模型、气象模型都点不到了）。
+    // 迁移时"照抄注册表已有的行"这种做法，天生看不见那些**只存在于 HTML** 的开关。
+    //
+    // `checkbox` 字段仍然写上：URL 钩子（`?terrain=` / `?weather=`）靠它把
+    // 复选框 id 反查成图层 id（见 app.js 的 layerIdForCheckbox）。
+    { id: 'terrain.model', kind: 'globe', z: 10, label: '地形模型',
+      group: '底图', default: false, checkbox: 'modelTerrain' },
+    { id: 'weather.model', kind: 'globe', z: 20, label: '气象模型',
+      group: '底图', default: false, checkbox: 'modelWeather' },
     // ---- scene primitive 栈：mesh 类，两两互斥（同一块地面不能同时铺两套网格）
     {
       id: 'tiles.google3d', kind: 'primitive', z: 10, default: true,

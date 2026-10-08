@@ -2172,6 +2172,18 @@ function markHealthDirty() { /* 面板已移除：诊断按需查询，不缓存
  * 若还停在勾选状态，界面就在撒谎——用户看到天地图勾着、画面却是离线影像。
  * 这里只改 .checked，**不派发 change**，否则会再走一遍 setDesired 造成回环。
  */
+/**
+ * 把注册表的**实际**可见性同步回 DOM 复选框。
+ *
+ * 只对**还剩 DOM 节点**的图层有效 —— 迁进生成式面板的那些层没有静态复选框，
+ * 它们的行由 `layerPanel.js` 按 `desired` 重绘（面板签名里带 `feed`，所以互斥导致的
+ * `hidden` 变化也会触发重建）。`if (box && …)` 的守卫是必须的：迁移之后
+ * `getElementById` 会对这些 id 返回 null，没有守卫就是每轮 apply 抛一次异常。
+ *
+ * 注意这里同步的是 `effective`（事实）而不是 `desired`（意图）：静态复选框是旧的
+ * 交互方式，让用户看到"实际有没有在显示"；面板那边相反，显示 `desired` 并把
+ * 被顶掉的原因写在旁边的标记里 —— 两种呈现各有各的道理，不要互相看齐。
+ */
 function syncLayerCheckboxes() {
   LayerRegistry.status().forEach(function (s) {
     if (!s.checkbox) return;
@@ -3144,10 +3156,13 @@ window.SituationHost = {
   // （DOM 上是 true、dom.modelBuildings.checked 是 false），拿缓存的引用去判断
   // "开关开没开"会把已经打开的开关读成关的。
   debugBuildings: function () {
-    const box = document.getElementById('modelBuildings');
+    // ⚠ `checked` 必须走 `checkboxOn()`，**不能**直接读 `getElementById('modelBuildings')`：
+    // 那个复选框已经随面板迁移从 HTML 删除，节点永远为 null，于是这个诊断字段
+    // 恒为 false —— 实测"`?buildings=1` 已经生效（注册表 desired=true、effective=true）"
+    // 时它仍报 false，会把人引向错误的方向。`checkboxOn()` 会在没有节点时反查注册表。
     const aoiIdx = nearestAoiToCamera();
     return {
-      checked: !!(box && box.checked),
+      checked: checkboxOn('modelBuildings'),
       checkedViaDomCache: !!(dom.modelBuildings && dom.modelBuildings.checked),
       cachedNodeIsLive: !!(dom.modelBuildings && dom.modelBuildings.isConnected),
       rampLoaded: !!state.ramp,
@@ -3656,6 +3671,10 @@ function bindUI() {
     ['compCompass', function (v) { setComponent('compass', v); }],
     ['compScalebar', function (v) { setComponent('scalebar', v); }],
     ['compViewpoint', function (v) { setComponent('viewpoint', v); }],
+    // 地形/气象：它们原先只是 HTML 复选框（DOM-only），迁移「底图」组时漏了，
+    // 现在补进注册表并在这里接上原本 bindCheck 的回调体。
+    ['terrain.model', function (v) { setTerrain(v); }],
+    ['weather.model', function (v) { setWeather(v); }],
   ].forEach(function (pair) {
     var d = LayerRegistry.def(pair[0]);
     if (d) d.handler = function (id, want) { pair[1](want); };
@@ -3734,20 +3753,21 @@ function bindUI() {
     });
   }
 
-  bindCheck('modelTerrain', setTerrain);
-  bindCheck('modelWsf3dOverlay', setWsf3dOverlay);
-  bindCheck('modelBuildings', setBuildings);
-  bindCheck('modelBuildingsOnline', setBuildingsOnline);
-  bindCheck('modelWeather', setWeather);
-  bindCheck('modelImagery', setImagery);
-  bindCheck('modelTianditu', setTianditu);
-  bindCheck('modelTiandituLabel', setTiandituLabel);
-  // 离线底图也默认开（垫在天地图下面兜底），把它的 desired 同步给注册表。
-  if (dom.modelImagery && dom.modelImagery.checked) setImagery(true);
-  // 天地图是默认底图：HTML 的 checked 只是初始显示，change 不会自动触发，
-  // 而 initViewer 里已经把它设成 baseLayer，所以这里不需要再调用一次；
-  // 但把提示文案写清楚，否则用户不知道当前底图是在线还是离线。
-  if (dom.modelTianditu && dom.modelTianditu.checked) setTianditu(true);
+  // ⚠ 这里原先有 7 个 `bindCheck('modelXxx', …)`（Wsf3dOverlay / Buildings /
+  // BuildingsOnline / Weather / Imagery / Tianditu / TiandituLabel）。**全是死代码**：
+  // 这些复选框随「底图」组一起并进了生成式图层面板，`getElementById` 对它们一律返回
+  // null，而 `bindCheck` 的首行就是 `if (!node) return` —— 不报错、也不接线。
+  // 留着比删掉更糟：读代码的人会以为这条通路是活的。开关现在由注册表的 handler
+  // 驱动（见 LAYERS 里各行的 `handler` 与 `registerLayerProviders`）。
+  //
+  // 同理，下面两处原先读的是 `dom.*` 缓存引用 —— 缓存只在 bindCheck 成功时才填，
+  // 节点没了它永远是 undefined，条件恒为 false。改走 `checkboxOn()`（它会反查注册表）；
+  // 注意 `checkboxOn('modelImagery')` 在本项目里**一直是 false**：离线底图的初始
+  // `checked` 从来没打过（见原始 HTML），所以这一句在此之前也没生效过。
+  if (checkboxOn('modelImagery')) setImagery(true);
+  // 天地图是默认底图，`initViewer` 里已把它设成 baseLayer。这里补一句是为了把
+  // 在线/离线的提示文案写清楚 —— 用户需要知道当前底图是哪一种。
+  if (checkboxOn('modelTianditu')) setTianditu(true);
 
   // 天地图可用性探测。必须**真的发一次请求**：`/api/tdt/status` 只能说明"配了 key"，
   // 说明不了"key 还能用"——配额耗尽（429）与被禁用（301005）都只有请求了才知道。
