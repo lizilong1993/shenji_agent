@@ -1,0 +1,64 @@
+# 审计记录：哪些轴已扫过、结论是什么
+
+本文只记一件事：**哪些审计轴已经扫过、结论如何**，以及扫描方法。
+目的是让下一个人不要从零再扫一遍，而是直接去看“本轮新加的代码”。
+
+**为什么需要它**：这个项目里的缺陷大多“**不报错**”——界面不报、
+`pageErrors` 为空、案例照样加载。所以只能靠系统性扫描。而扫描结果不落盘，
+下一个人的起点就还是零。
+
+## 已扫过的轴（均已干净，除非注明）
+
+| 轴 | 方法 | 结论 |
+|---|---|---|
+| 悬空 DOM id | `index.html` 现存 id 全集 对 `app.js` 的 `getElementById`/`bindCheck` | **修了 6 处**（含建筑体块整条链路） |
+| 定义但不可达的函数 | 全仓引用计数 | **删了 3 个 setter** + 附带死绑定 |
+| 空 `catch` 吞异常 | 正则扫 `catch` 空块 | **9/9 均合理**（都是“移除已消失的实体”） |
+| JS 用但 CSS 未定义的类 | 类名集 对 `style.css` | 2 个，属**有意保留的空桩** `renderHotspotTable` |
+| 只写不读的 `state.*` | 赋值点 vs 读取点计数 | 3 个无害残留 |
+| `LAYERS` 字段是否有人读 | 逐字段在注册表内/消费者里计数 | 唯一惰性声明 `requires`，**已删** |
+| 图层是否空转（kind 无 sink） | 直接问 `apply()` 的 `skipped` | **27/27 都有 handler 或 sink** |
+| `exclusives` 对称性 | 逐对比 | 两组都双向写了 |
+| 声明 vs 盘上事实（瓦片） | Mercator 算该有哪些瓦 + `isfile` | **6/6 零缺**（两战区 × imagery/terrain/wsf3d） |
+| URL 钩子是否绕过注册表 | 逐个钩子实测注册表意图 | **4 例已修**，已装通用守卫（16 条 URL） |
+| 各模块“效果入口”的调用点 | 逐入口列调用点 | 都只从各自 sink/handler 调用 |
+| **事件监听注册/注销配对** | 73 注册 vs 1 注销，逐个看调用位置与 viewer 生命周期 | **无泄漏**（见下） |
+
+## 监听器轴的结论依据（2026-10-08）
+
+73 个 `addEventListener` 对 1 个 `removeEventListener` 看着像漏漏，但**逐个看过后不是**：
+
+* 大多数挂在**静态 DOM 节点**上，由 `bindUI()` 在开机时注册一次；
+  `bindUI` 全仓**只被调用一次**（app.js:4503）。
+* `window.pointermove` / `pointerup`（app.js:2976/2984）看上去像“按一次加一对”，
+  实际在 `bindFollowInput()` 里，而它只从 `bindUI` 被调一次（app.js:3890）；
+  行为靠 `state.follow.press` 当标志位，不依赖重复注册。
+* `situation.js:336` 的 `document.keydown` 与 353 行的 `removeEventListener` **成对**。
+* **关键前提**：`new Cesium.Viewer` 全仓**只有一处**（app.js:444），
+  `teardownScene()` **不重建 viewer**（只清 entity/primitive）。
+  所以开机注册的监听不会随案例切换叠加。
+
+**如果将来真要重建 viewer**，这条结论就不再成立** ——
+那时这 70+ 个开机注册的监听会全部挂在旧对象上。
+这是本条结论的**前提**，不是一个永久结论。
+
+## 尚未扫的轴
+
+* 各模块内部状态与注册表的一致性（例：模块自己缓存的 `enabled` 与
+  `registry.desired` 是否会长期脱节）。
+* `web/src` 之外的前端代码与 `server/serve.py` 的行为一致性。
+
+## 修改后该做什么
+
+每次动过这些轴上的代码后，至少跑：
+
+```
+python3 tools/plot_selftest.py        # 标绘端到端
+python3 tools/deeplink_selftest.py    # 16 条 URL + 图层意图断言 + 鸟瞰图黄框
+python3 tools/road_selftest.py        # 引擎侧
+python3 tools/intent_selftest.py
+python3 tools/intent_set_selftest.py
+```
+
+若改了 `manifest` 或重抓了瓦片，另跑一遍“声明 vs 盘上事实”
+（脚本跟随 `NOTES_offline_coverage.md`）。
