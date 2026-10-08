@@ -183,15 +183,35 @@ def run_probe(base, case, tmpdir):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://127.0.0.1:8848")
-    ap.add_argument("--case", default="taiwan_landing")
+    # 默认**两个案例都跑**。为什么：两个案例的图层集合与规模不同
+    # （台海 31 目标/11 热点；中印 10 目标/7 热点、且**没有城区 AOI**），
+    # 只跑一个案例会把“只在某个案例下才坏”的问题漏掉。
+    # 而且两个案例的计数**应该不同**（实测：31 vs 10、11 vs 7）——
+    # 这也是“读的是真实场景数据、不是常量”的侧面证据。
+    ap.add_argument("--case", action="append", default=None,
+                    help="可重复；省略时默认跑 taiwan_landing 与 india_china_west")
     args = ap.parse_args(argv)
 
-    print("意图↔效果一致性自检  %s/?case=%s" % (args.base, args.case))
-    print()
+    cases = args.case or ["taiwan_landing", "india_china_west"]
     tmpdir = tempfile.mkdtemp(prefix="consistency-")
-    ev, page_errors = run_probe(args.base, args.case, tmpdir)
+    for ci, case in enumerate(cases):
+        print("意图↔效果一致性自检  %s/?case=%s" % (args.base, case))
+        print()
+        _one(args.base, case, tmpdir, ci)
+        print()
+    if FAILURES:
+        print("FAILED (%d):" % len(FAILURES))
+        for f in FAILURES:
+            print("  - " + f)
+        return 1
+    print("ALL CHECKS PASSED")
+    return 0
+
+
+def _one(base, case, tmpdir, ci):
+    ev, page_errors = run_probe(base, case, tmpdir)
     if ev is None:
-        ev, page_errors = run_probe(args.base, args.case, tmpdir)
+        ev, page_errors = run_probe(base, case, tmpdir)
     if ev is None:
         check("页面能跑起来", False, "两次都拿不到结果（服务未启动？）")
         print()
@@ -222,15 +242,5 @@ def main(argv=None):
         check("%s  关掉后效果消失" % rid, n_off == 0, "可见数=%s" % n_off)
         check("%s  开上后效果出现" % rid, n_on > n_off,
               "可见数 %s -> %s" % (n_off, n_on))
-    print()
-    if FAILURES:
-        print("FAILED (%d):" % len(FAILURES))
-        for f in FAILURES:
-            print("  - " + f)
-        return 1
-    print("ALL CHECKS PASSED")
-    return 0
-
-
 if __name__ == "__main__":
     raise SystemExit(main())
