@@ -74,18 +74,45 @@ python3 tools/fetch_assets.py terrain --bbox 77.4,32.5,79.7,36.5 \
 （可能是这个视口按屏幕误差只需 z11，也可能是 hotspot provider 的请求没进
 `imageryStats` —— 后者是这套计数的已知边界，见下。）
 
-## ⚠ 已知不一致：manifest 只描述一个区域
+## ⚠ 订正：manifest **本来就支持多战区**，而且早就声明了中印覆盖
 
-`manifest.json` 只有一个 `bbox` 与一个 `region_rectangle`，两次抓取都用 `--no-manifest`
-（**故意不写**，否则会把台海那份描述覆盖成中印的）。后果：manifest 仍只描述台海，
-而部署已覆盖两个战区。运行时它被用来
-（a）拼一句状态文案、（b）给 provider 声明覆盖矩形 ——
-其中 (b) 走的是 `global_rectangle`（全球），所以**没有功能影响**；
-**但描述确实已经不准**。
+我在本文早先的版本里写过"manifest 只有一个 bbox、不支持多区域、`region_rectangle`
+只描述台海"—— **那是错的**。查实后：
 
-**要么**把 manifest 改成支持多区域（`regions: {taiwan_strait: {...}, india_china: {...}}`），
-**要么**明确它就是"主抓取批次的记录"。前者更诚实，但改它要动
-`tools/analyze_tile_coverage.py` 与 `assets.js` 的读取点，本轮**没有做**。
+`manifest.theatres` 是一张**按战区索引**的表，里面**两个战区都在**：
+
+```json
+"taiwan_strait": { "bbox": [115.5,20.0,122.5,26.5],
+                   "coverage": { "imagery": {"min_zoom":0,"max_zoom":11},
+                                 "terrain": {"min_zoom":0,"max_zoom":10}, ... } },
+"india_china":   { "bbox": [77.0,31.5,81.5,36.5],
+                   "coverage": { "imagery": {"min_zoom":0,"max_zoom":11},
+                                 "terrain": {"min_zoom":0,"max_zoom":10}, ... } }
+```
+
+`assets.js` 的 `theatreList()` **优先读 `m.theatres`**（manifest 赢），只有在拿不到时才
+退回代码里写死的 `THEATRE_BBOX`。所以"烘焙一个战区就能让前端生效、不必改代码"这条
+通路**本来就是通的**。
+
+**这把本轮那个缺口说明得更准确、也更严重**：
+
+> manifest **早就声明** `india_china` 有 `imagery z0-11` / `terrain z0-10` 覆盖，
+> **而瓦片实际不存在** —— 每次请求都 404。
+
+也就是说这不是"少烘焙了一个战区"，而是**声明与事实不符**：元数据说覆盖到了，
+盘上什么都没有。所以本轮的抓取不是"新增覆盖"，而是**把已经声明的东西补成真的**。
+
+**`--no-manifest` 这个选择仍然是对的**，但理由要改：不是为了"避免覆盖掉台海"，
+而是因为本次抓的是**战区级 z0-11 + 热点 z12**，而 `analyze_tile_coverage.py` 生成的
+manifest 还会重算 `coverage`/`tile_counts`/`per_zoom` —— 手工抓取后重跑它才该更新 manifest，
+手动拼容易写出半真半假的数。**要更新就重跑那个工具，不要手改。**
+
+### 仍然对不上的两处（都无害，但记下来）
+
+* `theatres.india_china.coverage.imagery.max_zoom = 11`，而中印 **7 个热点层要 z12**
+  （实测层清单 `maxLevel: 12`）。manifest 声明的是**战区级**层级，热点层级另有一套；
+  本轮已把 z12 瓦片补齐，所以事实层面没问题，**只是 manifest 的这个字段不描述热点**。
+* `terrain max_zoom = 10`，而本轮实际抓到了 **z11 与 z12** —— 多抓了一层，无害。
 
 ## 仍未覆盖
 
