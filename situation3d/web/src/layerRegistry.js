@@ -123,7 +123,17 @@
       label: '在线三维实景建筑（Google 3D Tiles）', group: '底图',
       checkbox: 'modelBuildingsOnline',
       // 实测：Google 实景瓦片与本机离线 DEM 几何冲突，启用时必须关掉 globe。
-      requires: { globeHidden: true },
+      //
+      // ⚠ 这里原先写的是 `requires: { globeHidden: true }` —— **那是一句空话**：
+      // `resolve()` 只处理 `exclusives`，全仓**没有任何代码读 `requires`**（它只出现过
+      // 这唯一一次）。真正关掉 globe 的地方是 `buildings3d.js` 挂载在线瓦片时：
+      //   `state.globeWasShowing = viewer.scene.globe.show; viewer.scene.globe.show = false;`
+      // 卸载时再恢复（同文件 264-265 行）。
+      //
+      // 之所以不改成"在 resolve() 里实现它"：`resolve()` 算的是**可见性**，
+      // 而 `globeHidden` 是**场景副作用**，还带保存/恢复语义 —— 放进去反而更绕。
+      // 之所以要删掉那行：**一条不生效的声明比没有声明更危险** —— 将来有人以为注册表
+      // 管着它，把 `buildings3d.js` 里的两行删了，冲突就会悄悄回来。
       exclusives: ['buildings.blocks'],
     },
     {
