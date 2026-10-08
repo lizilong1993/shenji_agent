@@ -180,9 +180,9 @@ def svg_for(cls):
 
 def _geom_extents(text):
     xs, ys = [], []
-    for m in re.finditer(rr"[ML]\s*([-\d.]+)\s*,\s*([-\d.]+)", text):
+    for m in re.finditer(r"[ML]\s*([-\d.]+)\s*,\s*([-\d.]+)", text):
         xs.append(float(m.group(1))); ys.append(float(m.group(2)))
-    for m in re.finditer('circle cx="([-\d.]+)" cy="([-\d.]+)" r="([-\d.]+)"', text):
+    for m in re.finditer(r'circle cx="([-\d.]+)" cy="([-\d.]+)" r="([-\d.]+)"', text):
         cx2, cy2, r2 = float(m.group(1)), float(m.group(2)), float(m.group(3))
         xs += [cx2 - r2, cx2 + r2]; ys += [cy2 - r2, cy2 + r2]
     return (min(xs), min(ys), max(xs), max(ys)) if xs else (0, 0, 0, 0)
@@ -190,7 +190,7 @@ def _geom_extents(text):
 
 def geom_bbox(svg):
     xs, ys = [], []
-    for m in re.finditer(rr"[ML]\s*([-\d.]+)\s*,\s*([-\d.]+)", svg):
+    for m in re.finditer(r"[ML]\s*([-\d.]+)\s*,\s*([-\d.]+)", svg):
         xs.append(float(m.group(1))); ys.append(float(m.group(2)))
     for m in re.finditer(r'circle cx="([-\d.]+)" cy="([-\d.]+)" r="([-\d.]+)"', svg):
         cx, cy, r = float(m.group(1)), float(m.group(2)), float(m.group(3))
