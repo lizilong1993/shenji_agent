@@ -3692,7 +3692,29 @@ function bindUI() {
   // 顶栏「鸟瞰图」按钮已移除，改由上面的 #layerOverview 复选框控制；
   // 组件自带的 × 仍可关闭。
   const ovHide = document.getElementById('ovHide');
-  if (ovHide) ovHide.addEventListener('click', function () { setOverview(false); });
+  if (ovHide) {
+    // ⚠ **必须走注册表**。原先这里是 `setOverview(false)`，
+    // 而 `setOverview` 只写 `state.layers.overview` —— **绕过注册表**。
+    // 后果：点×能把鸟瞰图关掉，但注册表那一行的 desired 仍是 true，
+    // 随后任何一次 `apply()` 都会调 handler 把它**弹回来** ——
+    // 与 `?overview=1` / `?places=1` 完全同型。
+    //
+    // 而且这条路径不是 URL 钩子，是 **UI 按钮**：
+    // 上一轮只查了钩子，所以漏掉了它。类别不限于钩子。
+    //
+    // 走 setSwitch 后三者一致：面板复选框取消勾选、注册表 desired=false、
+    // 场景里鸟瞰图真的隐藏（且不会再自己弹回来）。
+    // ⚠不能用 `setSwitch('layerOverview', ...)`：`setSwitch` 按 **checkbox id**
+    // 反查图层（`layerIdForCheckbox`），而 `layerOverview` 那一行**没有 `checkbox` 字段**，
+    // 反查返回 null —— 调用**静默空转**。实测：点×后 desired 仍为 true、isVisible 仍为 true。
+    // （我先前就是这么修的，又踩了一次——**推断 `setSwitch` 能用之前应先查它的映射依据**。）
+    //
+    // 直接走注册表，与 `?overview=1` 那处修法一致（那处已实测可行）。
+    ovHide.addEventListener('click', function () {
+      LayerRegistry.setDesired('layerOverview', false);
+      LayerRegistry.apply();
+    });
+  }
 
   // 地图上的「区域级TS」横幅与其开关已移除，读数只在右栏「区域TS」显示。
   // 「目标元数据面板」开关现在控制右栏「目标TS栏」是否展开详情。
@@ -4285,8 +4307,18 @@ function applyCaseIndependentHooks() {
     setWsf3dOverlay(true);
   }
   if (params.get('sensors') === '1') {
-    setSwitch('modelSensor', true);
-    setSensors(true);
+    // ⚠ `modelSensor` 是**图层 id**，而它那一行**没有 `checkbox` 字段**。
+    // `setSwitch` 按 **checkbox id** 反查图层（`layerIdForCheckbox`），于是反查为 null、
+    // **静默空转**；而旁边直接调的 `setSensors(true)` 又会被随后的 `apply()` 按注册表
+    // （desired 仍是 false）改回去。实测：`?sensors=1` 下 desired=True 的图层数
+    // **20 -> 20 没变**，即参数完全没生效。
+    //
+    // （对比：旁边 `?overlay=1` 的 `wsf3d.overlay` **有** `checkbox: 'modelWsf3dOverlay'`，
+    // 实测 False -> True，是好的。差别就在有没有那个字段。）
+    //
+    // 直接走注册表，与 `?overview=1` / 鸟瞰图×按钮两处修法一致。
+    LayerRegistry.setDesired('modelSensor', true);
+    LayerRegistry.apply();
   }
   if (params.get('weather') === '0') {
     setSwitch('modelWeather', false);

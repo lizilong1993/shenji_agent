@@ -54,6 +54,10 @@ LAYER_PARAM_EXPECT = {
     "overview=1": "layerOverview",
     "places=1": "places.labels",
     "buildings=1": "buildings.blocks",
+    # 两个实测过的同型实例：这两行都**没有 `checkbox` 字段**，
+    # 而钩子原先调的是 `setSwitch('modelSensor')` —— `setSwitch` 按 checkbox id 反查，
+    # 反查为 null 就静默空转。实测：`?sensors=1` 下 desired 图层数 20 -> 20 没变。
+    "sensors=1": "modelSensor",
     "terrain=1": "terrain.model",
 }
 
@@ -198,6 +202,9 @@ CASES = [
     # 这条用例的价值全在 LAYER_PARAM_EXPECT 那条断言上：只断言"案例加载了"会**空过**
     # （案例无论参数是否生效都会加载），这正是 `?overview=1` 上一轮骗过我的方式。
     ("case=taiwan_landing&places=1", "taiwan_landing"),
+    # 传感器：与 places/overview 同型。无这条用例的话，
+    # LAYER_PARAM_EXPECT 里那一项对它就是空转。
+    ("case=taiwan_landing&sensors=1", "taiwan_landing"),
     ("case=nope_not_here", None),   # unknown id must fall back to the default
 ]
 
