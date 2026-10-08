@@ -93,6 +93,14 @@
     // 以前靠一次 raiseToTop 抢救，现在由 z 序号直接决定，不再需要事后调整。
     {
       id: 'tianditu.label', kind: 'imagery', z: 90, default: true,
+      // 有天地图注记时就不需要离线地名 —— 两套注记叠在一起只会互相压字。
+      //
+      // ⚠ 这条规则原先**不在这里**，而是 `app.js` 里的一段硬编码：apply 之前直接把
+      // `places.labels` 的 `desired` 改成 false。那是个**单向开关** —— 用户后来把
+      // 天地图注记关掉，离线地名**再也回不来**（没有任何路径会把它重新打开）。
+      // 改成注册表的互斥之后：`desired` 是用户意图、不被改写，判负的一方只被置为
+      // 不可见，赢家一关它就自动回来；面板上还会显示"被顶掉"以及原因。
+      exclusives: ['places.labels'],
       label: '天地图注记', group: '底图', checkbox: 'modelTiandituLabel',
     },
 
@@ -114,7 +122,17 @@
 
     // ---- 标签栈：不贴地，靠 disableDepthTestDistance 保证在几何之上 ----
     {
-      id: 'places.labels', kind: 'label', z: 20, default: true,
+      // `default: false` —— 默认**不开**离线地名，因为天地图注记默认开着，两者互斥。
+      // 这一点必须靠 default 表达，不能靠"默认 true 再在运行时把它改掉"：
+      // 互斥的仲裁规则是"**后动的一方赢**"，而启动时 `setDesired` 按 LAYERS 顺序
+      // 依次打 stamp —— 于是"谁在数组里靠后"就决定了谁赢。`places.labels` 排在
+      // `tianditu.label` 之后，若它 default 也是 true，**默认胜出的会是离线地名**，
+      // 把原本"天地图注记优先"的意图整个反过来（实测就是这样）。
+      id: 'places.labels', kind: 'label', z: 20, default: false,
+      // 与天地图注记**对称**互斥（两边互相列进 exclusives）。对称是必须的：
+      // 注册表的仲裁规则是"后动的一方赢"，只写单向的话，用户后来手动打开离线地名
+      // 也不会赢 —— 而"我刚点的开关应该生效"是更强的预期。
+      exclusives: ['tianditu.label'],
       label: '地名', group: '底图', checkbox: 'modelPlaces',
     },
 

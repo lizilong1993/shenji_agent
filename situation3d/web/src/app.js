@@ -2114,17 +2114,15 @@ function applyLayers() {
   // **必须在 apply() 之前改 desired**：这样注册表算出的 effective 与实际一致，
   // 健康面板不会出现"开关开着却没在显示"的假状态；在 apply 之后再关就会留下它。
   // 同时把复选框也改掉——界面不能与事实不符。
-  var st = LayerRegistry.status();
-  var cvaWanted = st.some(function (s) {
-    return s.id === 'tianditu.label' && s.desired;
-  });
-  if (cvaWanted && st.some(function (s) {
-        return s.id === 'places.labels' && s.desired;
-      })) {
-    LayerRegistry.setDesired('places.labels', false);
-    var pbox = document.getElementById('modelPlaces');
-    if (pbox) pbox.checked = false;
-  }
+  // 「有天地图注记就不要离线地名」这条规则**已经移进注册表**（`tianditu.label` 与
+  // `places.labels` 互相列进 `exclusives`，见 layerRegistry.js）。
+  //
+  // 原先这里是硬编码：apply 之前直接把 `places.labels` 的 `desired` 改 false。
+  // 那是个**单向开关** —— 用户后来关掉天地图注记，离线地名**再也回不来**，
+  // 因为没有任何路径会把它重新打开（实测：cva 关掉后 places 仍是
+  // desired:false / effective:false / Places.loaded:false）。
+  // 交给注册表的互斥之后，desired 保持为用户意图、判负方自动回归，
+  // 面板还会显示"被顶掉"及原因 —— 而不是让用户面对一个"开了却没东西"的开关。
 
   var out = LayerRegistry.apply();
   state.lastLayerApply = out;

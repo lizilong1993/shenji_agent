@@ -1444,6 +1444,22 @@
     var def = CATALOGUE[spec.type];
     if (!def) throw new Error('未知标绘类型：' + spec.type);
     if (!spec.points || spec.points.length < 2) throw new Error('标绘至少需要 2 个控制点');
+    // 控制点数还必须落在**该类型**的上下限内。
+    //
+    // 为什么这里也要校验（UI 两个入口都已各自校验过 min）：`normalizeStructured`
+    // 按 `ctrl.min/max` 严格校验，而 `add()` 原先只要求"≥2 个点" —— 于是程序化造出的
+    // 低于下限的标绘**能进场景、能被草稿收割、能被导出，再导入却报错**：
+    // 导出与导入不等价，而这条路径只有控制台/脚本走得到，所以一直没被发现。
+    // 把上下限收到 `add()` 里，"add() 接受的，import 一定也接受"才成立。
+    var ctrl = CTRL_BY_FAMILY[def.family] || { min: 2, max: null };
+    if (spec.points.length < ctrl.min) {
+      throw new Error(def.zh + ' 至少需要 ' + ctrl.min + ' 个控制点（当前 '
+        + spec.points.length + ' 个）');
+    }
+    if (ctrl.max && spec.points.length > ctrl.max) {
+      throw new Error(def.zh + ' 最多 ' + ctrl.max + ' 个控制点（当前 '
+        + spec.points.length + ' 个）');
+    }
     var id = spec.id || ('plot-' + (++seq));
     if (byId[id]) throw new Error('标绘 id 重复：' + id);
     var rec = {
