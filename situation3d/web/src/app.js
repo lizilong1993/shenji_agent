@@ -228,7 +228,15 @@ function renderDiagnostics() {
   const lines = [];
   lines.push('Cesium ' + Cesium.VERSION);
   lines.push('camera height   ' + (viewer.camera.positionCartographic.height / 1000).toFixed(1) + ' km');
-  lines.push('imagery requests ' + im.requests + '  errors ' + im.errors);
+  // ⚠ 必须写清这组计数是**哪一层**的。`imageryStats` 只给**离线底图** provider 包了
+  // 计数（见 initViewer 里的 `OfflineAssets.instrument`）；天地图走服务端代理 `/tdt/`，
+  // **不计入这里**。而 `imagery.offline` 默认是关的（默认底图是天地图），于是
+  // 画面上明明有瓦片在加载，这里却显示 `requests 0 / levels none` —— 查"底图为什么糊"
+  // 的人会照着这个 0 往"影像根本没加载"的方向查，正好查反。
+  // 实测：把 `imagery.offline` 打开并压到 300 km 后，计数立刻变成
+  // requests 57 / levels {1..8} / maxLevel 8。
+  lines.push((im.label || 'imagery') + '  requests ' + im.requests
+    + '  errors ' + im.errors + '   （仅离线底图层；天地图经 /tdt/ 代理，不计入）');
   lines.push('imagery levels  min=' + im.minLevel + ' max=' + im.maxLevel);
   const hist = Object.keys(im.levels).sort(function (a, b) { return Number(a) - Number(b); })
     .map(function (k) { return 'z' + k + ':' + im.levels[k]; }).join(' ');
@@ -423,7 +431,11 @@ function initViewer() {
   // 离线与天地图**不再互斥**：离线垫在下面当兜底，天地图有瓦片的地方盖住它。
   // 这样 key 失效 / 离线 / 瓦片在途时露出的是离线影像，而不是球体底色（rgb(0,0,128)
   // ——以前底图"变蓝"就是这个）。顺序由 layerRegistry 的 z 决定，不在这里手工调整。
-  state.imageryStats = OfflineAssets.newStats('imagery');
+    // 标签写成 `imagery(offline)` 而不是 `imagery`：这组计数只给**离线底图** provider
+  // 包了计数（下面的 instrument），天地图走服务端代理 `/tdt/`、不计入。
+  // 标签含糊过一次——`?diag=1` 上写着"imagery requests 0"，而画面上天地图瓦片明明在加载，
+  // 查"底图为什么糊"的人会照着这个 0 往"影像根本没加载"的方向查，正好查反。
+  state.imageryStats = OfflineAssets.newStats('imagery(offline)');
   state.tiandituLayer = new Cesium.ImageryLayer(
     OfflineAssets.createTiandituProvider('img'));
   state.tiandituLabelLayer = new Cesium.ImageryLayer(
