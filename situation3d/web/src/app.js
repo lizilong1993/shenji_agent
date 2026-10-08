@@ -511,6 +511,13 @@ function initViewer() {
       // 绑定在复选框删除后已经不会触发 —— 于是用户在面板里关掉城区影像，相机高度
       // 一变化它又会被挂回来（挂载判据读的正是 state.urbanEnabled）。
       if (id === 'urban.imagery') state.urbanEnabled = !!want;
+
+      // 这里本来还想把 `setTiandituLabel` / `setHotspotImagery` 里的提示文案接过来，
+      // 查证后**没有必要**：`setSwitchNote()` 本身就是一个空函数
+      // （`function setSwitchNote(text) { /* 说明性文字已从界面移除 */ }`）——
+      // 那些文案早就按"界面不写说明性文字"的要求被有意丢弃了，从来没有显示过。
+      // 所以那两个 setter 里除 `setDesired` + `applyLayers`（都已由面板的 onChange
+      // 覆盖）之外**没有任何可观察行为**，删掉即可，不必搬运提示。
       // imagery.offline 是两级（全球 z0-6 + 战区 z7-11），都在槽位里，
       // 由下面的通用分支统一翻，不需要特判。
       // 热点层是**一层多实例**（每个热点框一个 provider 各自带 rectangle），
@@ -524,7 +531,9 @@ function initViewer() {
     },
     primitive: function (id, want) {
       if (id === 'buildings.blocks') {
-        // 直接走内部实现：若改走 setBuildings 会再写一次 desired，形成回环。
+        // 直接走内部实现（`applyBuildingsVisibility`）：它只把状态落到场景上、不碰
+      // `desired`，所以不会形成回环。`desired` 由注册表那条行统一写 —— 面板的
+      // onChange、URL 钩子、恢复默认都走同一条路。
         applyBuildingsVisibility(want);
       } else if (id === 'tiles.google3d') {
         setOnlineTilesetVisible(want);
@@ -2037,8 +2046,8 @@ function syncBuildingsOnlineNote(info) {
 /**
  * 建筑体块的**实际显隐**（注册表的 primitive sink 调它）。
  *
- * 纯"把状态落到场景上"，不碰 desired——desired 由 setBuildings 写。
- * 两者分开是为了避免回环：sink 若再调 setBuildings，就会又写一次 desired。
+ * 纯"把状态落到场景上"，不碰 desired——desired 由注册表的 `buildings.blocks` 行写。
+ * 两者分开是为了避免回环：sink 若再去写 desired，就会又触发一轮 apply。
  */
 function applyBuildingsVisibility(on) {
   if (!on) {
@@ -2069,17 +2078,6 @@ function applyBuildingsVisibility(on) {
     return;
   }
   refreshBuildings();
-}
-
-/**
- * 建筑体块开关：只写「意图」，实际显隐交给注册表解算。
- *
- * 以前的写法是直接改场景（show / buildingsKey / 重建），于是"在线实景开着的时候
- * 体块该不该显示"这类**跨图层**的判断只能散在各个 setter 里手工维护。现在意图与
- * 落地分开，互斥规则集中在 layerRegistry.js。
- */
-function setBuildings(on) {
-  LayerRegistry.setDesired('buildings.blocks', !!on);
 }
 
 /**
@@ -2474,45 +2472,11 @@ function setImagery(on) {
 }
 
 /**
- * 天地图注记层开关。
- *
- * 单独一个开关的理由：注记是**栅格**，会盖住热点/城区的高清影像（栅格叠栅格
- * 没有"谁更重要"这回事，只有顺序）。有些场景（例如要看城市细节）不想要注记，
- * 所以给它独立开关，默认开。
- *
- * 顺序上注记在 LAYERS 里是 z=90，排在所有底图/高清影像之上——这是它**应该**
- * 在的位置（文字压在影像上才符合直觉）；以前是被热点影像盖住之后用一次
- * raiseToTop 救回来的，现在由声明直接保证。
- */
-function setTiandituLabel(on) {
-  LayerRegistry.setDesired('tianditu.label', !!on);
-  let extra = '';
-  if (on) {
-    // 天地图注记（cva）**自带中文地名**，而本项目还有一层自己的地名
-    // （Natural Earth，县镇更密）。两层同时开会把同一个城市画两遍，位置略有差异
-    // —— 屏幕上就是重影。这是"地名看不清"里最容易被误判成"分辨率不够"的一条，
-    // 实测截图里杭州/浙江/福州都能看到双份。
-    //
-    // 所以开 cva 时自动关掉本机地名层，并且**说出来**（不静默改用户的开关）。
-    // 互斥**已经交给注册表**（见 layerRegistry.js 里 tianditu.label 与 places.labels
-    // 的对称 exclusives），这里不再改写 desired。但"为什么本机地名不见了"必须**说出来**：
-    // 原先这段读 DOM 复选框，节点删除后整块不再执行，提示也就永远不显示了。
-    if (checkboxOn('modelPlaces')) {
-      extra = ' 同时隐藏了本机地名层：两层都带中文地名，叠在一起会重影。'
-            + '需要本机地名（县镇更密）时，先取消勾选天地图注记。';
-    }
-  }
-  applyLayers();
-  setSwitchNote(on ? '天地图注记已显示（置于所有影像层之上）。' + extra
-                   : '天地图注记已隐藏。');
-}
-
-/**
  * 天地图底图开关（默认开）。
  *
  * 天地图影像与它的中文注记是**两个 layer**：影像本身不含地名，不叠 `cva` 注记层
  * 地图上一个字都没有。所以打开这个开关会同时打开注记；注记另有一个独立开关
- * （setTiandituLabel）用来在需要时单独关掉。
+ * 用来在需要时单独关掉（与天地图注记互斥，见 layerRegistry.js 的 exclusives）。
  *
  * 自 2026-09-29 起天地图与**离线底图不再互斥**：离线影像垫在下面（z=5），天地图
  * 盖在上面（z=10）。所以这里不再需要"关掉一个才能开另一个"的说法；key 失效时露出
@@ -2585,15 +2549,6 @@ function probeTiandituStatus() {
     .catch(function (e) {
       fallbackToOffline('状态检查失败 ' + (e && e.message ? e.message : e));
     });
-}
-
-function setHotspotImagery(on) {
-  LayerRegistry.setDesired('hotspot.imagery', !!on);
-  applyLayers();
-  const n = (state.hotspotLayers || []).length;
-  setSwitchNote(on
-    ? '热点区域高清影像已启用：' + n + ' 个热点框（z0–12，约 19 m/px）。'
-    : '热点区域高清影像已关闭。');
 }
 
 // --------------------------------------------------------------------------
