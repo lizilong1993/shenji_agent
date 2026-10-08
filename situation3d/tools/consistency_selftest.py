@@ -75,6 +75,20 @@ PROBE = r"""
     L.forEach(function (x) { if (x && x.show) n++; });
     return n;
   }
+  // 目标：`state.targets[id]` 是**包装对象**（`{ def, entity, sensorEntity, trail, ... }`），
+  // **不是实体** —— 所以 `countShown(ST.targets)` 恒为 0（包装对象没有 `.show`）。
+  // 真正的落点是它里面的 `entity.show`，而 `entity.show` 由 `isVisible(def)` 算出
+  // （图层开关 + 阵营/域过滤 + 是否被移除），因此数它就是在数“图层开关的真实效果”。
+  function countTargetsShown() {
+    var m = ST.targets || {};
+    var n = 0;
+    Object.keys(m).forEach(function (k) {
+      var w = m[k];
+      if (w && w.entity && w.entity.show) n++;
+    });
+    return n;
+  }
+
   function modPlaces() {
     var s = window.Places ? String(Places.debugInfo()) : "";
     var m = s.match(/enabled\s+(true|false)/);
@@ -99,6 +113,8 @@ PROBE = r"""
     // 宁可不盖，也不能放一条会嗧的断言进来。
     // 要补它，先找到目标图层真正的场景落点（大概率是 `refilter()` 控制的
     // 某个集合，而不是 `state.targets`），再把它加回来。
+    { id: "layerTargets",    what: "可见目标（包装对象里 entity.show 的计数）",
+      read: countTargetsShown },
     { id: "layerHotspots",   what: "热点区域（实体 show 计数）", read: function () { return countShown(ST.hotspotEntities); } },
     { id: "layerRoutes",     what: "计划航路（实体 show 计数）", read: function () { return countShown(ST.routeEntities); } },
     { id: "layerOverview",   what: "鸟瞰图（第二个 view 的可见性）", read: function () {
