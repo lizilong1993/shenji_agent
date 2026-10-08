@@ -203,6 +203,32 @@ PROBE = r"""
     return r;
   })();
 
+  // —— 重复重载下的状态积累（只在重复时才暴露的那类泄漏）——
+  // 本会话早期把 `resetElementState()` 从 `clearSituation()` 挑进 `teardownScene()`，
+  // 因为切换路径是 `loadCase → applySituationData → teardownScene()`；但当时**只做了单点验证**。
+  // 累积型泄漏只在反复重载时现形，所以这里重载两次比对。
+  out.reloads = [];
+  function cnt() {
+    var S = SituationHost.state, v = SituationHost.viewer();
+    return {
+      caseId: S.caseId,
+      targetObjs: Object.keys(S.targets || {}).length,
+      hotspotEntities: (S.hotspotEntities || []).length,
+      routeEntities: (S.routeEntities || []).length,
+      viewerEntities: v.entities.values.length,
+      imageryLayers: v.imageryLayers.length,
+    };
+  }
+  out.reloads.push(cnt());
+  for (var _r = 0; _r < 2; _r++) {
+    try {
+      var _pr = window.SituationHost.reload();
+      if (_pr && _pr.then) { await _pr; }
+    } catch (e) { out.reloadErr = String(e && e.message || e); }
+    await frames(20);
+    out.reloads.push(cnt());
+  }
+
   return out;
 })()
 """
@@ -295,6 +321,17 @@ def _one(base, case, tmpdir, ci):
               json.dumps(ex.get("recovered"), ensure_ascii=False))
         check("互斥：被顶掉期间不会改写用户的意图",
               ex.get("placesDesiredKept") is True)
+
+    # 重复重载：计数不应增长
+    rl = ev.get("reloads") or []
+    if len(rl) >= 2:
+        b = rl[0]
+        for k in ("targetObjs", "hotspotEntities", "routeEntities", "viewerEntities", "imageryLayers"):
+            vals = [x.get(k) for x in rl]
+            check("重重载后 %s 不增长" % k, len(set(vals)) == 1,
+                  "各次=%s" % vals)
+        check("重重载后案例不变", all(x.get("caseId") == b.get("caseId") for x in rl),
+              b.get("caseId"))
 
     rows = ev.get("rows") or []
     if not rows:
