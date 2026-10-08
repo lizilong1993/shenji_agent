@@ -131,6 +131,13 @@ PROBE = r"""
     LayerRegistry.apply();
     await frames(4);
     row.nOff = s.read();
+    // 面板复选框：`layerPanel.js` 里 `box.id = "layerRow-" + status.id`。
+    // **这是本自检原本漏掉的一环** —— 意图对了、场景也变了，
+    // 但面板上的勾还是旧的，就是“界面与事实不符”。本会话修过好几处这类。
+    row.panelOff = (function () {
+      var b = document.getElementById("layerRow-" + s.id);
+      return b ? !!b.checked : null;
+    })();
     LayerRegistry.setDesired(s.id, true);
     LayerRegistry.apply();
     // 开上后**轮询到出现为止**：有些效果是异步的
@@ -142,6 +149,19 @@ PROBE = r"""
       await frames(3);
       row.nOn = s.read();
     }
+    // 面板读数**必须在轮询之后**：面板是按签名差分重建的，
+    // 不会在 `apply()` 返回的同一刻就织好。我一度在 `apply()`
+    // 后立即读，结果 **10 个图层 × 2 个案例全部同向失败**。
+    // 那种整齐划一的失败就是“测试写错了”的信号，不是 10 个真缺陷 ——
+    // 我又用一个只测单个图层、打印原始值的聚焦探针把它排除了。
+    // 无条件等几帧：上面的轮询**只在读数为 0/-1 时才跑**，
+    // 而 imagery 类的 `.show` 是 sink 同步设的、立即就非零，于是一帧都不过。
+    // 面板却是按签名差分在**帧里**重建的 —— 不等就读到旧值。
+    await frames(5);
+    row.panelOn = (function () {
+      var b = document.getElementById("layerRow-" + s.id);
+      return b ? !!b.checked : null;
+    })();
     row.desired1 = LayerRegistry.runtime[s.id].desired;
     // 复原初始意图
     LayerRegistry.setDesired(s.id, row.desired0);
@@ -240,6 +260,13 @@ def _one(base, case, tmpdir, ci):
                   "读数为 None/不可用（图层未创建、模块未就绪）")
             continue
         check("%s  关掉后效果消失" % rid, n_off == 0, "可见数=%s" % n_off)
+        p_off, p_on = row.get("panelOff"), row.get("panelOn")
+        if p_off is None or p_on is None:
+            check("%s  面板里有对应的勾选框" % rid, False,
+                  "layerRow-%s 不存在" % rid)
+        else:
+            check("%s  面板勾选如实反映意图（关）" % rid, p_off is False)
+            check("%s  面板勾选如实反映意图（开）" % rid, p_on is True)
         check("%s  开上后效果出现" % rid, n_on > n_off,
               "可见数 %s -> %s" % (n_off, n_on))
 if __name__ == "__main__":
