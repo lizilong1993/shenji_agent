@@ -2602,12 +2602,27 @@ function cameraOrientation() {
  * 这里改为累加"最短角差"，写入值因此始终连续；跨 ±180 只是数值上的事，
  * 不再产生绕圈。
  *
- * 关于"缩放时指针晃动"：**尚未定位**。曾按"俯视时 atan2 病态"的假设改过一次
- * （改用视线/屏幕上方向量取水平分量较大者 + 圆周平滑），实测被推翻并在
- * −86° 姿态引入了 10° 跳变，已回退（详见提交 d9ef78c）。目前可复现的路径都测不出
- * 抖动：脚本化 setView + 动画 zoomIn/zoomOut 在 pitch −89.5/−86/−70、heading 0/35/120
- * 下各采样 40 次，角度极差 ≤0.08°。因此改为**采集实测数据**而不是继续猜：
- * 见下方 COMPASS_TRACE 与 `SituationHost.compassTrace()` / `compassTraceStats()`。
+ * 关于"缩放时指针晃动"：**三条候选机制都实测为 0，未能复现**。
+ *
+ * 曾经按"俯视时 atan2 病态"的假设改过一次（改用视线/屏幕上方向量取水平分量较大者
+ * + 圆周平滑），实测被推翻并在 −86° 姿态引入了 10° 跳变，已回退（见提交 d9ef78c）。
+ * 此后不再猜，改为**采集实测数据**：见下方 COMPASS_TRACE 与
+ * `SituationHost.compassTrace()` / `compassTraceStats()`。
+ *
+ * 已测的路径与结果：
+ *   · 脚本化 setView + 动画 zoomIn/zoomOut，pitch −89.5/−86/−70、heading 0/35/120，
+ *     各 40 次采样 → 角度极差 ≤ 0.08°
+ *   · **真实滚轮事件** 60 次（交替 ±120，相机高度 900 km → 601 km，确实缩放了），
+ *     240 个采样 → 角度极差 **0**、单步最大跳变 **0**、容器位移 **0 px**、尺寸变化 **0 px**
+ *
+ * 也就是说：写进 DOM 的角度、元素的位置、元素的尺寸**三者都没动**。剩下的解释只有
+ * "针在如实反映交互过程中相机航向的微小变化"（那属于正确行为，要消除只能给针加平滑/
+ * 迟滞，是**取舍**不是修 bug），或者来自这里驱动不出的路径。若将来又有人报晃动，
+ * 先调 `compassTraceStats()`：这三个数只要有一个不为 0，方向就明确了。
+ *
+ * ⚠ 本 trace 里 `hdg` 字段曾经与 `raw` 用了**不同的区间**（[0,360) vs (-180,180]），
+ * 于是 `maxCameraHeadingStepDeg` 报出 360° 的**假跳变**。诊断自己在撒谎，比没有诊断更糟。
+ * 已统一归一化。
  */
 let _compassWrittenDeg = null;
 
@@ -2630,7 +2645,12 @@ function compassSample(rawDeg, writtenDeg) {
     elTop: Math.round(r.top),
     elW: Math.round(r.width),
     elH: Math.round(r.height),
-    hdg: Math.round(Cesium.Math.toDegrees(c.heading) * 100) / 100,
+    // ⚠ 必须和 `raw` 用**同一个区间**。`raw` 来自 `Math.atan2`（区间 (-180, 180]），
+    // 而 `camera.heading` 的区间是 [0, 360) —— 同一个物理朝向在两者里可能分别是 0 与
+    // 360，直接入 trace 会让 `maxCameraHeadingStepDeg` 报出一个 **360° 的假跳变**
+    // （实测就是这样）。那是诊断自己在撒谎，会把下一个查"指针晃动"的人引到一个
+    // 不存在的问题上去 —— 而这条 trace 存在的唯一目的就是查它。
+    hdg: Math.round((((Cesium.Math.toDegrees(c.heading) + 540) % 360) - 180) * 100) / 100,
     pitch: Math.round(Cesium.Math.toDegrees(c.pitch) * 100) / 100,
     heightM: Math.round(c.positionCartographic.height),
   });
