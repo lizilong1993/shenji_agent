@@ -55,6 +55,7 @@
 每次动过这些轴上的代码后，至少跑：
 
 ```
+python3 tools/consistency_selftest.py # 意图↔效果（图层行在、效果不发生的那类）
 python3 tools/plot_selftest.py        # 标绘端到端
 python3 tools/deeplink_selftest.py    # 16 条 URL + 图层意图断言 + 鸟瞰图黄框
 python3 tools/road_selftest.py        # 引擎侧
@@ -87,3 +88,23 @@ attachWsf3dOverlay ... registerImagerySlot ... }`），而那个函数**只有 U
 
 **实测**：修后 `desired` 置开 → 图层创建且 `show=true`；置关 → `show=false`；
 `places.labels` 与 `tiles.google3d` 仍一致；`pageErrors` 为空。
+
+## `tools/consistency_selftest.py`（意图↔效果，2026-10-08）
+
+逐对翻转图层的 `desired`，再读**场景/模块自己的状态**（不只看 `desired`）。
+当前覆盖 4 个图层：`places.labels`、`wsf3d.overlay`、`tianditu.label`、`imagery.offline`。
+
+**它真的会失败 —— 已演示过三阶段：**
+
+| 阶段 | 结果 |
+|---|---|
+| 正常代码 | ALL CHECKS PASSED |
+| 人为破坏：把图层创建条件改成 `if (false)`（复现上一轮那个 bug） | **FAILED (1)**：`wsf3d.overlay 置开后能取到效果读数 读数为 None` |
+| 恢复 | ALL CHECKS PASSED |
+
+破坏时**另外 3 个图层仍然通过** —— 失败是定位到具体图层的，没有级联误报。
+
+⚠ 读数为 `None` 没有当成“无法取证”放过 —— 在本自检里它
+**就是失败**：图层未创建恰恰是要抓的现象。
+
+新增图层时应把它加进 `SPECS`（每项只需一个 `read()`）。
