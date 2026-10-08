@@ -98,7 +98,8 @@ PROBE = r"""
     // “开上后”必然失败 —— 那是**假失败**，不是产品缺陷。
     // 宁可不盖，也不能放一条会嗧的断言进来。
     // 要补它，先找到目标图层真正的场景落点（大概率是 `refilter()` 控制的
-    // 某个集合，而不是 `state.targets`），再把它加回来。    { id: "layerHotspots",   what: "热点区域（实体 show 计数）", read: function () { return countShown(ST.hotspotEntities); } },
+    // 某个集合，而不是 `state.targets`），再把它加回来。
+    { id: "layerHotspots",   what: "热点区域（实体 show 计数）", read: function () { return countShown(ST.hotspotEntities); } },
     { id: "layerRoutes",     what: "计划航路（实体 show 计数）", read: function () { return countShown(ST.routeEntities); } },
     { id: "layerOverview",   what: "鸟瞰图（第二个 view 的可见性）", read: function () {
         return (window.Overview && typeof Overview.isVisible === "function") ? (Overview.isVisible() ? 1 : 0) : -1; } },
