@@ -50,6 +50,22 @@ FAILURES = []
 # "绕过注册表直接改效果"，于是 **URL 上带着参数、参数实际不生效**，而且不报错。
 # 案例照样加载（所以只断言"案例加载了"是**空过**，抓不到），`pageErrors` 也照样为空。
 # 断言"注册表意图真的被翻转"才能抓到。
+# 这一类到 2026-10-08 为止共 4 例（均已修）：
+#   `?overview=1` · `?places=1` · 鸟瞰图的×按钮 · `?sensors=1`
+#
+# 修完后又把两层入口都扫了一遍，**结果干净**，不必重扫：
+#   · 全部 URL 钩子：imagery / terrain / overlay / sensors / weather / buildings /
+#     compass / scalebar / viewpoint / components 都走 `setSwitch(...)` 加显式 setter；
+#     cam / follow / hotspot / panel / tick / cache 不是图层开关。
+#   · 全部“效果入口”的调用点：`setOnlineTilesetVisible` 与
+#     `applyBuildingsVisibility` 各自**只有一处调用**（都是 primitive sink），
+#     `Places.setEnabled` 只在 label sink、`Plotting.setLayerVisible` 只在 plot sink，
+#     `Overview.show/hide` 只在鸟瞰图那行的 handler（另有两处防御性兼底，
+#     读的是 `state.layers.overview`，与注册表同步）。
+#
+# 若将来又出现同类，优先看两个地方：新加的 URL 钩子、
+# 以及新加的“直接调 setter”代码。守卫本身只能盖住表里列了的参数。
+
 LAYER_PARAM_EXPECT = {
     "overview=1": "layerOverview",
     "places=1": "places.labels",
