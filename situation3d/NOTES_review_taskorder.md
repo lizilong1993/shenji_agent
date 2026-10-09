@@ -321,3 +321,134 @@ consolidate 巩固滩头 / inland 向内陆夺控` —— **里面没有侦察�
 → 方向 **2**（唯一需要新增帧字段并重建数据集的一条，放最后）。
 
 每条独立提交、独立跑对应自检；方向 2 合入后**四条一起做一次全量回归**（前端五套 + 引擎三套）。
+
+---
+
+# 新会话开工须知
+
+> 本节是给**没有本次上下文的新会话**看的。上面第 0-8 节是方案本身。
+> 开工前**先把第 6 节的 7 个决策点拿到答复**，再按第 8 节顺序动手。
+
+## 9. 环境与工作流（硬约束，先读这一节）
+
+### 9.1 工作方式
+
+- **本机只做写代码与语法检查**；**一切执行、验证、渲染都在远程容器**。
+  这是既定约束（"不要在本机跑代码和实验"），不要因为"跑一下更快"而违反。
+- 仓库权威在**远程**：主机 `situ155`，仓库 `/remote-home/lizilong/shenji_agent`，
+  项目目录 `situation3d`。
+- 同步方式：本地改完 → `scp` 到远程同名路径 → 在远程执行。
+- git 在远程：`/remote-home/lizilong/.local/bin/git`。
+  **本机没有 `.git`**，不要试图在本地提交。
+
+### 9.2 ⚠ 本地副本是**部分镜像**，不是完整仓库
+
+| 本地**有** | 本地**没有**（只在远程） |
+|---|---|
+| `web/index.html`、`web/src/*`（16 个 js + `style.css`）、`engine/*`、`engine/data/*`、`server/*`、`tools/*`（23 个 `.py`）、`web/data/base.json`、`README.md`、`.gitignore` | `web/assets/symbols/*`（40 个 svg）、`web/vendor/`、`web/tiles/`、`web/poc/`、`NOTES_audits.md`、`NOTES_offline_coverage.md` |
+
+→ 需要读右侧这些文件时，**从远程 `scp` 回来再读**，不要当成"不存在"。
+→ `web/data/situations/*.json`（数据集）也在远程，本地方便起见可拉一份看结构。
+
+### 9.3 文件格式：**必须 LF**
+
+- 写文件一律用能保证 LF 的方式；**不要用会产出 CRLF 的批量写行接口**。
+- 提交/部署前自查：`tr -cd '\r' < 文件 | wc -c` 必须是 **0**。
+
+### 9.4 重启规则
+
+| 改了什么 | 是否需要重启服务 |
+|---|---|
+| `web/src/*.js`、`web/index.html`、`web/src/style.css` | **不需要**，刷新页面即可 |
+| `server/serve.py`、`.env` | **必须** `sh tools/restart_server.sh 8848` |
+| `engine/*.py` | 不涉及服务；但**数据集需重建**（见 9.6） |
+
+### 9.5 提交纪律
+
+- **显式路径**提交，不要 `git add -A`。
+- **不要提交**：`web/data/*.json`、`web/data/situations/`、`web/tiles/`、`web/vendor/`、
+  `tools/shots/`、`.env`。
+- 提交前扫密钥（天地图 key、Cesium ion token）。
+
+### 9.6 数据集重建（方向 2/3/4 会用到）
+
+引擎侧改完后必须重建案例数据集，否则前端读到的还是旧数据：
+
+```
+python3 scripts/gen_demo_trajectory.py <case_id>
+```
+
+案例 id 由 `GET /api/situations` 列出（固定目录 `web/data/situations/`）。
+已知两个案例：`taiwan_landing`（31 目标）、`india_china_west`（10 目标）。
+**重建后要重跑引擎三套自检**。
+
+## 10. 自检清单（验收一律走这些，不要另造框架）
+
+位于 `tools/`：
+
+| 自检 | 覆盖 | 何时跑 |
+|---|---|---|
+| `consistency_selftest.py` | **意图↔效果**：10 图层 × 2 案例，判据是"翻转 `desired` 后场景/面板真的变了" | 任何图层/开关改动 |
+| `deeplink_selftest.py` | 16 条 URL + URL 钩子是否真的点亮了对应图层 + 鸟瞰图黄框 | 任何启动链/钩子/视图改动 |
+| `plot_selftest.py` | 标绘端到端 | 标绘/图元改动 |
+| `road_selftest.py` | 引擎：陆上航路 | 引擎改动 |
+| `intent_selftest.py` | 引擎：意图链路 | 引擎改动 |
+| `intent_set_selftest.py` | 引擎：意图集合（CES） | 引擎改动 |
+
+本环境实测**六套全跑约 50 分钟**；`deeplink_selftest` 单跑约 15–20 分钟。
+它们在远程执行，不要在本机跑。
+
+## 11. 写代码时必须遵守的四条（都是本仓已付过代价的）
+
+1. **新增开关一律走图层注册表**（`LayerRegistry.setDesired` + `apply()`），不要直接调模块 setter。
+   本仓已修过 4 起"绕过注册表 → 被 `apply()` 改回去 → **静默失效**"的缺陷。
+2. **不要只断言 `desired`**。`consistency_selftest.py` 的判据是"意图翻转后**场景/面板**跟着变"。
+   只断言意图，会漏掉"意图对了、场景没变"这一整类。
+3. **自检里的假失败与假通过都要当 bug 修**。本仓记录过：假失败会让人去修没坏的东西；
+   假通过（空过）更隐蔽。**全绿的报告里少了一条断言，比一条断言失败更难发现。**
+4. **生成/改写代码的脚本：先 `ast.parse` 校验、再写盘**，且校验要在**同一份即将写出的内容**上做；
+   部署后还要用**独立手段**确认服务上确实是新内容（例如 `curl` 数元素个数、比文件大小）。
+
+## 12. 逐步执行清单（与第 8 节顺序一致）
+
+每一步都是**原子任务**，做完即跑对应自检、独立提交。
+
+### 步骤 A — 方向 4（港口/机场标注），风险最低，先做
+
+- [ ] A1 读 `engine/scenario.py` 的 `_HOTSPOT_BOXES` 与 `INDIA_CHINA_HOTSPOT_BOXES`，确认 `_hotspot()` 构造签名（`name, bbox[w,s,e,n], note, kind`）
+- [ ] A2 按坐标核实并增补港口条目（`kind="port"`）与机场条目（`kind="airport"`）；**bbox 必须落在既有战区内**，否则同时要补离线瓦片（属另立工作项）
+- [ ] A3 前端：找到热点渲染点（`app.js` 的 `createHotspots` 一族），按 `kind` 分支出"带文字锚点"；此时才需要决定是否新增 `layerFacilities` 图层行
+- [ ] A4 重建两个案例数据集
+- [ ] A5 验收：数据集断言 `port`/`airport` 条数；前端断言标注图元数**精确等于**数据条数；`deeplink_selftest` 两条 `?case=` 仍 `pageErrors` 为空
+
+### 步骤 B — 方向 1（轨迹窗口 / 选中轨迹 / 掩码）
+
+- [ ] B1 定位 `app.js` 的 `syncEntities` 轨迹段（判据：`state.layers.tracks` 与 `rec.lastTick`）与 `rec.trail` 追加逻辑
+- [ ] B2 引入显示窗口（默认 `TRAIL_WINDOW_TICKS = 120`）；**保留全量 `trail`**，渲染时切片，避免破坏"清空后从第 0 帧重建"的回退逻辑
+- [ ] B3 选中态：历史实线（全量）+ 预测虚线（两条独立 polyline）
+- [ ] B4 掩码：新增图层行 + 带洞多边形图元（外环全图、内环挖空选中目标与轨迹范围）
+- [ ] B5 给掩码加**外部可读的 debug 出口**（照 `web/src/overview.js` 的 `footprintDebug()` 样子），否则"画得对不对"只能靠肉眼
+- [ ] B6 验收：`plot_selftest` 加 4 条断言（窗口顶点数上界、选中后出现第二条虚线、掩码 `show` 跟随选中、新图层纳入 `consistency_selftest`）
+
+### 步骤 C — 方向 3（长机/僚机 + 活动状态 + 关系线）
+
+- [ ] C1 用 `Target.attributes`（**已存在的 `Dict[str, str]`**）承载 `formation_id` / `pair_role` / `paired_with`；**不动契约**
+- [ ] C2 为空中目标补属性。已核实空中目标 12 个（红 7 / 蓝 5），**够编成对，默认不新增单位**；只补属性、不动航路与速度
+- [ ] C3 活动状态：默认取 `engine/data/intent_ontology_v2.json` 的 6 个父类，来源 `inference_frames`；`unit_phase` 并列显示
+- [ ] C4 关系线渲染 + 线中部文本（复用 `plotting.js` 的 `refreshScreenSpaceDecorations`）
+- [ ] C5 验收：`wingman → paired_with` 指向存在的同阵营 `lead`；关系线条数**精确断言**；活动状态 code **全部 ∈ 本体 code ∪ status layer**；纳入 `consistency_selftest`
+
+### 步骤 D — 方向 2（占领区域动态化），放最后（唯一要新增帧字段的）
+
+- [ ] D1 `engine/scenario.py` 帧构造里新增归属表（**挂进既有 `frames[i]`**，与 `unit_phase` 同类，只存 `区域id → 归属` 的紧凑映射，不存几何）
+- [ ] D2 归属判据按 `OCCUPATION_RULE` 默认（热点 bbox 内双方数量或 `influence_km` 加权，比例阈值 1.5，无目标 `neutral`）
+- [ ] D3 前端主视图面图元 + `overview.js` 小地图掩码图元（第二个 entity，复用 `footprint` 的更新节拍）
+- [ ] D4 新增图层行（建议 `situation.occupation`，`group:'TS图层'`）
+- [ ] D5 小地图掩码同样要给 debug 出口
+- [ ] D6 验收：**把标绘全部清空后占领区域仍随推演变化**（这是"解耦"的可判定形式）；同一 tick 归属可复现；相邻 tick 无"无依据跳变"
+
+### 收尾
+
+- [ ] E1 四条都合入后，跑一次**全量回归**：前端五套 + 引擎三套
+- [ ] E2 同步更新 `tools/deeplink_selftest.py` 里 `layers=27` 之类的**硬编码图层数**断言（新增图层行会命中它，不改就是假失败）
+- [ ] E3 更新 `tools/consistency_selftest.py` 的覆盖清单（新增图层要进 `SPECS`）
