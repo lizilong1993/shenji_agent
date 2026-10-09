@@ -34,6 +34,9 @@ Checks:
    labels that are perpendicular to the line and equidistant from the break.
 5. `arrayPieces` -- the three decoration kinds produce marks of the right arity.
 6. Catalogue sweep -- every entry produces finite geometry via `ringsFor`.
+7. Theatre facilities -- hotspot port/airport counts for the case under test
+   (`EXPECT_FACILITIES`); `facilityDebug()` is preferred, `SituationHost.state`
+   is the fallback.
 
 Exits non-zero with a readable message on the first failing group.
 """
@@ -486,7 +489,90 @@ PROBE = r"""
 """
 
 
-def probe(url: str) -> dict:
+# Second payload, for the theatre-filtering checks: counts the port/airport
+# hotspots the page built for the current case. `SituationHost.facilityDebug()`
+# is the contract (`app.js`); when the hook is missing the counts are derived
+# from `SituationHost.state` instead and `has_debug` says which path ran, so
+# losing the hook cannot make this check pass on zero entities.
+PROBE_FACILITY = r"""
+(async function () {
+  var t0 = Date.now();
+  while (Date.now() - t0 < 40000 && !(window.SituationHost &&
+         SituationHost.state.data && SituationHost.state.data.case_id)) {
+    await new Promise(function (r) { setTimeout(r, 500); });
+  }
+  await new Promise(function (r) { setTimeout(r, 3000); });
+  var H = window.SituationHost;
+  if (!H) return { error: 'window.SituationHost missing' };
+  var S = H.state || {}, hs = (S.data && S.data.hotspots) || [];
+  var list = Array.isArray(hs) ? hs : Object.keys(hs).map(function (k) { return hs[k]; });
+  list = list.reduce(function (a, x) { return a.concat(Array.isArray(x) ? x : [x]); }, []);
+  var fd = (typeof H.facilityDebug === 'function') ? H.facilityDebug() : null;
+  if (fd && typeof fd.then === 'function') fd = await fd;
+  // `facilityDebug()` reports {data:{kind:count}, anchors:{...}, labels:{...}}.
+  function kindN(kind) {
+    var d = (fd && fd.data) || {};
+    var v = d[kind];
+    if (typeof v === 'number') return v;
+    if (v && typeof v.length === 'number') return v.length;
+    return null;
+  }
+  function sum(x) {
+    if (typeof x === 'number') return x;
+    if (!x) return null;
+    var ks = Object.keys(x), t = 0, i;
+    for (i = 0; i < ks.length; i++) t += (typeof x[ks[i]] === 'number' ? x[ks[i]] : 1);
+    return t;
+  }
+  function kindOf(x) { return '' + ((x && (x.kind || x.type)) || '') + ' ' + ((x && (x.name || x.label)) || ''); }
+  var scan = { port: 0, airport: 0 };
+  list.forEach(function (x) {
+    var s = kindOf(x).toLowerCase();
+    if (s.indexOf('airport') >= 0 || s.indexOf('\u673a\u573a') >= 0) scan.airport += 1;
+    else if (s.indexOf('port') >= 0 || s.indexOf('\u6e2f') >= 0) scan.port += 1;
+  });
+  var he = S.hotspotEntities;
+  var he_n = he ? (he.length === undefined ? Object.keys(he).length : he.length) : null;
+  function or(v, fb) { return typeof v === 'number' ? v : fb; }
+  return {
+    case_id: S.data && S.data.case_id,
+    has_debug: !!fd,
+    port: or(kindN('port'), scan.port),
+    airport: or(kindN('airport'), scan.airport),
+    port_fd: kindN('port'),
+    airport_fd: kindN('airport'),
+    port_scan: scan.port,
+    airport_scan: scan.airport,
+    data: or(sum(fd && fd.data), list.length),
+    anchors: or(sum(fd && fd.anchors), he_n),
+    labels: sum(fd && fd.labels),
+    data_kinds: (fd && fd.data) ? JSON.stringify(fd.data) : null,
+    anchor_kinds: (fd && fd.anchors) ? JSON.stringify(fd.anchors) : null,
+    facility_bboxes: list.filter(function (x) { return x && (x.kind === 'port' || x.kind === 'airport'); })
+        .map(function (x) { return { kind: x.kind, name: x.name, bbox: x.bbox }; }),
+    label_kinds: (fd && fd.labels) ? JSON.stringify(fd.labels) : null
+  };
+})()
+"""
+
+HANEDA_NAME = "\u65e5\u672c \u7fbd\u7530\u673a\u573a"
+
+# Expected hotspot counts per case: (port min, port max, airport min, theatre
+# bbox west/south/east/north from `engine/scenario.py`); port max
+# None means no upper bound. Mirrors the theatre bbox filter in
+# `engine/scenario.py` (`THEATRE_BBOXES`): taiwan_strait keeps its ports,
+# india_china drops every port but keeps its airports. The last tuple element
+# lists names declared exempt from the box: only the Haneda airport, whose entry
+# at `engine/scenario.py:102-103` says it sits outside the theatre bbox and gets
+# its own imagery/elevation download. The list is self-checked in both
+# directions, so it cannot silently become a no-op.
+EXPECT_FACILITIES = {
+    "taiwan_landing": (4, None, 3, (115.5, 20.0, 122.5, 26.5), (HANEDA_NAME,)),
+    "india_china_west": (0, 0, 3, (77.0, 31.5, 81.5, 36.5), ()),
+}
+
+
+def probe(url: str, js: str = PROBE) -> dict:
     """Drive the headless browser and return the measurement dict."""
     with tempfile.TemporaryDirectory() as tmp:
         out = os.path.join(tmp, "probe.json")
@@ -494,7 +580,7 @@ def probe(url: str) -> dict:
         # --eval-file. Passing argv as a list avoids the shell entirely, which is what
         # makes a multi-line JS payload safe here: there is no quoting layer to escape.
         cmd = [sys.executable, INSPECT, "--url", url, "--out", out,
-               "--wait-ms", "20000", "--eval-async", "--eval", PROBE]
+               "--wait-ms", "20000", "--eval-async", "--eval", js]
         try:
             subprocess.run(cmd, cwd=ROOT, check=True,
                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -717,6 +803,66 @@ def main() -> int:
           "tiny=%r long=%r fill=%r" % (wt.get("leaked"), wl.get("leaked"), fl.get("leaked")))
     check("FIX-5: marks no longer created as one entity each",
           (wl.get("entities") or 0) <= 2, "entities=%r marks=%r" % (wl.get("entities"), wl.get("marks")))
+    # 7. Theatre filtering: how many port/airport hotspots the case produced.
+    print()
+    print("7. theatre facilities -- hotspot port/airport counts")
+    raw_fac = probe(args.url, PROBE_FACILITY)
+    if raw_fac.get("evalError"):
+        print("probe error: %s" % raw_fac["evalError"])
+        return 1
+    fac = raw_fac.get("eval") or {}
+    if fac.get("error"):
+        print("probe returned: %s" % fac["error"])
+        return 1
+    print("  facility raw: %s" % json.dumps(fac, sort_keys=True))
+    expect = EXPECT_FACILITIES.get(fac.get("case_id"))
+    if expect is None:
+        print("  no expectation for case %r -- numbers above are informational"
+              % (fac.get("case_id"),))
+    else:
+        pmin, pmax, amin, tbox, exempt = expect
+        port, airport = fac.get("port"), fac.get("airport")
+        span = "%d" % pmin if pmax is None else "%d..%d" % (pmin, pmax)
+        check("port count in %s" % span,
+              isinstance(port, int) and port >= pmin and (pmax is None or port <= pmax),
+              "port=%r" % (port,))
+        check("airport count >= %d" % amin,
+              isinstance(airport, int) and airport >= amin,
+              "airport=%r" % (airport,))
+        ak = json.loads(fac.get("anchor_kinds") or "{}")
+        dk = json.loads(fac.get("data_kinds") or "{}")
+        for kind in ("port", "airport"):
+            check("anchors[%s] == data[%s]" % (kind, kind),
+                  ak.get(kind, 0) == dk.get(kind, 0),
+                  "anchors=%r data=%r" % (ak.get(kind), dk.get(kind)))
+        extra = sorted(k for k in ak if k not in ("port", "airport"))
+        check("no anchors for non-facility kinds", not extra, "extra=%s" % (extra,))
+        # Facilities sit inside the theatre box; the only allowed exception is
+        # HANEDA_NAME (`engine/scenario.py:102-103`: outside the box, covered by
+        # its own imagery/elevation download). Checked in both directions - an
+        # exempt name that is inside the box, or never shows up, fails too, so the
+        # exemption cannot quietly turn this check into a no-op.
+        bad, seen = [], set()
+        for it in fac.get("facility_bboxes") or []:
+            b = it.get("bbox")
+            name = it.get("name")
+            if not isinstance(b, list) or len(b) != 4:
+                bad.append("%s %s bbox=%r" % (it.get("kind"), name, b))
+                continue
+            if (tbox[0] <= b[0] and b[1] >= tbox[1]
+                    and b[2] <= tbox[2] and b[3] <= tbox[3]):
+                if name in exempt:
+                    bad.append("exempt but inside: %s %r" % (name, b))
+            elif name in exempt:
+                seen.add(name)
+            else:
+                bad.append("outside theatre: %s %s %r" % (it.get("kind"), name, b))
+        missing = sorted(set(exempt) - seen)
+        if missing:
+            bad.append("exempt never out of bounds: %s" % (missing,))
+        print("  exempt=%s out_of_box_seen=%s missing=%s"
+              % (sorted(exempt), sorted(seen), missing))
+        check("facility bboxes inside theatre box (or exempt)", not bad, "; ".join(bad[:3]))
 
     print()
     if FAILURES:

@@ -1339,12 +1339,37 @@ function createRouteEntities() {
  * 所以"框"的立体感主要来自侧面与顶面，而不是加粗的棱线。
  */
 const HOTSPOT_HEIGHT_M = 25000;
+// 方向 4：热点按 kind 区分呈现。port / airport 是「设施」——加一个锚点图元，并把文字收进
+// 显式层级门槛（默认取 places.js LOD 的 rank-5 档 700 km：相机高于门槛时只留锚点、不显示文字）；
+// 其余 kind 保持既有矩形棱柱 + 名称不变。符号集里没有港口/机场图标，先用颜色区分，不引入新资源。
+const FACILITY_KINDS = {
+  port: Cesium.Color.fromCssColorString('#1f6feb'),
+  airport: Cesium.Color.fromCssColorString('#7b3fa0'),
+};
+const FACILITY_TEXT_MAX_HEIGHT_M = 700000;
+
+// 方向 4 取证出口：数据集条数 vs 真建出的锚点/文字，供自检断言「图元数 == 数据条数」。
+function hotspotFacilities() {
+  var out = { data: {}, anchors: {}, labels: {} };
+  var list = (state.data && state.data.hotspots) || [];
+  list.forEach(function (hs, i) {
+    var kind = hs.kind || 'other';
+    out.data[kind] = (out.data[kind] || 0) + 1;
+    var e = state.hotspotEntities[i];
+    if (e && e.point) out.anchors[kind] = (out.anchors[kind] || 0) + 1;
+    if (e && e.label && e.label.show) out.labels[kind] = (out.labels[kind] || 0) + 1;
+  });
+  return out;
+}
+
 
 function createHotspots() {
   state.data.hotspots.forEach(function (hs, i) {
     const w = hs.bbox[0], s = hs.bbox[1], e = hs.bbox[2], n = hs.bbox[3];
     const centerLat = hs.center[0], centerLon = hs.center[1];
     const boxH = Number.isFinite(hs.height_m) ? hs.height_m : HOTSPOT_HEIGHT_M;
+    const facility = FACILITY_KINDS[hs.kind] || null;
+    const tint = facility || Cesium.Color.fromCssColorString('#f0a020');
 
     // 热点区域按真实经纬范围绘制成矩形棱柱，而不是一个点 —— 面板展示的是"范围"，
     // 一个点无法表示一条海峡或一个群岛。
@@ -1353,9 +1378,9 @@ function createHotspots() {
       name: hs.name,
       rectangle: {
         coordinates: Cesium.Rectangle.fromDegrees(w, s, e, n),
-        material: Cesium.Color.fromCssColorString('#f0a020').withAlpha(0.10),
+        material: tint.withAlpha(0.10),
         outline: true,
-        outlineColor: Cesium.Color.fromCssColorString('#f0a020').withAlpha(0.85),
+        outlineColor: tint.withAlpha(0.85),
         outlineWidth: 1,
         // 底在椭球面、顶在 boxH：得到一个立起来的框，而不是贴地的一张纸。
         height: 0,
@@ -1363,6 +1388,14 @@ function createHotspots() {
       },
       // 标签放到框顶：区域范围一高，标签留在底部会与侧面重叠、看起来像在框里。
       position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, boxH),
+      // 方向 4：设施类热点补一个锚点图元（符号集暂无港口/机场图标）。
+      point: facility ? {
+        pixelSize: 9,
+        color: facility,
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 1.5,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      } : undefined,
       label: {
         text: hs.name,
         font: '13px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
@@ -1375,6 +1408,7 @@ function createHotspots() {
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     });
+    entity.hsKind = facility ? hs.kind : null;
     state.hotspotEntities.push(entity);
   });
 }
@@ -1430,10 +1464,12 @@ function syncEntities() {
     var key = id.indexOf('route-') === 0 ? id.slice(6) : null;
     e.show = !!state.layers.routes && !(key && state.hiddenRoutes[key]);
   });
+  const camHeightM = viewer.camera.positionCartographic.height;
   state.hotspotEntities.forEach(function (e) {
     var id = typeof e.id === 'string' ? e.id : '';
     var key = id.indexOf('hotspot-') === 0 ? id.slice(8) : null;
     e.show = !!state.layers.hotspots && !(key && state.hiddenHotspots[key]);
+      if (e.hsKind && e.label) e.label.show = e.show && camHeightM <= FACILITY_TEXT_MAX_HEIGHT_M;
   });
 }
 
@@ -3276,7 +3312,8 @@ window.SituationHost = {
   // 热点层选框结果：declared=案例声明的热点数，boxes=manifest 里的框数，
   // matched=按坐标匹配上的数量，fallback=true 表示没匹配上而全挂（战区未烘制时如此）。
   // 没有这个读数时，"热点层挂错战区"与"该战区还没烘制"看起来完全一样。
-  hotspotMatch: function () { return state.hotspotMatch || null; },
+  facilityDebug: hotspotFacilities,
+    hotspotMatch: function () { return state.hotspotMatch || null; },
   // 意图链路取证：本体是否加载、当前帧每目标的意图集合与状态、判不出的原因。
   debugIntent: debugIntent,
   applyLayers: applyLayers,
