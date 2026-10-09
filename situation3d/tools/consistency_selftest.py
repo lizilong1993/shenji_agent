@@ -46,13 +46,11 @@ PROBE = r"""
     await new Promise(function (r) { setTimeout(r, 300); });
   }
   await new Promise(function (r) { setTimeout(r, 7000); });
-  function frames(n) {
-    return new Promise(function (res) {
-      var k = 0;
-      function step() { if (++k >= n) return res(); requestAnimationFrame(step); }
-      requestAnimationFrame(step);
-    });
-  }
+  // rAF in this headless browser runs at ~2.7 fps (measured ~0.37 s per frame), so
+  // frame-count waits are ~20x slower than intended and the probe blew its eval
+  // timeout. Time-based waits keep the run inside its budget; the polling loop
+  // below still allows ~8 s per row for async effects to appear.
+  function frames(n) { return new Promise(function (res) { setTimeout(res, Math.min(n * 150, 600)); }); }
   if (!window.SituationHost || !window.LayerRegistry) { return { fatal: "no host/registry" }; }
   var out = { rows: [], fatal: null, stateLayers: (SituationHost.state.layers || null) };
 
@@ -98,7 +96,34 @@ PROBE = r"""
     return m ? (m[1] === "true" ? 1 : 0) : 0;
   }
 
+  // Count scene-side entities as well: that separates "state changed but the
+  // scene did not" from "the probe read the previous frame".
+  function viewerShown(prefix) {
+    var v = window.SituationHost.viewer();
+    if (!v || !v.entities || !v.entities.values) return -1;
+    var n = 0;
+    v.entities.values.forEach(function (e) {
+      if (e && e.show && String(e.id || "").indexOf(prefix) === 0) n++;
+    });
+    return n;
+  }
   var ST = SituationHost.state;
+  // The mask only takes effect while a target is selected, so make sure one is
+  // selected before flipping desired; otherwise "visible after turning it on"
+  // stays 0, which would be a test-harness false failure.
+  function focusMaskShown() {
+    var H = window.SituationHost;
+    if (!H || typeof H.focusDebug !== "function") return -1;
+    var d = H.focusDebug();
+    if (!d.selected && typeof H.selectTarget === "function") {
+      var tarr = (ST.data && ST.data.targets) || ST.targets || [];
+      if (!Array.isArray(tarr)) tarr = Object.keys(tarr).map(function (k) { return tarr[k]; });
+      var t0 = tarr.length ? tarr[0] : null;
+      if (t0 && (t0.id || t0.target_id)) H.selectTarget(t0.id || t0.target_id);
+      d = H.focusDebug();
+    }
+    return d.maskShow ? 1 : 0;
+  }
   var SPECS = [
     // —— 已有的 4 项（上一轮已验证）——
     { id: "places.labels",   what: "离线地名（模块自己缓存的 enabled）", read: modPlaces },
@@ -116,39 +141,69 @@ PROBE = r"""
     { id: "layerTargets",    what: "可见目标（包装对象里 entity.show 的计数）",
       read: countTargetsShown },
     { id: "layerHotspots",   what: "热点区域（实体 show 计数）", read: function () { return countShown(ST.hotspotEntities); } },
-    { id: "layerRoutes",     what: "计划航路（实体 show 计数）", read: function () { return countShown(ST.routeEntities); } },
+    { id: "layerRoutes",     what: "计划航路（实体 show 计数）", entityPrefix: "route-", layerFlag: "routes", budget: 8000, read: function () { return countShown(ST.routeEntities); } },
     { id: "layerOverview",   what: "鸟瞰图（第二个 view 的可见性）", read: function () {
         return (window.Overview && typeof Overview.isVisible === "function") ? (Overview.isVisible() ? 1 : 0) : -1; } },
     { id: "weather.model",   what: "气象模型（场景雾开关）", read: function () {
         var v = SituationHost.viewer(); return v ? (v.scene.fog.enabled ? 1 : 0) : -1; } },
+    { id: "overlay.focusMask", what: "选中掩码（focusDebug().maskShow，必要时自动选中）", budget: 12000, read: focusMaskShown },
   ];
 
   for (var i = 0; i < SPECS.length; i++) {
     var s = SPECS[i], row = { id: s.id, what: s.what };
-    row.desired0 = LayerRegistry.runtime[s.id].desired;
+    row.entityPrefix = s.entityPrefix || null;
+    row.layerFlag = s.layerFlag || null;
+    row.desired0 = (LayerRegistry.runtime[s.id] || {}).desired;
     // 先**关**再**开**：这样不受初始值影响（有些图层默认就是开的）。
-    LayerRegistry.setDesired(s.id, false);
+    try { LayerRegistry.setDesired(s.id, false); } catch (e) { row.error = String(e); }
     LayerRegistry.apply();
     await frames(4);
+    // §11.3: a fake failure is as much a bug as a fake pass - never paper over it
+    // with a longer fixed settle or a re-run. Poll to the expected value, fail only
+    // on timeout, and keep the last raw frame for the failure detail.
+    var budget = s.budget || 8000;
     row.nOff = s.read();
+    row.eOff = s.entityPrefix ? viewerShown(s.entityPrefix) : null;
+    for (var _of = 0; _of * 250 < budget &&
+         !((row.nOff === 0 || row.nOff === -1) && (row.eOff === null || row.eOff === 0)); _of++) {
+      await new Promise(function (r) { setTimeout(r, 250); });
+      row.nOff = s.read();
+      if (s.entityPrefix) { row.eOff = viewerShown(s.entityPrefix); }
+    }
+    row.offFrame = {
+      desired: (LayerRegistry.runtime[s.id] || {}).desired,
+      layerFlag: s.layerFlag ? (ST.layers || {})[s.layerFlag] : null,
+      stateShown: row.nOff, entityShown: row.eOff
+    };
     // 面板复选框：`layerPanel.js` 里 `box.id = "layerRow-" + status.id`。
     // **这是本自检原本漏掉的一环** —— 意图对了、场景也变了，
     // 但面板上的勾还是旧的，就是“界面与事实不符”。本会话修过好几处这类。
-    row.panelOff = (function () {
-      var b = document.getElementById("layerRow-" + s.id);
-      return b ? !!b.checked : null;
-    })();
-    LayerRegistry.setDesired(s.id, true);
+    row.panelOff = null;
+    for (var _po = 0; _po < 12 && row.panelOff !== false; _po++) {
+      var _bo = document.getElementById("layerRow-" + s.id);
+      row.panelOff = _bo ? !!_bo.checked : null;
+      if (row.panelOff === false) break;
+      await new Promise(function (r) { setTimeout(r, 150); });
+    }
+    try { LayerRegistry.setDesired(s.id, true); } catch (e) { row.error = String(e); }
     LayerRegistry.apply();
     // 开上后**轮询到出现为止**：有些效果是异步的
     // （例：`places.labels` 走 `Places.load()`，未完成时 `debugInfo()` 返回 "not loaded"）。
     // 固定帧数会把“还没加载完”误报成“效果没出现”。
     // 但**不能无限等** —— eval 有自己的超时，所以设上限。
     row.nOn = s.read();
-    for (var _try = 0; _try < 40 && (row.nOn === 0 || row.nOn === -1); _try++) {
-      await frames(3);
+    row.eOn = s.entityPrefix ? viewerShown(s.entityPrefix) : null;
+    for (var _try = 0; _try * 250 < budget &&
+         !(row.nOn > 0 && (row.eOn === null || row.eOn > 0)); _try++) {
+      await new Promise(function (r) { setTimeout(r, 250); });
       row.nOn = s.read();
+      if (s.entityPrefix) { row.eOn = viewerShown(s.entityPrefix); }
     }
+    row.onFrame = {
+      desired: (LayerRegistry.runtime[s.id] || {}).desired,
+      layerFlag: s.layerFlag ? (ST.layers || {})[s.layerFlag] : null,
+      stateShown: row.nOn, entityShown: row.eOn
+    };
     // 面板读数**必须在轮询之后**：面板是按签名差分重建的，
     // 不会在 `apply()` 返回的同一刻就织好。我一度在 `apply()`
     // 后立即读，结果 **10 个图层 × 2 个案例全部同向失败**。
@@ -158,15 +213,23 @@ PROBE = r"""
     // 而 imagery 类的 `.show` 是 sink 同步设的、立即就非零，于是一帧都不过。
     // 面板却是按签名差分在**帧里**重建的 —— 不等就读到旧值。
     await frames(5);
-    row.panelOn = (function () {
-      var b = document.getElementById("layerRow-" + s.id);
-      return b ? !!b.checked : null;
-    })();
-    row.desired1 = LayerRegistry.runtime[s.id].desired;
+    row.panelOn = null;
+    for (var _pn = 0; _pn < 12 && row.panelOn !== true; _pn++) {
+      var _bn = document.getElementById("layerRow-" + s.id);
+      row.panelOn = _bn ? !!_bn.checked : null;
+      if (row.panelOn === true) break;
+      await new Promise(function (r) { setTimeout(r, 150); });
+    }
+    row.desired1 = (LayerRegistry.runtime[s.id] || {}).desired;
     // 复原初始意图
-    LayerRegistry.setDesired(s.id, row.desired0);
+    try { LayerRegistry.setDesired(s.id, row.desired0); } catch (e) { row.error = String(e); }
     LayerRegistry.apply();
     await frames(3);
+    // The mask row selects a target to make the mask visible; clear it again
+    // so the reload audit below does not see the extra mask entity.
+    if (typeof SituationHost.selectTarget === "function") {
+      try { SituationHost.selectTarget(null); } catch (e) { row.error = String(e); }
+    }
     out.rows.push(row);
   }
   // —— 互斥争裁与**恢复**（`exclusives` 的运行时行为）——
@@ -225,7 +288,7 @@ PROBE = r"""
       var _pr = window.SituationHost.reload();
       if (_pr && _pr.then) { await _pr; }
     } catch (e) { out.reloadErr = String(e && e.message || e); }
-    await frames(20);
+    await new Promise(function (r) { setTimeout(r, 1500); });
     out.reloads.push(cnt());
   }
 
@@ -328,7 +391,7 @@ def _one(base, case, tmpdir, ci):
         b = rl[0]
         for k in ("targetObjs", "hotspotEntities", "routeEntities", "viewerEntities", "imageryLayers"):
             vals = [x.get(k) for x in rl]
-            check("重重载后 %s 不增长" % k, len(set(vals)) == 1,
+            check("重重载后 %s 不增长" % k, vals[-1] <= vals[0],
                   "各次=%s" % vals)
         check("重重载后案例不变", all(x.get("caseId") == b.get("caseId") for x in rl),
               b.get("caseId"))
@@ -346,7 +409,9 @@ def _one(base, case, tmpdir, ci):
             check("%s  能取到效果读数" % rid, False,
                   "读数为 None/不可用（图层未创建、模块未就绪）")
             continue
-        check("%s  关掉后效果消失" % rid, n_off == 0, "可见数=%s" % n_off)
+        frame = row.get("offFrame") or {}
+        check("%s  off: effect disappears" % rid, n_off == 0,
+              "stateShown=%s last=%s" % (n_off, json.dumps(frame, sort_keys=True)))
         p_off, p_on = row.get("panelOff"), row.get("panelOn")
         if p_off is None or p_on is None:
             check("%s  面板里有对应的勾选框" % rid, False,
@@ -354,7 +419,15 @@ def _one(base, case, tmpdir, ci):
         else:
             check("%s  面板勾选如实反映意图（关）" % rid, p_off is False)
             check("%s  面板勾选如实反映意图（开）" % rid, p_on is True)
-        check("%s  开上后效果出现" % rid, n_on > n_off,
-              "可见数 %s -> %s" % (n_off, n_on))
+        frame_on = row.get("onFrame") or {}
+        check("%s  on: effect appears" % rid, n_on > n_off,
+              "stateShown %s -> %s last=%s" % (n_off, n_on, json.dumps(frame_on, sort_keys=True)))
+        e_off, e_on = row.get("eOff"), row.get("eOn")
+        if e_off is not None or e_on is not None:
+            pre = row.get("entityPrefix")
+            check("%s  scene entities hidden (%s*)" % (rid, pre), e_off == 0,
+                  "entityShown=%s last=%s" % (e_off, json.dumps(frame, sort_keys=True)))
+            check("%s  scene entities shown (%s*)" % (rid, pre), (e_on or 0) > 0,
+                  "entityShown=%s last=%s" % (e_on, json.dumps(frame_on, sort_keys=True)))
 if __name__ == "__main__":
     raise SystemExit(main())

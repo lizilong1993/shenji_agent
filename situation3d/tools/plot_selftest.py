@@ -572,6 +572,107 @@ EXPECT_FACILITIES = {
 }
 
 
+
+# Third payload: the trajectory window / predicted leg / focus mask contract that
+# `app.js` exposes through `SituationHost.focusDebug()` and drives through
+# `SituationHost.selectTarget()`. Every number below is read from the page, and
+# the selection is toggled in-place, so "the thing really happened" is what the
+# assertions in section 8 compare.
+PROBE_FOCUS = r"""
+(async function () {
+  var t0 = Date.now();
+  while (Date.now() - t0 < 40000 && !(window.SituationHost &&
+         SituationHost.state.data && SituationHost.state.data.case_id)) {
+    await new Promise(function (r) { setTimeout(r, 500); });
+  }
+  await new Promise(function (r) { setTimeout(r, 3000); });
+  var H = window.SituationHost;
+  if (!H) return { error: 'window.SituationHost missing' };
+  if (typeof H.focusDebug !== 'function') return { error: 'focusDebug missing' };
+  function frames(n) {
+    return new Promise(function (res) {
+      var i = 0;
+      (function step() { if (++i >= n) return res(); requestAnimationFrame(step); })();
+    });
+  }
+  function layer(id, on) {
+    try { LayerRegistry.setDesired(id, on); LayerRegistry.apply(); return true; }
+    catch (e) { return false; }
+  }
+  var S = H.state, o = { mask_layer_ok: false, tracks_on: false };
+  function snap(tag, d) {
+    o[tag] = {
+      trailWindowTicks: d.trailWindowTicks, predictMode: d.predictMode, selected: d.selected,
+      maxTrailVertices: d.maxTrailVertices, trailVertexSum: d.trailVertexSum,
+      trailFull: d.trailFull, trailDrawn: d.trailDrawn, tick: d.tick,
+      predictedPolylines: d.predictedPolylines, predictedPoints: d.predictedPoints,
+      historySolid: d.historySolid, maskExists: d.maskExists, maskShow: d.maskShow
+    };
+  }
+  // `selectTarget()` and the mask land on the next sync / RenderGovernor apply, so
+  // a read taken right after the call still shows the previous frame. Poll until
+  // the state is stable and record how long it took; a timeout keeps the last raw
+  // frame so the failure can be diagnosed instead of guessed.
+  async function poll(cond, budget_ms) {
+    var t = Date.now(), n = 0, d = H.focusDebug();
+    while (Date.now() - t < budget_ms && !cond(d)) {
+      await new Promise(function (r) { setTimeout(r, 250); });
+      d = H.focusDebug();
+      n += 1;
+    }
+    return { d: d, n: n, ok: cond(d), ms: Date.now() - t };
+  }
+  var mask0 = (LayerRegistry.runtime['overlay.focusMask'] || {}).desired;
+  o.mask_desired0 = typeof mask0 === 'undefined' ? null : mask0;
+  o.tracks_on = layer('layerTracks', true);
+  if (typeof H.selectTarget === 'function') H.selectTarget(null);
+  // A windowed trail is only meaningful once the full trail is longer than the
+  // window: run the sim past tick 240, then pause so later reads are stable.
+  // A timeout is reported as advance_ok=false and fails the assertion - never
+  // silently skipped.
+  o.playing0 = !!S.playing;
+  var t_adv = Date.now();
+  S.playing = true;
+  while (Date.now() - t_adv < 30000 && !(S.tick > 240)) {
+    await new Promise(function (r) { setTimeout(r, 250); });
+  }
+  S.playing = false;
+  o.tick_at_read = S.tick;
+  o.advance_ok = S.tick > 240;
+  await frames(10);
+  snap('base', H.focusDebug());
+  o.mask_layer_ok = layer('overlay.focusMask', true);
+  await frames(6);
+  snap('mask_unselected', H.focusDebug());
+  var tarr = (S.data && S.data.targets) || S.targets || [];
+  if (!Array.isArray(tarr)) tarr = Object.keys(tarr).map(function (k) { return tarr[k]; });
+  var t0x = tarr.length ? tarr[0] : null;
+  o.targets_n = tarr.length;
+  o.target_id = t0x ? (t0x.id || t0x.target_id || null) : null;
+  if (o.target_id && typeof H.selectTarget === 'function') H.selectTarget(o.target_id);
+  var p1 = await poll(function (d) { return d.predictedPolylines === 1; }, 3000);
+  o.select_ok = p1.ok; o.select_polls = p1.n; o.select_ms = p1.ms;
+  var p2 = await poll(function (d) { return d.maskShow === true; }, 12000);
+  o.mask_ok = p2.ok; o.mask_polls = p2.n; o.mask_ms = p2.ms;
+  o.selected_last = { selected: p2.d.selected, predictedPolylines: p2.d.predictedPolylines,
+                      predictedPoints: p2.d.predictedPoints, historySolid: p2.d.historySolid,
+                      maskExists: p2.d.maskExists, maskShow: p2.d.maskShow,
+                      maxTrailVertices: p2.d.maxTrailVertices, trailFull: p2.d.trailFull,
+                      trailDrawn: p2.d.trailDrawn, trailVertexSum: p2.d.trailVertexSum,
+                      tick: p2.d.tick };
+  snap('selected', p2.d);
+  if (typeof H.selectTarget === 'function') H.selectTarget(null);
+  var p3 = await poll(function (d) { return d.maskShow === false; }, 12000);
+  o.mask_hide_ok = p3.ok; o.mask_hide_polls = p3.n; o.mask_hide_ms = p3.ms;
+  o.unselected_last = { selected: p3.d.selected, predictedPolylines: p3.d.predictedPolylines,
+                        maskShow: p3.d.maskShow, tick: p3.d.tick };
+  snap('unselected', p3.d);
+  if (o.mask_desired0 !== null) layer('overlay.focusMask', o.mask_desired0);
+  return o;
+})()
+"""
+
+
 def probe(url: str, js: str = PROBE) -> dict:
     """Drive the headless browser and return the measurement dict."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -864,6 +965,72 @@ def main() -> int:
               % (sorted(exempt), sorted(seen), missing))
         check("facility bboxes inside theatre box (or exempt)", not bad, "; ".join(bad[:3]))
 
+    # 8. trajectory window / predicted leg / focus mask.
+    print()
+    print("8. trajectory window, predicted leg, focus mask")
+    foc_raw = probe(args.url, PROBE_FOCUS)
+    if foc_raw.get("evalError"):
+        print("probe error: %s" % foc_raw["evalError"])
+        return 1
+    foc = foc_raw.get("eval") or {}
+    if foc.get("error"):
+        print("probe returned: %s" % foc["error"])
+        return 1
+    print("  focus raw: %s" % json.dumps(foc, sort_keys=True))
+    base = foc.get("base") or {}
+    sel = foc.get("selected") or {}
+    desel = foc.get("unselected") or {}
+    moff = foc.get("mask_unselected") or {}
+    win = base.get("trailWindowTicks")
+    check("sim ran past the window before reading (not a tick-0 sample)",
+          foc.get("advance_ok") is True, "tick=%r" % (foc.get("tick_at_read"),))
+    check("TRAIL_WINDOW_TICKS is 120", win == 120, "got %r" % (win,))
+    check("drawn trail is clamped to the window (max == window)",
+          isinstance(base.get("maxTrailVertices"), int) and base.get("maxTrailVertices") == win,
+          "max=%r window=%r full=%r drawn=%r sum=%r tick=%r" % (
+              base.get("maxTrailVertices"), win, base.get("trailFull"),
+              base.get("trailDrawn"), base.get("trailVertexSum"), base.get("tick")))
+    check("full trail is longer than the window (truncation is real)",
+          max(base.get("trailFull") or 0, sel.get("trailFull") or 0) > (win or 0),
+          "base_full=%r sel_full=%r window=%r" % (
+              base.get("trailFull"), sel.get("trailFull"), win))
+    check("windowed vertex sum fits targets * window",
+          isinstance(base.get("trailVertexSum"), int) and isinstance(foc.get("targets_n"), int)
+          and base["trailVertexSum"] <= foc["targets_n"] * (win or 0),
+          "sum=%r targets=%r window=%r" % (
+              base.get("trailVertexSum"), foc.get("targets_n"), win))
+    check("selection settles within the poll budget (predictedPolylines==1)",
+          foc.get("select_ok") is True,
+          "polls=%r ms=%r last=%s" % (foc.get("select_polls"), foc.get("select_ms"),
+                                      json.dumps(foc.get("selected_last"), sort_keys=True)))
+    check("selecting a target yields exactly one predicted polyline",
+          sel.get("predictedPolylines") == 1,
+          "selected=%r polylines=%r" % (sel.get("selected"), sel.get("predictedPolylines")))
+    check("history line stays solid while the predicted leg is separate",
+          sel.get("historySolid") is True, "historySolid=%r" % (sel.get("historySolid"),))
+    check("selected target shows its full trail (max == trailFull > window)",
+          isinstance(sel.get("trailFull"), int) and sel.get("trailFull") > (win or 0)
+          and sel.get("maxTrailVertices") == sel.get("trailFull"),
+          "max=%r full=%r drawn=%r window=%r" % (
+              sel.get("maxTrailVertices"), sel.get("trailFull"),
+              sel.get("trailDrawn"), win))
+    check("focus mask becomes visible while selected (polled, desired=true)",
+          foc.get("mask_ok") is True,
+          "polls=%r ms=%r last=%s" % (foc.get("mask_polls"), foc.get("mask_ms"),
+                                      json.dumps(foc.get("selected_last"), sort_keys=True)))
+    check("focus mask is visible while a target is selected",
+          sel.get("maskExists") is True and sel.get("maskShow") is True,
+          "maskExists=%r maskShow=%r" % (sel.get("maskExists"), sel.get("maskShow")))
+    check("deselecting removes the predicted polyline",
+          desel.get("predictedPolylines") == 0,
+          "selected=%r polylines=%r" % (desel.get("selected"), desel.get("predictedPolylines")))
+    check("focus mask hides after deselect (polled)",
+          foc.get("mask_hide_ok") is True,
+          "polls=%r ms=%r last=%s" % (foc.get("mask_hide_polls"), foc.get("mask_hide_ms"),
+                                      json.dumps(foc.get("unselected_last"), sort_keys=True)))
+    check("focus mask is hidden while nothing is selected",
+          moff.get("maskShow") is False and desel.get("maskShow") is False,
+          "unselected=%r deselect=%r" % (moff.get("maskShow"), desel.get("maskShow")))
     print()
     if FAILURES:
         print("FAILED (%d): %s" % (len(FAILURES), "; ".join(FAILURES)))

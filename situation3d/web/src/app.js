@@ -28,6 +28,20 @@
 const params = new URLSearchParams(window.location.search);
 
 const LEVEL_CLASS = { 1: 'lv1', 2: 'lv2', 3: 'lv3', 4: 'lv4' };
+// ---- B（方向 1）：轨迹显示窗口 / 选中预测线 / 选中掩码 -------------------------
+// TRAIL_WINDOW_TICKS：历史轨迹**全量保留**，只在渲染时切片。窗口只影响"看多少"，
+// 不影响"清空后从第 0 帧重建"的回退逻辑（回退靠 rec.lastTick，不靠窗口）。
+const TRAIL_WINDOW_TICKS = 120;
+// 预测线来源：默认取"计划航路剩余段"（标注为 计划/预计，不冒充观测）；
+// 'kinematic' 才是航向外推备选。
+const PREDICT_MODE = 'planned';
+// 航向外推的视野（备选，默认不走 PREDICT_MODE=planned；切换前未在远程验证过）。TICK_SECONDS = 30。
+const PREDICT_HORIZON_TICKS = 60;
+const TICK_SECONDS = 30;
+// 掩码内环的最小挖空半径（度）：目标刚起步、轨迹只有几帧时也看得见那个点。
+const FOCUS_MASK_PAD_DEG = 0.05;
+// 选中掩码的图元 id：左键拾取被它挡住时要能认出它（它不是可选对象）。
+const FOCUS_MASK_ID = 'overlay-focus-mask';
 
 const state = {
   // 动态图层管理的**单要素**状态。与图层开关、阵营/域过滤是三层，取与（见 isVisible）。
@@ -50,9 +64,11 @@ const state = {
   ticksPerSecond: 30,
   targets: {},              // id -> { def, entity, trail: [], lastTick, sensorEntity }
   layers: { targets: true, tracks: true, routes: true, hotspots: true, labels: true,
-            targetPanel: true, overview: true },
+            targetPanel: true, overview: true, focusMask: false },
   filters: { red: true, blue: true, sea: true, land: true, air: true },
   selected: null,
+  focusMaskEntity: null, // 选中掩码图元（懒建：没选中就先不建）
+  focusMaskHole: null,   // 掩码内环经纬边界（focusDebug 报出去用）
   hotspotEntities: [],
   hotspotRows: [],
   routeEntities: [],
@@ -1265,7 +1281,7 @@ function createTargetEntities() {
     entity.polyline = {
       positions: new Cesium.CallbackProperty(function () {
         const rec = state.targets[def.id];
-        return rec ? rec.trail : [];
+        return rec ? trailWindowOf(rec, def.id) : [];
       }, false),
       width: 2,
       material: color.withAlpha(0.85),
@@ -1292,9 +1308,44 @@ function createTargetEntities() {
       },
     });
 
+      // 选中态的预测虚线：与历史实线是**两条独立 polyline** —— 计划/外推永远不和观测
+      // 叠在同一条线上，否则"哪段是观测、哪段是计划"肉眼分不出来。
+      const predicted = viewer.entities.add({
+        id: 'predict-' + def.id,
+        show: false,
+        polyline: {
+          positions: new Cesium.CallbackProperty(function () {
+            return predictedPointsOf(def);
+          }, false),
+          width: 2,
+          material: new Cesium.PolylineDashMaterialProperty({
+            color: color.withAlpha(0.9),
+            dashLength: 12,
+          }),
+          clampToGround: false,
+        },
+        // 预测线末端标"计划/预计"：这是已声明的计划，不是观测，也不是"预测"。
+        position: new Cesium.CallbackProperty(function () {
+          const pts = predictedPointsOf(def);
+          return pts.length ? pts[pts.length - 1] : undefined;
+        }, false),
+        label: {
+          text: '计划/预计',
+          font: '12px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
+          fillColor: Cesium.Color.fromCssColorString('#dce9ff'),
+          outlineColor: Cesium.Color.fromCssColorString('#10233c'),
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          pixelOffset: new Cesium.Cartesian2(0, -14),
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString('rgba(18,38,64,0.72)'),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
     state.targets[def.id] = {
       def: def,
       entity: entity,
+      predicted: predicted,
       sensorEntity: sensorEntity,
       trail: [],
       lastTick: -1,
@@ -1455,7 +1506,11 @@ function syncEntities() {
 
     if (!state.layers.tracks) rec.trail.length = 0;
     rec.entity.polyline.show = visible && state.layers.tracks && rec.trail.length > 1;
+    // B3 预测虚线只跟选中目标走；与历史实线是两条独立图元。
+    setEntityShow(rec.predicted, visible && state.selected === id && state.layers.tracks);
   });
+  // 掩码遮的是"整图减去选中目标与轨迹"：选中、时间、图层任一变化都要重画。
+  updateFocusMask();
 
   // 图层开关 ∩ 该要素未被单独关掉。实体 id 里带着身份（`route-<目标id>` /
   // `hotspot-<序号>`），直接从中解析，不再另存一份映射 —— 另存一份就多一处会不同步。
@@ -1472,6 +1527,162 @@ function syncEntities() {
       if (e.hsKind && e.label) e.label.show = e.show && camHeightM <= FACILITY_TEXT_MAX_HEIGHT_M;
   });
 }
+/**
+ * 轨迹显示窗口：历史轨迹全量保留（回退到早期帧仍能重建），只在渲染时切片。
+ * 未选中 → 最近 TRAIL_WINDOW_TICKS 帧；选中 → 全量（选中态给的是"历史实线"）。
+ */
+function trailWindowOf(rec, id) {
+  const t = rec.trail;
+  if (state.selected === id || t.length <= TRAIL_WINDOW_TICKS) return t;
+  return t.slice(t.length - TRAIL_WINDOW_TICKS);
+}
+
+/**
+ * 计划航路剩余段：当前位置 → 最近的航路点及其后续点。
+ * 不碰引擎、不做运动学外推 —— 这条线永远是"已声明的计划"，所以只能标注为 计划/预计。
+ * waypoints 是 [lat, lon]（见 createRouteEntities 的 fromDegreesArrayHeights 调用）。
+ */
+function plannedRemainder(def) {
+  const s = positionFor(def.id, state.tick);
+  if (!s || !def.waypoints || def.waypoints.length < 2) return [];
+  let near = 0;
+  let best = Infinity;
+  for (let i = 0; i < def.waypoints.length; i++) {
+    const w = def.waypoints[i];
+    const d = (w[0] - s.lat) * (w[0] - s.lat) + (w[1] - s.lon) * (w[1] - s.lon);
+    if (d < best) { best = d; near = i; }
+  }
+  const alt = def.altitude_m || 0;
+  const out = [Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt)];
+  for (let j = near; j < def.waypoints.length; j++) {
+    const w = def.waypoints[j];
+    out.push(Cesium.Cartesian3.fromDegrees(w[1], w[0], alt));
+  }
+  return out;
+}
+
+/** 航向外推（PREDICT_MODE 为 'kinematic' 的备选）：heading + speed_kn 直线外推。 */
+function kinematicPrediction(def) {
+  const s = positionFor(def.id, state.tick);
+  if (!s || !(s.speed_kn > 0.01)) return [];
+  const dM = s.speed_kn * 1852 / 3600 * TICK_SECONDS * PREDICT_HORIZON_TICKS;
+  const rad = Cesium.Math.toRadians(s.heading || 0);
+  const dLat = dM * Math.cos(rad) / 110540;
+  const dLon = dM * Math.sin(rad) / (111320 * Math.cos(Cesium.Math.toRadians(s.lat)) || 1);
+  return [
+    Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt),
+    Cesium.Cartesian3.fromDegrees(s.lon + dLon, s.lat + dLat, s.alt),
+  ];
+}
+
+function predictedPointsOf(def) {
+  return PREDICT_MODE === 'kinematic' ? kinematicPrediction(def) : plannedRemainder(def);
+}
+
+/**
+ * 幂等开关：ntity.show = x 每次都会换一个新的属性对象，逐帧写会让地面分类图元
+ * 反复重建、实测整块掩码永远画不出来。只在状态真的变化时写一次。
+ */
+function setEntityShow(entity, on) {
+  const cur = entity.show;
+  const val = (cur && typeof cur.getValue === "function") ? cur.getValue() : cur;
+  if (!!val !== !!on) entity.show = !!on;
+}
+
+/**
+ * 选中掩码：外环全图、内环挖空「选中目标 + 它的轨迹显示窗口」。
+ * 图层关着、或没有选中目标 → 隐藏（没选中时掩码没有意义，也不留常驻整图图元）。
+ * ⚠ 世界级地面分类多边形在 headless 下要 ~10 s 才画出来（截图验收请给足 settle，别误判"没渲染"）。
+ */
+function updateFocusMask() {
+  const id = state.selected;
+  const rec = id ? state.targets[id] : null;
+  const s = rec ? positionFor(id, state.tick) : null;
+  if (!state.layers.focusMask || !s) {
+    if (state.focusMaskEntity) setEntityShow(state.focusMaskEntity, false);
+    state.focusMaskHole = null;
+    return;
+  }
+  let w = s.lon - FOCUS_MASK_PAD_DEG;
+  let e = s.lon + FOCUS_MASK_PAD_DEG;
+  let so = s.lat - FOCUS_MASK_PAD_DEG;
+  let n = s.lat + FOCUS_MASK_PAD_DEG;
+  const pts = trailWindowOf(rec, id);
+  for (let i = 0; i < pts.length; i++) {
+    const c = Cesium.Cartographic.fromCartesian(pts[i]);
+    if (!c) continue;
+    const lon = Cesium.Math.toDegrees(c.longitude);
+    const lat = Cesium.Math.toDegrees(c.latitude);
+    if (lon < w) w = lon;
+    if (lon > e) e = lon;
+    if (lat < so) so = lat;
+    if (lat > n) n = lat;
+  }
+  // 点集算完再统一外扩，四面留一样的边距；洞最小就是 FOCUS_MASK_PAD_DEG。
+  w -= FOCUS_MASK_PAD_DEG;
+  e += FOCUS_MASK_PAD_DEG;
+  so -= FOCUS_MASK_PAD_DEG;
+  n += FOCUS_MASK_PAD_DEG;
+  const outer = Cesium.Cartesian3.fromDegreesArray([-180, -90, 180, -90, 180, 90, -180, 90]);
+  const inner = Cesium.Cartesian3.fromDegreesArray([w, so, e, so, e, n, w, n]);
+  const hierarchy = new Cesium.PolygonHierarchy(outer, [new Cesium.PolygonHierarchy(inner)]);
+  const hole = state.focusMaskHole;
+  // 洞没动就不重建 hierarchy：地面分类图元每帧重建会导致整帧纹丝不动（实测）。
+  const moved = !hole || Math.abs(hole.w - w) > 1e-7 || Math.abs(hole.e - e) > 1e-7 ||
+    Math.abs(hole.s - so) > 1e-7 || Math.abs(hole.n - n) > 1e-7;
+  if (!state.focusMaskEntity) {
+    state.focusMaskEntity = viewer.entities.add({
+      id: FOCUS_MASK_ID,
+      name: '选中掩码',
+      show: false,
+      polygon: {
+        hierarchy: hierarchy,
+        material: Cesium.Color.fromCssColorString('#0b1a2a').withAlpha(0.45),
+        // 地面分类：普通 height=0 多边形与球面同深度，实测整帧亮度和不开掩码一样（没渲染出来）。
+        classificationType: Cesium.ClassificationType.BOTH,
+        outline: false,
+      },
+    });
+  } else if (moved) {
+    state.focusMaskEntity.polygon.hierarchy = hierarchy;
+  }
+  setEntityShow(state.focusMaskEntity, true);
+  state.focusMaskHole = { w: w, e: e, s: so, n: n };
+}
+
+/**
+ * 轨迹窗口 / 预测线 / 掩码的取证读数：外部（自检、验收）只认这些数字 ——
+ * 少了这个出口，"画得对不对"就只能靠肉眼，窗口与掩码是否生效也无从断言。
+ */
+function focusDebug() {
+  const id = state.selected;
+  const rec = id ? state.targets[id] : null;
+  let maxV = 0;
+  let sum = 0;
+  Object.keys(state.targets).forEach(function (tid) {
+    const n = trailWindowOf(state.targets[tid], tid).length;
+    if (n > maxV) maxV = n;
+    sum += n;
+  });
+  const mat = rec ? rec.entity.polyline.material : null;
+  return {
+    focusMask: !!state.layers.focusMask,
+    selected: id || null,
+    tick: state.tick,
+    predictMode: PREDICT_MODE,
+    trailWindowTicks: TRAIL_WINDOW_TICKS,
+    trailFull: rec ? rec.trail.length : 0,
+    trailDrawn: rec ? trailWindowOf(rec, id).length : 0,
+    maxTrailVertices: maxV,
+    trailVertexSum: sum,
+    historySolid: !!mat && !(mat instanceof Cesium.PolylineDashMaterialProperty),
+    predictedPolylines: rec && rec.predicted && rec.predicted.show ? 1 : 0,
+    predictedPoints: rec ? predictedPointsOf(rec.def).length : 0,
+    maskExists: !!state.focusMaskEntity,
+    maskShow: !!(state.focusMaskEntity && state.focusMaskEntity.show),
+    maskHole: state.focusMaskHole,
+  };
+}
 
 function syncSelection() {
   Object.keys(state.targets).forEach(function (id) {
@@ -1479,6 +1690,8 @@ function syncSelection() {
     rec.entity.billboard.image = Symbology.symbolUri(
       rec.def.icon, rec.def.affiliation, { selected: state.selected === id });
   });
+  // 选中/取消选中会改变掩码的洞：立即重画一次，不等下一帧。
+  updateFocusMask();
 }
 
 // --------------------------------------------------------------------------
@@ -3337,6 +3550,15 @@ window.SituationHost = {
   clearSituation: clearSituation,
   exportFrame: exportData,
   exportCsv: exportCsv,
+  // 选中入口（与点选/面板"定位"走**同一条路径**）：自检自动化要选中/取消选中时用它。
+  // 另抄一份状态改动就会漏掉 markScene 与掩码重算 —— 那正是本仓修过 4 起的老毛病。
+  selectTarget: function (id) {
+    selectTarget(id || null, false);
+    return state.selected;
+  },
+  // 轨迹窗口 / 预测线 / 掩码的取证读数：外部（自检、验收）只认这些数字，
+  // "画得对不对"不能靠肉眼。
+  focusDebug: focusDebug,
 };
 
 function exportData() {
@@ -3733,6 +3955,9 @@ function bindUI() {
     // 现在补进注册表并在这里接上原本 bindCheck 的回调体。
     ['terrain.model', function (v) { setTerrain(v); }],
     ['weather.model', function (v) { setWeather(v); }],
+  // B4 选中掩码：开关只改 state.layers.focusMask，重画交给 updateFocusMask()。
+  // 必须走注册表 + apply() 的 handler：绕过注册表直接调 setter，会被 apply() 改回去。
+  ['overlay.focusMask', function (v) { state.layers.focusMask = v; updateFocusMask(); }],
   ].forEach(function (pair) {
     var d = LayerRegistry.def(pair[0]);
     if (d) d.handler = function (id, want) { pair[1](want); };

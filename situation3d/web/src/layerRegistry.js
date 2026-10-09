@@ -211,6 +211,10 @@
       group: '目标图层', default: true },
     { id: 'layerTracks', kind: 'target', z: 30, label: '历史轨迹',
       group: '目标图层', default: true },
+  // B4 选中掩码：外环全图 + 内环挖空「选中目标 + 它的轨迹范围」。
+  // handler 在 app.js 的映射表里（state.layers.focusMask → updateFocusMask）。
+  { id: 'overlay.focusMask', kind: 'target', z: 35, label: '选中掩码',
+    group: '目标图层', default: false },
     { id: 'modelSensor', kind: 'target', z: 40, label: '传感器覆盖',
       group: '目标图层', default: false },
     { id: 'layerTargetPanel', kind: 'target', z: 50, label: '目标元数据面板',
