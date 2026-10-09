@@ -107,6 +107,32 @@ PROBE = r"""
     });
     return n;
   }
+  // `relationsDebug().linesVisible` is the scene-side truth: 0 while the layer is
+  // off, and equal to `total` (the logical line count) when the layer is on and a
+  // lead is selected. The failure detail prints linesVisible and total together.
+  function relationsSnapshot() {
+    var H = window.SituationHost;
+    if (!H || typeof H.relationsDebug !== 'function') return null;
+    var d = H.relationsDebug();
+    return { selected: d.selected, linesVisible: d.linesVisible, total: d.total };
+  }
+  function relationsShown() {
+    var H = window.SituationHost;
+    if (!H || typeof H.relationsDebug !== 'function') return -1;
+    var d = H.relationsDebug();
+    if (!d.selected && typeof H.selectTarget === 'function') {
+      var defs = (ST.data && ST.data.targets) || [];
+      for (var i = 0; i < defs.length; i++) {
+        var a = (defs[i] && (defs[i].attributes || defs[i].attrs)) || {};
+        if (a.pair_role === 'lead' && (defs[i].id || defs[i].target_id)) {
+          H.selectTarget(defs[i].id || defs[i].target_id);
+          break;
+        }
+      }
+      d = H.relationsDebug();
+    }
+    return typeof d.linesVisible === 'number' ? d.linesVisible : -1;
+  }
   var ST = SituationHost.state;
   // The mask only takes effect while a target is selected, so make sure one is
   // selected before flipping desired; otherwise "visible after turning it on"
@@ -147,6 +173,7 @@ PROBE = r"""
     { id: "weather.model",   what: "气象模型（场景雾开关）", read: function () {
         var v = SituationHost.viewer(); return v ? (v.scene.fog.enabled ? 1 : 0) : -1; } },
     { id: "overlay.focusMask", what: "选中掩码（focusDebug().maskShow，必要时自动选中）", budget: 12000, read: focusMaskShown },
+    { id: "situation.relations", what: "关联关系线（选中长机后的可见折线增量）", budget: 12000, read: relationsShown, snapshot: relationsSnapshot },
   ];
 
   for (var i = 0; i < SPECS.length; i++) {
@@ -170,6 +197,7 @@ PROBE = r"""
       row.nOff = s.read();
       if (s.entityPrefix) { row.eOff = viewerShown(s.entityPrefix); }
     }
+    row.offExtra = s.snapshot ? s.snapshot() : null;
     row.offFrame = {
       desired: (LayerRegistry.runtime[s.id] || {}).desired,
       layerFlag: s.layerFlag ? (ST.layers || {})[s.layerFlag] : null,
@@ -199,6 +227,7 @@ PROBE = r"""
       row.nOn = s.read();
       if (s.entityPrefix) { row.eOn = viewerShown(s.entityPrefix); }
     }
+    row.onExtra = s.snapshot ? s.snapshot() : null;
     row.onFrame = {
       desired: (LayerRegistry.runtime[s.id] || {}).desired,
       layerFlag: s.layerFlag ? (ST.layers || {})[s.layerFlag] : null,
@@ -422,6 +451,13 @@ def _one(base, case, tmpdir, ci):
         frame_on = row.get("onFrame") or {}
         check("%s  on: effect appears" % rid, n_on > n_off,
               "stateShown %s -> %s last=%s" % (n_off, n_on, json.dumps(frame_on, sort_keys=True)))
+        ex = row.get("onExtra")
+        if ex is not None:
+            check("%s  on: linesVisible == total" % rid,
+                  ex.get("linesVisible") is not None and ex.get("linesVisible") == ex.get("total"),
+                  "linesVisible=%r total=%r selected=%r off=%s" % (
+                      ex.get("linesVisible"), ex.get("total"), ex.get("selected"),
+                      json.dumps(row.get("offExtra"), sort_keys=True)))
         e_off, e_on = row.get("eOff"), row.get("eOn")
         if e_off is not None or e_on is not None:
             pre = row.get("entityPrefix")

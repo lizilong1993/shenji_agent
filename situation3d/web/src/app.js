@@ -599,6 +599,9 @@ function initViewer() {
   // 注册表，否则就会出现"面板画出来是关的、而代码以为它开着"这类两边不一致。
   // 原先逐个 `checkboxOn('modelXxx')` 的写法还漏过一个：`urban.imagery` 从头到尾
   // 没被同步过，HTML 里勾着、注册表里却是关的。
+  // Step C: register the relation-line layer before the default pass below, so
+  // `default: true` travels the same setDesired/apply path as every other row.
+  registerRelationsLayer();
   LayerRegistry.LAYERS.forEach(function (d) {
     LayerRegistry.setDesired(d.id, d.default === true);
   });
@@ -1526,6 +1529,7 @@ function syncEntities() {
     e.show = !!state.layers.hotspots && !(key && state.hiddenHotspots[key]);
       if (e.hsKind && e.label) e.label.show = e.show && camHeightM <= FACILITY_TEXT_MAX_HEIGHT_M;
   });
+  if (state.selected) refreshRelations();
 }
 /**
  * 轨迹显示窗口：历史轨迹全量保留（回退到早期帧仍能重建），只在渲染时切片。
@@ -2123,6 +2127,255 @@ function clearHotspotSelection() {
 // 原先是中部地图右上角的浮动面板 `#targetPanel`。该位置与新增的鸟瞰图重叠，且
 // 右栏已专设「目标TS栏」，因此浮动面板整体移除，内容迁到这里——目标信息只在一处。
 
+
+// ---------------------------------------------------------------- relations
+// Step C: relation lines for the selected unit.
+//   * friendly link : both ends share attributes.formation_id -> SOLID line
+//   * hostile  link : weapon-coverage overlap -> DASHED line. Default criterion is
+//                     engage_km (sum of the two engage radii >= distance). If a case
+//                     yields no engage-based hostile pair at all we fall back to
+//                     influence_km and report criterion = 'influence'.
+// Mid-line text: Cesium label, font size in px, i.e. already screen spaced. That is
+// the same guarantee plotting.refreshScreenSpaceDecorations rebuilds for its own
+// `array` family (it only walks items registered inside plotting.js), so no extra
+// rebuild hook is needed here.
+var REL_LAYER_ID = 'situation.relations';
+var relView = { ents: [], own: 0, hostile: 0, hostileInf: 0, peers: [], criterion: 'engage', show: true,
+               caseKey: '', caseEngage: false };
+
+function relAttr(def, key) {
+  var a = (def && def.attributes) || {};
+  var v = a[key];
+  return (v === undefined || v === null) ? '' : String(v);
+}
+
+function relNum(def, key) {
+  var v = def ? Number(def[key]) : NaN;
+  return isFinite(v) ? v : 0;
+}
+
+function relKm(a, b) {
+  var R = 6371.0088, rad = Math.PI / 180;
+  var dla = (b.lat - a.lat) * rad, dlo = (b.lon - a.lon) * rad;
+  var h = Math.sin(dla / 2) * Math.sin(dla / 2)
+        + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dlo / 2) * Math.sin(dlo / 2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function relColor(kind) {
+  var p = (window.Plotting && Plotting.palette) ? Plotting.palette() : null;
+  var css = (kind === 'own') ? ((p && p.friendly) || '#c8102e') : ((p && p.enemy) || '#123a6b');
+  return Cesium.Color.fromCssColorString(css);
+}
+
+function relClear() {
+  relView.ents.forEach(function (e) {
+    try { viewer.entities.remove(e); } catch (err) { /* already gone */ }
+  });
+  relView.ents.length = 0;
+  relView.own = 0; relView.hostile = 0; relView.hostileInf = 0; relView.peers.length = 0;
+}
+
+function relAddLine(from, to, dashed, color, text) {
+  var alt = Math.max(0, (Number(from.alt) || 0) + (Number(to.alt) || 0)) / 2;
+  var ent = viewer.entities.add({
+    polyline: {
+      positions: Cesium.Cartesian3.fromDegreesArrayHeights(
+        [from.lon, from.lat, alt, to.lon, to.lat, alt]),
+      width: 2,
+      material: dashed
+        ? new Cesium.PolylineDashMaterialProperty({ color: color, dashLength: 16 })
+        : new Cesium.ColorMaterialProperty(color),
+    },
+    position: Cesium.Cartesian3.fromDegrees((from.lon + to.lon) / 2, (from.lat + to.lat) / 2, alt),
+    label: {
+      text: text, font: '12px sans-serif', fillColor: color, style: Cesium.LabelStyle.FILL,
+      showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('#000000a6'),
+      horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+      verticalOrigin: Cesium.VerticalOrigin.CENTER,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    },
+  });
+  ent.show = !!relView.show;
+  relView.ents.push(ent);
+}
+
+
+// Case-level criterion gate: the engage criterion is the default, but a case where
+// NO opposing pair at all overlaps under engage would draw nothing, so we fall back
+// to influence for the whole case (stable across selections; the debug output says
+// which one is in force). Measured on the first frame so the answer does not drift
+// with playback.
+function relCaseEngageOk() {
+  var key = String((state.data && state.data.case_id) || state.caseId || '');
+  if (relView.caseKey !== key) {
+    var ids = Object.keys(state.targets), hit = false;
+    for (var i = 0; i < ids.length && !hit; i++) {
+      var da = state.targets[ids[i]].def, pa = positionFor(ids[i], 0);
+      if (!da || !pa) continue;
+      for (var j = i + 1; j < ids.length; j++) {
+        var db = state.targets[ids[j]].def, pb = positionFor(ids[j], 0);
+        if (!db || !pb || da.affiliation === db.affiliation) continue;
+        if (relKm(pa, pb) <= relNum(da, 'engage_km') + relNum(db, 'engage_km')) { hit = true; break; }
+      }
+    }
+    relView.caseKey = key;
+    relView.caseEngage = hit;
+  }
+  return relView.caseEngage;
+}
+
+function refreshRelations() {
+  if (!window.Cesium || !viewer || !state || !state.targets) return;
+  relClear();
+  var sid = state.selected;
+  if (!sid || !state.targets[sid]) return;
+  var sdef = state.targets[sid].def;
+  var spos = positionFor(sid, state.tick);
+  if (!sdef || !spos) return;
+  var fid = relAttr(sdef, 'formation_id');
+  var eng = [], inf = [];
+  Object.keys(state.targets).forEach(function (id) {
+    if (id === sid) return;
+    var def = state.targets[id] && state.targets[id].def;
+    var pos = def ? positionFor(id, state.tick) : null;
+    if (!pos) return;
+    if (fid && relAttr(def, 'formation_id') === fid) {
+      var role = relAttr(def, 'pair_role');
+      relAddLine(spos, pos, false, relColor('own'), role ? (fid + ' / ' + role) : fid);
+      relView.own++;
+      relView.peers.push(id);
+      return;
+    }
+    if (def.affiliation === sdef.affiliation) return;
+    var km = relKm(spos, pos);
+    if (km <= relNum(sdef, 'engage_km') + relNum(def, 'engage_km')) eng.push({ id: id, km: km });
+    if (km <= relNum(sdef, 'influence_km') + relNum(def, 'influence_km')) inf.push({ id: id, km: km });
+  });
+  var useInf = (!relCaseEngageOk() && inf.length > 0);
+  relView.criterion = useInf ? 'influence' : 'engage';
+  relView.hostileInf = inf.length;
+  var drawn = useInf ? inf : eng;
+  drawn.forEach(function (o) {
+    relAddLine(spos, positionFor(o.id, state.tick), true, relColor('hostile'),
+               '\u654c\u5bf9 ' + Math.round(o.km) + ' km');
+  });
+  relView.hostile = drawn.length;
+}
+
+function setRelationsVisible(on) {
+  relView.show = !!on;
+  relView.ents.forEach(function (e) { e.show = !!on; });
+  if (on) refreshRelations();
+}
+
+// Activity state: the code(s) the UI is actually showing right now, taken from
+// inference_frames (parent-class semantics per the plan). Selected unit -> its own
+// codes at this tick; nothing selected -> de-duplicated codes of the visible units.
+// `activityVocabulary` reports the six parent classes the ontology offers, so a test
+// can tell "which values are on screen" from "where the values come from".
+function relActivityCode(code) {
+  if (!code) return '';
+  var o = (window.IntentUi && IntentUi._ontology) ? IntentUi._ontology() : null;
+  if (!o) return code;
+  var intents = o.intents || [];
+  for (var i = 0; i < intents.length; i++) {
+    if (intents[i].code === code) return intents[i].parent_code || code;
+  }
+  return code;   // already a parent class, or a status layer code
+}
+
+function activityCodes() {
+  var seen = {}, keys = [];
+  function add(code) {
+    var c = relActivityCode(code);
+    if (c && !seen[c]) { seen[c] = 1; keys.push(c); }
+  }
+  var inf = inferenceAt(state.tick);
+  if (!inf || !inf.targets) return keys;
+  if (state.selected && inf.targets[state.selected]) {
+    var own = inf.targets[state.selected];
+    (own.intent_set || []).forEach(function (x) { add(x && x.code); });
+    add(own.primary_intent);
+    return keys;
+  }
+  Object.keys(inf.targets).forEach(function (tid) {
+    var rec = state.targets[tid];
+    if (!rec || !isVisible(rec.def)) return;
+    var e = inf.targets[tid];
+    (e.intent_set || []).forEach(function (x) { add(x && x.code); });
+    add(e.primary_intent);
+  });
+  return keys;
+}
+
+function activityVocabulary() {
+  var out = [];
+  try {
+    var o = (window.IntentUi && IntentUi._ontology) ? IntentUi._ontology() : null;
+    var ps = (o && o.parents) || [];
+    ps.forEach(function (p) { if (p && p.code) out.push(p.code); });
+  } catch (err) { /* ontology not loaded yet */ }
+  return out;
+}
+
+function activityName(code) {
+  if (!code) return '';
+  if (!window.IntentUi) return code;
+  var st = IntentUi.statusInfo ? IntentUi.statusInfo(code) : null;
+  if (st && st.zh) return st.zh;
+  var par = IntentUi.parentZh ? IntentUi.parentZh(code) : '';
+  if (par) return par;
+  var o = IntentUi._ontology ? IntentUi._ontology() : null;
+  var ps = (o && o.parents) || [];
+  for (var i = 0; i < ps.length; i++) {
+    if (ps[i] && ps[i].code === code) return ps[i].name_zh || code;
+  }
+  return IntentUi.nameZh ? IntentUi.nameZh(code) : code;
+}
+
+// "text really drawn": every visible relation line must carry exactly one mid-line
+// label. Counted off the entity list rather than eyeballed.
+function lineLabelStats() {
+  var lines = 0, labeled = 0;
+  relView.ents.forEach(function (e) {
+    if (!e.show) return;
+    lines++;
+    var t = e.label && e.label.text;
+    try { t = (t && t.getValue) ? t.getValue() : t; } catch (err) { t = null; }
+    if (t) labeled++;
+  });
+  return { ok: (labeled === lines), lines: lines, labeled: labeled };
+}
+
+function relationsDebug() {
+  var ls = lineLabelStats();
+  return {
+    selected: state.selected || null,
+    ownLines: relView.own,
+    hostileLines: relView.hostile,
+    hostileLinesInfluence: relView.hostileInf,
+    total: relView.own + relView.hostile,
+    formationMembers: relView.peers.slice(),
+    activityCodes: activityCodes(),
+    activityVocabulary: activityVocabulary(),
+    linesVisible: ls.lines,
+    lineLabelOk: ls.ok,
+    lineLabelCount: ls.labeled,
+    criterion: relView.criterion,
+  };
+}
+
+function registerRelationsLayer() {
+  if (!window.LayerRegistry || !LayerRegistry.register) return;
+  if (LayerRegistry.def && LayerRegistry.def(REL_LAYER_ID)) return;
+  LayerRegistry.register({
+    id: REL_LAYER_ID, kind: 'plot', z: 45, default: true,
+    label: '\u5173\u8054\u5173\u7cfb\u7ebf', group: 'TS\u56fe\u5c42',
+    handler: function (id, want) { setRelationsVisible(want); },
+  });
+}
+
 function selectTarget(id, fly) {
   state.selected = id;
   const s = positionFor(id, state.tick);
@@ -2135,6 +2388,7 @@ function selectTarget(id, fly) {
   syncSelection();
   renderTargetCounts();
   renderTargetStatus(id);
+  refreshRelations();
   // The banner shows the operation's phase plus the selected unit's own phase when
   // the two differ, so it has to be refreshed on selection - otherwise picking a
   // unit that lags leaves the previous unit's comparison on screen.
@@ -2147,6 +2401,7 @@ function clearTargetSelection() {
   state.selected = null;
   syncSelection();
   renderTargetStatus(null);
+  refreshRelations();
   markScene('clearTargetSelection');
 }
 
@@ -2182,6 +2437,21 @@ function renderTargetStatus(id) {
   const l1 = (inf && inf.targets[id]) || null;
   StatusPanels.renderTargetStatus(
     host, rec.def, s || null, l1, l1, state.data && state.data.frames, state.tick);
+  // Step C: activity state (ontology parent class) beside the unit's own phase.
+  var fr = (state.data && state.data.frames) ? state.data.frames[state.tick] : null;
+  var up = (fr && fr.unit_phase && fr.unit_phase[id]) || null;
+  var act = activityName(l1 && l1.primary_intent);
+  if (dom.targetBody && (act || up)) {
+    var actRow = document.createElement('div');
+    actRow.className = 'tp-kv tp-activity';
+    var actKey = document.createElement('span');
+    actKey.textContent = '\u6d3b\u52a8\u72b6\u6001';
+    var actVal = document.createElement('b');
+    actVal.textContent = (act || '\u2014') + (up ? (' \u00b7 \u9636\u6bb5 ' + (up.name || up.id || '')) : '');
+    actRow.appendChild(actKey);
+    actRow.appendChild(actVal);
+    dom.targetBody.appendChild(actRow);
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -3391,6 +3661,8 @@ function exportCsv() {
 // TS模块（src/situation.js）拿不到本文件的闭包，用这个接口回调。
 window.SituationHost = {
   state: state,
+  relationsDebug: relationsDebug,
+  selectTarget: function (id, fly) { selectTarget(id || null, !!fly); },
   viewer: function () { return viewer; },
   // 取证用：建筑体块的短路条件逐条报出来。`?buildings=1` 不生效时，
   // "到底卡在哪个 return"光看结果猜不出来。

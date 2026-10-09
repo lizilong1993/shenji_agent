@@ -673,6 +673,160 @@ PROBE_FOCUS = r"""
 """
 
 
+
+PROBE_RELATIONS = r"""
+(async function () {
+  var t0 = Date.now();
+  while (Date.now() - t0 < 40000 && !(window.SituationHost &&
+         SituationHost.state.data && SituationHost.state.data.case_id)) {
+    await new Promise(function (r) { setTimeout(r, 500); });
+  }
+  await new Promise(function (r) { setTimeout(r, 3000); });
+  var H = window.SituationHost;
+  if (!H) return { error: 'window.SituationHost missing' };
+  if (typeof H.relationsDebug !== 'function') return { error: 'relationsDebug missing' };
+  var S = H.state, out = {};
+  // Run the sim past the window so distances (and the hostile-line set) reflect a
+  // realistic mid-scenario tick instead of the paused tick-0 frame.
+  S.playing = true;
+  var t_adv = Date.now();
+  while (Date.now() - t_adv < 30000 && !(S.tick > 240)) {
+    await new Promise(function (r) { setTimeout(r, 250); });
+  }
+  S.playing = false;
+  out.tick = S.tick;
+  out.advance_ok = S.tick > 240;
+  var defs = (S.data && S.data.targets) || [];
+  if (!Array.isArray(defs)) defs = Object.keys(defs).map(function (k) { return defs[k]; });
+  function attrs(d) { return (d && (d.attributes || d.attrs)) || {}; }
+  function idOf(d) { return d && (d.id || d.target_id); }
+  var leads = defs.filter(function (d) { return attrs(d).pair_role === 'lead'; });
+  if (!leads.length) return { error: 'no lead target in the served dataset' };
+  var wrap = S.targets || {};
+  var now = null;
+  try { now = H.viewer().clock.currentTime; } catch (e) { now = null; }
+  function pos(d) {
+    var w = wrap[idOf(d)];
+    var e = w && w.entity;
+    if (!e || !e.position || !now) return null;
+    try {
+      var c = Cesium.Cartographic.fromCartesian(e.position.getValue(now));
+      return { lon: Cesium.Math.toDegrees(c.longitude), lat: Cesium.Math.toDegrees(c.latitude) };
+    } catch (err) { return null; }
+  }
+  function distKm(a, b) {
+    var R = 6371.0, p = Math.PI / 180;
+    var dLat = (b.lat - a.lat) * p, dLon = (b.lon - a.lon) * p;
+    var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(a.lat * p) * Math.cos(b.lat * p) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+  }
+  // Case-level engage check: the criterion is engage unless the case has no
+  // engage-coverage hostile pair at all (then the page falls back to influence).
+  var caseEngage = false;
+  for (var a = 0; a < defs.length && !caseEngage; a++) {
+    var pa = pos(defs[a]);
+    if (!pa) continue;
+    for (var b = a + 1; b < defs.length; b++) {
+      var db = defs[b];
+      if (db.affiliation === defs[a].affiliation) continue;
+      var pb = pos(db);
+      if (!pb) continue;
+      if (distKm(pa, pb) <= (Number(defs[a].engage_km) || 0) + (Number(db.engage_km) || 0)) { caseEngage = true; break; }
+    }
+  }
+  out.case_engage_ok = caseEngage;
+  function countsFor(ld) {
+    var c0 = pos(ld), engN = 0, infN = 0;
+    if (!c0) return { eng: 0, inf: 0 };
+    defs.forEach(function (d) {
+      if (d === ld || d.affiliation === ld.affiliation) return;
+      var p = pos(d);
+      if (!p) return;
+      var dk = distKm(c0, p);
+      if (dk <= (Number(ld.engage_km) || 0) + (Number(d.engage_km) || 0)) engN++;
+      if (dk <= (Number(ld.influence_km) || 0) + (Number(d.influence_km) || 0)) infN++;
+    });
+    return { eng: engN, inf: infN };
+  }
+  // Pick the lead with the most hostile associations under the case criterion, so
+  // the hostile-line path is actually exercised (a 0-line sample would make the
+  // whole check vacuous).
+  var crit0 = caseEngage ? 'engage' : 'influence';
+  var best = leads[0], bestN = -1, perLead = [];
+  leads.forEach(function (ld) {
+    var c = countsFor(ld);
+    perLead.push({ id: idOf(ld), formation: attrs(ld).formation_id, engage: c.eng, influence: c.inf });
+    var n = crit0 === 'engage' ? c.eng : c.inf;
+    if (n > bestN) { bestN = n; best = ld; }
+  });
+  var lead = best, leadId = idOf(lead), formation = attrs(lead).formation_id;
+  out.lead_candidates = perLead;
+  out.lead_id = leadId;
+  out.formation = formation;
+  out.defs_n = defs.length;
+  out.members = defs.filter(function (d) { return attrs(d).formation_id === formation; }).length;
+  out.peers_n = out.members - 1;
+  var p0 = pos(lead);
+  out.lead_pos = p0;
+  var eng = [], inf = [];
+  defs.forEach(function (d) {
+    if (d === lead || d.affiliation === lead.affiliation) return;
+    var p = pos(d);
+    if (!p0 || !p) return;
+    var dk = distKm(p0, p);
+    if (dk <= (Number(lead.engage_km) || 0) + (Number(d.engage_km) || 0)) eng.push(idOf(d));
+    if (dk <= (Number(lead.influence_km) || 0) + (Number(d.influence_km) || 0)) inf.push(idOf(d));
+  });
+  out.engage_n = eng.length;
+  out.influence_n = inf.length;
+  out.engage_ids = eng.slice(0, 8);
+  out.influence_ids = inf.slice(0, 8);
+  out.criterion = (caseEngage || inf.length === 0) ? 'engage' : 'influence';
+  out.expected_hostile = out.criterion === 'engage' ? eng.length : inf.length;
+  if (typeof H.selectTarget === 'function') H.selectTarget(null);
+  await new Promise(function (r) { setTimeout(r, 800); });
+  var u = H.relationsDebug();
+  out.unselected = { selected: u.selected, ownLines: u.ownLines, hostileLines: u.hostileLines,
+                     total: u.total, formationMembers: u.formationMembers };
+  if (typeof H.selectTarget === 'function') H.selectTarget(leadId);
+  for (var k = 0; k < 32; k++) {
+    await new Promise(function (r) { setTimeout(r, 250); });
+    var probeNow = H.relationsDebug();
+    if (probeNow && probeNow.selected === leadId && probeNow.total === probeNow.ownLines + probeNow.hostileLines) break;
+  }
+  var s2 = H.relationsDebug();
+  out.selected = { selected: s2.selected, ownLines: s2.ownLines, hostileLines: s2.hostileLines,
+                   total: s2.total, formationMembers: s2.formationMembers, activityCodes: s2.activityCodes,
+                   activityVocabulary: s2.activityVocabulary, lineLabelOk: s2.lineLabelOk,
+                   lineLabelCount: s2.lineLabelCount, linesVisible: s2.linesVisible,
+                   criterion: s2.criterion };
+  if (typeof H.selectTarget === 'function') H.selectTarget(null);
+  await new Promise(function (r) { setTimeout(r, 800); });
+  var u2 = H.relationsDebug();
+  out.after_deselect = { selected: u2.selected, total: u2.total };
+  return out;
+})()
+"""
+
+def ontology_codes(path):
+    """Codes the ontology defines: leaf intents + parent categories + status layers."""
+    with open(path, "r", encoding="utf-8") as fh:
+        onto = json.load(fh)
+    leaves, parents, status = set(), set(), set()
+    for parent in onto.get("parent_categories") or []:
+        if parent.get("code"):
+            parents.add(parent["code"])
+        for child in parent.get("children") or []:
+            code = child.get("code") if isinstance(child, dict) else child
+            if code:
+                leaves.add(code)
+    for st in onto.get("status_layers") or []:
+        if st.get("code"):
+            status.add(st["code"])
+    return leaves | parents | status, (len(leaves), len(parents), len(status))
+
+
 def probe(url: str, js: str = PROBE) -> dict:
     """Drive the headless browser and return the measurement dict."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -1031,6 +1185,132 @@ def main() -> int:
     check("focus mask is hidden while nothing is selected",
           moff.get("maskShow") is False and desel.get("maskShow") is False,
           "unselected=%r deselect=%r" % (moff.get("maskShow"), desel.get("maskShow")))
+    # 9. formation pairs, recomputed from the served dataset (not writer-c's code).
+    print()
+    print("9. wingman/lead pairing in the dataset")
+    from urllib.parse import parse_qs, urlparse
+    case = (parse_qs(urlparse(args.url).query).get("case") or [None])[0] or "taiwan_landing"
+    ds_path = os.path.join(ROOT, "web", "data", "situations", "%s.json" % case)
+    with open(ds_path, "r", encoding="utf-8") as fh:
+        ds = json.load(fh)
+    targets = ds.get("targets") or []
+    by_id = {}
+    for t in targets:
+        by_id[t.get("id") or t.get("target_id")] = t
+    wingmen, leads, bad = [], [], []
+    for t in targets:
+        a = t.get("attributes") or {}
+        tid = t.get("id") or t.get("target_id")
+        if a.get("pair_role") == "lead":
+            leads.append(tid)
+        if a.get("pair_role") != "wingman":
+            continue
+        wingmen.append(tid)
+        ref = a.get("paired_with")
+        other = by_id.get(ref)
+        if other is None:
+            bad.append("%s->%s missing" % (tid, ref))
+            continue
+        oa = other.get("attributes") or {}
+        if other.get("affiliation") != t.get("affiliation"):
+            bad.append("%s(%s)->%s(%s) side" % (tid, t.get("affiliation"), ref, other.get("affiliation")))
+        if oa.get("pair_role") != "lead":
+            bad.append("%s->%s role=%r" % (tid, ref, oa.get("pair_role")))
+    check("every wingman points at an existing same-side lead (n=%d)" % len(wingmen),
+          len(wingmen) > 0 and len(leads) > 0 and not bad,
+          "wingmen=%s leads=%s bad=%s" % (wingmen[:6], leads[:6], bad[:4]))
+    print("  dataset %s: targets=%d wingmen=%d leads=%d" % (case, len(targets), len(wingmen), len(leads)))
+
+    # 10. relation lines and activity codes (frontend relationsDebug contract).
+    print()
+    print("10. relation lines and activity codes")
+    rel_raw = probe(args.url, PROBE_RELATIONS)
+    if rel_raw.get("evalError"):
+        print("probe error: %s" % rel_raw["evalError"])
+        return 1
+    rel = rel_raw.get("eval") or {}
+    if rel.get("error"):
+        print("probe returned: %s" % rel["error"])
+        return 1
+    print("  relations raw: %s" % json.dumps(rel, sort_keys=True))
+    unsel = rel.get("unselected") or {}
+    sel = rel.get("selected") or {}
+    desel = rel.get("after_deselect") or {}
+    check("nothing selected -> zero relation lines",
+          unsel.get("selected") is None and unsel.get("total") == 0
+          and unsel.get("ownLines") == 0 and unsel.get("hostileLines") == 0,
+          "unselected=%s" % json.dumps(unsel, sort_keys=True))
+    check("sim advanced past tick 240 before measuring",
+          rel.get("advance_ok") is True, "tick=%r" % (rel.get("tick"),))
+    check("the lead target is really selected",
+          sel.get("selected") == rel.get("lead_id"),
+          "selected=%r lead=%r" % (sel.get("selected"), rel.get("lead_id")))
+    engage_n = rel.get("engage_n") or 0
+    influence_n = rel.get("influence_n") or 0
+    # §3.3 lists engage before influence, and "can actually shoot each other" is the
+    # harder reading, so engage coverage is the criterion. Fallback (documented):
+    # a case whose hostile pairs never intersect engage coverage falls back to
+    # influence, or the feature would look unimplemented. The criterion is printed,
+    # never implied, and cross-checked against the page's own `criterion` field.
+    criterion = rel.get("criterion") or ("engage" if engage_n > 0 else "influence")
+    expected_hostile = rel.get("expected_hostile")
+    if not isinstance(expected_hostile, int):
+        expected_hostile = engage_n if criterion == "engage" else influence_n
+    print("  hostile criterion=%s expected=%d engage=%d influence=%d case_engage_ok=%r"
+          % (criterion, expected_hostile, engage_n, influence_n, rel.get("case_engage_ok")))
+    check("dataset has hostile coverage intersections (non-vacuous, criterion=%s)" % criterion,
+          expected_hostile > 0,
+          "engage_n=%r influence_n=%r case_engage_ok=%r" % (engage_n, influence_n, rel.get("case_engage_ok")))
+    peers_n = rel.get("peers_n")
+    fm = sel.get("formationMembers")
+    fm_n = len(fm) if isinstance(fm, list) else fm
+    check("formationMembers == dataset peers (formation members minus the lead itself)",
+          fm_n == peers_n,
+          "debug=%r dataset_peers=%r members_incl_self=%r formation=%r" % (
+              fm_n, peers_n, rel.get("members"), rel.get("formation")))
+    check("own lines == other formation members (one line per peer)",
+          sel.get("ownLines") == peers_n,
+          "ownLines=%r peers=%r members_incl_self=%r" % (sel.get("ownLines"), peers_n, rel.get("members")))
+    check("hostile lines == %s coverage intersections" % criterion,
+          sel.get("hostileLines") == expected_hostile,
+          "hostileLines=%r criterion=%s expected=%r engage=%r influence=%r ids=%s" % (
+              sel.get("hostileLines"), criterion, expected_hostile, engage_n, influence_n,
+              json.dumps(rel.get("engage_ids") if criterion == "engage" else rel.get("influence_ids"))))
+    check("page criterion matches the independently computed criterion",
+          sel.get("criterion") == criterion,
+          "page=%r computed=%r engage=%r influence=%r" % (sel.get("criterion"), criterion, engage_n, influence_n))
+    check("line labels are drawn for every relation line",
+          sel.get("lineLabelOk") is True and sel.get("lineLabelCount") == sel.get("total"),
+          "lineLabelOk=%r lineLabelCount=%r total=%r" % (
+              sel.get("lineLabelOk"), sel.get("lineLabelCount"), sel.get("total")))
+    check("relation lines are really visible in the scene",
+          isinstance(sel.get("linesVisible"), int) and sel.get("linesVisible") > 0
+          and sel.get("linesVisible") == sel.get("total"),
+          "linesVisible=%r total=%r lineLabelCount=%r" % (
+              sel.get("linesVisible"), sel.get("total"), sel.get("lineLabelCount")))
+    check("total == own + hostile",
+          isinstance(sel.get("total"), int)
+          and sel.get("total") == (sel.get("ownLines") or 0) + (sel.get("hostileLines") or 0),
+          "total=%r own=%r hostile=%r" % (sel.get("total"), sel.get("ownLines"), sel.get("hostileLines")))
+    check("deselect clears the relation lines",
+          desel.get("total") == 0 and desel.get("selected") is None,
+          "after=%s" % json.dumps(desel, sort_keys=True))
+    codes = sel.get("activityCodes") or []
+    flat = [c.get("code") if isinstance(c, dict) else c for c in codes]
+    allowed, counts = ontology_codes(os.path.join(ROOT, "engine", "data", "intent_ontology_v2.json"))
+    unknown = sorted(set(x for x in flat if x not in allowed))
+    if not sel.get("activityVocabulary"):
+        # writer-c is switching activityCodes from the static vocabulary to the
+        # codes actually on screen; asserting against the static list would be a
+        # fake pass (the plan's own warning), so it stays off until the new field
+        # lands and this branch flips by itself.
+        print("  activity codes: %s (assertion deferred until activityVocabulary lands)" % (flat,))
+    else:
+        check("displayed activity codes are all defined in the ontology",
+              bool(flat) and not unknown,
+              "n=%d unknown=%s codes=%s vocab=%s (leaves=%d parents=%d status=%d)" % (
+                  len(flat), unknown, flat[:10], sel.get("activityVocabulary"),
+                  counts[0], counts[1], counts[2]))
     print()
     if FAILURES:
         print("FAILED (%d): %s" % (len(FAILURES), "; ".join(FAILURES)))

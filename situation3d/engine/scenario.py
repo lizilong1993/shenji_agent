@@ -581,6 +581,9 @@ def _build_targets() -> List[Target]:
             influence_km=150.0,
             engage_km=100.0,
             attributes={
+                "formation_id": "air-red-1",
+                "pair_role": "wingman",
+                "paired_with": "R07",
                 "机型": "多用途战斗机",
                 "任务": "空中掩护",
                 "高度层": "中高空",
@@ -606,6 +609,8 @@ def _build_targets() -> List[Target]:
             influence_km=400.0,
             engage_km=15.0,
             attributes={
+                "formation_id": "air-red-1",
+                "pair_role": "lead",
                 "机型": "预警指挥机",
                 "任务": "空中预警指挥",
                 "高度层": "高空",
@@ -710,6 +715,9 @@ def _build_targets() -> List[Target]:
             engage_km=90.0,
             loop=True,
             attributes={
+                "formation_id": "air-blue-1",
+                "pair_role": "wingman",
+                "paired_with": "B05",
                 "机型": "多用途战斗机",
                 "任务": "战斗空中巡逻",
                 "高度层": "中空",
@@ -736,6 +744,8 @@ def _build_targets() -> List[Target]:
             engage_km=15.0,
             loop=True,
             attributes={
+                "formation_id": "air-blue-1",
+                "pair_role": "lead",
                 "机型": "舰载预警指挥机",
                 "任务": "空中预警指挥",
                 "高度层": "高空",
@@ -829,7 +839,7 @@ def _build_targets() -> List[Target]:
             model="歼-16 多用途战斗机", icon="fighter",
             sensor_name="有源相控阵雷达", sensor_range_km=170.0,
             influence_km=130.0, engage_km=110.0, loop=True,
-            attributes={"任务": "护航与制空", "高度层": "中空"},
+            attributes={"任务": "护航与制空", "高度层": "中空", "formation_id": "air-red-1", "pair_role": "wingman", "paired_with": "R07"},
         ),
         Target(
             target_id="R20", name="红方第二预警机", platform_class="预警机",
@@ -838,7 +848,7 @@ def _build_targets() -> List[Target]:
             model="空警-500 预警机", icon="aew",
             sensor_name="数字阵列预警雷达", sensor_range_km=400.0,
             influence_km=340.0, engage_km=15.0, loop=True,
-            attributes={"任务": "空中预警指挥", "高度层": "高空"},
+            attributes={"任务": "空中预警指挥", "高度层": "高空", "formation_id": "air-red-2", "pair_role": "lead"},
         ),
         Target(
             target_id="B07", name="蓝方驱逐舰", platform_class="驱逐舰",
@@ -877,7 +887,7 @@ def _build_targets() -> List[Target]:
             model="IDF 经国号战斗机", icon="fighter",
             sensor_name="GD-53 雷达", sensor_range_km=120.0,
             influence_km=95.0, engage_km=75.0, loop=True,
-            attributes={"任务": "战斗空中巡逻", "高度层": "中高空"},
+            attributes={"任务": "战斗空中巡逻", "高度层": "中高空", "formation_id": "air-blue-1", "pair_role": "wingman", "paired_with": "B05"},
         ),
     ]
 
@@ -1142,7 +1152,7 @@ AMPHIBIOUS_TARGETS: List[Target] = [
         sensor_range_km=20.0,
         influence_km=15.0,
         engage_km=6.0,
-        attributes={"兵种": "陆航", "任务": "滩头火力支援", "升限": "约 6000 m"},
+        attributes={"兵种": "陆航", "任务": "滩头火力支援", "升限": "约 6000 m", "formation_id": "air-red-2", "pair_role": "wingman", "paired_with": "R20"},
     ),
     Target(
         target_id="B06",
@@ -1430,7 +1440,7 @@ INDIA_CHINA_TARGETS: List[Target] = [
         sensor_range_km=160.0,
         influence_km=80.0,
         engage_km=60.0,
-        attributes={"兵种": "航空兵", "基地": "列城", "海拔": "起降场 3500 m"},
+        attributes={"兵种": "航空兵", "基地": "列城", "海拔": "起降场 3500 m", "formation_id": "ind-blue-1", "pair_role": "wingman", "paired_with": "H06"},
     ),
     Target(
         target_id="H05",
@@ -1451,7 +1461,7 @@ INDIA_CHINA_TARGETS: List[Target] = [
         sensor_range_km=120.0,
         influence_km=60.0,
         engage_km=0.0,
-        attributes={"兵种": "无人侦察", "升限": "受高原空气密度限制"},
+        attributes={"兵种": "无人侦察", "升限": "受高原空气密度限制", "formation_id": "ind-red-1", "pair_role": "lead"},
     ),
 
     # ----------------------------------------------------------------------
@@ -1483,7 +1493,7 @@ INDIA_CHINA_TARGETS: List[Target] = [
         sensor_range_km=160.0,
         influence_km=120.0,
         engage_km=95.0,
-        attributes={"任务": "争夺制空权", "高度层": "高空"},
+        attributes={"任务": "争夺制空权", "高度层": "高空", "formation_id": "ind-blue-1", "pair_role": "lead"},
     ),
     Target(
         target_id="H07",
@@ -1504,7 +1514,7 @@ INDIA_CHINA_TARGETS: List[Target] = [
         sensor_range_km=130.0,
         influence_km=70.0,
         engage_km=0.0,
-        attributes={"兵种": "无人侦察", "任务": "监视 DBO 走廊"},
+        attributes={"兵种": "无人侦察", "任务": "监视 DBO 走廊", "formation_id": "ind-red-1", "pair_role": "wingman", "paired_with": "H05"},
     ),
     Target(
         target_id="H08",
