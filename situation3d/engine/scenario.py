@@ -66,6 +66,32 @@ INTENT_MAX_PREDICT_TICKS = 40
 # over which a real intent change would be visible anyway.
 REENTRY_GRACE_TICKS = 48
 
+# --------------------------------------------------------------------------
+# Direction 2: occupation per hotspot (the only new frame field)
+# --------------------------------------------------------------------------
+# ``frames[i]["occupation"]`` is a compact ``{hotspot_name: state}`` map, a
+# derived view of the frame (position + affiliation + influence). No geometry
+# is duplicated into every frame: the front end reads the bbox from
+# ``hotspots[]``.
+#
+# Criterion (``OCCUPATION_RULE``):
+#   * a target counts for a hotspot when its *current frame position* falls in
+#     the hotspot bbox ``(west, south, east, north)``;
+#   * default rule ``weighted`` sums ``targets[].influence_km`` for red and for
+#     blue separately. A ratio inside ``[1 / OCCUPATION_CONTEST_RATIO,
+#     OCCUPATION_CONTEST_RATIO]`` is ``contested``; otherwise the larger side
+#     owns the area. Nobody inside -> ``neutral``.
+#   * fallback, documented because ``influence_km`` is optional in the target
+#     contract: when one side sums to <= 0 while it does have units in the box
+#     (missing ``influence_km`` or every value 0), that side is measured by unit
+#     count instead of weight. Every platform in the current order of battle
+#     carries a positive ``influence_km``, so this is inert for the shipped
+#     datasets and keeps "no influence data" from reading as "no target".
+#   * rule ``count`` ignores influence and always uses unit counts.
+OCCUPATION_RULE = "weighted"
+OCCUPATION_CONTEST_RATIO = 1.5
+OCCUPATION_STATES = ("red", "blue", "contested", "neutral")
+
 # Real geographic reference points (WGS84), used as waypoint anchors.
 ANCHORS = {
     "fuzhou": (26.07, 119.30),      # 福州
@@ -965,9 +991,69 @@ def route_land_targets(targets: List[Target], theatre: Optional[str] = None
     return routes, meta
 
 
+def occupation_state(state, targets, hotspots,
+                     rule: str = OCCUPATION_RULE) -> Dict[str, str]:
+    """Return ``{hotspot_name: red|blue|contested|neutral}`` for one frame.
+
+    ``state`` is the per-target list stored in ``frames[i]["targets"]`` (items
+    carry ``id``, ``lat``, ``lon``); hotspot items carry a ``bbox`` of
+    ``[west, south, east, north]``. The function is pure: the same frame always
+    yields the same map, and the map changes only when targets enter or leave a
+    bbox (which is exactly what the independent self-test re-derives).
+    """
+    info = {}
+    for t in targets:
+        info[t.target_id] = (t.affiliation,
+                             float(getattr(t, "influence_km", 0.0) or 0.0))
+
+    out = {}
+    for hs in hotspots:
+        w, s, e, n = hs["bbox"]
+        red_weight = blue_weight = 0.0
+        red_count = blue_count = 0
+        for unit in state:
+            lon = unit.get("lon")
+            lat = unit.get("lat")
+            if lon is None or lat is None:
+                continue
+            if not (w <= lon <= e and s <= lat <= n):
+                continue
+            aff, influence = info.get(unit.get("id"), ("", 0.0))
+            if aff == "red":
+                red_count += 1
+                red_weight += influence
+            elif aff == "blue":
+                blue_count += 1
+                blue_weight += influence
+        if red_count == 0 and blue_count == 0:
+            out[hs["name"]] = "neutral"
+            continue
+        if rule == "count":
+            red_side = float(red_count)
+            blue_side = float(blue_count)
+        else:
+            red_side = red_weight if red_weight > 0.0 else float(red_count)
+            blue_side = blue_weight if blue_weight > 0.0 else float(blue_count)
+        if red_side <= 0.0 and blue_side <= 0.0:
+            out[hs["name"]] = "neutral"
+        elif blue_side <= 0.0:
+            out[hs["name"]] = "red"
+        elif red_side <= 0.0:
+            out[hs["name"]] = "blue"
+        elif red_side > blue_side * OCCUPATION_CONTEST_RATIO:
+            out[hs["name"]] = "red"
+        elif blue_side > red_side * OCCUPATION_CONTEST_RATIO:
+            out[hs["name"]] = "blue"
+        else:
+            out[hs["name"]] = "contested"
+    return out
+
+
+
 def build_frames(targets: Optional[List[Target]] = None,
                  theatre: Optional[str] = None,
-                 routes: Optional[Dict[str, List]] = None) -> List[dict]:
+                 routes: Optional[Dict[str, List]] = None,
+                 hotspots: Optional[Sequence[dict]] = None) -> List[dict]:
     """Generate per-tick positions for every target.
 
     Each frame carries the simulation time plus one entry per target with its
@@ -983,6 +1069,12 @@ def build_frames(targets: Optional[List[Target]] = None,
     targets = targets if targets is not None else ALL_TARGETS
     if routes is None:
         routes, _ = route_land_targets(targets, theatre)
+    if hotspots is None:
+        # No case object at this level, so fall back to the whole theatre.
+        # build_dataset() passes the case-filtered list so the dataset keys
+        # match case.hotspot_names exactly.
+        hotspots = (INDIA_CHINA_HOTSPOTS if theatre == "india_china"
+                    else HOTSPOTS)
 
     dense_routes = {}
     lengths = {}
@@ -1034,6 +1126,9 @@ def build_frames(targets: Optional[List[Target]] = None,
             "unit_phase": {
                 t.target_id: unit_phase_name(tick, t.target_id) for t in targets
             },
+            # Direction 2: per-hotspot ownership for this tick. Compact map,
+            # no geometry (the front end reads hotspots[].bbox).
+            "occupation": occupation_state(state, targets, hotspots),
             "targets": state,
         })
 
@@ -1599,7 +1694,13 @@ def build_dataset(case=None) -> dict:
     land_ids = {t.target_id for t in targets
                 if t.domain == "land" and getattr(t, "road_bound", True)}
     land_routes, land_meta = route_land_targets(targets, theatre)
-    frames = build_frames(targets, theatre=theatre, routes=land_routes)
+    # Direction 2: occupation covers exactly the hotspots this case declares,
+    # so frames[i]["occupation"] has the same key set as dataset["hotspots"].
+    hotspots = [h for h in (INDIA_CHINA_HOTSPOTS if theatre == "india_china"
+                            else HOTSPOTS)
+                if h["name"] in set(case.hotspot_names)]
+    frames = build_frames(targets, theatre=theatre, routes=land_routes,
+                          hotspots=hotspots)
     inferred = inference_mod.infer(frames, targets, case.hotspot_names)
 
     # 战术意图判定（22 种本体口径）。在推理之后做，因为规则要用 L1/L2/L3 之外的
@@ -1627,9 +1728,6 @@ def build_dataset(case=None) -> dict:
                     road = roads_mod.load(theatre)
             except roads_mod.RoadError:
                 road = None
-            hotspots = [h for h in (INDIA_CHINA_HOTSPOTS if theatre == "india_china"
-                                    else HOTSPOTS)
-                        if h["name"] in set(case.hotspot_names)]
             order = [t.target_id for t in targets]
             tracks = intent_features_mod.build_tracks(frames, targets)
             # Predict on a strided subset. Feature extraction walks road geometry
@@ -1736,10 +1834,7 @@ def build_dataset(case=None) -> dict:
         "start_time_utc": START_TIME_UTC,
         "camera": case.camera,
         "symbology": symbology.catalog(),
-        "hotspots": [
-            h for h in (INDIA_CHINA_HOTSPOTS if theatre == "india_china" else HOTSPOTS)
-            if h["name"] in set(case.hotspot_names)
-        ],
+        "hotspots": hotspots,
         "urban_aoi": THEATRE_URBAN_AOI.get(theatre, URBAN_AOI),
         "targets": [t.to_dataset_entry() for t in targets],
         "inference_model": inferred["model"],

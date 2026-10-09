@@ -266,6 +266,96 @@ def main(argv) -> int:
         refused = True
     check(refused, "feature-schema mismatch refuses to load")
 
+    # --- D. occupation (direction 2): reproducible, explained, rule-recomputed ---
+    print()
+    print("D. occupation per hotspot")
+    hot_by_name = {h["name"]: h for h in hotspots}
+    # The contract is "one key per hotspot of this case", so the key set is compared
+    # against the case definition; the bboxes come from the engine hotspot tables.
+    names = set(case.hotspot_names)
+    allowed = {"red", "blue", "contested", "neutral"}
+    occ_frames = [f.get("occupation") for f in frames]
+    missing = [f["tick"] for f, o in zip(frames, occ_frames) if not isinstance(o, dict)]
+    check(not missing, "every frame carries an occupation map",
+          "frames without occupation=%d first_tick=%s" % (len(missing), missing[:1]))
+    if not missing:
+        bad_keys = [f["tick"] for f, o in zip(frames, occ_frames) if set(o) != names]
+        check(not bad_keys, "occupation keys == this case's hotspot names",
+              "bad_ticks=%s names=%d" % (bad_keys[:3], len(names)))
+        seen = set()
+        for o in occ_frames:
+            seen.update(o.values())
+        check(seen <= allowed, "occupation values within the four states",
+              "extra=%s" % sorted(seen - allowed))
+        check(set(hot_by_name) == names, "every case hotspot has an engine bbox",
+              "missing=%s extra=%s" % (sorted(names - set(hot_by_name))[:3],
+                                       sorted(set(hot_by_name) - names)[:3]))
+
+        frames_b = scenario.build_frames(targets, theatre=theatre, routes=routes)
+        mism = next((a["tick"] for a, b in zip(frames, frames_b)
+                     if (a.get("occupation") or {}) != (b.get("occupation") or {})), None)
+        check(mism is None, "the same tick reproduces the same occupation",
+              "first_mismatching_tick=%s frames=%d" % (mism, len(frames)))
+
+        infl = {}
+        for t in targets:
+            infl[t.target_id] = (getattr(t, "affiliation", ""),
+                                 float(getattr(t, "influence_km", 0.0) or 0.0))
+
+        def weighted(name, state):
+            w, s, e, n = hot_by_name[name]["bbox"]
+            red = blue = 0.0
+            for st in state:
+                if not (w <= st["lon"] <= e and s <= st["lat"] <= n):
+                    continue
+                aff, inf = infl.get(st["id"], ("", 0.0))
+                if aff == "red":
+                    red += inf
+                elif aff == "blue":
+                    blue += inf
+            if red <= 0 and blue <= 0:
+                return "neutral"
+            if blue <= 0:
+                return "red"
+            if red <= 0:
+                return "blue"
+            r = red / blue
+            if (1.0 / 1.5) <= r <= 1.5:
+                return "contested"
+            return "red" if red > blue else "blue"
+
+        wrong = []
+        for f in frames:
+            for name, got in (f.get("occupation") or {}).items():
+                want = weighted(name, f["targets"])
+                if got != want:
+                    wrong.append((f["tick"], name, got, want))
+        check(not wrong, "occupation == influence-weighted rule recomputed from frames",
+              "mismatches=%d sample=%s" % (len(wrong), wrong[:3]))
+
+        def inside(name, state):
+            w, s, e, n = hot_by_name[name]["bbox"]
+            return set(st["id"] for st in state if w <= st["lon"] <= e and s <= st["lat"] <= n)
+
+        unexplained = []
+        changes = 0
+        for i in range(1, len(frames)):
+            prev, cur = frames[i - 1], frames[i]
+            po, co = prev.get("occupation") or {}, cur.get("occupation") or {}
+            for name in names:
+                if po.get(name) == co.get(name):
+                    continue
+                changes += 1
+                if inside(name, prev["targets"]) == inside(name, cur["targets"]):
+                    unexplained.append((cur["tick"], name, po.get(name), co.get(name)))
+        check(not unexplained, "every occupation change is explained by targets entering/leaving",
+              "unexplained=%d sample=%s" % (len(unexplained), unexplained[:3]))
+        check(changes > 0, "at least one hotspot changes owner during the run (not vacuous)",
+              "changes=%d frames=%d hotspots=%d" % (changes, len(frames), len(names)))
+        print("  occupation: frames=%d hotspots=%d transitions=%d unexplained=%d "
+              "rule_mismatch=%d repro_ok=%s"
+              % (len(frames), len(names), changes, len(unexplained), len(wrong),
+                 mism is None))
     print()
     if FAILURES:
         print("FAILED (%d): %s" % (len(FAILURES), "; ".join(FAILURES)))

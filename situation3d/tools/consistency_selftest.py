@@ -133,6 +133,14 @@ PROBE = r"""
     }
     return typeof d.linesVisible === 'number' ? d.linesVisible : -1;
   }
+  // Occupation areas expose their entities on the state, so the layer flip is read
+  // directly: 0 while the layer is off, one visible polygon per hotspot when on.
+  function occupationShown() {
+    var list = (ST && ST.occupationEntities) || [];
+    var n = 0;
+    list.forEach(function (e) { if (e && e.show) n += 1; });
+    return n;
+  }
   var ST = SituationHost.state;
   // The mask only takes effect while a target is selected, so make sure one is
   // selected before flipping desired; otherwise "visible after turning it on"
@@ -174,6 +182,7 @@ PROBE = r"""
         var v = SituationHost.viewer(); return v ? (v.scene.fog.enabled ? 1 : 0) : -1; } },
     { id: "overlay.focusMask", what: "选中掩码（focusDebug().maskShow，必要时自动选中）", budget: 12000, read: focusMaskShown },
     { id: "situation.relations", what: "关联关系线（选中长机后的可见折线增量）", budget: 12000, read: relationsShown, snapshot: relationsSnapshot },
+    { id: "situation.occupation", what: "占领区域（occupationEntities 可见数）", budget: 8000, read: occupationShown },
   ];
 
   for (var i = 0; i < SPECS.length; i++) {

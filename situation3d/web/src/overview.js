@@ -63,6 +63,24 @@
   let footprintUpdates = 0;        // 黄框真正被重画的次数（诊断与自检用）
   let created = false;
 
+  // Direction 2: occupation mask. One polygon per hotspot under the footprint
+  // entity ("second entity family"), coloured by the engine's per-tick
+  // occupation map. Logical geometry is kept even when this viewer has not
+  // been created yet, so the evidence outlet works with the mini-map closed
+  // (the default state, and the state the headless probe runs in).
+  let maskEntities = [];
+  let maskVertices = 0;
+  let maskUpdates = 0;
+  let maskState = { tick: null, occupation: {}, hotspots: [], visible: false, key: '' };
+
+  const MASK_COLORS = {
+    red: '#d0342c', blue: '#1f5fbf', contested: '#d8a12a', neutral: '#7d8a99',
+  };
+
+  function maskColor(status) {
+    return Cesium.Color.fromCssColorString(MASK_COLORS[status] || MASK_COLORS.neutral);
+  }
+
   function container() { return document.getElementById('overviewContainer'); }
 
   /**
@@ -175,6 +193,93 @@
         clampToGround: false,
       },
     });
+    // Direction 2: build/refresh the occupation mask on the same lazy
+    // ensure() path as the footprint entity.
+    rebuildMaskEntities();
+    applyMask();
+  }
+
+  /** Rebuild one mask polygon per hotspot (called when the case changes). */
+  function rebuildMaskEntities() {
+    if (!viewer) return;
+    maskEntities.forEach(function (e) {
+      try { viewer.entities.remove(e); } catch (err) { /* already gone */ }
+    });
+    maskEntities = [];
+    maskState.hotspots.forEach(function (hs, i) {
+      const w = hs.bbox[0], s = hs.bbox[1], e = hs.bbox[2], n = hs.bbox[3];
+      const ent = viewer.entities.add({
+        id: 'overview-occupation-' + i,
+        name: (hs.name || ('hotspot-' + i)) + ' 占领掩码',
+        show: false,
+        polygon: {
+          hierarchy: new Cesium.PolygonHierarchy(
+            Cesium.Cartesian3.fromDegreesArray([w, s, e, s, e, n, w, n])),
+          material: maskColor('neutral').withAlpha(0.5),
+          outline: true,
+          outlineColor: maskColor('neutral'),
+          outlineWidth: 1,
+        },
+      });
+      ent.maskStatus = null;
+      maskEntities.push(ent);
+    });
+  }
+
+  /** Apply the last pushed occupation map to the mask entities. */
+  function applyMask() {
+    if (!viewer) return;
+    const on = !!maskState.visible;
+    maskEntities.forEach(function (ent, i) {
+      const hs = maskState.hotspots[i];
+      const status = (hs && maskState.occupation[hs.name]) || 'neutral';
+      if (ent.maskStatus !== status) {
+        ent.maskStatus = status;
+        ent.polygon.material = maskColor(status).withAlpha(0.5);
+        ent.polygon.outlineColor = maskColor(status);
+      }
+      ent.show = on;
+    });
+    viewer.scene.requestRender();
+  }
+
+  /**
+   * Push the current tick's occupation map. app.js calls this from
+   * syncEntities(), i.e. the same markScene cadence that drives the main
+   * view; geometry is only rebuilt when the hotspot set changes.
+   */
+  function updateOccupation(tick, occupation, hotspots, visible) {
+    maskState.tick = tick;
+    maskState.occupation = occupation || {};
+    maskState.hotspots = hotspots || [];
+    maskState.visible = !!visible;
+    maskUpdates++;
+    // Logical vertex count (4 per bbox ring). Kept even without a viewer so
+    // the evidence outlet is readable before the user opens the mini-map.
+    maskVertices = 4 * maskState.hotspots.length;
+    const key = maskState.hotspots.map(function (h) { return h.name || ''; }).join('|');
+    if (viewer) {
+      if (key !== maskState.key || maskEntities.length !== maskState.hotspots.length) {
+        maskState.key = key;
+        rebuildMaskEntities();
+      }
+      applyMask();
+    } else {
+      maskState.key = key;
+    }
+  }
+
+  function occupationMaskDebug() {
+    let shown = 0;
+    maskEntities.forEach(function (e) { if (e && e.show) shown++; });
+    return {
+      tick: maskState.tick,
+      vertices: maskVertices,
+      entities: maskEntities.length,
+      shown: shown,
+      updates: maskUpdates,
+      visible: maskState.visible,
+    };
   }
 
   function bindClick() {
@@ -324,6 +429,8 @@
     init: function (main) { mainViewer = main; },
     debugInfo: debugInfo,
     footprintDebug: footprintDebug,
+    updateOccupation: updateOccupation,
+    occupationMaskDebug: occupationMaskDebug,
     ensure: ensure,
     show: show,
     hide: hide,

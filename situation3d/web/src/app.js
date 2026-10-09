@@ -43,6 +43,18 @@ const FOCUS_MASK_PAD_DEG = 0.05;
 // 选中掩码的图元 id：左键拾取被它挡住时要能认出它（它不是可选对象）。
 const FOCUS_MASK_ID = 'overlay-focus-mask';
 
+// ---- D (direction 2): occupation faces + minimap mask ----------------------
+// Four distinguishable status colours. The engine owns the judgement; the
+// front end only paints frames[i]["occupation"] and never reads plotting.
+const OCCUPATION_LAYER_ID = 'situation.occupation';
+const OCCUPATION_FACE_HEIGHT_M = 1000;
+const OCCUPATION_STATUS_COLORS = {
+  red: Cesium.Color.fromCssColorString('#d0342c'),
+  blue: Cesium.Color.fromCssColorString('#1f5fbf'),
+  contested: Cesium.Color.fromCssColorString('#d8a12a'),
+  neutral: Cesium.Color.fromCssColorString('#7d8a99'),
+};
+
 const state = {
   // 动态图层管理的**单要素**状态。与图层开关、阵营/域过滤是三层，取与（见 isVisible）。
   //   hiddenTargets   单独关掉某个目标（可再打开）
@@ -64,12 +76,13 @@ const state = {
   ticksPerSecond: 30,
   targets: {},              // id -> { def, entity, trail: [], lastTick, sensorEntity }
   layers: { targets: true, tracks: true, routes: true, hotspots: true, labels: true,
-            targetPanel: true, overview: true, focusMask: false },
+            targetPanel: true, overview: true, focusMask: false, occupation: true },
   filters: { red: true, blue: true, sea: true, land: true, air: true },
   selected: null,
   focusMaskEntity: null, // 选中掩码图元（懒建：没选中就先不建）
   focusMaskHole: null,   // 掩码内环经纬边界（focusDebug 报出去用）
   hotspotEntities: [],
+  occupationEntities: [],
   hotspotRows: [],
   routeEntities: [],
   activeHotspot: -1,        // index into data.hotspots, -1 = none
@@ -926,6 +939,7 @@ function teardownScene() {
   viewer.entities.removeAll();
   state.targets = {};
   state.hotspotEntities = [];
+  state.occupationEntities = [];
   state.hotspotRows = [];
   state.routeEntities = [];
   // 场景都拆了，单要素状态自然跟着作废（换案例 / 回空态两条路都经过这里）。
@@ -1418,6 +1432,9 @@ function hotspotFacilities() {
 
 
 function createHotspots() {
+  // Direction 2 faces are rebuilt together with the hotspot prisms: every
+  // caller that rebuilds hotspots also tears the scene down first.
+  state.occupationEntities = [];
   state.data.hotspots.forEach(function (hs, i) {
     const w = hs.bbox[0], s = hs.bbox[1], e = hs.bbox[2], n = hs.bbox[3];
     const centerLat = hs.center[0], centerLon = hs.center[1];
@@ -1464,6 +1481,27 @@ function createHotspots() {
     });
     entity.hsKind = facility ? hs.kind : null;
     state.hotspotEntities.push(entity);
+    // Direction 2: one face for the same hotspot, recoloured from
+    // frames[i]["occupation"] on every markScene. Show/hide follows the
+    // situation.occupation layer through updateOccupationAreas().
+    const occFace = viewer.entities.add({
+      id: 'occupation-' + i,
+      name: hs.name + ' 归属',
+      show: false,
+      polygon: {
+        hierarchy: new Cesium.PolygonHierarchy(
+          Cesium.Cartesian3.fromDegreesArray([w, s, e, s, e, n, w, n])),
+        height: OCCUPATION_FACE_HEIGHT_M,
+        material: OCCUPATION_STATUS_COLORS.neutral.withAlpha(0.35),
+        outline: true,
+        outlineColor: OCCUPATION_STATUS_COLORS.neutral.withAlpha(0.95),
+        outlineWidth: 2,
+      },
+    });
+    occFace.occIndex = i;
+    occFace.occName = hs.name;
+    occFace.occStatus = null;
+    state.occupationEntities.push(occFace);
   });
 }
 
@@ -1529,6 +1567,7 @@ function syncEntities() {
     e.show = !!state.layers.hotspots && !(key && state.hiddenHotspots[key]);
       if (e.hsKind && e.label) e.label.show = e.show && camHeightM <= FACILITY_TEXT_MAX_HEIGHT_M;
   });
+  updateOccupationAreas();
   if (state.selected) refreshRelations();
 }
 /**
@@ -1685,6 +1724,68 @@ function focusDebug() {
     maskExists: !!state.focusMaskEntity,
     maskShow: !!(state.focusMaskEntity && state.focusMaskEntity.show),
     maskHole: state.focusMaskHole,
+  };
+}
+
+function occupationFrame() {
+  const frames = (state.data && state.data.frames) || [];
+  if (!frames.length) return null;
+  return frames[Math.max(0, Math.min(state.tick, frames.length - 1))];
+}
+
+/**
+ * Direction 2: paint one face per hotspot from the frame's compact occupation
+ * map. Called from syncEntities() on every markScene (tick advance, data load,
+ * layer toggle), and the same map is pushed to the minimap mask.
+ */
+function updateOccupationAreas() {
+  const list = state.occupationEntities || [];
+  const frame = occupationFrame();
+  const occ = (frame && frame.occupation) || {};
+  const on = !!state.layers.occupation;
+  for (let i = 0; i < list.length; i++) {
+    const e = list[i];
+    const status = occ[e.occName] || 'neutral';
+    if (e.occStatus !== status) {
+      e.occStatus = status;
+      const color = OCCUPATION_STATUS_COLORS[status] || OCCUPATION_STATUS_COLORS.neutral;
+      e.polygon.material = color.withAlpha(0.35);
+      e.polygon.outlineColor = color.withAlpha(0.95);
+    }
+    setEntityShow(e, on);
+  }
+  // Minimap mask shares the tick cadence. The overview module keeps the logical
+  // mask even when its viewer was never created (overview is off by default),
+  // so the evidence outlet stays readable in headless runs.
+  if (window.Overview && Overview.updateOccupation) {
+    Overview.updateOccupation(state.tick, occ,
+      (state.data && state.data.hotspots) || [], on);
+  }
+}
+
+/**
+ * Direction 2 evidence outlet: tick, the exact per-hotspot status map of the
+ * current frame, its histogram, and the minimap mask readings.
+ */
+function occupationDebug() {
+  const frame = occupationFrame();
+  const occ = (frame && frame.occupation) || {};
+  const statuses = {};
+  const counts = { red: 0, blue: 0, contested: 0, neutral: 0 };
+  Object.keys(occ).forEach(function (name) {
+    const status = occ[name];
+    statuses[name] = status;
+    if (counts[status] === undefined) counts[status] = 0;
+    counts[status] += 1;
+  });
+  const ov = (window.Overview && Overview.occupationMaskDebug)
+    ? Overview.occupationMaskDebug() : null;
+  return {
+    tick: state.tick,
+    statuses: statuses,
+    counts: counts,
+    maskVertices: ov ? ov.vertices : 0,
+    maskTick: ov ? ov.tick : null,
   };
 }
 
@@ -3608,6 +3709,7 @@ function reloadSituation() {
   viewer.entities.removeAll();
   state.targets = {};
   state.hotspotEntities = [];
+  state.occupationEntities = [];
   state.hotspotRows = [];
   state.routeEntities = [];
   state.selected = null;
@@ -3615,6 +3717,7 @@ function reloadSituation() {
   createHotspots();
   createRouteEntities();
   createTargetEntities();
+  updateOccupationAreas();
   renderHotspotTable();
   renderTargetCounts();
   renderTransport();
@@ -3831,6 +3934,7 @@ window.SituationHost = {
   // 轨迹窗口 / 预测线 / 掩码的取证读数：外部（自检、验收）只认这些数字，
   // "画得对不对"不能靠肉眼。
   focusDebug: focusDebug,
+  occupationDebug: occupationDebug,
 };
 
 function exportData() {
@@ -4230,6 +4334,9 @@ function bindUI() {
   // B4 选中掩码：开关只改 state.layers.focusMask，重画交给 updateFocusMask()。
   // 必须走注册表 + apply() 的 handler：绕过注册表直接调 setter，会被 apply() 改回去。
   ['overlay.focusMask', function (v) { state.layers.focusMask = v; updateFocusMask(); }],
+  // D (direction 2): occupation faces + minimap mask. The handler writes the
+  // state flag and repaints immediately; apply() alone would leave stale shows.
+  [OCCUPATION_LAYER_ID, function (v) { state.layers.occupation = v; updateOccupationAreas(); }],
   ].forEach(function (pair) {
     var d = LayerRegistry.def(pair[0]);
     if (d) d.handler = function (id, want) { pair[1](want); };

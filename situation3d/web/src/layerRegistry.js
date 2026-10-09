@@ -204,6 +204,10 @@
       group: 'TS图层', default: true },
     { id: 'layerOverview', kind: 'situation', z: 30, label: '鸟瞰图',
       group: 'TS图层', default: false },
+    // 方向 2：占领区域。引擎逐帧下发 frames[i]["occupation"]，主视图面图元
+    // 与小地图掩码都由 app.js 的 handler 驱动（不经过 plotting.js）。
+    { id: 'situation.occupation', kind: 'plot', z: 25, label: '占领区域',
+      group: 'TS图层', default: true },
 
     { id: 'layerTargets', kind: 'target', z: 10, label: '可见目标',
       group: '目标图层', default: true },

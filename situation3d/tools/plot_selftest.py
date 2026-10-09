@@ -827,6 +827,79 @@ def ontology_codes(path):
     return leaves | parents | status, (len(leaves), len(parents), len(status))
 
 
+
+PROBE_OCCUPATION = r"""
+(async function () {
+  var t0 = Date.now();
+  while (Date.now() - t0 < 40000 && !(window.SituationHost &&
+         SituationHost.state.data && SituationHost.state.data.case_id)) {
+    await new Promise(function (r) { setTimeout(r, 500); });
+  }
+  await new Promise(function (r) { setTimeout(r, 3000); });
+  var H = window.SituationHost;
+  if (!H) return { error: 'window.SituationHost missing' };
+  if (typeof H.occupationDebug !== 'function') return { error: 'occupationDebug missing' };
+  var S = H.state, out = {};
+  function snap(tag) {
+    var d = H.occupationDebug();
+    out[tag] = { tick: d.tick, statuses: d.statuses, counts: d.counts,
+                 maskVertices: d.maskVertices, maskTick: d.maskTick };
+    return d;
+  }
+  // Clear every plotting record first: the occupation layer MUST keep moving
+  // without any user plotting, which is the decoupling this check pins down.
+  var cleared = null;
+  try {
+    if (window.Plotting && typeof Plotting.clearLayer === 'function') {
+      Plotting.clearLayer();
+      cleared = true;
+    } else {
+      cleared = 'no Plotting.clearLayer';
+    }
+  } catch (e) { cleared = String(e); }
+  out.plotting_cleared = cleared;
+  var a = snap('after_clear');
+  var tick0 = S.tick;
+  // Compare more than the two endpoints: on the Taiwan case the map changes and
+  // comes back (endpoints equal) before the first sustained change near tick 92.
+  // So sample while advancing 120 ticks and keep every change that is seen.
+  var prev = a.statuses || {};
+  var total_changes = 0, max_diff = 0, first_change = null;
+  S.playing = true;
+  var t_adv = Date.now();
+  while (Date.now() - t_adv < 30000 && S.tick < tick0 + 120) {
+    await new Promise(function (r) { setTimeout(r, 120); });
+    var cur = H.occupationDebug();
+    var cs = cur.statuses || {}, diff = 0;
+    Object.keys(cs).forEach(function (k) { if (prev[k] !== cs[k]) diff += 1; });
+    if (diff > 0) {
+      total_changes += diff;
+      if (first_change === null) first_change = cur.tick;
+      if (diff > max_diff) max_diff = diff;
+      prev = cs;
+    }
+  }
+  S.playing = false;
+  out.advanced = S.tick - tick0;
+  var b = snap('after_advance');
+  var names = Object.keys(b.statuses || {}), endpoint = 0;
+  names.forEach(function (k) {
+    if ((a.statuses || {})[k] !== b.statuses[k]) endpoint += 1;
+  });
+  out.status_changes = total_changes;
+  out.endpoint_changes = endpoint;
+  out.max_diff = max_diff;
+  out.first_change_tick = first_change;
+  out.names_n = names.length;
+  var c = b.counts || {};
+  out.counts_sum = (c.red || 0) + (c.blue || 0) + (c.contested || 0) + (c.neutral || 0);
+  out.non_neutral = (c.red || 0) + (c.blue || 0) + (c.contested || 0);
+  out.mask_moved = (a.maskTick !== b.maskTick) || (a.maskVertices !== b.maskVertices);
+  return out;
+})()
+"""
+
+
 def probe(url: str, js: str = PROBE) -> dict:
     """Drive the headless browser and return the measurement dict."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -1311,6 +1384,69 @@ def main() -> int:
               "n=%d unknown=%s codes=%s vocab=%s (leaves=%d parents=%d status=%d)" % (
                   len(flat), unknown, flat[:10], sel.get("activityVocabulary"),
                   counts[0], counts[1], counts[2]))
+    # 11. occupation (direction 2): plotting-decoupled movement + minimap mask.
+    print()
+    print("11. occupation statuses and minimap mask")
+    occ_raw = probe(args.url, PROBE_OCCUPATION)
+    if occ_raw.get("evalError"):
+        print("probe error: %s" % occ_raw["evalError"])
+        return 1
+    occ = occ_raw.get("eval") or {}
+    if occ.get("error"):
+        print("probe returned: %s" % occ["error"])
+        return 1
+    print("  occupation raw: %s" % json.dumps(occ, sort_keys=True))
+    before = occ.get("after_clear") or {}
+    after = occ.get("after_advance") or {}
+    st = after.get("statuses") or {}
+    counts = after.get("counts") or {}
+    four = {"red", "blue", "contested", "neutral"}
+    check("plotting was cleared before the occupation sample",
+          occ.get("plotting_cleared") is True, "cleared=%r" % (occ.get("plotting_cleared"),))
+    check("statuses is a non-empty map keyed by hotspot name",
+          isinstance(st, dict) and len(st) > 0 and occ.get("names_n") == len(st),
+          "keys=%r names_n=%r" % (len(st), occ.get("names_n")))
+    check("statuses values within the four states",
+          set(st.values()) <= four, "extra=%s" % sorted(set(st.values()) - four))
+    hist = {}
+    for v in st.values():
+        hist[v] = hist.get(v, 0) + 1
+    check("counts match the status histogram",
+          all((counts.get(k) or 0) == hist.get(k, 0) for k in four)
+          and sum(counts.get(k) or 0 for k in four) == len(st),
+          "counts=%s histogram=%s" % (json.dumps(counts, sort_keys=True), json.dumps(hist, sort_keys=True)))
+    ds_occ = None
+    for f in (ds.get("frames") or []):
+        if f.get("tick") == after.get("tick"):
+            ds_occ = f.get("occupation")
+            break
+    if isinstance(ds_occ, dict):
+        diff = sorted(k for k in set(ds_occ) | set(st) if ds_occ.get(k) != st.get(k))
+        check("frontend statuses == dataset occupation at the same tick",
+              not diff, "tick=%r differing=%s dataset=%s page=%s" % (
+                  after.get("tick"), diff[:4],
+                  json.dumps(dict((k, ds_occ.get(k)) for k in diff[:4]), sort_keys=True),
+                  json.dumps(dict((k, st.get(k)) for k in diff[:4]), sort_keys=True)))
+    else:
+        check("dataset has an occupation map at the page tick",
+              False, "tick=%r frames=%d" % (after.get("tick"), len(ds.get("frames") or [])))
+    check("occupation keeps moving after every plotting record is cleared",
+          (occ.get("status_changes") or 0) > 0 and (occ.get("advanced") or 0) >= 120,
+          "status_changes=%r advanced=%r first_change_tick=%r max_diff=%r endpoint_changes=%r" % (
+              occ.get("status_changes"), occ.get("advanced"), occ.get("first_change_tick"),
+              occ.get("max_diff"), occ.get("endpoint_changes")))
+    check("counts are not all zero after the tick advance",
+          (occ.get("counts_sum") or 0) == len(st) and (occ.get("non_neutral") or 0) > 0,
+          "counts_sum=%r names=%r non_neutral=%r" % (occ.get("counts_sum"), len(st), occ.get("non_neutral")))
+    check("minimap mask has vertices",
+          isinstance(before.get("maskVertices"), int) and before.get("maskVertices") > 0
+          and isinstance(after.get("maskVertices"), int) and after.get("maskVertices") > 0,
+          "before=%r after=%r" % (before.get("maskVertices"), after.get("maskVertices")))
+    check("minimap mask moves with the tick",
+          occ.get("mask_moved") is True,
+          "maskTick=%r->%r maskVertices=%r->%r" % (
+              before.get("maskTick"), after.get("maskTick"),
+              before.get("maskVertices"), after.get("maskVertices")))
     print()
     if FAILURES:
         print("FAILED (%d): %s" % (len(FAILURES), "; ".join(FAILURES)))
