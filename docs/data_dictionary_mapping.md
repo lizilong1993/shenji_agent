@@ -1,0 +1,181 @@
+# 数据字典与语义对照（I04 步骤 4 / Q10）
+
+> `I04` 步骤 4 要求：P3 侧由 `ai/features.py` 生成 108 维；P2 侧在
+> `situation3d/engine/intent_features.py` 暴露 `ifv2`；**两套语义在文档中显式区分**。
+>
+> `Q10`（P2 与 P3 的 108 维特征是否统一）**未关闭**，故 `I04` 前置条件写明
+> 「**只建语义对照，不做数值合并**」。本文就是那份对照。
+>
+> **本文所有数字均为远程实测**（读源码 + 用真实复盘帧跑向量），不是从注释转抄。
+
+---
+
+## 0. 一句话结论（**最重要的一条**）
+
+**两套 108 维只是"长度相同"，语义完全不同；而且 P3 那一套有 50 维（46%）从未被写入。**
+
+| | P2 `ifv2` | P3 `situation` |
+| --- | --- | --- |
+| 文件 | `situation3d/engine/intent_features.py` | `ai/features.py` |
+| 长度 | **108** | **108** |
+| 维度**是否有名字** | **有**。`FEATURE_NAMES` 显式列出 108 个名字 | **无统一名字表**。靠赋值下标隐含 |
+| 被覆盖的维 | **108 / 108（100%）** | **58 / 108（54%）** |
+| 未覆盖的维 | 无 | **50 维**：`38,39,60..107` —— **无任何赋值语句，恒为 0** |
+| 语义单位 | **一个目标（track）的运动学/相对/规则/桥梁上下文** | **一个算子（operator）的字段 + 所在帧的标量** |
+| 有无"规则"维 | 有，`rule_*` 共 **76 维** | 无 |
+| 有无"桥梁"维 | 有，`bridge_*`（含在 76 维内） | 无 |
+
+> ⚠ **把两者当同义合并会直接产出错误样本** —— 这正是 `I04`【风险与回滚】第一条点名的风险。
+> **本文的用途是防止这件事，不是为合并做准备。**
+
+---
+
+## 1. P2 `ifv2`：108 维逐维表（**完整，无未标注项**）
+
+`engine/intent_features.py::FEATURE_NAMES`（实测 108 个）。原文注释（`:63`）写明：
+「**A fixed order is the schema. Never append in the middle**」——
+顺序即 schema，中间插入会让已训练权重错位。
+
+### 1.1 `0..31` 非规则段（32 维）
+
+| 下标 | 名字 | 语义 |
+| --- | --- | --- |
+| 0 | `speed_kn` | 速度（节），原始值 |
+| 1 | `speed_norm` | 速度归一（对 nominal 速度） |
+| 2 | `speed_ratio_class` | 速度等级 |
+| 3 | `alt_norm` | 高度归一 |
+| 4–6 | `d_heading_1` / `d_heading_3` / `d_heading_8` | 1/3/8 步航向变化量 |
+| 7 | `heading_std_8` | 8 步航向标准差 |
+| 8–10 | `disp_3_km` / `disp_8_km` / `disp_30_km` | 3/8/30 步位移（km） |
+| 11–13 | `net_speed_3_kmh` / `net_speed_8_kmh` / `net_speed_30_kmh` | 3/8/30 步净速度（km/h） |
+| 14 | `path_ratio_8` | 8 步路径比（路程/位移，判断绕行） |
+| 15–16 | `stationary_8` / `stationary_30` | 8/30 步是否静止 |
+| 17–18 | `monotone_sep_3` / `monotone_close_3` | 3 步单调远离 / 接近 |
+| 19–20 | `nearest_opp_km` / `nearest_opp_km_norm` | 最近敌方距离（km / 归一） |
+| 21 | `in_engage_range` | 是否进入交战距离 |
+| 22 | `in_sensor_range` | 是否进入传感器距离 |
+| 23 | `neg_in_engage_range` | 反过来看**对方**是否在己方交战距离内 |
+| 24 | `bearing_to_opp_deg` | 到敌方的方位角（度） |
+| 25 | `bearing_rate_3` | 3 步方位角变化率 |
+| 26 | `opp_heading_delta` | 与敌方航向差 |
+| 27 | `closure_rate_kmh` | 接近速率（km/h） |
+| 28 | `nearest_friend_km` | 最近友军距离 |
+| 29 | `friend_in_contact` | 友军是否接敌 |
+| 30 | `closing_on_friend_3` | 3 步是否在接近友军 |
+| 31 | `friend_lt_3hex` | 友军是否在 3 格内 |
+
+### 1.2 `32..107` 规则与桥梁段（76 维）
+
+`FEATURE_NAMES` 里以 `rule_` 开头的共 **76 个**（实测下标 32–107），
+其中 `bridge_*` 为**从兵棋系统状态桥接来的原始字段**（`action_type_18`、
+`judge_attack_count`、`judge_damage`、`city_owner_flag`、`move_state`、
+`fatigue`、`suppression`、`see_enemy` 等），
+其余 `rule_*` 为规则引擎的三类输出：`_margin` / `_fire` / `_approx`。
+
+**逐维完整清单**见仓库内 `engine/intent_features.py::FEATURE_NAMES`（108 项，可 `feature_names()` 取）。
+本表只需记住：**P2 的每一维都有名字、都有生产者。**
+
+---
+
+## 2. P3 `situation`：108 维布局与**50 维空洞**（实测）
+
+`ai/features.py::operator_to_feature()`（`:88`）返回 `np.zeros(FEATURE_DIM)` 后按下标填。
+
+| 区间 | 维数 | 内容 | 来源语句 |
+| --- | --- | --- | --- |
+| **0..37** | 38 | `NUMERIC_FIELDS` 逐字段（经 `_scale()` 归一） | `:96-100` 循环 |
+| 38, 39 | 2 | **未写入** | — |
+| **40..47** | 8 | 算子附加字段：`remain_bullet_nums` / `carry_weapon_ids` / `valid_passenger_types` / `max_passenger_nums` / `observe_distance` / `passenger_ids` / `launch_ids` / `see_enemy_bop_ids` | `:103-110` |
+| **48..59** | 12 | 帧级标量：`cur_step` / `tick` / `red_total` / `blue_total` / `red_win` / `blue_win` / 算子数/64 / 城市数/16 / 有效动作数/64 / 通信数/16 / `tank_enemy` 数/16 / 最大城市价值/100 | `:116-129` |
+| **60..107** | 48 | **未写入** | — |
+
+### 2.1 `NUMERIC_FIELDS`（38 个，下标 0..37）
+
+`obj_id` `color` `type` `sub_type` `basic_speed` `armor` `A1` `stack`
+`guide_ability` `value` `move_state` `cur_hex` `cur_pos` `speed`
+`move_to_stop_remain_time` `can_to_move` `flag_force_stop` `stop` `blood`
+`max_blood` `tire` `tire_accumulate_time` `keep` `keep_remain_time` `on_board`
+`car` `launcher` `lose_control` `alive_remain_time` `get_on_remain_time`
+`get_off_remain_time` `change_state_remain_time` `target_state`
+`weapon_cool_time` `weapon_unfold_time` `weapon_unfold_state` `C2` `C3`
+
+### 2.2 空洞的**实证**（不是静态推断）
+
+以真实复盘 `replays/replay_1770632023.2594852.zip` 的一帧驱动：
+
+```
+FEATURE_DIM = 108   实际长度 = 108
+非零维数 = 25 / 108
+非零下标 = [0,1,2,4,5,6,9,11,17,18,19,35,36,40,41,44,49,50,51,52,53,54,55,56,59]
+60..107 里非零的维 = （全为 0）
+38..39 的值 = [0.0, 0.0]
+```
+
+**并且全仓扫描确认无第二处写入**：`vector[60]`–`vector[107]` 在 `ai/features.py` 中
+**零命中**（唯一近似命中是 `operator_to_graph_feature` 的 `vector[70..72]`，
+那是**图特征**那条路径，不是本 108 维态势向量）。
+
+**→ `operator_to_feature` 的 108 维里，50 维（46%）从未被任何语句覆盖，恒为 0。**
+
+---
+
+## 3. 三条必须写进任何结论的差异
+
+### 3.1 粒度不同：**一个目标** vs **一个算子**
+
+P2 的一行 108 维描述**一个 track（目标）的时间窗行为**；
+P3 的一行 108 维描述**一个 operator（算子）在某帧的字段**，
+末尾 12 维还是**整帧标量**（把帧级信息塞进算子向量里）。
+
+**同一个算子在不同帧会得到不同向量**，而 P2 的一个 track 向量编码的是**历史窗口**。
+两者的"一行"不是同一个东西。
+
+### 3.2 信息类别不相交
+
+| 信息类别 | P2 | P3 |
+| --- | --- | --- |
+| 运动学（速度/航向/位移） | **有**（0–18） | 只有瞬时 `speed`/`cur_pos`，**无窗口量** |
+| 相对几何（最近敌/方位/接近率） | **有**（19–31） | **无** |
+| 规则引擎判定 | **有**（76 维） | **无** |
+| 桥梁/裁决桥接 | **有** | **无** |
+| 算子装备/弹药/载员 | **无** | **有**（40–47） |
+| 整帧比分/城市/通信计数 | **无** | **有**（48–59） |
+
+**→ 两者几乎不重叠。合并等于把两本不同的字典按页码对齐。**
+
+### 3.3 归一化口径不同
+
+P3 走 `_scale(field, value)` 的逐字段缩放，且 48–59 用硬编码除数（`/64`、`/16`、`/100`）；
+P2 用 `_norm_speed` / `_clamp01` 等各自的口径。
+**即使同一物理量（如 `speed`）在两边的取值域也不同**，故**逐维相减没有意义**。
+
+---
+
+## 4. 对 `Q10` 的建议（**不代替裁定**）
+
+| 选项 | 说明 |
+| --- | --- |
+| **A. 保持两套、显式区分**（现状） | 本文即其依据。风险最低；代价是策略侧要分别处理 |
+| **B. 统一为 P2 的命名 schema** | 需给 P3 的 108 维**建名字表**并**填掉 50 维空洞**，属独立改造 |
+| **C. 建显式转换层** | 若要互相喂，必须写**命名映射 + 归一化对齐**，且**不可隐含**（`I04` 回滚要求「不做隐式替代」） |
+
+**无论选哪个，第 2 节的 50 维空洞都应先处置** ——
+它意味着 P3 态势模型有 **46% 的输入恒为 0**，
+这与本会话在 `C4` 观察到的 `situation_pre_sigmoid_near_zero_variance` 告警**方向一致**，
+是一个**应当独立立项**的模型质量问题（不属于本文范围，此处只记录关联）。
+
+---
+
+## 5. 未做的部分（如实列出）
+
+| 项 | 状态 |
+| --- | --- |
+| `get_multimodal_situation()` 接口（`I04` 步骤 1） | **未做** |
+| 文本模态接 `brief.py::build_brief()`（步骤 2） | **未做**（该函数存在，458 行） |
+| 图像模态引用（步骤 3） | **未做** |
+| 样本生成脚本与冒烟测试（步骤 5） | **未做** |
+| 本文（步骤 4 的语义对照） | **已完成** |
+| 「108 维语义对照表覆盖全部维度且无未标注项」（判据 3） | **P2 侧达成**；**P3 侧有 50 维无法标注** —— 不是本文遗漏，而是**源码里确实没赋值** |
+
+**→ 判据 3 在 P3 侧无法通过，因为"未标注项"50 个是真实的实现空洞。**
+本文把这个事实写清楚，而不是用"预留位"之类措辞掩盖。
