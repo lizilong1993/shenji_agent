@@ -59,6 +59,27 @@ def test_manifest_records_training_normalizer_contract(monkeypatch) -> None:
     assert manifest["situation_normalizer_feature_dim"] == 108
     assert "tactical_model.pt" in manifest["managed_files"]
 
+    # ── I07：manifest 必须含实验 ID / 依赖版本 / 环境记录 ──────────────────
+    # 既有键一个都不能动（既有调用方按名字取值），新信息集中在 `environment` 一个 dict 里。
+    env = manifest.get("environment")
+    assert isinstance(env, dict), "I07 要求 manifest 含 environment 段（整块 dict）"
+    assert env["experiment_id"] == "test-tag-abc123", \
+        "实验 ID 应为 <generated_at>-<commit8>（monkeypatch 已固定这两个输入）"
+    assert env["generated_at"] == "test-tag", "environment.generated_at 应与顶层同源"
+    assert env["python_version"], "缺少 python_version"
+    assert "naming_rule" in env, "缺少命名规则声明"
+    # 依赖哈希可能为 None（本仓无 lock 文件时）—— 但**键必须存在**
+    assert "requirements_lock_sha256" in env, "缺少依赖哈希键（值可为 None，但不得缺席）"
+    # 关键：顶层不得因此多出字符串值 —— 否则 copy_publish_artifacts 会把它们当文件路径
+    for key, value in manifest.items():
+        if key in ("generated_at", "managed_files"):
+            continue
+        assert not isinstance(value, str) or key in (
+            "source_commit_sha", "intent_lstm", "situation_gcn",
+            "situation_feature_normalizer", "tactical_model",
+            "situation_normalizer_kind", "situation_normalizer_fitted_on",
+        ), "顶层新增了字符串值 %r，会被 copy_publish_artifacts 当文件路径处理" % key
+
 
 class _Backbone(nn.Module):
     def forward(self, x: torch.Tensor, adj: torch.Tensor) -> torch.Tensor:

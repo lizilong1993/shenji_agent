@@ -354,6 +354,65 @@ def build_summary(metrics: Dict[str, object], run_dir: Path) -> None:
     (run_dir / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
 
+def _experiment_id(generated_at: str) -> str:
+    """实验 ID：`<generated_at>-<commit 前 8 位>`（I07 步骤 1 的命名规范）。
+
+      - 前缀是**训练产出时刻**（`now_tag()` 的 `YYYYmmdd_HHMMSS`），可按时间排序；
+      - 后缀是**代码状态**，把「这一次实验」与「产生它的提交」绑定；
+      - **完全确定**：同一时刻 + 同一提交 -> 同一 ID，不含随机数，
+        故第三方复跑时能判断「是不是同一次实验」。
+    """
+    sha = git_head_sha(repo_root()) or ""
+    return "%s-%s" % (generated_at, sha[:8]) if sha else generated_at
+
+
+def _requirements_lock_sha() -> "Optional[str]":
+    """依赖锁文件哈希。优先 `requirements.lock`，退回 `requirements.txt`。
+
+    找不到时返回 `None`（**不编造**）—— 验证脚本据此把依赖一项标为
+    「历史产物、无法核验」，而不是假装核过。
+    """
+    root = repo_root()
+    for name in ("requirements.lock", "requirements.txt"):
+        p = root / name
+        if p.is_file():
+            import hashlib
+
+            return hashlib.sha256(p.read_bytes()).hexdigest()
+    return None
+
+
+def _build_environment_record(experiment_id: str, generated_at: str) -> Dict[str, object]:
+    """环境记录（I07 步骤 2）。
+
+    必须**整块是 dict**，不能是「顶层几个标量」：`copy_publish_artifacts()`
+    会把 manifest 里**任何字符串值**当成文件路径去 `run_dir / rel_path` 复制
+    （只跳过 `generated_at` 与 `managed_files`）。
+    收进一个 dict 可让该函数原样继续工作，**不必改它**。
+    """
+    import platform
+
+    env: Dict[str, object] = {
+        "experiment_id": experiment_id,
+        "generated_at": generated_at,
+        "python_version": platform.python_version(),
+        "python_implementation": platform.python_implementation(),
+        "platform": platform.platform(),
+        "requirements_lock_sha256": _requirements_lock_sha(),
+        "naming_rule": "checkpoint_policy/1: <generated_at>-<commit8>",
+        "torch_version": None,
+    }
+    try:
+        import torch  # noqa: PLC0415 - 缺 torch 也不该让清单构造失败
+
+        env["torch_version"] = getattr(torch, "__version__", None)
+        env["cuda_available"] = bool(torch.cuda.is_available())
+        env["cuda_device_count"] = int(torch.cuda.device_count()) if torch.cuda.is_available() else 0
+    except Exception:  # noqa: BLE001 - 环境记录尽力而为，不得阻断训练
+        env["torch_version"] = None
+    return env
+
+
 def _build_model_manifest(config: Dict[str, object], metrics: Dict[str, object], *, tactical_skipped: bool) -> Dict[str, object]:
     managed_files = [
         "intent_lstm.pt",
@@ -364,8 +423,11 @@ def _build_model_manifest(config: Dict[str, object], metrics: Dict[str, object],
     if not tactical_skipped:
         managed_files.append("tactical_model.pt")
     situation_normalizer = metrics["situation"].get("normalizer", {})
+    # 先取出 generated_at：experiment_id 由它派生，两处必须用**同一个**值，
+    # 否则 now_tag() 被调两次会得到相差一秒的 ID 与时间戳。
+    generated_at = now_tag()
     return {
-        "generated_at": now_tag(),
+        "generated_at": generated_at,
         "source_commit_sha": git_head_sha(repo_root()),
         "history_len": int(config["intent"]["history_len"]),
         "horizons": int(config["intent"]["horizons"]),
@@ -379,6 +441,11 @@ def _build_model_manifest(config: Dict[str, object], metrics: Dict[str, object],
         "situation_training_applied_normalizer": situation_normalizer.get("training_applied_normalizer"),
         "tactical_model": "tactical_model.pt" if not tactical_skipped else None,
         "managed_files": managed_files,
+        # I07 新增：实验 ID / 依赖版本 / 环境记录（**整块 dict**，理由见 _build_environment_record）。
+        # 与 I06 的耦合点：两者都可能改本函数。本扩展是**纯加法**
+        # （不动既有键、不改既有值的类型），新信息集中在单独一个 dict，
+        # 故与 I06 的改动可机械合并 —— 这正是前置条件要求的那句。
+        "environment": _build_environment_record(_experiment_id(generated_at), generated_at),
     }
 
 
