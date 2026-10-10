@@ -1,12 +1,12 @@
 # I06 步骤 5：奖励消融配置
 # 关闭时间折扣（gamma=1.0），其余同全开
 #
-# 用法（需引擎鉴权可用）：
-#   python3 -m training.selfplay --config configs/reward_ablation/reward_no_discount.yaml
-#
-# ⚠ 本环境 .engine_config 鉴权不通过，故这 4 组**尚未实际跑过**，
-#   仅作为配置就位；判据 2（≥3 组消融对比报告）**未达成**。
-
+# 执行（**不需要引擎鉴权** —— 第 49/52 轮实测：鉴权失败不阻塞本地推演）：
+#   python3 scripts/run_reward_ablation.py
+# 注：本配置**必须由 scripts/run_reward_ablation.py 读取**才有效。
+#     仅跑 `training.selfplay --config <本文件>` 是**无效**的 ——
+#     selfplay.py 里没有任何 `reward_shaping` 处理（实测 0 处引用），
+#     那样只会重跑一遍同样的实验，不构成消融。
 reward_shaping:
   enabled: true
   gamma: 1.0
