@@ -158,6 +158,27 @@ PROBE = r"""
     }
     return d.maskShow ? 1 : 0;
   }
+  // 标绘图层（`kind:'plot'`）的显隐读取口。
+  //
+  // 为什么用它、而不是数场景里的几何：标绘的 sink 是 `Plotting.setLayerVisible()`
+  // （见 `app.js` 的 plot handler），它只写 `layerVisible[layerId]` 再调
+  // `applyVisibility()`；而**很多标绘类别默认没有要素**，数几何会得到「开关都=0」
+  // 的恒真/恒假断言——那正是本文件注释里警告过的**假失败**。所以这里读的是
+  // 「sink 有没有把意图传下去」这一层，这正是注册表↔模块之间最容易断的接缝。
+  //
+  // 返回 0/1：自检的契约是「关=0、开>0」，布尔转 0/1 正好满足。
+  function plotFlagShown(layerId) {
+    if (!window.Plotting || typeof window.Plotting.debug !== "function") return -1;
+    // ⚠ 用 `debug()`，**不是 `catalogue()`**：实测 `catalogue()` 返回的是
+    // **24 条标绘类型定义**（`type`/`zh`/`sourceStandard`… 的数组），**没有 `visible`**
+    // ——我第一版就读错成 `catalogue().visible`，于是恒为 undefined→0，
+    // 6 条断言全报「开后效果没出现」的**假失败**。`debug()` 才是状态：
+    // 返回 `{bound, visible:{layerId:bool}, count, items, resolution, …}`。
+    var d = window.Plotting.debug();
+    var v = (d && d.visible) || {};
+    return v[layerId] ? 1 : 0;
+  }
+
   var SPECS = [
     // —— 已有的 4 项（上一轮已验证）——
     { id: "places.labels",   what: "离线地名（模块自己缓存的 enabled）", read: modPlaces },
@@ -183,6 +204,15 @@ PROBE = r"""
     { id: "overlay.focusMask", what: "选中掩码（focusDebug().maskShow，必要时自动选中）", budget: 12000, read: focusMaskShown },
     { id: "situation.relations", what: "关联关系线（选中长机后的可见折线增量）", budget: 12000, read: relationsShown, snapshot: relationsSnapshot },
     { id: "situation.occupation", what: "占领区域（occupationEntities 可见数）", budget: 8000, read: occupationShown },
+    // —— 标绘栈（`kind:'plot'`）：此前**完全没有覆盖** ——
+    // 实测发现 `consistency_selftest.py` 的断言集合里只有 `situation.occupation`
+    // 属 plot 栈，故 6 个 `plot.*` 图层的显隐从未被校验；而任务五刚把它们的
+    // z 值从 10–50 上调到 80–93，更需要一条回归网兜住。
+    { id: "plot.mobility", what: "标绘·机动与集结（sink 是否收到意图）", read: function () { return plotFlagShown("plot.mobility"); } },
+    { id: "plot.offense",  what: "标绘·进攻（sink 是否收到意图）",     read: function () { return plotFlagShown("plot.offense"); } },
+    { id: "plot.defense",  what: "标绘·防御与障碍（sink 是否收到意图）", read: function () { return plotFlagShown("plot.defense"); } },
+    { id: "plot.fire",     what: "标绘·火力（sink 是否收到意图）",     read: function () { return plotFlagShown("plot.fire"); } },
+    { id: "plot.intel",    what: "标绘·侦察与空域（sink 是否收到意图）", read: function () { return plotFlagShown("plot.intel"); } },
   ];
 
   for (var i = 0; i < SPECS.length; i++) {
