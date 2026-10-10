@@ -170,6 +170,122 @@ def labels_from_action_outcomes(path: Path) -> List[Dict[str, Any]]:
     return [normalize_label(record, source_file=str(path)) for record in records if isinstance(record, dict)]
 
 
+def labels_from_events(path: Path) -> List[Dict[str, Any]]:
+    """从 `events.jsonl` 的**引擎裁决**与**夺控**事件导出高置信 objective 标签。
+
+    ## 为什么加这个函数（I06 步骤 2）
+
+第 50 轮查清：`ADJUDICATION` 的 payload 已携带
+    `damage` / `target_obj_id` / `attack_color` / `att_obj_blood` / `cur_step`，
+    但本模块**从不读它** —— 于是 `high_confidence` 恒为 0，判据 1 无法达成。
+    根因不是"引擎给不出数据"，而是"标签器没读引擎已经给的数据"。
+
+    ## 字段口径（**全部由事件本身推导，不靠外部假设**）
+
+    每个 `ADJUDICATION` 描述"某方攻击某目标"这一事实，故对**两个阵营各产生一条标签**：
+
+      - 攻方：`damage_dealt = -damage`（`damage` 是受击方的血量变化，负数为掉血）
+      - 受方：`damage_taken = -damage`
+      - 击杀：受方 `att_obj_blood + damage <= 0` 时记 1 次（**由同一 payload 推导**）
+
+    同一步内多条裁决会**按阵营累加**，得到该步每方的净伤害/击杀，
+    再交给既有的 `compute_reward_proxy()` —— 其 `damage_kill_delta` 分支返回 `high`。
+
+    `SEIZE` 事件记 `occupy_success = True`（攻方）与 `occupy_loss = True`（另一方），
+    交给既有 `occupy_success` 分支，同样返回 `high`。
+
+    ## 不做什么
+
+    - **不新增置信度档位**，不改既有分支 —— 那等于把标准往实现上凑；
+    - 字段缺失时**留 null**，不编造（沿用本模块既有约定）。
+    """
+    labels: List[Dict[str, Any]] = []
+    episode_id = path.parent.name
+
+    # step -> side -> 聚合
+    agg: Dict[Tuple[int, int], Dict[str, float]] = {}
+    captures: Dict[Tuple[int, int], bool] = {}
+
+    def bucket(step: int, side: int) -> Dict[str, float]:
+        return agg.setdefault((step, side), {"damage_dealt": 0.0, "damage_taken": 0.0,
+                                              "kill_dealt": 0.0, "kill_taken": 0.0})
+
+    with path.open(encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except (TypeError, ValueError):
+                continue
+            kind = event.get("event_type")
+            step = _as_int(event.get("step"))
+            payload_raw = event.get("payload_json")
+            try:
+                payload = json.loads(payload_raw) if payload_raw else {}
+            except (TypeError, ValueError):
+                payload = {}
+            if not isinstance(payload, dict):
+                payload = {}
+
+            if kind == "ADJUDICATION":
+                if step is None:
+                    step = _as_int(payload.get("cur_step"))
+                if step is None:
+                    continue
+                damage = _as_float(payload.get("damage"))
+                if damage is None:
+                    continue
+                attacker_side = _as_int(payload.get("attack_color"))
+                target_side = _as_int(payload.get("target_color"))
+                if attacker_side is None or target_side is None:
+                    continue
+                target_blood = _as_float(payload.get("att_obj_blood"))
+                # damage 是受击方血量变化；掉血为负 → 施加的伤害 = -damage
+                applied = -float(damage)
+                killed = bool(target_blood is not None and target_blood + damage <= 0)
+                atk = bucket(step, attacker_side)
+                atk["damage_dealt"] += applied
+                atk["kill_dealt"] += 1.0 if killed else 0.0
+                tgt = bucket(step, target_side)
+                tgt["damage_taken"] += applied
+                tgt["kill_taken"] += 1.0 if killed else 0.0
+
+            elif kind == "SEIZE":
+                if step is None:
+                    step = _as_int(payload.get("cur_step"))
+                actor = _as_int(payload.get("actor"))
+                if step is None or actor is None:
+                    continue
+                captures[(step, actor)] = True
+
+    for (step, side), values in sorted(agg.items()):
+        record: Dict[str, Any] = {
+            "match_id": episode_id,
+            "cur_step": step,
+            "side": side,
+            "damage_dealt": values["damage_dealt"],
+            "damage_taken": values["damage_taken"],
+            "kill_dealt": values["kill_dealt"],
+            "kill_taken": values["kill_taken"],
+            "label_kind_hint": "engine_adjudication",
+        }
+        labels.append(normalize_label(record, source_file=str(path)))
+
+    for (step, side), _ in sorted(captures.items()):
+        record = {
+            "match_id": episode_id,
+            "cur_step": step,
+            "side": side,
+            "occupy_success": True,
+            "label_kind_hint": "engine_seize",
+        }
+        labels.append(normalize_label(record, source_file=str(path)))
+
+    return labels
+
+
 def labels_from_objective_progress(path: Path) -> List[Dict[str, Any]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     labels: List[Dict[str, Any]] = []
@@ -289,6 +405,8 @@ def discover_source_files(input_paths: Iterable[Path]) -> List[Path]:
             files.extend(sorted(path.rglob("match_results.json")))
             files.extend(sorted(path.rglob("action_outcome_diagnostics.json")))
             files.extend(sorted(path.rglob("objective_progress_diagnostics.json")))
+            # I06 步骤 2：引擎裁决事件（ADJUDICATION/SEIZE）是高置信标签的真实来源
+            files.extend(sorted(path.rglob("events.jsonl")))
     return sorted(set(files))
 
 
@@ -301,6 +419,8 @@ def build_labels(input_paths: Iterable[Path], *, scenario_root: Path) -> List[Di
             labels.extend(labels_from_action_outcomes(path))
         elif path.name == "objective_progress_diagnostics.json":
             labels.extend(labels_from_objective_progress(path))
+        elif path.name == "events.jsonl":
+            labels.extend(labels_from_events(path))
     return labels
 
 

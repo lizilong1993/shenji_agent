@@ -53,18 +53,32 @@ def test_p1_external_opponent_remains_platform_blocked() -> None:
 
 # ─────────────────── I06 的根因证据
 
-def test_labeler_does_not_read_adjudication_events() -> None:
-    """**根因**：`build_objective_labels.py` 不读 `events.jsonl` 的 `ADJUDICATION`。
+def test_labeler_now_reads_adjudication_events() -> None:
+    """**原为「标签器不读 ADJUDICATION」的哨兵，第 51 轮已按其设计退场。**
 
-    这条断言直接检查脚本源码 —— 若哪天脚本改了，测试会失败并强制更新文档。
+    第 50 轮这里断言标签器源码里**没有** `ADJUDICATION` / `events.jsonl`，
+    并写明这是 `high_confidence` 恒为 0 的根因。
+    第 51 轮**实现了该修复**，故原断言必然失败 —— **这正是哨兵的作用**：
+    它迫使文档与测试同步。
+
+    现改为正向断言：标签器**已**消费引擎裁决事件。
     """
     if not LABELER.is_file():
         pytest.skip("labeler not present")
     src = LABELER.read_text(encoding="utf-8")
-    assert "ADJUDICATION" not in src, "标签器已开始读 ADJUDICATION —— 文档需更新"
-    assert "events.jsonl" not in src, "标签器已开始读 events.jsonl —— 文档需更新"
-    # 但 damage/kill 这些概念它在用（说明它想读，只是读的是别的来源）
+    assert "ADJUDICATION" in src, "标签器又丢了 ADJUDICATION 处理"
+    assert "events.jsonl" in src, "标签器又丢了 events.jsonl 发现"
+    assert "labels_from_events" in src
+    # 概念仍在使用（说明它确实在做伤害/击杀推导）
     assert "damage" in src and "kill" in src
+
+
+def test_attribution_doc_marks_the_fix_as_landed() -> None:
+    """文档必须同步为「已修复」，不得仍写「标签器根本不读它」。"""
+    d = _doc()
+    assert "已修复" in d or "第 51 轮" in d, "文档未同步修复状态"
+    # 但必须保留「原根因」的历史记录（不静默改写）
+    assert "根因" in d
 
 
 def test_doc_records_adjudication_payload_carries_objective_fields() -> None:
@@ -116,5 +130,11 @@ def test_doc_records_what_is_not_done() -> None:
     """**不得**把复核写成"已修复"。"""
     d = _doc()
     assert "未做" in d
-    for claim in ("已修复", "已完成修复", "high_confidence>0 已达成"):
+    # **精确**的防过度声明：该文档不得声称 objective 模型已训练/整条 I06 已完成。
+    # （第 51 轮起，"标签器已修复"是**事实**，故不再禁止"已修复"这个宽泛措辞。）
+    for claim in ("model_trained 已为 true", "objective 模型已训练", "I06 已完成",
+                  "判据 1 全部达成", "消融已完成"):
         assert claim not in d, "出现过度声明 %r" % claim
+    # 必须仍写明模型未训练与消融未做
+    assert "model_trained" in d
+    assert "消融" in d

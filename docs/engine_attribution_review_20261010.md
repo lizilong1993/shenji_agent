@@ -86,6 +86,15 @@
 | `SEIZE` | **False** |
 
 **→ 根因不是"引擎给不出数据"，而是"标签器没有读引擎已经给的数据"。**
+
+> **⚠ 状态更新（第 51 轮）**：该根因**已修复**。
+> `scripts/build_objective_labels.py` 新增 `labels_from_events()`，
+> 并已把 `events.jsonl` 纳入输入发现与分派。
+> **实测结果**：在既有 56 场上重跑标签采集 →
+> `high_confidence` **由 0 升至 3181**（`label_count` 3702，
+> `damage_kill_delta` 3004 + `occupy_success` 177，正/负样本 1679/1502），
+> 即 **`I06` 判据 1 的前半已达成**。
+> 本节保留原根因记录，因为它解释了**为什么**会有这次修复。
 它读的是 self-play 的诊断产物（`--input` 指向 `experiments/.../objective_labels`），
 其中 objective 字段**全为 null**：
 
@@ -129,9 +138,9 @@ END_DEPLOYMENT 1200 / DEPLOY_EMBARK 599 / EMBARK 1
 | 项 | 状态 |
 | --- | --- |
 | 逐项复核（本文） | **✓** |
-| **改标签器读 `ADJUDICATION`** | **✗ 未做**（下一轮的自然入口） |
-| **重跑标签采集使 `high_confidence>0`** | **✗ 未做** |
-| 训练 objective 模型（步骤 3） | **✗ 未做** |
+| **改标签器读 `ADJUDICATION`** | **✓ 第 51 轮已做**（`high_confidence` 0 → 3181） |
+| **重跑标签采集使 `high_confidence>0`** | **✓ 第 51 轮已做**（3181） |
+| 训练 objective 模型（步骤 3） | **✗ 未做** —— 实测**训练器本身不存在**（`supervised.py` 里 `objective` 出现 0 次，全仓无 objective 模型类） |
 | 消融（步骤 5） | **✗ 未做** |
 | 让探针进入战斗（换配置/想定） | **✗ 未做** |
 | 清理探针产物 | **✓ 已清理**（避免占盘；数据记入本文） |
