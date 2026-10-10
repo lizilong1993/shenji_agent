@@ -51,6 +51,14 @@
    * 参考层级（自下而上）：
    *   在线底图 → 离线底图 → 热点/城区高清影像 → 建筑高度覆盖 → 三维实景/体块
    *   → TS几何（航迹/计划路线）→ 热点区域面 → 目标/标牌 → 地名 → 目标元数据面板
+   *
+   * 标绘栈（`kind: 'plot'`）**单独占最高段 z=80—93**，与上面这条链不同轴、不可比：
+   *   80 机动/集结 → 83 进攻 → 85 占领区域 → 87 防御/障碍 → 90 火力 → 93 侦察/空域
+   * 依据：用户要求「标绘、目标相关要素的 z-index 应处于最高级别范围」。故标绘**整体高于**
+   * target 栈（其最高为 50）与所有 imagery/globe 层。改前它们分散在 z=10—50，与影像、
+   * 目标层交错，数值上看不出「标绘在最上层」这一意图。
+   * 注：Cesium 没有跨栈的统一 z（见文件头），**这条只是数值上的表达**；跨栈遮挡仍由渲染
+   * 管线（深度缓冲 / ground-vs-nonground / depthTest）决定。
    */
   // `default` 是该图层的**初始意图**。面板由本表生成之后，HTML 的 `checked`
   // 不再是默认值的来源（那些复选框已经删掉了）；用同一份声明，才不会出现
@@ -170,23 +178,23 @@
     //
     // 默认**开**：标绘是"开了就该看到"的东西，没有数据时自然什么都没有，不会误导。
     {
-      id: 'plot.mobility', kind: 'plot', z: 10, default: true,
+      id: 'plot.mobility', kind: 'plot', z: 80, default: true,
       label: '标绘·机动与集结', group: '标绘', checkbox: 'plotMobility',
     },
     {
-      id: 'plot.offense', kind: 'plot', z: 20, default: true,
+      id: 'plot.offense', kind: 'plot', z: 83, default: true,
       label: '标绘·进攻', group: '标绘', checkbox: 'plotOffense',
     },
     {
-      id: 'plot.defense', kind: 'plot', z: 30, default: true,
+      id: 'plot.defense', kind: 'plot', z: 87, default: true,
       label: '标绘·防御与障碍', group: '标绘', checkbox: 'plotDefense',
     },
     {
-      id: 'plot.fire', kind: 'plot', z: 40, default: true,
+      id: 'plot.fire', kind: 'plot', z: 90, default: true,
       label: '标绘·火力', group: '标绘', checkbox: 'plotFire',
     },
     {
-      id: 'plot.intel', kind: 'plot', z: 50, default: true,
+      id: 'plot.intel', kind: 'plot', z: 93, default: true,
       label: '标绘·侦察与空域', group: '标绘', checkbox: 'plotIntel',
     },
     // ---- TS图层 / 目标图层：原先只存在于 index.html，注册表里没有 ----
@@ -206,7 +214,7 @@
       group: 'TS图层', default: false },
     // 方向 2：占领区域。引擎逐帧下发 frames[i]["occupation"]，主视图面图元
     // 与小地图掩码都由 app.js 的 handler 驱动（不经过 plotting.js）。
-    { id: 'situation.occupation', kind: 'plot', z: 25, label: '占领区域',
+    { id: 'situation.occupation', kind: 'plot', z: 85, label: '占领区域',
       group: 'TS图层', default: true },
 
     { id: 'layerTargets', kind: 'target', z: 10, label: '可见目标',
