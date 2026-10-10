@@ -21,6 +21,7 @@ import numpy as np
 
 from ai.artifacts import resolve_manifest_assets
 
+from .selfplay_replay import MatchReplayRecorder
 from .common import dump_yaml, ensure_dir, git_head_sha, git_show_text, load_config, now_tag, repo_root, save_json, set_seed
 from .evaluate import promotion_decision, summarize_matches
 from .maps import (
@@ -619,6 +620,8 @@ def _run_single(
     max_steps: int,
     heartbeat: Callable[[int], None] | None = None,
     match_id: str | None = None,
+    replay_dir: Path | None = None,
+    replay_seed: int | None = None,
 ) -> Tuple[float, float, Dict[str, object], Dict[str, object]]:
     env_class, env_backend = _train_env_runtime()
     env = env_class()
@@ -641,6 +644,10 @@ def _run_single(
     city_control_timeline: List[Dict[str, object]] = []
     phase_action_records: List[Dict[str, object]] = []
     diagnostic_match_id = match_id or scenario_path.name
+    # I15：可选记录 v1.1.0 双核心复盘（**默认不记录 → 行为不变**）
+    _recorder = (MatchReplayRecorder(
+        match_id=str(diagnostic_match_id), seed=replay_seed,
+        scenario=str(scenario_path.name)) if replay_dir is not None else None)
     while not done and steps < max_steps:
         before_state = deepcopy(state)
         actions = red.step(state[RED]) + blue.step(state[BLUE])
@@ -667,9 +674,29 @@ def _run_single(
         objective_progress_turns.extend(progress)
         action_outcomes.extend(outcomes)
         city_control_timeline.append(city_timeline)
+        if _recorder is not None:
+            # 记录**该步之后**的全局观测（含 judge_info 裁决与 time 时间线）
+            _recorder.record(
+                observation=state, actions=actions,
+                agent_summary={"turn": steps, "action_count": len(actions)})
         steps += 1
         if heartbeat is not None:
             heartbeat(steps)
+    # I15：写盘（**帧为空则由记录器抛错**，不产空文件）
+    replay_info: Dict[str, object] | None = None
+    if _recorder is not None:
+        _rpath = Path(replay_dir)
+        _rpath.mkdir(parents=True, exist_ok=True)
+        _target = _rpath / ("replay_%s.zip" % diagnostic_match_id)
+        _report = _recorder.write(_target)
+        replay_info = {
+            "path": str(_target),
+            "frames": len(_recorder),
+            "validate_ok": bool(_report.get("ok")),
+            "declared_version": _report.get("declared_version"),
+            "size_bytes": _report.get("size_bytes"),
+            "record_type_coverage": _recorder.summary(),
+        }
     red_score = _terminal_objective_score(state[RED], RED)
     blue_score = _terminal_objective_score(state[BLUE], BLUE)
     red_stats = red.get_policy_stats()
@@ -681,6 +708,8 @@ def _run_single(
             stats["city_control_timeline"] = city_control_timeline
             stats["phase_action_records"] = phase_action_records
             stats["auth_status"] = auth_status
+            if replay_info is not None:
+                stats["replay"] = replay_info
     return red_score, blue_score, red_stats, blue_stats
 
 
