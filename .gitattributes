@@ -1,0 +1,9 @@
+# 仓库统一用 LF。此前两次提交因 Windows 侧编辑把 app.js 写成 CRLF，
+# 导致 diff 显示上万行（真实改动仅 88 行）。这里显式声明，避免依赖 core.autocrlf。
+*.js   text eol=lf
+*.json text eol=lf
+*.py   text eol=lf
+*.md   text eol=lf
+*.sh   text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
