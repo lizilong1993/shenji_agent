@@ -47,11 +47,26 @@ DEFAULT_WEIGHTS: Dict[str, float] = {
     #    属标准说的"惩罚不当行为"，不是调参偏好。
     "pen_friendly_loss": 8.0,     # 每次己方损失（> align_kill，避免拿命换命）
     "pen_damage_taken": 0.25,
+    # c) 消极拖延（标准原文举例之一）——**独立权重**，不再借用别人的
     "pen_idle": 0.5,              # 该动未动（有一手棋可走却原地不动）
+    # c) 友军误伤（标准原文举例之一）
+    "pen_friendly_fire": 10.0,    # 每次误伤己方（**高于歼敌**，与 pen_friendly_loss 同向）
+    # c) 超出规则的动作（与"无效动作"分开：无效是引擎拒收，违规是规则不允许）
+    "pen_rule_violation": 5.0,
+    # b) 最终胜负：**长期奖励为主**（标准原文「以最终结果的长期奖励为主」）
+    #    ⚠ 与 `clip` 必须配套：若权重 10.0 而 clip=50，典型分差 10 就会算出 100 →
+    #    **被裁剪成 50，长期项反而被削**。故权重取 2.0、clip 取 100.0，
+    #    使终局项在实际分差范围内**不被裁**，从而真正"为主"。
+    "terminal_outcome": 2.0,
+    # b) 阶段性成果：**小额**奖励（标准原文「给予小额奖励」）
+    "milestone_bonus": 1.0,       # 每个阶段性成果
+    "milestone_threshold": 1.0,   # 达到该值才算一个阶段成果
     # ③ 时间折扣
     "gamma": 0.99,                # 每步折扣因子
     # ④ 尺度与平滑
-    "clip": 50.0,                 # 单步奖励绝对值上限（数值尺度）
+    # 单步奖励绝对值上限（数值尺度）。取 100 而非 50：需容纳终局胜负项
+    # （分差 ~10 × 权重 2.0 = 20）+ 过程项，避免"长期项被裁剪"这个反效果。
+    "clip": 100.0,
 }
 
 # 判定「原地不动」的动作类型集合（与 `ai/action_safety.py` 的字典同源）
@@ -86,6 +101,11 @@ def shape_step_reward(progress: Optional[Mapping[str, Any]],
                       weights: Optional[Mapping[str, float]] = None,
                       mission_steps: Optional[Mapping[str, Any]] = None,
                       action_outcomes: Optional[Any] = None,
+                      milestones: Optional[Any] = None,
+                      friendly_fire: int = 0,
+                      rule_violations: int = 0,
+                      idle_steps: int = 0,
+                      terminal_margin: Optional[float] = None,
                       ) -> Tuple[float, Dict[str, Any]]:
     """对**单步**计算塑形奖励。返回 `(total, components)`。
 
@@ -171,12 +191,36 @@ def shape_step_reward(progress: Optional[Mapping[str, Any]],
         for o in action_outcomes:
             if isinstance(o, Mapping) and o.get("error"):
                 invalid += 1
-    add("pen_invalid_action", -float(invalid), w.get("pen_idle", 0.0))
+    # c) 无效动作（引擎拒收）。⚠ 修一处**复制粘贴错误**：原实现用 `pen_idle` 当权重，
+    #    于是"无效动作"与"消极拖延"共用同一个数，两个概念的权重无法独立调 ——
+    #    而标准 e) 明确要求"根据各分量贡献调整奖励参数"。
+    add("pen_invalid_action", -float(invalid), w.get("pen_invalid_action", 0.5))
+    # c) 超出规则的动作 / 友军误伤 / 消极拖延 —— **各自独立**，互不借用权重
+    add("pen_rule_violation", -abs(_f(rule_violations)), w["pen_rule_violation"])
+    add("pen_friendly_fire", -abs(_f(friendly_fire)), w["pen_friendly_fire"])
+    add("pen_idle", -abs(_f(idle_steps)), w["pen_idle"])
+
+    # b) 阶段性成果：**小额**正向（标准原文「给予小额奖励」，故不进 `gains` 折主流，
+    #    而与收益同路按 gamma 折 —— 它是即时反馈，天生该被折）
+    if milestones is not None:
+        try:
+            n_ms = len(milestones) if hasattr(milestones, "__len__") else int(milestones)
+        except (TypeError, ValueError):
+            n_ms = 0
+        add("milestone_bonus", float(n_ms), w["milestone_bonus"])
+
+    # b) 最终胜负：**只在终局步给**（`steps_remaining <= 0`），否则会每步重复计分。
+    #    标准原文「以最终结果的长期奖励为主」→ 故它**不打折**（本来就是长期项）。
+    if terminal_margin is not None:
+        add("terminal_outcome", _f(terminal_margin), w["terminal_outcome"])
 
     # ③ 时间折扣：只对**收益**打折，**惩罚全额计入** ——
     #    否则早期的不当行为会被 gamma^T 抹平，等于纵容（标准要求"惩罚不当行为"）。
+    #    终局胜负项**不打折**（它是长期项，折它等于把最终结果也当短期信号）。
+    terminal_val = comp.get("terminal_outcome", {}).get("value", 0.0)
+    discounted_gains = gains - terminal_val
     disc = time_discount(w["gamma"], steps_remaining)
-    shaped = gains * disc + losses
+    shaped = discounted_gains * disc + terminal_val + losses
     comp["gains_losses"] = {"gains": gains, "losses": losses,
                             "net_shaped": shaped, "note": "惩罚不打折，收益按 gamma^t 折"}
     comp["time_discount"] = {"gamma": w["gamma"], "steps_remaining": int(steps_remaining or 0),
