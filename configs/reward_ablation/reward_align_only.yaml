@@ -1,0 +1,14 @@
+# I06 步骤 5：奖励消融配置
+# 仅任务对齐（折扣与惩罚均关闭）
+#
+# 用法（需引擎鉴权可用）：
+#   python3 -m training.selfplay --config configs/reward_ablation/reward_align_only.yaml
+#
+# ⚠ 本环境 .engine_config 鉴权不通过，故这 4 组**尚未实际跑过**，
+#   仅作为配置就位；判据 2（≥3 组消融对比报告）**未达成**。
+
+reward_shaping:
+  enabled: true
+  gamma: 1.0
+# 惩罚总开关：0 = 全部惩罚项置 0（用于「无惩罚」组）
+  penalty_scale: 0.0
