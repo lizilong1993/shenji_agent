@@ -19,6 +19,7 @@ import zipfile
 import os
 import numpy
 
+from offline_replay import write_offline_replay
 from ai import Agent
 from train_env import TrainEnv
 
@@ -130,14 +131,22 @@ def run_in_single_agent_mode():
 
     print(f"Total time: {time.time() - begin:.3f}s")
 
-    # save replay
+    # save replay（I15：默认写 v1.1.0 双核心；可用 SHENJI_REPLAY_VERSION=1.0.0 切回旧格式）
+    #
+    # 原文是直接 `state[GREEN]` 快照 → json.dumps → writestr，即 **v1.0.0 单核心**，
+    # 双核心（人类操作 + 智能体数据）缺失。现交给 offline_replay.write_offline_replay：
+    #   - 默认升级为 1.1.0 并**过 schema 校验**（不合格不发布）；
+    #   - 升级助手 import 不到、或校验失败时，**退回与原文逐字节等价的 v1 写法**，
+    #     保证离线对局的产物不会整个丢失。
     zip_name = f"logs/replays/replay_{begin}.zip"
-    if not os.path.exists("logs/replays/"):
-        os.makedirs("logs/replays/")
-    with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
-        for i, ob in enumerate(all_states):
-            data = json.dumps(ob, ensure_ascii=False, separators=(",", ":"))
-            z.writestr(f"{begin}/{i}", data)
+    replay_report = write_offline_replay(
+        all_states, zip_name=zip_name, run_id=str(begin), scenario=None,
+    )
+    print(
+        "[replay] %s version=%s frames=%s validate_ok=%s"
+        % (replay_report.get("path"), replay_report.get("frame_version"),
+           replay_report.get("frames"), replay_report.get("validate_ok"))
+    )
 
 
 def to_json_string(o, indent=None):
@@ -340,14 +349,22 @@ def run_in_multi_agents_mode():
 
     print(f"Total time: {time.time() - begin:.3f}s")
 
-    # save replay
+    # save replay（I15：默认写 v1.1.0 双核心；可用 SHENJI_REPLAY_VERSION=1.0.0 切回旧格式）
+    #
+    # 原文是直接 `state[GREEN]` 快照 → json.dumps → writestr，即 **v1.0.0 单核心**，
+    # 双核心（人类操作 + 智能体数据）缺失。现交给 offline_replay.write_offline_replay：
+    #   - 默认升级为 1.1.0 并**过 schema 校验**（不合格不发布）；
+    #   - 升级助手 import 不到、或校验失败时，**退回与原文逐字节等价的 v1 写法**，
+    #     保证离线对局的产物不会整个丢失。
     zip_name = f"logs/replays/replay_{begin}.zip"
-    if not os.path.exists("logs/replays/"):
-        os.makedirs("logs/replays/")
-    with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
-        for i, ob in enumerate(all_states):
-            data = json.dumps(ob, ensure_ascii=False, separators=(",", ":"))
-            z.writestr(f"{begin}/{i}", data)
+    replay_report = write_offline_replay(
+        all_states, zip_name=zip_name, run_id=str(begin), scenario=None,
+    )
+    print(
+        "[replay] %s version=%s frames=%s validate_ok=%s"
+        % (replay_report.get("path"), replay_report.get("frame_version"),
+           replay_report.get("frames"), replay_report.get("validate_ok"))
+    )
 
 if __name__ == "__main__":
     main()
