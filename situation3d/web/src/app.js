@@ -879,6 +879,7 @@ function applySituationData(data, caseId) {
       createHotspots();
       createRouteEntities();
       createTargetEntities();
+  if (typeof applyTargetLod === "function") applyTargetLod(true);
       applyCamera(data.camera);
 
       renderHotspotTable();
@@ -1256,6 +1257,65 @@ function isVisible(def) {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// 车/船 2D 图标 ⇄ 3D 模型（按视点高度，判据在 web/src/entityLod.js）
+// ---------------------------------------------------------------------------
+//
+// 判据与场景分离：EntityLod.decide() 是纯函数（已有 Node 用例
+// tools/entity_lod_test.js）。这里只负责「把结果落到场景」。
+//
+// 为什么不在 isVisible() 里做：isVisible 表达的是**用户意图**（图层开关、阵营/
+// 域过滤、单要素隐藏），而形态切换是**相机距离的函数**，两者混在一起会让
+// 「关了目标图层」和「离得远」变成同一件事，无法分别推理。所以这里只写
+// billboard.show / model.show，**不碰 isVisible**，避免与既有通路打架。
+
+/** 该目标要用的 3D 模型 URL；拿不准返回 null（保留 2D）。 */
+function modelUrlForTarget(def) {
+  if (!window.EntityLod) return null;
+  return window.EntityLod.modelUrlFor(window.EntityLod.formClassOf(def));
+}
+
+/** 当前相机高度（米）。取不到时返回 undefined —— decide() 会保持现状。 */
+function cameraHeightMeters() {
+  try {
+    return viewer.camera.positionCartographic.height;
+  } catch (e) {
+    return undefined;
+  }
+}
+
+/**
+ * 把当前相机高度对应的形态落到所有目标实体上。
+ *
+ * 只在**形态真的变了**时写 show：每次 camera.changed 都遍历 31 个实体写属性，
+ * 会让 Cesium 每帧重建这些实体的渲染状态。所以记住上一次的形态，没变就直接返回。
+ */
+var lastTargetForm = null;
+// 哪些目标真的挂了 3D 模型。**由 createTargetEntities() 登记**，不去读实体属性猜：
+// 实测 Cesium 的 `entity.model.uri` 读出来是 Property 对象而不是字符串真值，
+// 用它做 `!!` 判断会在首次解算时误判为「没有模型」，表现为「刚进低空时图标和
+// 模型同时显示」，要等下一次 camera.changed 才自愈。登记表没有这个歧义。
+var targetHasModel = {};
+
+function applyTargetLod(force) {
+  if (!window.EntityLod || !state.data || !state.data.targets) return;
+  const d = window.EntityLod.decide(cameraHeightMeters(), lastTargetForm || window.EntityLod.MODE_ICON);
+  if (!force && !d.changed) return;
+  lastTargetForm = d.mode;
+  const useModel = (d.mode === window.EntityLod.MODE_MODEL);
+  state.data.targets.forEach(function (def) {
+    const rec = state.targets[def.id];
+    if (!rec || !rec.entity) return;
+    const hasModel = !!targetHasModel[def.id];
+    // 没有模型的实体（车辆、空中目标）**永远保留 2D 图标**——不能因为
+    // 切到「模型」形态就把图标藏掉，那会让这些目标整个消失（实测：31 个目标
+    // 里只有 12 个有模型，另 19 个是陆/空目标）。
+    const showModel = useModel && hasModel;
+    if (rec.entity.billboard) rec.entity.billboard.show = !showModel;
+    if (hasModel && rec.entity.model) rec.entity.model.show = showModel;
+  });
+}
+
 function createTargetEntities() {
   state.data.targets.forEach(function (def) {
     const color = colorFor(def.affiliation);
@@ -1276,6 +1336,21 @@ function createTargetEntities() {
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         scaleByDistance: new Cesium.NearFarScalar(20000, 1.5, 2000000, 0.5),
       },
+      // 车/船的 3D 模型（低空显示，见 EntityLod）。**默认 show:false**：
+      // 高空由 billboard 表达，跨过阈值后由 applyTargetLod() 切过来。
+      // uri 可能是 undefined（形态类别拿不准 / 尚无车辆资产）——那时 Cesium 不建
+      // 模型，实体只留 2D，这正是我们要的「拿不准就保留图标」。
+      model: (function () {
+        const url = modelUrlForTarget(def);
+        if (!url) return undefined;
+        targetHasModel[def.id] = true;   // 供 applyTargetLod 判断，不读 Property
+        return {
+          uri: url,
+          minimumPixelSize: 24,
+          maximumScale: 20000,
+          show: false,
+        };
+      })(),
       label: {
         text: def.id + ' ' + def.platform_class,
         font: '12px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
@@ -3717,6 +3792,7 @@ function reloadSituation() {
   createHotspots();
   createRouteEntities();
   createTargetEntities();
+  if (typeof applyTargetLod === "function") applyTargetLod(true);
   updateOccupationAreas();
   renderHotspotTable();
   renderTargetCounts();
@@ -4588,7 +4664,18 @@ function bindUI() {
       if (state.buildingTimer) clearTimeout(state.buildingTimer);
       state.buildingTimer = setTimeout(refreshBuildings, 400);
     }
+    // 车/船的 2D/3D 形态（判据在 web/src/entityLod.js）。放在这个监听器内部
+    // 即可被上面的 250 ms 节流覆盖：applyTargetLod 只在**形态真的变了**时遍历
+    // 实体，所以相机连续移动时每 250 ms 至多一次空转判断，不会每帧重写实体状态。
+    applyTargetLod();
   });
+
+  // 目标实体建好时相机可能还没动过，先算一次让初始形态与当前高度一致
+  // （否则会一律停在默认的 2D）。案例数据异步到位，故补两次延迟重试，
+  // 与 places.js 处理同类时序问题的做法一致。
+  applyTargetLod(true);
+  setTimeout(function () { applyTargetLod(true); }, 1200);
+  setTimeout(function () { applyTargetLod(true); }, 3000);
 }
 
 // --------------------------------------------------------------------------
