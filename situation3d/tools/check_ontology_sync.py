@@ -43,7 +43,24 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 
-DEFAULT_SOURCE = REPO.parent / "Shenji" / "ontology" / "intent_ontology_v2.json"
+def _first_existing(cands):
+    for c in cands:
+        if c.exists():
+            return c
+    return cands[0]
+
+
+# 真源可能位于几种检出布局下（远程是同仓兄弟目录，本机是另一棵子树），逐个探测。
+SOURCE_CANDIDATES = [
+    # 远程布局：同仓兄弟目录 shenji_agent/Shenji/ 与 shenji_agent/situation3d/
+    REPO.parent / "Shenji" / "ontology" / "intent_ontology_v2.json",
+    # 本机布局：真源在 <root>/code/shenji_agent/，副本在本子树
+    REPO.parent.parent / "code" / "shenji_agent" / "Shenji" / "ontology" / "intent_ontology_v2.json",
+    REPO.parent / "code" / "shenji_agent" / "Shenji" / "ontology" / "intent_ontology_v2.json",
+    REPO.parent.parent / "Shenji" / "ontology" / "intent_ontology_v2.json",
+    REPO / "Shenji" / "ontology" / "intent_ontology_v2.json",
+]
+DEFAULT_SOURCE = _first_existing(SOURCE_CANDIDATES)
 DEFAULT_COPY = REPO / "engine" / "data" / "intent_ontology_v2.json"
 
 # 已登记的豁免：真源侧的值 -> 副本侧的值。新增豁免必须在本文件里显式写出理由。
@@ -101,8 +118,10 @@ def main() -> int:
 
     for label, p in (("source", src), ("copy", cpy)):
         if not p.exists():
+            cands = SOURCE_CANDIDATES if label == "source" else [cpy]
             report["problems"].append({"path": "/", "kind": "MISSING_%s" % label.upper(),
-                                       "detail": "file not found: %s" % p})
+                                       "detail": "file not found: %s" % p,
+                                       "tried": [str(x) for x in cands]})
             print(json.dumps(report, ensure_ascii=False, indent=2) if args.json else
                   "FAIL: %s file not found: %s" % (label, p))
             return 2
