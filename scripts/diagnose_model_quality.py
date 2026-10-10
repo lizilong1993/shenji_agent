@@ -36,6 +36,143 @@ def _repo_root() -> Path:
     return ROOT
 
 
+def move_bias_estimate_from_probs(probs) -> float:
+    """移动偏差：第 0 类（原地/不动）与移动类（1..n-1）的**平均概率差**。
+
+    定义为 `mean(probs[:, 1:]) - mean(probs[:, 0])`：
+      - 负值 = 模型偏向"不动"；正值 = 偏向"移动"；量纲与概率一致，落在 [-1, 1]。
+
+    ⚠ **这里修的是一个量纲错误**（原实现为
+    `sum(probs[:, 1:]) / (n-1) - mean(probs[:, 0])`）：
+    前半段是**对所有样本求和**，后半段是**对样本取均值** —— 两者量纲不同。
+    后果是**该指标随批次样本数线性增长**，实测：
+    | 样本数 | 原公式 | 本函数 |
+    | --- | --- | --- |
+    | 33 | +3.61 | -0.0782 |
+    | 93 | +10.67 | -0.0661 |
+    | 193 | +22.46 | -0.0616 |
+    | 393 | +45.93 | -0.0614 |
+    即原值 **≈ 0.117 × 样本数**，不是一个可比量：
+    证据文件里的 `-0.317` 只能来自"恰好 4 个样本"，
+    换任何真实样本集都会得到完全不同的数（300 个样本时约 +35）。
+    故**不要在训练门里使用原公式**，它会把"批次多大"当成"偏差多少"。
+    """
+    import numpy as _np
+
+    p = _np.asarray(probs, dtype="float64")
+    if p.ndim != 2 or p.shape[0] == 0 or p.shape[1] < 2:
+        return 0.0
+    return float(_np.mean(p[:, 1:]) - _np.mean(p[:, 0]))
+
+
+def _find_intent_train_json(datasets_dir) -> "Optional[Path]":
+    """在 datasets 根下定位意图训练 json（与 `training/data.py` 同一份数据）。
+
+    先按 `training/data.py::discover_dataset_paths` 的口径找（目录名含
+    `WargameData_mini01` 且含 `train.json`），找不到再退回全目录搜索 `train.json`。
+    """
+    if datasets_dir is None:
+        return None
+    root = Path(datasets_dir)
+    if not root.exists():
+        return None
+    for d in sorted(root.iterdir()):
+        if d.is_dir() and "WargameData_mini01" in d.name and (d / "train.json").exists():
+            return d / "train.json"
+    hits = sorted(root.glob("*/train.json"))
+    return hits[0] if hits else None
+
+
+def _intent_stats_on_real_data(intent_model, datasets_dir, history_len: int,
+                               result: Dict[str, Any], max_frames: int = 800
+                               ) -> "Optional[Dict[str, Any]]":
+    """用**真实对局帧**构造意图序列并统计分布（C4 步骤 2 的度量入口）。
+
+    序列构造与 `training/data.py::IntentSequenceDataset` 完全一致：
+    对帧 idx 的每个 `tank_enemy` 条目，取 `frames[idx-history_len+1 : idx+1]`，
+    逐帧用 `ai.features.operator_to_feature(find_operator(frame, enemy_id))` 取特征。
+
+    `max_frames` 默认只取前 800 帧：真实 json 有 15,487 帧 / 136 MB，
+    全量构造序列既慢又没必要 —— 本函数要的是**分布**，不是穷举。
+    """
+    try:
+        import numpy as _np
+        import torch as _torch
+
+        from ai.features import find_operator, operator_to_feature
+    except Exception as exc:  # noqa: BLE001
+        return {"error": "deps unavailable: %s" % exc}
+
+    path = _find_intent_train_json(datasets_dir)
+    if path is None:
+        return None
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return {"error": "cannot read %s: %s" % (path, exc)}
+
+    stream = None
+    for s in raw if isinstance(raw, list) else []:
+        if isinstance(s, list) and s:
+            stream = s
+            break
+    if stream is None:
+        return {"error": "no usable stream in %s" % path}
+    frames = [f for f in stream if isinstance(f, dict)]
+
+    seqs = []
+    targets = []
+    for idx in range(history_len - 1, min(len(frames), max_frames)):
+        frame = frames[idx]
+        for entry in (frame.get("tank_enemy") or []):
+            if len(entry) < 2 + 5:
+                continue
+            enemy_id = int(entry[0])
+            enemy_pos = int(entry[1])
+            history = frames[idx - history_len + 1: idx + 1]
+            seqs.append(_np.stack([
+                operator_to_feature(find_operator(hf, enemy_id), frame=hf, fallback_pos=enemy_pos)
+                for hf in history
+            ]))
+            targets.append([int(_np.argmax(step)) for step in entry[2:7]])
+    if not seqs:
+        return {"error": "no sequences built from %s" % path}
+
+    x = _torch.tensor(_np.stack(seqs), dtype=_torch.float32)
+    # 输入必须跟模型同一设备：`diagnose()` 在 CUDA 可用时把模型放到 GPU，
+    # 若此处仍用 CPU 张量，会在 LSTM 上抛
+    # `NotImplementedError: Could not run 'aten::mkldnn_rnn_layer' ... 'CUDA' backend`。
+    try:
+        dev = next(intent_model.parameters()).device
+    except Exception:  # noqa: BLE001
+        dev = _torch.device("cpu")
+    x = x.to(dev)
+    with _torch.no_grad():
+        logits = intent_model(x)
+        logits0 = logits[:, 0, :] if logits.dim() == 3 else logits
+        probs = _torch.softmax(logits0, dim=-1).detach().cpu().numpy()
+
+    dist = probs.mean(axis=0).tolist()
+    head0 = [int(t[0]) for t in targets]
+    label_hist = {str(i): 0 for i in range(int(probs.shape[1]))}
+    for t in head0:
+        key = str(t)
+        label_hist[key] = label_hist.get(key, 0) + 1
+    return {
+        "source": str(path),
+        "stream_frames_total": len(frames),
+        "frames_used": int(min(len(frames), max_frames)),
+        "sample_count": int(probs.shape[0]),
+        "num_classes": int(probs.shape[1]),
+        "class_distribution": {f"class_{i}": float(v) for i, v in enumerate(dist)},
+        "move_bias_estimate": move_bias_estimate_from_probs(probs),
+        # 真实的 horizon-0 标签分布（one-hot argmax），用于判断类别失衡是否来自数据
+        "label_horizon0_histogram": label_hist,
+        "note": ("标签为 7 类 one-hot；模型输出 8 类时 class_7 无对应标签"
+                 if probs.shape[1] != 7 else ""),
+    }
+
+
 def _git_head() -> str:
     import subprocess
     result = subprocess.run(
@@ -349,14 +486,9 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
             class_means = probs.mean(axis=0).tolist()
             result["intent_output_distribution"] = {f"class_{i}": float(v) for i, v in enumerate(class_means)}
             result["intent_num_classes"] = int(probs.shape[1])
+            result["intent_bias_sample_count"] = int(probs.shape[0])
             # Horizon-0：class-0（通常为"原地/不动"）对 classes 1..n-1（移动方向）
-            #
-            # 原实现把除数写死为 7.0。本仓实际模型是 **8 类**（fc_intent.weight 形状
-            # (8,512)），故按**实际类别数**归一，否则偏差量纲随类别数漂移。
-            _n = int(probs.shape[1])
-            move_bias_estimate = (
-                float(np.sum(probs[:, 1:])) / float(max(1, _n - 1)) - float(np.mean(probs[:, 0]))
-            )
+            move_bias_estimate = move_bias_estimate_from_probs(probs)
             result["move_bias_estimate"] = move_bias_estimate
 
             if move_bias_estimate < -0.1:
@@ -365,6 +497,30 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
                 result["warnings"].append("intent_overconfident_class")
         except Exception as exc:
             result["warnings"].append(f"intent_diagnosis_error: {exc}")
+
+    # ── 真实数据上的意图分布（本轮新增）────────────────────────────────────
+    #
+    # 为什么必须补这一段：上面的意图统计喂的是 `torch.randn`，
+    # 故 `move_bias_estimate` **只有结构意义、没有行为意义** ——
+    # 它衡量的是"输出层偏置对噪声的响应"，不是"模型在战场上偏不偏向不动"。
+    # C4 步骤 2（定位成因）与"是否真的存在负向移动偏差"都要求**用真实样本**度量。
+    #
+    # 数据来源与训练时**同一份**：`datasets/*WargameData_mini01/train.json`
+    # （实测 136.37 MB、2 条流、15,487 帧；`tank_enemy` 条目为
+    # `[enemy_id, enemy_pos, 5 × 7类 one-hot]`）。
+    if intent_model is not None:
+        real = _intent_stats_on_real_data(intent_model, datasets_dir, history_len, result)
+        if real is not None:
+            result["intent_real_data"] = real
+            result["move_bias_estimate_real_data"] = real["move_bias_estimate"]
+            # 真实数据上的告警**单独命名**，避免与噪声口径混淆
+            if real["move_bias_estimate"] < -0.1:
+                result["warnings"].append("intent_negative_move_bias_on_real_data")
+        else:
+            result["intent_real_data"] = None
+            result["intent_real_data_note"] = (
+                "real-data stats skipped: pass --datasets <datasets 根，含 *WargameData_mini01/train.json>"
+            )
 
     # Tactical model diagnostics
     if tactical_model is not None:
