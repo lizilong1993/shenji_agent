@@ -65,6 +65,55 @@ def move_bias_estimate_from_probs(probs) -> float:
     return float(_np.mean(p[:, 1:]) - _np.mean(p[:, 0]))
 
 
+def move_bias_measurement(probs) -> "Optional[float]":
+    """同 `move_bias_estimate_from_probs`，但**输入不合法时返回 None**。
+
+    为什么需要这个区分：`move_bias_estimate_from_probs` 在退化输入上返回 `0.0`，
+    而 `0.0` 恰好也是"完全平衡"的取值。若把两者混同，
+    **一次失败的测量会被读成一次完美的通过** —— 对训练门而言这是最危险的一类错。
+    故凡是「要不要放行」的判断，一律用本函数：拿不到数就 `None`，门据此**拒绝**。
+    """
+    import numpy as _np
+
+    if probs is None:
+        return None
+    p = _np.asarray(probs, dtype="float64")
+    if p.ndim != 2 or p.shape[0] == 0 or p.shape[1] < 2:
+        return None
+    return float(_np.mean(p[:, 1:]) - _np.mean(p[:, 0]))
+
+
+def evaluate_move_bias_gate(measurement: "Optional[float]", *, threshold: float = 0.1,
+                            metric_source: str = "unknown") -> Dict[str, Any]:
+    """C4 步骤 4 的训练门：偏差指标超阈值即**拒绝放行**。
+
+    口径（可审计）：
+      - 判据是 `|measurement| <= threshold`；
+      - `measurement is None`（测量失败）→ **拒绝**，理由 `measurement_unavailable`。
+        **失败即拒绝（fail closed）**：这是有意的 —— 一个跑不出偏差指标的训练，
+        不应因为"没报错"而拿到放行。
+      - `threshold <= 0` 视为配置错误 → 拒绝。
+
+    返回值供写入诊断 JSON 与训练门日志，字段固定，便于下游消费。
+    """
+    res: Dict[str, Any] = {
+        "metric_source": metric_source,
+        "threshold": float(threshold),
+        "measurement": None if measurement is None else float(measurement),
+    }
+    if threshold <= 0:
+        res.update(accepted=False, reason="invalid_threshold")
+        return res
+    if measurement is None:
+        res.update(accepted=False, reason="measurement_unavailable")
+        return res
+    if abs(float(measurement)) > float(threshold):
+        res.update(accepted=False, reason="move_bias_exceeds_threshold")
+        return res
+    res.update(accepted=True, reason="ok")
+    return res
+
+
 def _find_intent_train_json(datasets_dir) -> "Optional[Path]":
     """在 datasets 根下定位意图训练 json（与 `training/data.py` 同一份数据）。
 
@@ -522,6 +571,24 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
                 "real-data stats skipped: pass --datasets <datasets 根，含 *WargameData_mini01/train.json>"
             )
 
+    # ── C4 步骤 4：把偏差指标接成**训练门** ─────────────────────────────────
+    #
+    # 「要不要放行」用**真实数据**口径，理由：
+    #   - 噪声口径衡量的是"输出层偏置对随机输入的响应"，不是行为；
+    #   - 且它的样本数固定为 4，任何阈值都只是在量一个常数。
+    # 真实数据拿不到时（未传 --datasets 等）**不放行**，理由 `measurement_unavailable`
+    # —— 不用噪声口径顶上，否则等于用"量不准的数"去通过门。
+    _gate_threshold = 0.1
+    _real_measure = None
+    if isinstance(result.get("intent_real_data"), dict):
+        _real_measure = result["intent_real_data"].get("move_bias_estimate")
+    result["move_bias_gate"] = evaluate_move_bias_gate(
+        _real_measure, threshold=_gate_threshold, metric_source="intent_real_data")
+    # 为便于训练侧直接消费，同时给一个扁平字段
+    result["move_bias_gate_passed"] = bool(result["move_bias_gate"]["accepted"])
+    if not result["move_bias_gate"]["accepted"]:
+        result["recommended_next_actions"].append("address_intent_move_bias")
+
     # Tactical model diagnostics
     if tactical_model is not None:
         result["tactical_available"] = True
@@ -639,6 +706,30 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
             recs.append("compute_and_save_feature_normalizer")
         if "tactical_model_missing" in result["warnings"]:
             recs.append("enable_and_train_tactical_model")
+
+    # ── 建议动作必须服从**训练门**，而不是服从噪声告警 ─────────────────────
+    # `intent_negative_move_bias` 是**噪声口径**（4 个样本）产生的告警，
+    # 而门用的是**真实数据口径**。若两者结论相反（噪声偏、真实不偏），
+    # 就不能再建议"去纠偏" —— 否则产物自相矛盾：
+    # `move_bias_gate.accepted=true` 却同时给出 `address_intent_move_bias`。
+    if "move_bias_gate" in result:
+        if result["move_bias_gate"]["accepted"]:
+            result["recommended_next_actions"] = [
+                a for a in result["recommended_next_actions"] if a != "address_intent_move_bias"
+            ]
+            if "intent_negative_move_bias" in result["warnings"]:
+                result["warnings"].append(
+                    "intent_negative_move_bias_is_noise_only"  # 口径提示，非缺陷
+                )
+        else:
+            result["recommended_next_actions"].append("address_intent_move_bias")
+
+    # 去重且保持顺序：同一个动作可能同时被"告警路径"与"训练门"提出，
+    # 重复项在消费端会被当成两件事。
+    seen: set = set()
+    result["recommended_next_actions"] = [
+        a for a in result.get("recommended_next_actions", recs) if not (a in seen or seen.add(a))
+    ]
 
     return result
 
