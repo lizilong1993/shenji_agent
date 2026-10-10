@@ -199,6 +199,24 @@ class LearnedPolicy:
         model.eval()
         return model
 
+    def _load_objective_model(self, payload: Dict[str, Any]) -> Any:
+        """加载 objective 模型（I06 步骤 3）。
+
+        支持带 `model_state` 的包裹 dict 或裸 `state_dict`。
+        维度**从权重形状推导**，不硬编码 —— 否则特征口径一变会静默加载错。
+        """
+        state_dict = payload["model_state"] if "model_state" in payload else payload
+        first = state_dict.get("net.0.weight")
+        if first is None:
+            raise ValueError("objective state_dict 缺少 net.0.weight，无法推导维度")
+        from ai.models import ObjectiveModel  # noqa: PLC0415
+
+        model = ObjectiveModel(num_features=int(first.shape[1]),
+                               hidden_dim=int(first.shape[0]))
+        model.load_state_dict(state_dict)
+        model.eval()
+        return model
+
     def _load_normalizer(self, artifact_dir: Path) -> Dict[str, Any]:
         for name in ("situation_feature_normalizer.json", "feature_normalizer.json"):
             path = artifact_dir / name
@@ -327,6 +345,32 @@ class LearnedPolicy:
             else:
                 logging.getLogger(__name__).warning(
                     "tactical model file not found at %s; tactical_score will be 0", tactical_path
+                )
+
+            # I06 步骤 3：objective 模型（缺文件时**保持启发式回退**，不报错）
+            objective_name = payload.get("objective_model") or "objective_model.pt"
+            objective_path = candidate_dir / objective_name
+            if payload.get("objective_enabled") and objective_path.exists():
+                try:
+                    objective_state = torch.load(objective_path, map_location="cpu")
+                    self.objective_model = self._move_to_device(
+                        self._load_objective_model(objective_state)
+                    )
+                    self.objective_diagnostics["objective_model_loaded"] = True
+                    self.objective_diagnostics["objective_fallback_reason"] = None
+                except Exception as exc:
+                    logging.getLogger(__name__).warning(
+                        "objective model file %s exists but failed to load: %s",
+                        objective_path, exc,
+                    )
+                    self.objective_model = None
+                    self.objective_diagnostics["objective_fallback_reason"] = (
+                        "objective_model_load_failed"
+                    )
+            else:
+                self.objective_model = None
+                self.objective_diagnostics["objective_fallback_reason"] = (
+                    "objective_model_missing_using_heuristic"
                 )
 
             logging.getLogger(__name__).info(

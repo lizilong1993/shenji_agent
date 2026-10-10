@@ -1,35 +1,81 @@
 {
-  "generated_at": "20260428_235813",
-  "source_commit_sha": "c3bd538603afe1f020bea7709523c588fb8b69a0",
+  "generated_at": "20261010_215611",
+  "source_commit_sha": "15633292fccff262c33dc6378b5c919f8eae1647",
   "history_len": 8,
   "horizons": 5,
-  "intent_lstm": "intention_lstm.pth",
-  "situation_gcn": "situation_gcn.pth",
+  "intent_lstm": "intent_lstm.pt",
+  "situation_gcn": "situation_gcn.pt",
   "situation_feature_normalizer": "situation_feature_normalizer.json",
   "situation_normalizer_kind": "per_dimension_zscore",
   "situation_normalizer_fitted_on": "situation_train_split",
   "situation_normalizer_feature_dim": 108,
   "situation_normalizer_zero_std_count": 50,
   "situation_training_applied_normalizer": true,
-  "tactical_model": "tactical_model.pt",
+  "tactical_model": null,
   "objective_enabled": true,
-  "objective_mode": "heuristic_policy_score",
-  "objective_label_source": "experiments/shenji_agent/objective_labels/latest/objective_labels.jsonl",
-  "objective_label_counts": {
-    "total": 1480,
-    "high_confidence": 0,
-    "medium_confidence": 1453,
-    "low_confidence": 27
-  },
+  "objective_model": "objective_model.pt",
+  "objective_mode": "trained_objective_model",
   "objective_metrics": {
-    "model_trained": false,
-    "reason": "existing artifacts yielded no high-confidence score/capture/damage labels; policy uses objective heuristic scoring while new diagnostics collect stronger labels"
+    "model_trained": true,
+    "objective_mode": "trained_objective_model",
+    "train_loss": 6.672718524932861,
+    "val_mae": 7.844199180603027,
+    "val_sign_agreement": 0.957613814756672,
+    "baseline_mae": 8.074140548706055,
+    "improves_over_baseline": true,
+    "label_total": 3702,
+    "high_confidence": 3181,
+    "excluded_non_high": 521,
+    "feature_names": [
+      "damage_dealt",
+      "damage_taken",
+      "kill_dealt",
+      "kill_taken",
+      "occupy_success",
+      "distance_delta",
+      "city_value",
+      "side",
+      "has_damage",
+      "has_kill"
+    ],
+    "artifact": "objective_model.pt"
   },
+  "objective_label_counts": {
+    "total": 3702,
+    "high_confidence": 3181,
+    "medium_confidence": 0,
+    "low_confidence": 521
+  },
+  "objective_label_source": "experiments/shenji_agent/objective_labels/latest/objective_labels.jsonl",
   "managed_files": [
-    "intention_lstm.pth",
-    "situation_gcn.pth",
+    "intent_lstm.pt",
+    "situation_gcn.pt",
     "situation_feature_normalizer.json",
     "model_manifest.json",
-    "tactical_model.pt"
-  ]
+    "objective_model.pt"
+  ],
+  "environment": {
+    "experiment_id": "20261010_215611-15633292",
+    "generated_at": "20261010_215611",
+    "python_version": "3.10.9",
+    "python_implementation": "CPython",
+    "platform": "Linux-5.4.0-216-generic-x86_64-with-glibc2.31",
+    "requirements_lock_sha256": "25ca56982390d5008119db61cfa01c6491c5e3e015de930f058b407e114985bd",
+    "naming_rule": "checkpoint_policy/1: <generated_at>-<commit8>",
+    "torch_version": "2.0.1+cu117",
+    "artifact_sha256": {
+      "intent_lstm.pt": "ae0bde99f0322f02760d1c00f60f3d56c4bed75be2261c512c555cd9db19f750",
+      "situation_gcn.pt": "c59dc0f3ab7cf4eb5ebe7faa7eeffc8314b3c26d3052588f35cf010cf6fa25fc",
+      "situation_feature_normalizer.json": "05b36f047861e74980f6c089f098070b7180cb1282cdad8b80f501ac98cf6025",
+      "objective_model.pt": "c35615571b31fa437d4a6dc4663bec9f5e3e2eb0e1f6d567d9be9e0f3c53d7f4"
+    },
+    "cuda_available": true,
+    "cuda_device_count": 5
+  },
+  "artifact_sha256": {
+    "intent_lstm.pt": "ae0bde99f0322f02760d1c00f60f3d56c4bed75be2261c512c555cd9db19f750",
+    "situation_gcn.pt": "c59dc0f3ab7cf4eb5ebe7faa7eeffc8314b3c26d3052588f35cf010cf6fa25fc",
+    "situation_feature_normalizer.json": "05b36f047861e74980f6c089f098070b7180cb1282cdad8b80f501ac98cf6025",
+    "objective_model.pt": "c35615571b31fa437d4a6dc4663bec9f5e3e2eb0e1f6d567d9be9e0f3c53d7f4"
+  }
 }

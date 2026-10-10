@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from ai.policy import LearnedPolicy
 
@@ -21,11 +22,11 @@ def _obs(operators, cities):
     return {"operators": operators, "cities": cities, "time": {"cur_step": 1}}
 
 
-def _policy() -> LearnedPolicy:
+def _policy(artifact_dir: str = "ai/weights") -> LearnedPolicy:
     saved_device = os.environ.get("SHENJI_POLICY_DEVICE")
     os.environ["SHENJI_POLICY_DEVICE"] = "cpu"
     policy = LearnedPolicy()
-    policy.configure(faction=1, artifact_dir="ai/weights", policy_profile="challenger")
+    policy.configure(faction=1, artifact_dir=artifact_dir, policy_profile="challenger")
     if saved_device is None:
         os.environ.pop("SHENJI_POLICY_DEVICE", None)
     else:
@@ -33,10 +34,43 @@ def _policy() -> LearnedPolicy:
     return policy
 
 
-def test_policy_loads_with_objective_fallback_diagnostics() -> None:
+def test_policy_loads_the_trained_objective_model() -> None:
+    """**I06 步骤 3 之后**：`ai/weights/` 里有训练好的 objective 模型时**必须加载**。
+
+    本用例原为 `test_policy_loads_with_objective_fallback_diagnostics`，断言
+    `objective_model_loaded is False` —— 那时**还没有** objective 模型可加载。
+    第 52 轮训练出模型并发布后，该断言按设计失效，故改为**正向断言**，
+    并**另立**一条用例继续守回退路径（见下）—— 不是把回退用例删掉。
+    """
     policy = _policy()
     diagnostics = policy.get_diagnostics()
 
+    assert diagnostics["objective_model_loaded"] is True, (
+        "objective 模型存在却未加载：%s" % diagnostics.get("objective_fallback_reason"))
+    assert diagnostics["objective_fallback_reason"] is None
+
+
+def test_policy_falls_back_when_objective_model_is_absent(tmp_path) -> None:
+    """**回退路径必须仍然可用**：产物目录里没有 objective 模型时，
+    保持启发式打分、给出可读原因，**且不抛异常**。
+    """
+    import json
+    import shutil
+
+    weights = Path(__file__).resolve().parents[1] / "ai" / "weights"
+    manifest = json.loads((weights / "model_manifest.json").read_text(encoding="utf-8"))
+    manifest["objective_enabled"] = True
+    manifest["objective_model"] = "objective_model.pt"
+    (tmp_path / "model_manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+    for name in ("intent_lstm.pt", "situation_gcn.pt", "situation_feature_normalizer.json"):
+        src = weights / name
+        if src.is_file():
+            shutil.copy(src, tmp_path / name)
+    assert not (tmp_path / "objective_model.pt").exists()   # 故意不放
+
+    policy = _policy(artifact_dir=str(tmp_path))
+    diagnostics = policy.get_diagnostics()
     assert diagnostics["objective_model_loaded"] is False
     assert diagnostics["objective_fallback_reason"] == "objective_model_missing_using_heuristic"
 

@@ -175,3 +175,27 @@ class GraphSituationModel(nn.Module):
     def forward(self, x, adj):
         node_scores = self.backbone(x, adj)
         return node_scores.mean(dim=0)
+
+
+class ObjectiveModel(nn.Module):
+    """objective 奖励回归器（I06 步骤 3）。
+
+    由引擎裁决标签（`damage_kill_delta` / `occupy_success`）预测 `reward_proxy`，
+    取代原先恒定的启发式打分（`objective_mode=heuristic_policy_score`）。
+
+    放在 `ai/models.py` 而不是 `training/supervised.py`：
+    `ai/policy.py` 已从本模块导入其余模型，放这里可避免 policy 反向依赖 training 层。
+    """
+
+    def __init__(self, num_features=10, hidden_dim=64):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(num_features, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, max(hidden_dim // 2, 1)),
+            nn.ReLU(),
+            nn.Linear(max(hidden_dim // 2, 1), 1),
+        )
+
+    def forward(self, x):
+        return self.net(x).view(-1)

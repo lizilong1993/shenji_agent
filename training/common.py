@@ -120,7 +120,11 @@ def safe_device():
 # 抽成模块级常量而不是留在函数里的字面量：这样**生产代码与测试引用同一个集合**，
 # 测试才能真正否决「新增顶层字符串键」这类回归 —— 否则测试只能维护自己的一份
 # 快照白名单，加字段时改测试即可通过，守卫形同虚设。
-MANIFEST_NON_PATH_KEYS = frozenset({"generated_at", "managed_files", "environment"})
+MANIFEST_NON_PATH_KEYS = frozenset({
+    "generated_at", "managed_files", "environment",
+    # I06 步骤 3：标签出处是**元数据**（相对仓库路径），不是 run_dir 下的产物
+    "objective_label_source",
+})
 
 
 def copy_publish_artifacts(run_dir: Path, publish_dir: Path, manifest: Dict[str, Any]) -> None:

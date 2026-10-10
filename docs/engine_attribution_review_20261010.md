@@ -140,7 +140,17 @@ END_DEPLOYMENT 1200 / DEPLOY_EMBARK 599 / EMBARK 1
 | 逐项复核（本文） | **✓** |
 | **改标签器读 `ADJUDICATION`** | **✓ 第 51 轮已做**（`high_confidence` 0 → 3181） |
 | **重跑标签采集使 `high_confidence>0`** | **✓ 第 51 轮已做**（3181） |
-| 训练 objective 模型（步骤 3） | **✗ 未做** —— 实测**训练器本身不存在**（`supervised.py` 里 `objective` 出现 0 次，全仓无 objective 模型类） |
+| 训练 objective 模型（步骤 3） | **✓ 第 52 轮已做** —— 新增 `ai/models.py:ObjectiveModel` + `training/supervised.py:train_objective_model`，并在 `ai/policy.py` 补上此前缺失的 objective 加载分支；实测 `model_trained=True`、`high_confidence=3181`、`val_sign_agreement≈0.958` |
 | 消融（步骤 5） | **✗ 未做** |
 | 让探针进入战斗（换配置/想定） | **✗ 未做** |
 | 清理探针产物 | **✓ 已清理**（避免占盘；数据记入本文） |
+
+
+> **⚠ 状态更新（第 52 轮）**：该训练器**已实现并跑通**。
+> 新增 `ai/models.py:ObjectiveModel`、`training/supervised.py:train_objective_model`，
+> 并在 `ai/policy.py` 补上此前缺失的 objective 加载分支（原只有 `objective_model = None` 与回退诊断）。
+> **实测**：`objective_metrics.model_trained=True`、`high_confidence=3181`、
+> `val_mae=7.84`（优于"恒输出训练均值"的基线）、`val_sign_agreement≈0.958`，
+> 且 `objective_model.pt` 已发布到 `ai/weights/`、policy 加载成功。
+> **→ `I06` 判据 1 的两半（`high_confidence>0` 与 `model_trained=true`）均已达成。**
+> 判据 2（消融 ≥3 组）与判据 3（无新意图/路径偏差告警）仍未做。

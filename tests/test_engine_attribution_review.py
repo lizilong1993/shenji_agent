@@ -96,18 +96,25 @@ def test_doc_records_that_existing_labels_are_null() -> None:
     assert "final_outcome_credit" in d
 
 
-def test_manifest_matches_the_quoted_counts() -> None:
-    """**复核** manifest 现值与文档引用一致（防抄错）。"""
+def test_manifest_now_shows_the_trained_objective_state() -> None:
+    """**原为「manifest 的 high_confidence 仍为 0」的哨兵，第 52 轮已按其设计退场。**
+
+    第 50/51 轮这里断言 manifest 的 `high_confidence == 0`、`model_trained is False`,
+    如实记录了当时的缺口。第 52 轮训练出 objective 模型并重发布 manifest 后，
+    原断言必然失败 —— **这正是哨兵的作用**：它迫使文档与测试同步。
+
+    现改为正向断言：manifest 反映的已是**训练后**状态。
+    """
     if not MANIFEST.is_file():
         pytest.skip("manifest not present")
     m = json.loads(MANIFEST.read_text(encoding="utf-8"))
     olc = m.get("objective_label_counts") or {}
-    assert olc.get("high_confidence") == 0, "high_confidence 已非 0 —— 文档需更新"
-    assert olc.get("total") == 1480
     om = m.get("objective_metrics") or {}
-    assert om.get("model_trained") is False
+    assert int(olc.get("high_confidence") or 0) > 0, "high_confidence 又回到 0"
+    assert om.get("model_trained") is True, "model_trained 又变回 false"
+    assert m.get("objective_mode") == "trained_objective_model"
     d = _doc()
-    assert "1480" in d and "model_trained" in d
+    assert "3181" in d, "归因文档未记录训练后的高置信标签数"
 
 
 def test_doc_owns_the_failed_probe_honestly() -> None:

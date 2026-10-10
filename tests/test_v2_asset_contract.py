@@ -17,27 +17,51 @@ class V2AssetContractTests(unittest.TestCase):
         resolutions = resolve_manifest_assets(artifact_dir, manifest)
 
         self.assertTrue(resolutions["intent_lstm"].exists)
-        self.assertEqual(resolutions["intent_lstm"].path.name, "intention_lstm.pth")
+        # 第 52 轮：完整训练后 manifest 声明的是**规范名** `.pt`
+        # （I07 的注释已说明：命名解析在**发布时**处理，manifest 只声明本次训练写出的规范名）。
+        # 故这里断言规范名；历史 `.pth` 的兼容性由下面的别名用例负责。
+        self.assertEqual(resolutions["intent_lstm"].path.name, "intent_lstm.pt")
         self.assertFalse(resolutions["intent_lstm"].resolved_by_alias)
         self.assertTrue(resolutions["situation_gcn"].exists)
-        self.assertEqual(resolutions["situation_gcn"].path.name, "situation_gcn.pth")
+        self.assertEqual(resolutions["situation_gcn"].path.name, "situation_gcn.pt")
 
     def test_validators_report_naming_mismatch_instead_of_false_missing_assets(self) -> None:
-        artifact_dir = Path("ai/weights")
+        """校验器要能区分**「缺文件」**与**「命名不一致」**两件事。
+
+        ⚠ 第 52 轮调整：原用例要求 `ai/weights/` 里"有别名、没规范名"才能报 mismatch。
+        完整训练后 `ai/weights/` **同时有**规范名与历史别名，故那里**本就不该**报 mismatch。
+        若把那两条 `assertIn` 直接删掉，就等于放弃了这个校验职责 ——
+        故改为在**临时目录**里只放历史别名，用它继续守住"命名不一致要被报出来"。
+        另有断言保证：命名不一致**不会**被误报成"缺文件"（这正是本用例的原意）。
+        """
         manifest = {
             "intent_lstm": "intent_lstm.pt",
             "situation_gcn": "situation_gcn.pt",
             "tactical_model": "tactical_model.pt",
         }
 
-        resolutions = resolve_manifest_assets(artifact_dir, manifest)
-        missing = missing_required_assets(resolutions)
-        mismatches = naming_mismatches(resolutions)
+        # (a) 规范名齐备时：不得报缺、不得报 mismatch
+        ok_dir = Path("ai/weights")
+        ok = resolve_manifest_assets(ok_dir, manifest)
+        self.assertNotIn("intent_lstm", missing_required_assets(ok))
+        self.assertNotIn("situation_gcn", missing_required_assets(ok))
+        self.assertNotIn("intent_lstm", naming_mismatches(ok))
+        self.assertNotIn("situation_gcn", naming_mismatches(ok))
 
-        self.assertNotIn("intent_lstm", missing)
-        self.assertNotIn("situation_gcn", missing)
-        self.assertIn("intent_lstm", mismatches)
-        self.assertIn("situation_gcn", mismatches)
+        # (b) 只放**历史别名**时：应报 mismatch，且**不得**报缺文件
+        with tempfile.TemporaryDirectory() as tmp:
+            legacy = Path(tmp)
+            for name in ("intention_lstm.pth", "situation_gcn.pth", "tactical_model.pt"):
+                (legacy / name).write_bytes(b"x")
+            res = resolve_manifest_assets(legacy, manifest)
+            missing = missing_required_assets(res)
+            mismatches = naming_mismatches(res)
+            self.assertNotIn("intent_lstm", missing,
+                             "别名可解析时不应报缺文件")
+            self.assertNotIn("situation_gcn", missing,
+                             "别名可解析时不应报缺文件")
+            self.assertIn("intent_lstm", mismatches, "别名未解析成 mismatch")
+            self.assertIn("situation_gcn", mismatches, "别名未解析成 mismatch")
 
     def test_tactical_checkpoint_restored_status_is_ready(self) -> None:
         missing = manifest_missing_files(Path("ai/weights"))

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from collections import Counter
 from collections import defaultdict
 from pathlib import Path
@@ -329,6 +330,154 @@ def train_situation_model(
     }
 
 
+# ── I06 步骤 3：objective 模型（由引擎裁决标签真实训练）────────────────────
+#
+# 数据来源：`tools/build_objective_labels.py` 产出的 `objective_labels.jsonl`。
+# 第 51 轮修好标签器后，高置信标签（`damage_kill_delta` / `occupy_success`）达 3181 条。
+#
+# 特征口径：**全部取自标签既有字段，不自造**。
+# 目标：`reward_proxy`（由 `compute_reward_proxy()` 依据同一批事件算出，已含尺度归一）。
+OBJECTIVE_FEATURE_NAMES = [
+    "damage_dealt", "damage_taken", "kill_dealt", "kill_taken",
+    "occupy_success", "distance_delta", "city_value", "side",
+    "has_damage", "has_kill",
+]
+OBJECTIVE_FEATURE_DIM = len(OBJECTIVE_FEATURE_NAMES)
+
+
+def _objective_feature_vector(label: Dict[str, object]) -> "np.ndarray":
+    def g(key: str) -> float:
+        value = label.get(key)
+        if value is None or value is False:
+            return 0.0
+        if value is True:
+            return 1.0
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    damage_dealt = g("damage_dealt")
+    damage_taken = g("damage_taken")
+    kill_dealt = g("kill_dealt")
+    kill_taken = g("kill_taken")
+    return np.asarray([
+        damage_dealt, damage_taken, kill_dealt, kill_taken,
+        g("occupy_success"), g("distance_delta"), g("city_value"), g("side"),
+        1.0 if (damage_dealt or damage_taken) else 0.0,
+        1.0 if (kill_dealt or kill_taken) else 0.0,
+    ], dtype=np.float32)
+
+
+def load_objective_labels(path: Path) -> List[Dict[str, object]]:
+    """读 `objective_labels.jsonl`；坏行跳过而不抛（沿用既有风格）。"""
+    out: List[Dict[str, object]] = []
+    if not path.is_file():
+        return out
+    with path.open(encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(record, dict) and record.get("reward_proxy") is not None:
+                out.append(record)
+    return out
+
+
+def train_objective_model(config, labels_path, device, run_dir):
+    """训练 objective 模型，返回写进 manifest 的指标。
+
+    仅在**高置信**标签上训练：特征全为 0、目标恒为 0 的低置信标签
+    只会教模型"输出 0"，故显式排除并写明数量。
+    """
+    labels = load_objective_labels(labels_path)
+    high = [l for l in labels if str(l.get("label_confidence")) == "high"]
+    if len(high) < 4:
+        return {
+            "model_trained": False,
+            "objective_mode": "heuristic_policy_score",
+            "reason": "not_enough_high_confidence_labels",
+            "label_total": len(labels),
+            "high_confidence": len(high),
+        }
+
+    from ai.models import ObjectiveModel  # noqa: PLC0415
+
+    x = np.stack([_objective_feature_vector(l) for l in high])
+    y = np.asarray([float(l["reward_proxy"]) for l in high], dtype=np.float32)
+    train_idx, val_idx = train_test_split(
+        np.arange(len(high)), test_size=0.2, random_state=42, shuffle=True)
+
+    model = ObjectiveModel(num_features=OBJECTIVE_FEATURE_DIM,
+                           hidden_dim=int(config.get("hidden_dim", 64))).to(device)
+    criterion = nn.SmoothL1Loss()
+    optimizer = optim.Adam(model.parameters(), lr=float(config.get("learning_rate", 1e-3)))
+    x_t = torch.from_numpy(x).to(device)
+    y_t = torch.from_numpy(y).to(device)
+
+    train_losses = []
+    for _ in range(int(config.get("epochs", 20))):
+        model.train()
+        optimizer.zero_grad()
+        loss = criterion(model(x_t[train_idx]), y_t[train_idx])
+        loss.backward()
+        optimizer.step()
+        train_losses.append(float(loss.item()))
+
+    model.eval()
+    with torch.no_grad():
+        pred_val = model(x_t[val_idx]).cpu().numpy()
+    y_val = y[val_idx]
+    mae = float(np.mean(np.abs(pred_val - y_val)))
+    sign_agree = float(np.mean(np.sign(pred_val) == np.sign(y_val)))
+    # 朴素基线：恒输出**训练集均值** —— 用来判断"训练了"是否等于"学到东西"
+    train_mean = float(np.mean(y[train_idx]))
+    baseline_mae = float(np.mean(np.abs(np.full_like(y_val, train_mean) - y_val)))
+
+    weight_path = run_dir / "objective_model.pt"
+    torch.save(
+        {
+            "model_state": model.state_dict(),
+            "input_dim": OBJECTIVE_FEATURE_DIM,
+            "hidden_dim": int(config.get("hidden_dim", 64)),
+            "feature_names": OBJECTIVE_FEATURE_NAMES,
+            "target": "reward_proxy",
+        },
+        weight_path,
+    )
+    return {
+        "model_trained": True,
+        "objective_mode": "trained_objective_model",
+        "train_loss": train_losses[-1] if train_losses else None,
+        "val_mae": mae,
+        "val_sign_agreement": sign_agree,
+        "baseline_mae": baseline_mae,
+        "improves_over_baseline": bool(mae < baseline_mae),
+        "label_total": len(labels),
+        "high_confidence": len(high),
+        "excluded_non_high": len(labels) - len(high),
+        "feature_names": OBJECTIVE_FEATURE_NAMES,
+        "artifact": weight_path.name,
+    }
+
+
+def _objective_label_counts(objective_metrics):
+    """整理成 manifest 的 `objective_label_counts`。
+
+    `high_confidence` 是 `I06` **判据 1 的取证字段**，故单独列出、不藏在别处。
+    """
+    return {
+        "total": int(objective_metrics.get("label_total") or 0),
+        "high_confidence": int(objective_metrics.get("high_confidence") or 0),
+        "medium_confidence": 0,
+        "low_confidence": int(objective_metrics.get("excluded_non_high") or 0),
+    }
+
+
 def build_summary(metrics: Dict[str, object], run_dir: Path) -> None:
     tactical = metrics.get("tactical", {})
     tactical_line = (
@@ -450,6 +599,8 @@ def _build_model_manifest(config: Dict[str, object], metrics: Dict[str, object],
     ]
     if not tactical_skipped:
         managed_files.append("tactical_model.pt")
+    if (metrics.get("objective") or {}).get("model_trained"):
+        managed_files.append("objective_model.pt")
     situation_normalizer = metrics["situation"].get("normalizer", {})
     # 先取出 generated_at：experiment_id 由它派生，两处必须用**同一个**值，
     # 否则 now_tag() 被调两次会得到相差一秒的 ID 与时间戳。
@@ -473,6 +624,23 @@ def _build_model_manifest(config: Dict[str, object], metrics: Dict[str, object],
         "situation_normalizer_zero_std_count": situation_normalizer.get("zero_std_count"),
         "situation_training_applied_normalizer": situation_normalizer.get("training_applied_normalizer"),
         "tactical_model": "tactical_model.pt" if not tactical_skipped else None,
+          # ── I06 步骤 3：objective 模型（**纯加法**，不动既有键/既有类型）──
+          # 判据 1 的取证出口就在这里：
+          #   objective_metrics.model_trained 与 objective_label_counts.high_confidence
+          "objective_enabled": bool((metrics.get("objective") or {}).get("model_trained")),
+          "objective_model": ("objective_model.pt"
+                              if (metrics.get("objective") or {}).get("model_trained")
+                              else None),
+          "objective_mode": (metrics.get("objective") or {}).get(
+              "objective_mode", "heuristic_policy_score"),
+          "objective_metrics": metrics.get("objective") or {},
+          "objective_label_counts": _objective_label_counts(metrics.get("objective") or {}),
+          # **相对仓库**路径，不是绝对路径 —— 与 manifest 里其他"产物名"字段区分开。
+          # 它是**出处元数据**（标签从哪来），不是 run_dir 下的产物，
+          # 故同时登记进 MANIFEST_NON_PATH_KEYS，避免 copy_publish_artifacts 误当产物复制。
+          "objective_label_source": (
+              "experiments/shenji_agent/objective_labels/latest/objective_labels.jsonl"
+          ),
         "managed_files": managed_files,
         # I07 新增：实验 ID / 依赖版本 / 环境记录（**整块 dict**，理由见 _build_environment_record）。
         # 与 I06 的耦合点：两者都可能改本函数。本扩展是**纯加法**
@@ -530,6 +698,14 @@ def main() -> None:
             training_files,
             bucket_lookup,
             dataset_contract.get("situation", {}),
+            device,
+            run_dir,
+        ),
+        # I06 步骤 3：objective 模型由引擎裁决标签真实训练
+        "objective": train_objective_model(
+            config.get("objective", {}),
+            repo_root() / "experiments" / "shenji_agent" / "objective_labels"
+            / "latest" / "objective_labels.jsonl",
             device,
             run_dir,
         ),
