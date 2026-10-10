@@ -18,3 +18,10 @@ ai/weights/model_manifest.json
 __pycache__/
 *.pyc
 *.bak*
+
+# 意图消融对比报告：训练时生成，随数据变化
+situation3d/intent_ablation_*.md
+
+# Python 虚拟环境（第 47 轮实测 Shenji/dataset/.venv 未被忽略，污染全仓检索）
+.venv/
+venv/
