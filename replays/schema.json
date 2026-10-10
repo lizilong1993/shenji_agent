@@ -1,0 +1,199 @@
+{
+  "schema_version": "1.1.0",
+  "title": "shenji_replay_schema",
+  "spec_ref": "31006 4.4.2.1-4.4.2.3 复盘数据双核心；31006 5.1.2 复盘文件<=100MB（建议）",
+  "status": "definition_only",
+  "status_note": "本文件先定义格式与校验，不改写入端（I15 前置条件要求先定义 schema，避免历史复盘不可读）。写入端改造见 I15 步骤 2-3。",
+
+  "container": {
+    "kind": "zip",
+    "observed_example": "replays/replay_1770632023.2594852.zip",
+    "observed_size_bytes": 3812007,
+    "observed_size_limit_bytes": 104857600,
+    "entry_naming": "<run_id>/<frame_index>",
+    "entry_naming_regex": "^[^/]+/[0-9]+$",
+    "frame_index": "从 0 连续递增，等于该帧的写盘序号（实测 0..1801，共 1802 帧）",
+    "encoding": "utf-8",
+    "json_style": "ensure_ascii=False, separators=(\",\",\":\")",
+    "compat_note": "v1.0 读取器只依赖 container + frame 两节；v1.1 新增字段对旧文件可缺失。"
+  },
+
+  "dual_core": {
+    "requirement": "31006 4.4.2 要求复盘同时承载『人类操作数据集』与『智能体数据』两条主线",
+    "human_ops": { "frame_path": "actions", "present_in_v1": true,
+                   "note": "v1 只记原始命令 {cur_step, message, error}，未标注发出者/阵营/是否人类" },
+    "agent_data": { "frame_path": "agent", "present_in_v1": false,
+                    "required_in": ">=1.1.0",
+                    "note": "v1 完全缺失：无智能体内部决策摘要、无随机种子 → I15 的核心缺口" },
+    "seed": { "frame_path": "meta.seed", "present_in_v1": false, "required_in": ">=1.1.0" }
+  },
+
+  "frame_required_v1": [
+    "operators", "passengers", "time", "jm_points", "cities", "scores",
+    "landmarks", "terrain_id", "judge_info", "role_and_grouping_info",
+    "communication", "scenario_id", "valid_actions", "actions"
+  ],
+
+  "frame_optional_v1_1": [
+    "meta", "agent", "human"
+  ],
+
+  "frame_fields": {
+    "time": {
+      "type": "object",
+      "required": true,
+      "present_in_v1": true,
+      "fields": {
+        "cur_step": { "type": "integer", "note": "当前步；实测从 0 起" },
+        "tick": { "type": "number", "note": "仿真秒数" },
+        "max_time": { "type": "integer", "note": "时限（秒），实测 1800" },
+        "max_step": { "type": "integer", "note": "最大步数，实测 1800" },
+        "stage": { "type": "integer" }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "required": true,
+      "present_in_v1": true,
+      "element_observed_keys": ["cur_step", "message", "error"],
+      "note": "v1 的元素**不是**完整动作记录，只是原始下发的命令与其执行回执；有 2/40 帧非空，说明并非每帧都有动作。"
+    },
+    "operators": {
+      "type": "array",
+      "required": true,
+      "present_in_v1": true,
+      "element_key_count": 87,
+      "element_keys_observed": [
+        "obj_id", "color", "type", "name", "sub_type", "basic_speed", "armor", "A1",
+        "stack", "carry_weapon_ids", "remain_bullet_nums", "remain_bullet_nums_bk",
+        "guide_ability", "value", "valid_passenger_types", "max_passenger_nums",
+        "loading_capacity", "observe_distance", "move_state", "cur_hex", "cur_pos",
+        "speed", "move_to_stop_remain_time", "can_to_move", "flag_force_stop", "stop",
+        "move_path", "blood", "max_blood", "tire", "tire_accumulate_time", "keep",
+        "keep_remain_time", "on_board", "car", "launcher", "passenger_ids", "launch_ids",
+        "lose_control", "alive_remain_time", "get_on_remain_time", "get_on_partner_id",
+        "get_off_remain_time", "get_off_partner_id", "change_state_remain_time",
+        "target_state", "weapon_cool_time", "weapon_unfold_time", "weapon_unfold_state",
+        "see_enemy_bop_ids", "owner", "move_deployed", "close_combat", "stationary_count",
+        "forking", "forking_remain_time", "unioning", "unioning_remain_time",
+        "unioning_partner", "unioning_role", "altitude", "changing_altitude",
+        "changing_altitude_remain_time", "target_altitude", "activating_radar",
+        "activating_radar_remain_time", "radar_activated", "in_fort", "fort",
+        "entering_fort", "entering_fort_remain_time", "entering_fort_partner",
+        "exiting_fort", "exiting_fort_remain_time", "exiting_fort_partner",
+        "fort_passengers", "laying_mine", "laying_mine_remain_time",
+        "remaining_mine_count", "laying_mine_target_pos", "observable_distance",
+        "C2", "C3", "B1"
+      ],
+      "element_required": ["obj_id", "color", "cur_hex", "blood"],
+      "note": "字段极多且属 SDK 侧模型；本 schema 只**要求**定位与状态必需的 4 个，其余声明为‘允许出现、不强制’，以免 SDK 升级即校验失败。"
+    },
+    "passengers": { "type": "array", "required": true, "present_in_v1": true },
+    "jm_points": { "type": "array", "required": true, "present_in_v1": true },
+    "cities": {
+      "type": "array", "required": true, "present_in_v1": true,
+      "element_required": ["coord"],
+      "element_observed_keys": ["coord", "value", "flag", "name"]
+    },
+    "scores": {
+      "type": "object", "required": true, "present_in_v1": true,
+      "observed_keys": ["red_occupy", "red_remain", "red_remain_max", "red_attack",
+                        "red_total", "red_win", "blue_occupy", "blue_remain",
+                        "blue_remain_max", "blue_attack", "blue_total", "blue_win"]
+    },
+    "landmarks": {
+      "type": "object", "required": true, "present_in_v1": true,
+      "observed_keys": ["roadblocks", "minefields", "fortifications"]
+    },
+    "terrain_id": { "type": "integer", "required": true, "present_in_v1": true },
+    "judge_info": {
+      "type": "array", "required": true, "present_in_v1": true,
+      "note": "裁决信息（31006 4.4.2 要求的『裁决』一类记录）。v1 中实测为**空数组**，说明裁决并未真正落盘。"
+    },
+    "role_and_grouping_info": { "type": "object", "required": true, "present_in_v1": true },
+    "communication": { "type": "array", "required": true, "present_in_v1": true },
+    "scenario_id": { "type": "integer", "required": true, "present_in_v1": true },
+    "valid_actions": { "type": "object", "required": true, "present_in_v1": true },
+
+    "meta": {
+      "type": "object",
+      "required": false,
+      "present_in_v1": false,
+      "required_in": ">=1.1.0",
+      "description": "时间线与随机种子等‘重现所需’元数据。",
+      "fields": {
+        "run_id": { "type": "string" },
+        "seed": { "type": "integer", "note": "随机种子；31006 4.4.2.3 精确重现的必要条件" },
+        "sdk_version": { "type": "string" },
+        "agent_config": { "type": "object" },
+        "started_utc": { "type": "string" }
+      }
+    },
+
+    "agent": {
+      "type": "object",
+      "required": false,
+      "present_in_v1": false,
+      "required_in": ">=1.1.0",
+      "description": "智能体数据主线（31006 4.4.2 双核心之一）。v1 缺失。",
+      "fields": {
+        "decisions": {
+          "type": "array",
+          "note": "每步的决策摘要",
+          "element_fields": {
+            "cur_step": { "type": "integer" },
+            "seat": { "type": "string", "enum_hint": ["red", "blue"] },
+            "actor_id": { "type": "integer" },
+            "action_type": { "type": "string" },
+            "intent": { "type": "string" },
+            "intent_confidence": { "type": "number" },
+            "candidate_count": { "type": "integer" },
+            "chosen_source": { "type": "string", "enum_hint": ["learned", "rule_fallback", "no_valid_move_candidate"] },
+            "situation_score": { "type": "number" },
+            "tactical_score": { "type": "number" },
+            "objective_score": { "type": "number" },
+            "combined_score": { "type": "number" },
+            "route_len": { "type": "integer" },
+            "route_empty": { "type": "boolean" },
+            "route_failure_reason": { "type": "string" }
+          }
+        },
+        "model_refs": { "type": "object", "note": "所用模型/权重标识，便于重现" },
+        "deterministic": { "type": "boolean" }
+      }
+    },
+
+    "human": {
+      "type": "object",
+      "required": false,
+      "present_in_v1": false,
+      "required_in": ">=1.1.0",
+      "description": "人类操作主线（31006 4.4.2 双核心之一）。v1 的 actions 未区分发出者。",
+      "fields": {
+        "operations": {
+          "type": "array",
+          "element_fields": {
+            "cur_step": { "type": "integer" },
+            "user_id": { "type": "integer" },
+            "user_name": { "type": "string" },
+            "seat": { "type": "string", "enum_hint": ["red", "blue", "green"] },
+            "raw_message": { "type": "object", "note": "v1 actions[].message 原样保留" }
+          }
+        }
+      }
+    }
+  },
+
+  "size_limit": {
+    "limit_bytes": 104857600,
+    "limit_human": "100MB",
+    "binding": "31006 5.1.2 索引注为『建议』，故本 schema 按建议处理：超限**提示分片**，不作为硬失败。",
+    "on_exceed": "warn_and_suggest_sharding"
+  },
+
+  "playback": {
+    "by_index": "给定 frame_index（0 起）直接读 <run_id>/<index> 条目，O(1) 定位",
+    "by_tick": "线性扫描 time.cur_step 建索引后 O(1) 定位；允许多帧同 step，取第一帧",
+    "reconstruction": "单帧即该 tick 的完整 GREEN 视角快照（v1），故『重建』= 取出该帧；v1.1 起需叠加 agent.decisions 才能还原决策侧上下文"
+  }
+}
