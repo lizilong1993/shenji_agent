@@ -24,6 +24,7 @@
 | 各模块“效果入口”的调用点 | 逐入口列调用点 | 都只从各自 sink/handler 调用 |
 | **事件监听注册/注销配对** | 73 注册 vs 1 注销，逐个看调用位置与 viewer 生命周期 | **无泄漏**（见下） |
 | **模块内部状态 vs 注册表意图** | 逐对翻转 `desired`，再读模块自己的 `enabled`/`show` | `places.labels` ✓、`tiles.google3d` ✓、**`wsf3d.overlay` ✗ 已修** |
+| **本体副本 vs 单一真源** | 递归结构化 diff（`tools/check_ontology_sync.py`） | 真源 `Shenji/ontology/intent_ontology_v2.json`（22 意图）与副本 `engine/data/intent_ontology_v2.json` **只差 1 个字段**（`/parent_categories[4]/name_zh`：机动态势 vs 机动TS，属术语替换规则的**有意豁免**）；其余**零差异**。已装校验：**除登记豁免外任何差异即失败** |
 
 ## 监听器轴的结论依据（2026-10-08）
 
@@ -64,6 +65,7 @@ python3 tools/deeplink_selftest.py    # 16 条 URL + 图层意图断言 + 鸟瞰
 python3 tools/road_selftest.py        # 引擎侧
 python3 tools/intent_selftest.py
 python3 tools/intent_set_selftest.py
+python3 tools/check_ontology_sync.py # 本体副本 vs 单一真源（无远程依赖，本地即可跑）
 ```
 
 若改了 `manifest` 或重抓了瓦片，另跑一遍“声明 vs 盘上事实”
