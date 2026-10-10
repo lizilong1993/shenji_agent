@@ -70,13 +70,52 @@ def test_historical_v1_replay_passes_and_is_not_judged_as_v1_1(tmp_path: Path) -
     assert any("v1 replay" in w for w in rep["warnings"])
 
 
-def test_frame_declaring_v1_1_must_carry_agent_human_meta(tmp_path: Path) -> None:
+def test_frame_declaring_v1_1_must_carry_agent_and_seed(tmp_path: Path) -> None:
+    """声明 v1.1 就必须有 `agent` 段与 `meta.seed`。
+
+    ⚠ **不再要求 `human`** —— 该帧 `actions` 为空，**没有命令可标注**。
+    判定依据是 `replays/schema.json` 的 `dual_core`：
+    `agent_data.required_in` 与 `seed.required_in` 均为 `">=1.1.0"`，
+    而 `human_ops` **没有** `required_in`（schema 明写 `present_in_v1: true`，
+    其 `frame_path` 就是 v1 已有的 `actions`）。
+
+    修前实现把 `frame_optional_v1_1` 整份当成必需，于是"没有人类命令的帧"被判失败 ——
+    实测：1802 帧真实复盘升级时报 `missing=['human']`，那不是文件的错。
+    """
     f = _v1_frame(0)
-    f["meta"] = {"schema_version": "1.1.0"}          # 声明 v1.1，但缺 agent/human
+    f["meta"] = {"schema_version": "1.1.0"}          # 声明 v1.1，但缺 agent / seed
     p = _write_zip(tmp_path / "bad11.zip", [f])
     rep = validate(path=p)
     assert rep["ok"] is False
-    assert "agent" in rep["missing_keys"] and "human" in rep["missing_keys"]
+    assert "agent" in rep["missing_keys"]
+    assert "meta.seed" in rep["missing_keys"]
+
+
+def test_human_is_required_only_when_the_frame_has_actions(tmp_path: Path) -> None:
+    """`human` 是 `actions` 的**标注** —— 有命令才要求，无命令不要求。
+
+    两半都要测：只测"没有就不要求"会放过"有命令却没标注"的缺陷。
+    """
+    # (a) 有 actions 却没 human → 必须失败
+    f = _v1_frame(0)
+    f["meta"] = {"schema_version": "1.1.0", "seed": 42}
+    f["agent"] = {"decisions": []}
+    f["actions"] = [{"cur_step": 0, "message": {"actor": 1}, "error": None}]
+    p1 = _write_zip(tmp_path / "no_human.zip", [f])
+    rep1 = validate(path=p1)
+    assert rep1["ok"] is False, "有 actions 却缺 human，应判失败"
+    assert "human" in rep1["missing_keys"]
+
+    # (b) 无 actions 且无 human → 不应因缺 human 而失败
+    g = _v1_frame(0)
+    g["meta"] = {"schema_version": "1.1.0", "seed": 42}
+    g["agent"] = {"decisions": []}
+    g["actions"] = []
+    p2 = _write_zip(tmp_path / "no_actions.zip", [g])
+    rep2 = validate(path=p2)
+    assert "human" not in rep2["missing_keys"], \
+        "无 actions 的帧不应要求 human（修前正是这里判错）"
+    assert rep2["ok"] is True, rep2
 
 
 def test_fully_populated_v1_1_passes(tmp_path: Path) -> None:

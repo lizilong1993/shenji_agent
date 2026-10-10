@@ -28,6 +28,7 @@ SDK 一升级校验就会全线失败。故只**要求**定位与状态必需的
 from __future__ import annotations
 
 import json
+import os
 import re
 import zipfile
 from pathlib import Path
@@ -57,12 +58,41 @@ def load_schema(path: Optional[Path] = None) -> Dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-def _frame_required(schema: Dict[str, Any], version: str) -> List[str]:
-    """按 schema_version 决定必需字段：v1.1 才要求 meta/agent/human。"""
+def _dual_core_required(schema, version):
+    """v1.1 **聚合必需**的段 —— 依据 schema 的 `dual_core[*].required_in`。
+
+    | 段 | `frame_path` | `required_in` | 是否聚合必需 |
+    | --- | --- | --- | --- |
+    | `human_ops` | `actions` | **（无）** | **否** —— schema 说 `present_in_v1: true` |
+    | `agent_data` | `agent` | `>=1.1.0` | **是** |
+    | `seed` | `meta.seed` | `>=1.1.0` | **是** |
+    """
+    if not version or _ver_tuple(version) < (1, 1, 0):
+        return []
+    dual = schema.get("dual_core") or {}
+    out = []
+    if _ver_tuple(str((dual.get("agent_data") or {}).get("required_in") or "0")) >= (1, 1, 0):
+        out.append("agent")
+    if _ver_tuple(str((dual.get("seed") or {}).get("required_in") or "0")) >= (1, 1, 0):
+        out.append("meta.seed")
+    return out
+
+
+def _frame_required(schema, version):
+    """**逐帧**必需字段：v1 的必需键 + 「有 actions 时才要求 human」。
+
+    ⚠ 不再把 `frame_optional_v1_1` 整份当成必需 —— 名字就是 optional，
+    而 schema 的 `dual_core` 也只把 `agent_data` 与 `seed` 标为
+    `required_in: >=1.1.0`。实测教训：原实现让「没有人类命令的帧」被判失败
+    （1802 帧真实复盘升级时报 `missing=['human']`）——
+    那不是文件的错，是判定与 schema 不一致。
+    """
     req = list(schema.get("frame_required_v1", []))
     if version and _ver_tuple(version) >= (1, 1, 0):
-        req += list(schema.get("frame_optional_v1_1", []))
+        # `human` 段是 `actions` 的**标注**：有命令才谈得上标注
+        req.append("human:only_if_actions")
     return req
+
 
 
 def _ver_tuple(v: str) -> Tuple[int, int, int]:
@@ -147,13 +177,41 @@ def validate(size_limit_bytes: Optional[int] = None,
             rep["warnings"].append(
                 "v1 replay: meta/agent/human absent by design (dual-core gap recorded in schema.dual_core)")
 
+        # ── 逐帧必需：v1 的键必须**每帧都有**；`human` 只在该帧有 actions 时要求 ──
         missing = set()
         for _, name in entries:
             frame = json.loads(zf.read(name).decode("utf-8"))
             if not isinstance(frame, dict):
-                rep["bad_entries"].append("frame %s is %s, expected object" % (name, type(frame).__name__))
+                rep["bad_entries"].append(
+                    "frame %s is %s, expected object" % (name, type(frame).__name__))
                 continue
-            missing |= {k for k in req if k not in frame}
+            for k in req:
+                if k == "human:only_if_actions":
+                    # 有命令才谈得上"标注发出者"；`actions: []` 的帧不要求 human
+                    if frame.get("actions") and "human" not in frame:
+                        missing.add("human")
+                    continue
+                if k not in frame:
+                    missing.add(k)
+
+        # ── v1.1 聚合必需（schema.dual_core[*].required_in）：整份复盘**至少一帧**满足 ──
+        agg_req = _dual_core_required(schema, version)
+        agg_ok = {k: False for k in agg_req}
+        for _, name in entries:
+            frame = json.loads(zf.read(name).decode("utf-8"))
+            if not isinstance(frame, dict):
+                continue
+            meta = frame.get("meta") if isinstance(frame.get("meta"), dict) else {}
+            for k in agg_req:
+                if k == "meta.seed":
+                    if meta.get("seed") is not None:
+                        agg_ok[k] = True
+                elif k in frame:
+                    agg_ok[k] = True
+        for k, ok in agg_ok.items():
+            if not ok:
+                missing.add(k)
+        rep["dual_core_present"] = agg_ok
         rep["missing_keys"] = sorted(missing)
 
     rep["ok"] = not rep["missing_keys"] and not rep["bad_entries"]
@@ -226,6 +284,190 @@ class Replay:
     def iter_frames(self) -> Iterator[Tuple[int, Dict[str, Any]]]:
         for i, name in self._entries:
             yield i, json.loads(self._zf.read(name).decode("utf-8"))
+
+
+# ── 写入端：帧构造（I15 步骤 2/3）─────────────────────────────────────────
+#
+# 为什么放在这里而不是 `run_offline_games.py` 里
+# ---------------------------------------------
+# `run_offline_games.py` 顶部 `from train_env import TrainEnv` ——
+# 那要**闭源引擎**，本环境鉴权不通过，故其中的写入逻辑**无法在本地执行或验证**。
+# 把帧构造抽成**纯函数**放在本模块，就能：
+#   ① 用真实 schema 校验其产出（不需要引擎）；
+#   ② 让 `run_offline_games.py` 只改"取值来源"这一小段，降低改动面。
+#
+# 补的是 31006 4.4.2 的**双核心缺口**（schema.dual_core 记录）：
+#   - `agent` 段：v1 完全没有 → 无智能体内部决策摘要、无随机种子；
+#   - `human` 段：v1 只记原始命令 {cur_step, message, error}，**未标注发出者/是否人类**。
+
+FRAME_VERSION_V1 = "1.0.0"
+FRAME_VERSION_V1_1 = "1.1.0"
+
+
+def build_frame(v1_frame: Dict[str, Any], *,
+                seed: Optional[int] = None,
+                agent: Optional[Dict[str, Any]] = None,
+                human: Optional[Dict[str, Any]] = None,
+                scenario: Optional[str] = None,
+                frame_version: str = FRAME_VERSION_V1_1,
+                ) -> Dict[str, Any]:
+    """把一个 v1 帧**升级**成 v1.1 帧（补 `meta` / `agent` / `human` 三段）。
+
+    **不修改 v1 的既有字段** —— 只做加法，故历史读取方不受影响。
+
+    Parameters
+    ----------
+    v1_frame:
+        原本要写入 zip 的 `state[GREEN]` 快照（必需字段见 schema.frame_required_v1）。
+    seed:
+        随机种子。写入 `meta.seed`（`dual_core.seed` 规定的位置）。
+    agent:
+        智能体决策摘要。**至少给 `side`**；缺失时整个 `agent` 段不写，
+        由 `validate()` 按版本判失败 —— **不编造一个空摘要冒充"有数据"**。
+    human:
+        人类操作标注。键为帧序号或座位，值为 `{"actor_kind": "human"|"agent", ...}`。
+    scenario:
+        想定标识。
+    frame_version:
+        要写入的版本；默认 `1.1.0`（即"带双核心"）。
+
+    Returns
+    -------
+    新的帧字典。`v1_frame` **不被就地修改**（返回新对象），
+    因为调用方可能还要用原始快照做别的记录。
+    """
+    if not isinstance(v1_frame, dict):
+        raise ReplayFormatError("v1_frame must be a dict, got %s" % type(v1_frame).__name__)
+
+    frame: Dict[str, Any] = dict(v1_frame)
+
+    # ⚠ 版本必须写在 **`meta.schema_version`**：
+    # `validate()` 就是从这里读的（`version = str(_meta.get("schema_version") or "1.0.0")`），
+    # 读不到即按 **1.0.0** 判，于是 v1.1 的必需字段（meta/agent/human）**不会被检查**。
+    # 我第一版写在帧顶层 `schema_version`，结果"缺 agent 段的 v1.1 帧"被判通过 ——
+    # 实测出来的（反向自检：构造缺 agent 的帧，期望被拒，实际放行）。
+    # 顶层同时留一份只为肉眼可读，**判定一律以 meta 为准**。
+    meta: Dict[str, Any] = dict(v1_frame.get("meta") or {})
+    meta["schema_version"] = frame_version
+    if seed is not None:
+        meta["seed"] = int(seed)
+    if scenario is not None:
+        meta["scenario"] = str(scenario)
+    meta.setdefault("frame_version", frame_version)
+    frame["meta"] = meta
+    frame["schema_version"] = frame_version      # 便于人工查看；非判定依据
+
+    # `agent`：智能体内部决策摘要（v1 完全缺失的那条主线）
+    if isinstance(agent, dict) and agent:
+        frame["agent"] = dict(agent)
+
+    # `human`：人类操作标注（v1 只记原始命令，未标发出者）
+    if isinstance(human, dict) and human:
+        frame["human"] = dict(human)
+
+    return frame
+
+
+def annotate_human_actions(frame: Dict[str, Any], *,
+                           human_actor: int = 0,
+                           actor_kinds: Optional[Dict[str, str]] = None,
+                           ) -> Dict[str, Any]:
+    """给帧里的 `actions` 逐条**标注发出者**（补 `dual_core.human_ops` 的缺口）。
+
+    v1 的命令形如 `{"cur_step": .., "message": {"actor": ..}, "error": ..}` ——
+    **没有字段说明"这是人下的还是智能体下的"**，故双核心里的人类操作主线无法区分。
+
+    本函数**只加标注，不改原字段**：在每条命令上补 `actor_kind`
+    （`"human"` / `"agent"`）与 `actor`（原样透出便于核对）。
+
+    `actor_kinds` 可显式指定每个 actor 的类别；未指定时，
+    凡 `actor == human_actor` 记为 `"human"`，其余记为 `"agent"`。
+    """
+    if not isinstance(frame, dict):
+        raise ReplayFormatError("frame must be a dict")
+    actions = frame.get("actions")
+    if not isinstance(actions, list):
+        return frame            # 无动作可标注，原样返回（不伪造空列表）
+
+    kinds = dict(actor_kinds or {})
+    new_actions = []
+    for act in actions:
+        if not isinstance(act, dict):
+            new_actions.append(act)
+            continue
+        a = dict(act)
+        msg = a.get("message")
+        actor = msg.get("actor") if isinstance(msg, dict) else None
+        a["actor"] = actor                                # 原样透出，便于核对
+        if actor is not None and str(actor) in kinds:
+            a["actor_kind"] = kinds[str(actor)]
+        else:
+            a["actor_kind"] = "human" if (actor is not None and int(actor) == int(human_actor)) else "agent"
+        new_actions.append(a)
+    out = dict(frame)
+    out["actions"] = new_actions
+
+    # ── 帧级 `human` 段：双核心的"人类操作"主线 ──────────────────────────
+    # ⚠ 我第一版只给每条动作打了 `actor_kind`，**没写帧级 `human` 段**，
+    # 于是 1802 帧真实复盘升级时 `validate()` 报 `missing=['human']`（实测）。
+    #
+    # `human` 段内容**不是编造的**：它就是按 `actor_kind` 分出来的两类命令
+    # —— 人类下达的 vs 智能体下达的。这正是 v1 缺失、
+    # 而 `31006 4.4.2` 双核心要求分开记录的那条主线。
+    human_actions = [a for a in new_actions
+                     if isinstance(a, dict) and a.get("actor_kind") == "human"]
+    agent_actions = [a for a in new_actions
+                     if isinstance(a, dict) and a.get("actor_kind") == "agent"]
+    out["human"] = {
+        "actor_kind": "human",
+        "human_actor": int(human_actor),
+        "source": "actions[actor_kind]",
+        "action_count": len(human_actions),
+        "actions": human_actions,
+        "agent_action_count": len(agent_actions),
+    }
+    return out
+
+
+def write_replay(path: Path, frames: List[Dict[str, Any]], *, run_id: str,
+                 validate_first: bool = True, **validate_kwargs: Any) -> Dict[str, Any]:
+    """把帧列表写成 `replay_<run_id>.zip`，并可**写前校验**。
+
+    `validate_first=True`（默认）时先写临时文件、校验通过才改名 ——
+    **避免产出"写完了但没人知道它不合法"的复盘**。
+
+    返回校验报告（供调用方记入 manifest / 日志）。
+    """
+    import tempfile
+
+    if not frames:
+        raise ReplayFormatError("refusing to write a replay with no frames")
+    if not run_id:
+        raise ReplayFormatError("run_id is required (entry names are <run_id>/<index>)")
+
+    tmp_fd, tmp_name = tempfile.mkstemp(suffix=".zip")
+    os.close(tmp_fd)
+    tmp_path = Path(tmp_name)
+    try:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+            for i, frame in enumerate(frames):
+                z.writestr("%s/%d" % (run_id, i),
+                           json.dumps(frame, ensure_ascii=False, separators=(",", ":")))
+        rep = validate(path=tmp_path, **validate_kwargs)
+        if validate_first and not rep.get("ok"):
+            raise ReplayFormatError(
+                "replay failed schema validation, not published: missing=%s bad=%s"
+                % (rep.get("missing_keys"), rep.get("bad_entries")))
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(tmp_path, target)
+        return rep
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 def run_summary(path: Path) -> Dict[str, Any]:
