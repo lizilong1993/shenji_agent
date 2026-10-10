@@ -128,6 +128,38 @@ def _merge_policy_stats(matches: Iterable[Dict[str, object]]) -> Dict[str, objec
             return 0.0
         return float(learned / total)
 
+    def rate(numerator: int, denominator: int) -> float:
+        """比率，分母为 0 时返回 0.0（而不是抛异常/NaN）。"""
+        if denominator <= 0:
+            return 0.0
+        return float(numerator / denominator)
+
+    # C5 步骤 5：把「空路径率」从计数器提升为**可监控指标**。
+    #
+    # 为什么必须在这里算：聚合器此前只累计 `empty_route_count` 这类**原始计数**，
+    # 读者要自己除；而 `reports/shenji_agent_promotion_v3_report.md` 里那句
+    # 「空路径 15,506/23,500 = 66%」正是**事后手算**出来的 —— 指标不在产物里，
+    # 就无法在评估阶段设阈值、也没法随时间追踪。
+    #
+    # 只**新增**字段，不改既有键：`tests/*` 与 `scripts/generate_paper_prewrite_package.py`
+    # 都按子键读取 `move_route_aggregate`，删键会破坏它们。
+    _route = totals["move_route_agg"]
+    # 全部 move 动作里，连回退也拿不到路的占比（主指标）
+    _route["empty_route_rate"] = rate(_route["empty_route_count"], _route["total_attempts"])
+    # `reachable_city_total` 是**每次尝试的可达城市数之和**（见 ai/agent.py
+    # `"reachable_city_count": len(reachable_city_routes)`），**不是**「有城可达的尝试数」。
+    # 所以它能表达两种含义，两者都算出来并**分别命名**，避免读者像前序工作那样读错：
+    #   - 若该值 <= 尝试数（常态）：它约等于「有城可达的尝试数」，
+    #     则 `no_reachable_city_count` = 尝试数 − 该值 = 无城可达的尝试数；
+    #   - 每次尝试平均可达城市数 = `reachable_city_mean`（<1 表示多数尝试找不到可达城市）。
+    _route["no_reachable_city_count"] = max(0, _route["total_attempts"] - _route["reachable_city_total"])
+    _route["no_reachable_city_rate"] = rate(_route["no_reachable_city_count"], _route["total_attempts"])
+    _route["reachable_city_mean"] = rate(_route["reachable_city_total"], _route["total_attempts"])
+    # 分移动类型的空路径率：定位到具体是哪种机动方式在失路
+    for _mt, _mtv in _route["by_move_type"].items():
+        if isinstance(_mtv, dict):
+            _mtv["empty_rate"] = rate(int(_mtv.get("empty", 0)), int(_mtv.get("total", 0)))
+
     score_means = {}
     for action_key, values in totals["score_sums"].items():
         samples = int(values["samples"])

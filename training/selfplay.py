@@ -1419,6 +1419,25 @@ def _merge_policy_stats(*payloads: Dict[str, object]) -> Dict[str, object]:
                 "combined_score": float(values["combined_score"] / samples) if samples else 0.0,
             }
 
+    # C5 步骤 5：把空路径率变成可监控指标（与 training/evaluate.py 同口径：
+    # 该处负责 rating.json，本处负责运行期 policy_stats 产物）。
+    # 只新增字段、不改既有键：tests/* 与 scripts/generate_paper_prewrite_package.py
+    # 都按子键读取 move_route_aggregate。
+    _ra = move_route_agg_merged
+    _ra["empty_route_rate"] = float(_ra["empty_route_count"] / _ra["total_attempts"]) if _ra["total_attempts"] else 0.0
+    # `reachable_city_total` 是「每次尝试可达城市数之和」（ai/agent.py
+    # `"reachable_city_count": len(reachable_city_routes)`），**不是**「有城可达的尝试数」。
+    # 两个派生量分别命名，避免读者读错（前序工作即把类似量记成了
+    # `empty_route_with_no_reachable_city`）。
+    _ra["no_reachable_city_count"] = max(0, _ra["total_attempts"] - _ra["reachable_city_total"])
+    _ra["no_reachable_city_rate"] = (
+        float(_ra["no_reachable_city_count"] / _ra["total_attempts"]) if _ra["total_attempts"] else 0.0
+    )
+    _ra["reachable_city_mean"] = float(_ra["reachable_city_total"] / _ra["total_attempts"]) if _ra["total_attempts"] else 0.0
+    for _mtv in _ra["by_move_type"].values():
+        if isinstance(_mtv, dict):
+            _mtv["empty_rate"] = float(_mtv["empty"] / _mtv["total"]) if _mtv.get("total") else 0.0
+
     return {
         "counts": merged,
         "learned_path_coverage": coverage(move_total + shoot_total, move_learned + shoot_learned),
