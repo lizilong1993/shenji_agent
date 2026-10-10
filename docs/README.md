@@ -46,6 +46,21 @@
 
 ---
 
+## 2.3 名称对照（任务清单中曾出现的别名 → 实际落点）
+
+部分条目在编写时使用了别名或预期落点，实际交付以下列为准（**后续引用请改用实际落点**）：
+
+| 清单中的引用 | 实际落点 | 说明 |
+| --- | --- | --- |
+| `docs/std_clause_audit.md` | `outputs/标准条款原文核对表_20261010.md` | P0-3 实际交付为对外可用报告，落 `outputs/`（含 docx） |
+| `docs/baseline_ledger.md` | `outputs/基线台账_20261010.md` | P0-4 实际交付同上 |
+| `docs/merge_evidence.md`、`docs/merge_buckets.md` | `docs/repo_reconciliation_20261010.md` | P0-1 将「差异清单」与「分桶决策」合并进一份归并报告 |
+| `docs/reproduce_offline.md` | P2 仓库 `三维态势系统/situation3d/docs/`（**待产出**） | 属 P2 专属文档，按 §1 边界不在本目录 |
+
+> 规则：**P2 专属文档落 P2 仓库，不落本目录**；对外评审材料落 `outputs/`。§2.2 表格是**权威清单**，新增文档须先在此登记。
+
+---
+
 ## 3. 提交纪律（与本仓库既有约定一致）
 
 1. **显式路径提交**，绝不 `git add -A`；
