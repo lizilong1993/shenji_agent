@@ -48,11 +48,23 @@ const FOCUS_MASK_ID = 'overlay-focus-mask';
 // front end only paints frames[i]["occupation"] and never reads plotting.
 const OCCUPATION_LAYER_ID = 'situation.occupation';
 const OCCUPATION_FACE_HEIGHT_M = 1000;
+// I09：视觉编码的**唯一来源是 `web/src/theme.css`**，此处只做一次 Cesium 包装。
+// 原先这 4 个颜色是硬编码字面量，与 style.css 的 --red/--blue 各写一份
+// （实测同一个"红方"有两个值：#d0342c vs #c8352c），改一处不影响另一处。
+// `Theme` 读不到 CSS 时会回落到与其内置默认（与 theme.css 一致），故不会静默变黑。
+function themeColor(key) {
+  if (typeof window !== 'undefined' && window.Theme) {
+    return Cesium.Color.fromCssColorString(window.Theme.color(key));
+  }
+  // 无 Theme（极端情况）时不静默：抛出以便被 pageErrors 捕获，而不是画成黑色
+  throw new Error('Theme module unavailable; cannot resolve colour: ' + key);
+}
+
 const OCCUPATION_STATUS_COLORS = {
-  red: Cesium.Color.fromCssColorString('#d0342c'),
-  blue: Cesium.Color.fromCssColorString('#1f5fbf'),
-  contested: Cesium.Color.fromCssColorString('#d8a12a'),
-  neutral: Cesium.Color.fromCssColorString('#7d8a99'),
+  red: themeColor('faction-red'),
+  blue: themeColor('faction-blue'),
+  contested: themeColor('faction-contested'),
+  neutral: themeColor('faction-neutral'),
 };
 
 const state = {
@@ -430,9 +442,13 @@ function el(tag, className, html) {
 }
 
 function colorFor(affiliation) {
-  return affiliation === 'red'
-    ? Cesium.Color.fromCssColorString('#d0342c')
-    : Cesium.Color.fromCssColorString('#1f5fbf');
+  // I09：取值来自 `theme.css`（经 `Theme.faction()`），不再是硬编码字面量。
+  // `Theme.faction()` 覆盖 red/blue/green/其余→neutral，比原先的二元三元式更完整：
+  // 原先任何非 'red' 都会被画成蓝方色，**绿方与未知阵营也会变成蓝方**。
+  if (typeof window !== 'undefined' && window.Theme) {
+    return Cesium.Color.fromCssColorString(window.Theme.faction(affiliation));
+  }
+  throw new Error('Theme module unavailable; cannot resolve affiliation colour');
 }
 
 function levelColor(level) {
