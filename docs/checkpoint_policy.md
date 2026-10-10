@@ -164,4 +164,15 @@ python3 scripts/verify_checkpoint.py --weights ai/weights
    若要达成，需新增一个小规模双跑比对用例；另注意 `training/common.py::set_seed()`
    **未设** `torch.use_deterministic_algorithms(True)` / cudnn deterministic，
    故在 CUDA 上"逐字节一致"未必成立 —— 需先工程化确定性再谈守护。
+
+   > **⚠ 状态更新（第 55 轮）**：该缺口**已处理**。
+   > `training/common.py:set_seed` 现默认开启确定性：
+   > `torch.use_deterministic_algorithms(True)`、
+   > `torch.backends.cudnn.deterministic=True` + `benchmark=False`、
+   > 并设 `CUBLAS_WORKSPACE_CONFIG=:4096:8`（CUDA ≥10.2 要求）。
+   > **实测**（本机 CUDA **可用**，故这些设置不是摆设）：
+   > 同 seed 两次训练权重 **SHA-256 相同**（逐字节一致）；
+   > **异 seed 权重不同** —— 后者保证"种子确实生效"，
+   > 否则"一致"只说明训练没受种子影响。
+   > 守护见 `tests/test_i07_deterministic_seed.py`（含反向断言）。
 3. **未改训练循环**：定期/触发式保存的具体实现沿用既有代码，本文件只固化**策略与验证口径**。

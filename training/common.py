@@ -41,7 +41,44 @@ def _optional_torch() -> Any | None:
         return None
 
 
-def set_seed(seed: int) -> None:
+def set_seed(seed: int, *, deterministic: bool = True) -> None:
+    """固定随机种子；默认**同时开启确定性算法**（I07）。
+
+    ## 为什么加 `deterministic`
+
+    `31007 5.3.1 d)` 要求「为增强实验可重复性，训练初始化应允许设置随机数种子。
+    在环境模拟、模型初始化、数据混洗等环节使用固定种子，**可重复相同训练过程验证结果**」。
+
+    `docs/checkpoint_policy.md` 记录的缺口是：
+    「同 seed 两次训练权重**逐字节一致**既未实现也无守护」，
+    并注明「需**先工程化确定性**再谈守护」。
+
+    ## 实测事实（第 55 轮）
+
+    | 项 | 实测 |
+    | --- | --- |
+    | CPU 同 seed 两次训练权重 | **已逐字节一致**（SHA-256 相同） |
+    | `torch.backends.cudnn.deterministic` | **False**（未设） |
+    | `torch.are_deterministic_algorithms_enabled()` | **False** |
+    | `CUBLAS_WORKSPACE_CONFIG` | **未设** |
+    | CUDA 可用 | **True** |
+
+    **即：CPU 路径本来就一致，但 CUDA 路径缺少确定性保证。**
+    故此处补上 CUDA 侧的三项设置 —— 否则「逐字节一致」在 GPU 上不成立，
+    而本机有 GPU，训练**可能**落到 GPU 上。
+
+    ## `deterministic=False` 的用途
+
+    某些算子**没有**确定性实现（如部分 scatter/atomic 操作），
+    强开 `use_deterministic_algorithms(True)` 会让它们直接抛错。
+    故保留关掉的开关，供"能跑但要快"的场景使用 ——
+    **但那种场景下不得声称"逐字节可复现"**。
+
+    ## 副作用说明（如实记录）
+
+    `use_deterministic_algorithms(True)` 会让缺少确定性实现的算子**抛异常**
+    （而非静默给不确定结果）。这是**有意的**：宁可报错，也不要"看起来可复现、实际不可复现"。
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch = _optional_torch()
@@ -50,6 +87,34 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+    if not deterministic:
+        # ⚠ 必须**显式关掉**，否则"关"只是"不开启"——
+        # 我第一版直接 `return`，于是前一次 set_seed(默认 True) 打开的
+        # `use_deterministic_algorithms` 会**残留**，该开关成了假的。
+        # 测试 `test_deterministic_false_is_available_as_an_escape_hatch` 抓出了这一点。
+        try:
+            torch.use_deterministic_algorithms(False)
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            torch.backends.cudnn.deterministic = False
+            torch.backends.cudnn.benchmark = True
+        except Exception:  # noqa: BLE001
+            pass
+        return
+    # ── CUDA 确定性（本机 CUDA 可用，故这几项不是摆设）───────────────
+    # cuBLAS 在 CUDA >= 10.2 时需要该环境变量才保证确定性；
+    # 官方要求取值为 `:4096:8` 或 `:16:8`（前者显存占用更高）。
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    try:
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    except Exception:  # noqa: BLE001 - 非 CUDA 构建可能没有这些属性
+        pass
+    try:
+        torch.use_deterministic_algorithms(True)
+    except Exception:  # noqa: BLE001 - 老版本/特殊构建可能不支持
+        pass
 
 
 def load_config(path: Path | str) -> Dict[str, Any]:
