@@ -664,19 +664,100 @@ class Handler(SimpleHTTPRequestHandler):
         })
 
     def _api_health(self):
-        """Cheap liveness/config probe for the front end and for scripts."""
+        """Liveness/config probe.
+
+        I08 步骤 3：在**保留原有布尔字段**的前提下增加进程健康维度 ——
+        `level`（整体级别）、`subchecks`（逐子项状态）、`cache`（离线缓存状态）。
+        保留原字段是【风险与回滚】的明确要求：扩展不得破坏既有调用方
+        （`dataHealth.js` 与脚本都按 `ion_configured` / `tianditu_configured` 取值）。
+
+        ⚠ 本函数**不得抛异常**（健康检查自己失败就失去意义），
+        故每个子项各自 try/except 并把失败降级成该子项的 `error` 状态，
+        而不是让整条接口 500。
+        """
         import engine.wfs as wfs
+
+        subchecks = {}
+
+        def _check(name, fn, *, required=True):
+            """跑一个子项检查，把结果记进 subchecks。异常即该项 error。"""
+            try:
+                value = fn()
+                ok = bool(value)
+                subchecks[name] = {
+                    "status": "ok" if ok else ("error" if required else "warn"),
+                    "ok": ok, "detail": None, "required": required,
+                }
+            except Exception as exc:  # noqa: BLE001 - health must never raise
+                subchecks[name] = {
+                    "status": "error", "ok": False,
+                    "detail": "%s: %s" % (type(exc).__name__, exc), "required": required,
+                }
+
+        _check("ion_token", lambda: read_ion_token() is not None)
+        _check("tianditu_key", lambda: tianditu_key() is not None)
+
+        types = None
         try:
             types = {k: v.get("features") for k, v in wfs.feature_types().items()}
-        except Exception:  # noqa: BLE001 - health must never raise
-            types = None
+            subchecks["wfs_types"] = {
+                "status": "ok" if types else "warn", "ok": bool(types),
+                "detail": None, "required": False,
+            }
+        except Exception as exc:  # noqa: BLE001
+            subchecks["wfs_types"] = {
+                "status": "error", "ok": False,
+                "detail": "%s: %s" % (type(exc).__name__, exc), "required": False,
+            }
+
+        # 离线缓存状态：瓦片集是否在位（断网期前端靠它回放）。
+        # 只数顶层目录与 manifest 是否存在，**不做全量遍历** —— 健康检查必须廉价。
+        try:
+            tiles_root = os.path.join(WEB_ROOT, "tiles")
+            manifest = os.path.join(tiles_root, "manifest.json")
+            subchecks["offline_tiles"] = {
+                "status": "ok" if os.path.isdir(tiles_root) else "warn",
+                "ok": os.path.isdir(tiles_root),
+                "detail": None, "required": False,
+            }
+            subchecks["offline_manifest"] = {
+                "status": "ok" if os.path.isfile(manifest) else "warn",
+                "ok": os.path.isfile(manifest),
+                "detail": None, "required": False,
+            }
+        except Exception as exc:  # noqa: BLE001
+            subchecks["offline_tiles"] = {"status": "error", "ok": False,
+                                          "detail": str(exc), "required": False}
+
+        # 整体级别：任一**必需**子项 error → critical；有任意 error → error；
+        # 有 warn → warn；否则 ok。这样级别的来源可解释，不是拍脑袋。
+        statuses = [v["status"] for v in subchecks.values()]
+        if any(v["status"] == "error" and v.get("required") for v in subchecks.values()):
+            level = "critical"
+        elif "error" in statuses:
+            level = "error"
+        elif "warn" in statuses:
+            level = "warn"
+        else:
+            level = "ok"
+
         self._send_json({
+            # ── 原有字段（**保持不变**，扩展不破坏既有调用方）──
             "ok": True,
             "ion_configured": read_ion_token() is not None,
             "tianditu_configured": tianditu_key() is not None,
             "env_file": ENV_PATH,
             "wfs_types": types,
             "web_root": WEB_ROOT,
+            # ── I08 新增 ──
+            "level": level,
+            "subchecks": subchecks,
+            "cache": {
+                "offline_tiles_present": subchecks.get("offline_tiles", {}).get("ok", False),
+                "manifest_present": subchecks.get("offline_manifest", {}).get("ok", False),
+                "note": "断网期前端用这些离线资产回放；恢复后应标记陈旧区间",
+            },
+            "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         })
 
     def _api_post(self, path):

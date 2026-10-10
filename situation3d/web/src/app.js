@@ -3870,6 +3870,13 @@ function exportCsv() {
 // TS模块（src/situation.js）拿不到本文件的闭包，用这个接口回调。
 window.SituationHost = {
   state: state,
+  // I08 取证出口：统一事件模型的字段、队列、过滤与导出。
+  // 事件是"看得见的问题"，故必须能被外部（自检/探针）读到，而不是只画在界面上。
+  eventsDebug: function () { return window.EventFeed ? window.EventFeed.debug() : null; },
+  eventsFilter: function (opts) { return window.EventFeed ? window.EventFeed.filter(opts) : []; },
+  eventsExportCSV: function (opts) { return window.EventFeed ? window.EventFeed.exportCSV(opts) : ""; },
+  eventsExportJSON: function (opts) { return window.EventFeed ? window.EventFeed.exportJSON(opts) : "{}"; },
+  eventsPush: function (e) { return window.EventFeed ? window.EventFeed.push(e) : null; },
   relationsDebug: relationsDebug,
   selectTarget: function (id, fly) { selectTarget(id || null, !!fly); },
   viewer: function () { return viewer; },

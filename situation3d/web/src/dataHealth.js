@@ -159,7 +159,12 @@
                         ? '：' + t.sources[0].lastError : '') });
       }
     }
-    return {
+    // I08：report() 是健康状态的**唯一**汇总点，事件从这里统一发出。
+    // 级别由 attention 内容推出：有 failed → error；只有 pending → warn；否则 ok。
+    var _healthLevel = 'ok';
+    if (att.some(function (a) { return a.feed === 'failed'; })) _healthLevel = 'error';
+    else if (att.length > 0) _healthLevel = 'warn';
+    var _out = {
       at: new Date().toISOString(),
       attention: att,
       healthy: att.length === 0,
@@ -170,6 +175,117 @@
       buildings: b,
       governor: governor(),
       viewport: viewport(),
+    };
+    _out.healthLevel = _healthLevel;
+    _out.emittedEventSeqs = emitReport(_out, _healthLevel).map(function (e) { return e.seq; });
+    _out.stale = staleInfo();
+    return _out;
+  }
+
+  // ── I08 步骤 2/4：把零散提示统一改为**投递事件** ──────────────────────
+  //
+  // 各页此后不得自建提示结构：本文件产出的"待查项"一律经 `EventFeed.push()`
+  // 变成六字段事件（time/level/source/object/content/raw），
+  // 于是「按级别筛」「导出」「5 秒内可见」这三件事才有统一数据源。
+  //
+  // 两个必须防的退化：
+  //   1. **重复投递**：`report()` 会被面板反复调用，同一问题每次都 push 会瞬间
+  //      冲掉队列上限里的其它事件。故按 `dedupKey` 去重：状态不变就不重复报。
+  //   2. **静默丢事件**：`EventFeed` 缺省时**抛错**而不是静默跳过 ——
+  //      健康页自己"看起来很健康"但事件没进队列，是最坏的一种假通过。
+  var _lastLevel = null;
+  var _seenAttention = {};
+  var _offlineSince = null;      // 断网起点（毫秒）；恢复后用于标记**陈旧区间**
+
+  function _emit(level, obj, content, raw, dedupKey) {
+    if (!window.EventFeed || typeof window.EventFeed.push !== 'function') {
+      // 不静默：事件模型没加载时必须显式失败，而不是让告警消失
+      throw new Error('EventFeed 未加载：健康事件无处投递');
+    }
+    if (dedupKey) {
+      if (_seenAttention[dedupKey]) return null;
+      _seenAttention[dedupKey] = true;
+    }
+    return window.EventFeed.push({
+      level: level, source: 'dataHealth', object: obj,
+      content: content, raw: raw || {},
+    });
+  }
+
+  function _clearAttention(prefix) {
+    Object.keys(_seenAttention).forEach(function (k) {
+      if (k.indexOf(prefix) === 0) delete _seenAttention[k];
+    });
+  }
+
+  /** 把一次 report 的结果转成事件。供 report() 调用，也可单独调（测试用）。 */
+  function emitReport(r, healthLevel) {
+    var emitted = [];
+
+    // ① 整体级别：**只在变化时**投递，避免每次刷新都刷屏
+    if (healthLevel && healthLevel !== _lastLevel) {
+      var lvl = healthLevel === 'ok' ? 'info'
+              : healthLevel === 'warn' ? 'warn'
+              : healthLevel === 'error' ? 'error' : 'critical';
+      var e = _emit(lvl, 'health', '健康级别变为 ' + healthLevel,
+                    { previous: _lastLevel, current: healthLevel },
+                    null);   // 级别变化不按 key 去重，_lastLevel 本身就是去重
+      if (e) emitted.push(e);
+      _lastLevel = healthLevel;
+    }
+
+    // ② 每个待查项一条；恢复后清掉对应 key，使再次出现时能重新报
+    var seenNow = {};
+    (r.attention || []).forEach(function (a) {
+      var key = 'att:' + a.id + ':' + a.feed;
+      seenNow[key] = true;
+      var e2 = _emit(a.feed === 'failed' ? 'error' : 'warn', a.id,
+                     a.detail || a.label || a.id,
+                     { label: a.label, feed: a.feed, detail: a.detail },
+                     key);
+      if (e2) emitted.push(e2);
+    });
+    Object.keys(_seenAttention).forEach(function (k) {
+      if (k.indexOf('att:') === 0 && !seenNow[k]) delete _seenAttention[k];
+    });
+    return emitted;
+  }
+
+  /**
+   * 步骤 4：断网提示与**恢复后标记陈旧区间**。
+   * 判据 3 要求「断网 10 分钟缓存可回放」—— 回放靠的是离线资产（C1 的包），
+   * 但**必须让用户知道看到的是陈旧数据**，故记录断网起止并报出区间。
+   */
+  function noteConnectivity(isOnline, nowMs) {
+    var t = nowMs || Date.now();
+    if (!isOnline) {
+      if (_offlineSince === null) {
+        _offlineSince = t;
+        _emit('warn', 'network', '网络断开，改为离线缓存回放',
+              { offline_since: new Date(t).toISOString() }, 'net:offline');
+      }
+      return null;
+    }
+    if (_offlineSince !== null) {
+      var from = _offlineSince;
+      _offlineSince = null;
+      delete _seenAttention['net:offline'];
+      var mins = (t - from) / 60000;
+      var e = _emit('info', 'network', '网络恢复；此前 ' + mins.toFixed(1) + ' 分钟为缓存回放',
+                    { offline_since: new Date(from).toISOString(),
+                      recovered_at: new Date(t).toISOString(),
+                      stale_seconds: Math.round((t - from) / 1000) }, null);
+      return e;
+    }
+    return null;
+  }
+
+  /** 当前是否处于断网（供面板显示"数据陈旧"）。 */
+  function staleInfo() {
+    return {
+      offline: _offlineSince !== null,
+      offlineSince: _offlineSince === null ? null : new Date(_offlineSince).toISOString(),
+      staleSeconds: _offlineSince === null ? 0 : Math.round((Date.now() - _offlineSince) / 1000),
     };
   }
 
@@ -186,5 +302,9 @@
     layers: layers,
     tileStats: tileStats,
     viewport: viewport,
+    // I08 新增
+    emitReport: emitReport,
+    noteConnectivity: noteConnectivity,
+    staleInfo: staleInfo,
   };
 })();
