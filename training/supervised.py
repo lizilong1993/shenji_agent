@@ -382,6 +382,29 @@ def _requirements_lock_sha() -> "Optional[str]":
     return None
 
 
+def _artifact_sha256(names: "Sequence[str]", root: Path) -> Dict[str, str]:
+    """对 `root` 下**实际存在**的 `names` 计算 sha256（I07 步骤 3 要求「与声明的哈希一致」）。
+
+    **没有这张表，"逐字节核对"就无从谈起**：校验脚本只能打印实算值，
+    回答不了「这份权重是不是 manifest 说的那一份」。同形状的另一次训练产物、
+    甚至把 tactical 权重改名顶替 intent，都会判通过 —— 那正是评审实测出来的缺陷。
+
+    ⚠ 调用点必须传**本次产物所在目录**（发布时为发布目录），
+    **不能**默认读 `ai/weights/`：那会把上一次训练的旧哈希写进本次 manifest。
+    读不到就返回空 dict，由校验脚本标注「未核验哈希」，而不是编一个值。
+    """
+    import hashlib
+
+    out: Dict[str, str] = {}
+    if not Path(root).is_dir():
+        return out
+    for name in names:
+        f = Path(root) / name
+        if f.is_file():
+            out[name] = hashlib.sha256(f.read_bytes()).hexdigest()
+    return out
+
+
 def _build_environment_record(experiment_id: str, generated_at: str) -> Dict[str, object]:
     """环境记录（I07 步骤 2）。
 
@@ -401,6 +424,11 @@ def _build_environment_record(experiment_id: str, generated_at: str) -> Dict[str
         "requirements_lock_sha256": _requirements_lock_sha(),
         "naming_rule": "checkpoint_policy/1: <generated_at>-<commit8>",
         "torch_version": None,
+        # `artifact_sha256` **不在此处填**：本函数只知道 run_dir，而 manifest 会随产物
+        # 一起被复制到发布位。哈希由 `copy_publish_artifacts()` 在**复制完成后**按
+        # 发布目录的**实际字节**填入 —— 这样声明的一定是随本次产物发布的那一份。
+        # 放这里填会描述"发布位上已有的旧文件"，正是评审点出的静默漏发布隐患。
+        "artifact_sha256": {},
     }
     try:
         import torch  # noqa: PLC0415 - 缺 torch 也不该让清单构造失败
@@ -431,6 +459,11 @@ def _build_model_manifest(config: Dict[str, object], metrics: Dict[str, object],
         "source_commit_sha": git_head_sha(repo_root()),
         "history_len": int(config["intent"]["history_len"]),
         "horizons": int(config["intent"]["horizons"]),
+        # 声明的文件名 = **本次训练在 run_dir 里写出的**规范名（见 supervised.py 的落盘处）。
+        # ⚠ 不能按发布位 `ai/weights/` 的现有内容取名：那会让"上一次训练留下的旧文件"
+        # 决定本次 manifest 的声明，于是 `copy_publish_artifacts` 会去找
+        # `run_dir/<旧名>` 而找不到，**新权重被静默漏发布**，且声明的哈希描述的是旧产物。
+        # 命名解析（.pt vs 历史 .pth）放在**发布时**处理，不放在 manifest 构造时。
         "intent_lstm": "intent_lstm.pt",
         "situation_gcn": "situation_gcn.pt",
         "situation_feature_normalizer": "situation_feature_normalizer.json",

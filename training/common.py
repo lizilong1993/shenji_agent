@@ -114,6 +114,15 @@ def safe_device():
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+# manifest 里**不是文件路径**的键。`copy_publish_artifacts` 遍历 manifest 时
+# 会把任何字符串值当作 `run_dir` 下的路径去复制，故这些键必须跳过。
+#
+# 抽成模块级常量而不是留在函数里的字面量：这样**生产代码与测试引用同一个集合**，
+# 测试才能真正否决「新增顶层字符串键」这类回归 —— 否则测试只能维护自己的一份
+# 快照白名单，加字段时改测试即可通过，守卫形同虚设。
+MANIFEST_NON_PATH_KEYS = frozenset({"generated_at", "managed_files", "environment"})
+
+
 def copy_publish_artifacts(run_dir: Path, publish_dir: Path, manifest: Dict[str, Any]) -> None:
     ensure_dir(publish_dir)
     managed_files = manifest.get("managed_files", [])
@@ -127,12 +136,36 @@ def copy_publish_artifacts(run_dir: Path, publish_dir: Path, manifest: Dict[str,
             elif target.exists():
                 target.unlink()
     for name, rel_path in manifest.items():
-        if name in {"generated_at", "managed_files"} or not isinstance(rel_path, str):
+        if name in MANIFEST_NON_PATH_KEYS or not isinstance(rel_path, str):
             continue
         src = run_dir / rel_path
         if src.exists():
             target = publish_dir / src.name
             target.write_bytes(src.read_bytes())
+    # ── I07：按**发布目录的实际字节**填入哈希，然后写 manifest ──────────────
+    # 顺序很关键：必须在复制**之后**算，否则声明的是"复制前"的旧文件；
+    # 而 manifest 又必须在填完哈希**之后**写，否则盘上的 manifest 里没有哈希。
+    #
+    # 为什么在这里而不是在 `_build_model_manifest()` 里：只有本函数知道
+    # 「这次到底发布了哪些文件、字节是什么」。在 manifest 构造期去读 `ai/weights/`
+    # 会把**上一次训练**的哈希写进本次 manifest，并可能让
+    # `copy_publish_artifacts` 去找 `run_dir/<旧名>` 而漏发布新权重。
+    try:
+        import hashlib
+
+        declared = {}
+        for name in manifest.get("managed_files", []) or []:
+            if not isinstance(name, str):
+                continue
+            f = publish_dir / name
+            if f.is_file():
+                declared[name] = hashlib.sha256(f.read_bytes()).hexdigest()
+        if isinstance(manifest.get("environment"), dict):
+            manifest["environment"]["artifact_sha256"] = declared
+        manifest["artifact_sha256"] = declared
+    except Exception:  # noqa: BLE001 - 发布不应因算哈希而失败
+        pass
+
     save_json(manifest, publish_dir / "model_manifest.json")
 
 

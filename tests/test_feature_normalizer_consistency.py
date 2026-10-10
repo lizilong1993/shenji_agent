@@ -36,7 +36,7 @@ def test_zero_std_dimension_uses_safe_std_without_nan_or_inf() -> None:
     assert torch.isfinite(transformed).all()
 
 
-def test_manifest_records_training_normalizer_contract(monkeypatch) -> None:
+def test_manifest_records_training_normalizer_contract(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr("training.supervised.now_tag", lambda: "test-tag")
     monkeypatch.setattr("training.supervised.git_head_sha", lambda _cwd: "abc123")
     config = {"intent": {"history_len": 8, "horizons": 5}}
@@ -70,15 +70,19 @@ def test_manifest_records_training_normalizer_contract(monkeypatch) -> None:
     assert "naming_rule" in env, "缺少命名规则声明"
     # 依赖哈希可能为 None（本仓无 lock 文件时）—— 但**键必须存在**
     assert "requirements_lock_sha256" in env, "缺少依赖哈希键（值可为 None，但不得缺席）"
-    # 关键：顶层不得因此多出字符串值 —— 否则 copy_publish_artifacts 会把它们当文件路径
+    # 关键：不得新增"会被 copy_publish_artifacts 当文件路径复制"的顶层字符串值。
+    # **引用生产代码的跳过集合**，不抄白名单快照 —— 抄一份会与实现各自漂移，
+    # 而且会在 I06 写入合法字符串字段时误报（评审实测过）。
+    # 按**真实 run_dir** 判定（不是 repo_root）：copy_publish_artifacts 复制的是
+    # run_dir / <值>。用 repo_root 会把"恰好与仓内某文件同名的合法字段"误判为危害。
+    from training.common import MANIFEST_NON_PATH_KEYS
+
+    run_dir = tmp_path
     for key, value in manifest.items():
-        if key in ("generated_at", "managed_files"):
+        if key in MANIFEST_NON_PATH_KEYS or not isinstance(value, str):
             continue
-        assert not isinstance(value, str) or key in (
-            "source_commit_sha", "intent_lstm", "situation_gcn",
-            "situation_feature_normalizer", "tactical_model",
-            "situation_normalizer_kind", "situation_normalizer_fitted_on",
-        ), "顶层新增了字符串值 %r，会被 copy_publish_artifacts 当文件路径处理" % key
+        assert not (run_dir / value).exists(), (
+            "顶层字符串值 %r=%r 在 run_dir 下真实存在，会被 copy_publish_artifacts 复制" % (key, value))
 
 
 class _Backbone(nn.Module):
