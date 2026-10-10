@@ -26,6 +26,9 @@
 """
 from __future__ import annotations
 
+import time
+from pathlib import Path
+
 from typing import Any, Dict, List, Optional
 
 from ai.agent import Agent
@@ -168,3 +171,208 @@ class AgentAPI:
         if not self.enabled:
             return None
         return self._require_agent().load(path)
+
+    # ── 多模态态势接口（I04 步骤 1/2/3）────────────────────────────────────
+
+    def get_multimodal_situation(self, frames: Any = None, *,
+                                 vector: Any = None,
+                                 image: Any = None,
+                                 targets: Any = None,
+                                 hotspot_names: Any = (),
+                                 case_id: Optional[str] = None,
+                                 case_name: Optional[str] = None,
+                                 start_utc: Optional[str] = None,
+                                 tick_seconds: Optional[float] = None,
+                                 observation: Any = None,
+                                 ) -> Dict[str, Any]:
+        """返回 `{text, image, vector, meta}` 多模态态势四件套。
+
+        **任一模态失败置空并标 `degraded=true`，不做隐式替代**（`I04`【风险与回滚】）。
+
+        Parameters
+        ----------
+        frames:
+            态势帧序列（`build_brief` 的输入）。缺省时文本模态置空。
+        vector:
+            108 维特征。**不传时**会尝试由 `observation` 经 P3 `ai.features` 生成；
+            两者都没有则 `vector=[]`。
+        image:
+            简化态势图**引用**（路径字符串或含 `path` 的 dict）。
+            **接口内不做渲染** —— 渲染是调用方的事（步骤 3）。
+        observation:
+            P3 的 observation；从中取算子 + 帧级标量生成 108 维。
+
+        Returns
+        -------
+        dict
+            `text:str` / `image:dict` / `vector:list[float]` / `meta:dict`
+        """
+        self.forwarded.setdefault("get_multimodal_situation", 0)
+        self.forwarded["get_multimodal_situation"] += 1
+
+        degraded: List[str] = []
+        meta: Dict[str, Any] = {
+            "schema_version": MULTIMODAL_SCHEMA_VERSION,
+            "interface_version": MULTIMODAL_SCHEMA_VERSION,
+            "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "source": "ai.adapters.AgentAPI",
+            "modalities_available": [],
+            "degraded": False,
+        }
+        if case_id is not None:
+            meta["case_id"] = case_id
+
+        # ── 文本模态：复用 P2 brief.py，不另写叙述逻辑（步骤 2）──────────
+        text = ""
+        brief_mod = _p2_brief_module()
+        if brief_mod is None:
+            degraded.append("text: P2 engine/brief.py 不可用")
+        elif not frames:
+            degraded.append("text: 未提供 frames")
+        else:
+            try:
+                brief = brief_mod.build_brief(
+                    frames, targets=targets, hotspot_names=hotspot_names,
+                    case_id=case_id, case_name=case_name,
+                    start_utc=start_utc, tick_seconds=tick_seconds)
+                text = brief_mod.render_text(brief) or ""
+                meta["brief_headline"] = brief.get("headline")
+                meta["brief_frame_count"] = brief.get("frame_count")
+                if not text.strip():
+                    degraded.append("text: brief 渲染为空")
+            except Exception as exc:  # noqa: BLE001 - 单模态失败不得拖垮接口
+                degraded.append("text: %s: %s" % (type(exc).__name__, exc))
+
+        # ── 图像模态：只返回引用与尺寸，**不渲染**（步骤 3）────────────
+        image_ref, image_err = _image_ref(image)
+        if image_err:
+            degraded.append("image: %s" % image_err)
+
+        # ── 向量模态：108 维。不截断、不补齐、不换另一套语义 ────────────
+        vec = vector
+        if vec is None and observation is not None:
+            made, err = _vector_from_observation(observation)
+            if err:
+                degraded.append("vector: %s" % err)
+            else:
+                vec = made
+        vals, vec_err = _p3_vector(vec, EXPECTED_VECTOR_DIM)
+        if vec_err:
+            degraded.append("vector: %s" % vec_err)
+        else:
+            meta["vector_feature_dim"] = len(vals)
+            meta["vector_source"] = "ai.features.operator_to_feature (P3)"
+            # Q10 未关闭：**分别**登记两套 schema，不合并、不假装同义
+            names = _p2_feature_names()
+            meta["p2_vector_schema"] = {
+                "module": "situation3d/engine/intent_features.py",
+                "schema_version": "ifv2",
+                "feature_names_available": bool(names),
+                "feature_dim": len(names) if names else None,
+                "note": ("与 P3 的 vector **语义不同**（见 docs/data_dictionary_mapping.md）；"
+                         "本接口不做数值合并，也不在两套之间做隐式替代"),
+            }
+
+        if text.strip():
+            meta["modalities_available"].append("text")
+        if image_ref:
+            meta["modalities_available"].append("image")
+        if vals:
+            meta["modalities_available"].append("vector")
+        meta["degraded"] = bool(degraded)
+        if degraded:
+            meta["degraded_reasons"] = degraded
+
+        return {"text": text, "image": image_ref, "vector": vals, "meta": meta}
+
+
+# ── 多模态接口的取值辅助（I04）────────────────────────────────────────────
+
+EXPECTED_VECTOR_DIM = 108
+MULTIMODAL_SCHEMA_VERSION = "mm/1"
+
+
+def _p2_brief_module():
+    """惰性导入 P2 的 `engine/brief.py`。
+
+    **惰性**：`situation3d/` 不在 P3 常规 import 路径上，而适配层必须在
+    **没有 P2 引擎**的环境里也能被导入（否则 `I03` 的契约会一起崩）。
+    导入失败返回 `None`，交调用方置空并标 `degraded`。
+    """
+    import sys
+
+    root = Path(__file__).resolve().parents[2] / "situation3d"
+    if not (root / "engine" / "brief.py").is_file():
+        return None
+    p = str(root)
+    if p not in sys.path:
+        sys.path.insert(0, p)
+    try:
+        from engine import brief as brief_mod
+
+        return brief_mod
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _p2_feature_names():
+    """P2 `ifv2` 的 108 个名字（拿不到返回 `None`）。仅用于**登记**两套 schema 不同。"""
+    try:
+        from engine import intent_features as if_mod
+
+        return list(if_mod.feature_names())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _vector_from_observation(observation):
+    """由 P3 observation 生成 108 维（复用 `ai.features`，**不另写特征逻辑**）。"""
+    if not isinstance(observation, dict):
+        return None, "observation 不是 dict"
+    try:
+        from ai import features as feat_mod
+
+        ops = observation.get("operators") or []
+        op = None
+        for o in ops:
+            if isinstance(o, dict) and o.get("color") is not None:
+                op = o
+                break
+        if op is None and ops:
+            op = ops[0] if isinstance(ops[0], dict) else None
+        if op is None:
+            return None, "observation 里没有可用算子"
+        return feat_mod.operator_to_feature(op, frame=observation), None
+    except Exception as exc:  # noqa: BLE001
+        return None, "%s: %s" % (type(exc).__name__, exc)
+
+
+def _p3_vector(vector, feature_dim):
+    """规整 108 维向量；长度不符则**拒绝**（不截断、不补齐 —— 那是隐式替代）。"""
+    if vector is None:
+        return [], "未提供 vector（P3 侧应由 ai.features.operator_to_feature 生成）"
+    try:
+        vals = [float(x) for x in vector]
+    except (TypeError, ValueError) as exc:
+        return [], "vector 不是数值序列: %s: %s" % (type(exc).__name__, exc)
+    if len(vals) != feature_dim:
+        return [], "vector 长度 %d != FEATURE_DIM %d（不截断也不补齐）" % (len(vals), feature_dim)
+    return vals, None
+
+
+def _image_ref(image):
+    """规整图像模态为**引用 + 尺寸**（步骤 3：接口内不做渲染阻塞）。"""
+    if image is None:
+        return {}, "未提供 image 引用"
+    if isinstance(image, str):
+        return {"path": image}, None
+    if isinstance(image, dict):
+        path = image.get("path")
+        if not path:
+            return {}, "image 缺 path"
+        out = {"path": str(path)}
+        for k in ("width", "height", "format"):
+            if image.get(k) is not None:
+                out[k] = image[k]
+        return out, None
+    return {}, "image 类型非法（应为路径字符串或含 path 的 dict）"
