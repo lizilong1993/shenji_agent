@@ -1,0 +1,141 @@
+{
+  "git_head": "ae50c23d3c6f6b1e5d2784214cee46f4d80781a4",
+  "manifest_path": "/remote-home/lizilong/shenji_agent/ai/weights/model_manifest.json",
+  "manifest_loaded": true,
+  "intent_model_path": "/remote-home/lizilong/shenji_agent/ai/weights/intent_lstm.pt",
+  "situation_model_path": "/remote-home/lizilong/shenji_agent/ai/weights/situation_gcn.pt",
+  "tactical_model_path": "/remote-home/lizilong/shenji_agent/ai/weights/tactical_model.pt",
+  "history_len": 8,
+  "horizons": 5,
+  "feature_dim": 108,
+  "situation_checkpoint_loaded": true,
+  "intent_checkpoint_loaded": true,
+  "tactical_checkpoint_loaded": true,
+  "normalizer_available": true,
+  "normalizer_loaded": true,
+  "asset_resolutions": {
+    "intent_lstm": {
+      "key": "intent_lstm",
+      "expected_name": "intent_lstm.pt",
+      "resolved_path": "/remote-home/lizilong/shenji_agent/ai/weights/intent_lstm.pt",
+      "exists": true,
+      "required": true,
+      "resolved_by_alias": false,
+      "alias_for": null
+    },
+    "situation_gcn": {
+      "key": "situation_gcn",
+      "expected_name": "situation_gcn.pt",
+      "resolved_path": "/remote-home/lizilong/shenji_agent/ai/weights/situation_gcn.pt",
+      "exists": true,
+      "required": true,
+      "resolved_by_alias": false,
+      "alias_for": null
+    }
+  },
+  "missing_required_assets": {},
+  "warnings": [
+    "intent_negative_move_bias",
+    "intent_negative_move_bias_on_real_data"
+  ],
+  "recommended_next_actions": [
+    "address_intent_move_bias"
+  ],
+  "manifest_generated_at": "20261010_215611",
+  "manifest_source_commit": "15633292fccff262c33dc6378b5c919f8eae1647",
+  "manifest_managed_files": [
+    "intent_lstm.pt",
+    "situation_gcn.pt",
+    "situation_feature_normalizer.json",
+    "model_manifest.json",
+    "objective_model.pt"
+  ],
+  "normalizer_applied_in_training": true,
+  "normalizer_manifest_feature_dim": 108,
+  "normalizer_manifest_kind": "per_dimension_zscore",
+  "situation_checkpoint_training_applied_normalizer": true,
+  "situation_pre_sigmoid_mean": 0.46354332672698156,
+  "situation_pre_sigmoid_std": 0.10326790543529028,
+  "situation_pre_sigmoid_min": 0.36081433296203613,
+  "situation_pre_sigmoid_max": 0.8310711979866028,
+  "situation_output_mean": 0.503636767466863,
+  "situation_output_std": 0.10146298060693457,
+  "situation_per_node_variance_mean": 0.008302144337600717,
+  "intent_output_distribution": {
+    "class_0": 0.6108258366584778,
+    "class_1": 0.03869706392288208,
+    "class_2": 0.11041703075170517,
+    "class_3": 0.07079121470451355,
+    "class_4": 0.06358888000249863,
+    "class_5": 0.06379123032093048,
+    "class_6": 0.04188871011137962
+  },
+  "intent_num_classes": 7,
+  "intent_bias_sample_count": 4,
+  "move_bias_estimate": -0.5459635346972694,
+  "intent_real_data": {
+    "source": "/remote-home/lizilong/shenji_agent/datasets/意图识别研究数据集WargameData_mini01/train.json",
+    "stream_frames_total": 7815,
+    "frames_used": 800,
+    "sample_count": 793,
+    "num_classes": 7,
+    "class_distribution": {
+      "class_0": 0.6251643896102905,
+      "class_1": 0.03635575994849205,
+      "class_2": 0.08797496557235718,
+      "class_3": 0.08413925021886826,
+      "class_4": 0.05774727836251259,
+      "class_5": 0.058651749044656754,
+      "class_6": 0.049966443330049515
+    },
+    "move_bias_estimate": -0.5626918837815067,
+    "label_horizon0_histogram": {
+      "0": 448,
+      "1": 7,
+      "2": 55,
+      "3": 57,
+      "4": 100,
+      "5": 117,
+      "6": 9
+    },
+    "note": ""
+  },
+  "move_bias_estimate_real_data": -0.5626918837815067,
+  "move_bias_gate": {
+    "metric_source": "intent_real_data",
+    "threshold": 0.1,
+    "measurement": -0.5626918837815067,
+    "accepted": false,
+    "reason": "move_bias_exceeds_threshold"
+  },
+  "move_bias_gate_passed": false,
+  "tactical_available": true,
+  "tactical_output_mean": 0.5063562393188477,
+  "tactical_output_std": 0.016182973980903625,
+  "normalizer_keys": [
+    "feature_mean",
+    "feature_std",
+    "feature_std_raw",
+    "feature_dim",
+    "num_samples",
+    "zero_std_count",
+    "zero_std_features",
+    "fitted_on",
+    "normalizer_kind"
+  ],
+  "normalizer_feature_count": 108,
+  "normalizer_zero_std_count": 50,
+  "normalizer_loaded_in_inference": true,
+  "datasets_available": true,
+  "datasets_state_graph_csv_count": 108,
+  "train_feature_stats_sample_shape": [
+    12,
+    108
+  ],
+  "train_feature_stats_available": true,
+  "train_feature_mean_abs_max": 5225.33349609375,
+  "train_feature_std_max": 4879.4013671875,
+  "train_feature_std_min": 0.0,
+  "datasets_intent_available": true,
+  "datasets_tactical_csv_size": 409055700
+}
