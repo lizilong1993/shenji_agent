@@ -42,7 +42,7 @@
 | `expert_rating_protocol.md` | I17 / P3 | 专家 0—10 分评分协议与认知对齐度 | 待产出 |
 | `competition_platform_assessment.md` | I20 / P5 | 竞赛平台可行性评估 | 待产出 |
 | `ui_theme_spec.md` | I09 | 深浅色分域与主题变量 | 待产出 |
-| `eval_intensity_spec.md` | I16 / Q7 | 对抗强度三档定义与算力口径 | 待产出 |
+| `eval_intensity_spec.md` | I16 / Q7 | 对抗强度三档定义与算力口径 | **已产出**（三档定义 ✓；算力预算缺实测耗时，缺口已写明） |
 
 ---
 
