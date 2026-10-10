@@ -1,0 +1,29 @@
+{
+  "expert_id": "mil_exp_1",
+  "assessment": {
+    "category_completeness": "Good for tactical maneuver intent recognition. Missing doctrinal concepts: RAID (distinct time-on-target profile vs ASSAULT, common at plt/co level), SCREEN (covering force mission, distinct from HOLD/INTERDICT), COUNTER_RECON (denial of enemy ISR, not captured by INTERDICT), WITHDRAWAL (planned retrograde vs forced RETREAT), DELAYING_ACTION (trade space for time, doctrinally distinct from RETREAT/EVADE). DEMONSTRATION as deception type (show of force without contact, vs FEINT which requires approach). 22 classes cover the most frequently observed intents in simulation; omissions acceptable for v1 but should be flagged for v3 expansion.",
+    "hierarchy_validity": "All children correctly belong under parents. One concern: TARGET_GUIDANCE under RECON_INFORMATION — doctrinally, guidance is a fires coordination function (FIRE_SUPPORT domain), not ISR. The behavioral overlap with SURVEILLANCE (both observe targets) makes this a pragmatic choice but a hierarchy fidelity gap. FORTIFY under MANEUVER_POSTURE is correct — posture can support both offense and defense. AMBUSH under OFFENSIVE_ACTION is correct despite passive phase. All parent-child assignments are operationally defensible.",
+    "discrimination_rules": "Six confusion pairs are doctrinally correct and have clear operational discriminants. RETREAT vs EVADE boundary (5-step EVADE→RETREAT escalation rule) is a workable heuristic. FLANK vs BREAKTHROUGH (>45° bearing change) is a clean geometric operationalization. ASSAULT vs SEIZE (enemy destruction vs terrain control) is doctrinally precise. FIRE_SUPPORT vs primary (secondary-only constraint) is correct. One gap: second-order confusion between REDEPLOY vs RECON (both involve movement without immediate engagement) is not addressed in the confusion matrix but will occur frequently in data.",
+    "condition_fields": "11-field annotation schema is comprehensive. Separation of necessary_conditions vs sufficient_evidence enables logical inference. Hard negatives per intent explicitly target the confusion pairs. Issues: (1) Some minimum_duration values too low — SEIZE=1, TARGET_GUIDANCE=1, FIRE_SUPPORT=1 (a single step is not operationally meaningful for these intents). (2) necessary_conditions for ASSEMBLE/DISPERSE require simulation-specific action types. (3) PURSUIT requires target showing RETREAT/EVADE pattern — creates circular labeling dependency. (4) ENCIRCLEMENT scope includes 'platoon' which is a single unit — contradiction unless platoon is treated as multi-entity group.",
+    "implementation_concerns": "Five practical issues for simulation environment: (A) Circular label dependencies — PURSUIT needs enemy intent, AMBUSH needs enemy arrival timing, creating two-pass labeling requirement. (B) Multi-agent intents (ENCIRCLEMENT) require cross-entity relational tracking. (C) FEINT at Grade C with plan tag will have very sparse positive examples. (D) Temporal boundary detection is straightforward for intents with clear action-type triggers but open-ended for boundary_rules like 'until target eliminated'. (E) Status layers described as 'independent' from tactical hierarchy, but practical labeling pipeline needs clear precedence rules."
+  },
+  "recommendations": [
+    "Add RAID to OFFENSIVE_ACTION expansion list for v3",
+    "Promote TARGET_GUIDANCE to SUPPORT_COORDINATION in v3 or add note explaining pragmatic ISR placement",
+    "Increase minimum_duration for SEIZE to 3, TARGET_GUIDANCE to 2, FIRE_SUPPORT to 2",
+    "Remove simulation-specific action type IDs from necessary_conditions where possible; keep in positive_evidence",
+    "Replace PURSUIT circular condition with kinematic criteria",
+    "Add REDEPLOY vs RECON to confusion matrix",
+    "Specify status-layer precedence rules explicitly",
+    "Clarify ENCIRCLEMENT subject_scope: remove 'individual_entity'",
+    "Add temporal boundary termination event catalogue",
+    "Consider adding DELAYING_ACTION as future DISENGAGEMENT_DECEPTION intent"
+  ],
+  "rejected_concepts": [],
+  "unresolved_issues": [
+    "Multi-track labeling pipeline is underspecified",
+    "FEINT pilot quota (80 episodes) likely insufficient",
+    "Confidence score semantics for multi-label segments unclear",
+    "OUT_OF_ONTOLOGY detection needs decision criteria"
+  ]
+}

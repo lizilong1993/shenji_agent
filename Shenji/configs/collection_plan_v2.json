@@ -1,0 +1,87 @@
+{
+  "dataset": "Shenji",
+  "plan_name": "collection_plan_v2",
+  "version": "2.0.0",
+  "description": "v2 collection plan. Key changes from v1: controllers per class raised to 5-8, single-controller cap tightened to 20-25%, collection targets stated in effective sample units (episodes/scenarios/controllers/maps) not just segment counts, BACKGROUND/UNKNOWN quotas added, FEINT and rare-class quotas separated.",
+  "changelog_v2": [
+    "Controllers per class: minimum raised from 3 to 5, target 5-8",
+    "Single controller contribution cap: tightened from 50% to 20-25%",
+    "Added BACKGROUND/UNKNOWN non-intent segment quotas",
+    "FEINT and rare-class intents get independent quotas",
+    "Collection targets now stratified by episode, scenario_family, controller_family, map_family",
+    "Effective sample size reported: intra-episode segment correlations acknowledged",
+    "Quality constraints expanded to cover open-set and human-inferred tracks"
+  ],
+  "max_steps": 1000,
+  "global_constraints": {
+    "min_map_families": 5,
+    "min_scenario_families": 3,
+    "min_controller_families": 3,
+    "per_intent_min_controllers": 5,
+    "per_intent_target_controllers": 8,
+    "max_single_controller_share": 0.25,
+    "pilot_min_episodes_per_intent": 3,
+    "v1_min_episodes_per_intent": 15,
+    "failure_or_switch_min_share": 0.20,
+    "background_min_share": 0.05,
+    "unknown_min_share_per_map": 0.03,
+    "human_inferred_audit_segments": 1000,
+    "ood_held_out_map_families": 2,
+    "ood_held_out_policies": 1,
+    "open_set_abstention_rate_target": 0.05
+  },
+  "per_intent_targets": {
+    "ASSAULT": {"pilot_min_segments": 40, "pilot_min_episodes": 3, "v1_min_segments": 400, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": true},
+    "BREAKTHROUGH": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 500, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": true},
+    "FLANK": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 500, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": true},
+    "ENCIRCLEMENT": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 500, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure","switch"], "failure_or_switch_required": true},
+    "PURSUIT": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 400, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": true},
+    "AMBUSH": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 500, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure","switch"], "failure_or_switch_required": true},
+    "SEIZE": {"pilot_min_segments": 40, "pilot_min_episodes": 3, "v1_min_segments": 400, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": false},
+    "HOLD": {"pilot_min_segments": 40, "pilot_min_episodes": 3, "v1_min_segments": 400, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": false},
+    "INTERDICT": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 500, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure","switch"], "failure_or_switch_required": true},
+    "RECON": {"pilot_min_segments": 40, "pilot_min_episodes": 3, "v1_min_segments": 400, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": false},
+    "SURVEILLANCE": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 500, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": false},
+    "TARGET_GUIDANCE": {"pilot_min_segments": 40, "pilot_min_episodes": 3, "v1_min_segments": 400, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": false},
+    "REINFORCE": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 500, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure","switch"], "failure_or_switch_required": true},
+    "ESCORT": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 500, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure","switch"], "failure_or_switch_required": true},
+    "FIRE_SUPPORT": {"pilot_min_segments": 40, "pilot_min_episodes": 3, "v1_min_segments": 400, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": false},
+    "REDEPLOY": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 500, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": false},
+    "ASSEMBLE": {"pilot_min_segments": 40, "pilot_min_episodes": 3, "v1_min_segments": 400, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": false},
+    "DISPERSE": {"pilot_min_segments": 40, "pilot_min_episodes": 3, "v1_min_segments": 400, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": false},
+    "FORTIFY": {"pilot_min_segments": 40, "pilot_min_episodes": 3, "v1_min_segments": 400, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": false},
+    "RETREAT": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 500, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure","switch"], "failure_or_switch_required": true},
+    "EVADE": {"pilot_min_segments": 60, "pilot_min_episodes": 3, "v1_min_segments": 500, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": false},
+    "FEINT": {"pilot_min_segments": 80, "pilot_min_episodes": 5, "v1_min_segments": 800, "controllers_required": 5, "controllers_target": 8, "map_families_min": 3, "scenario_families_min": 2, "min_outcomes": ["success","failure"], "failure_or_switch_required": true, "requires_plan_tag": true, "requires_human_review": true}
+  },
+  "phases": [
+    {
+      "name": "pilot",
+      "description": "Phase A: minimum viable per-class pilot. Verify definitions, throughput, and learnability before scaling.",
+      "entry_gate": ["ontology_v2_approved", "input_contract_v2_approved", "collection_pipeline_verified"],
+      "exit_gate": ["all_22_classes_have_at_least_3_episodes", "at_least_2_map_families_per_class", "pilot_coverage_report_passes"],
+      "actions": ["create minimal manifest for each class", "run pilot collection", "verify segment quality via Grade A labeler + manual spot-check"]
+    },
+    {
+      "name": "directed_expansion",
+      "description": "Phase B: targeted gap-filling. Not uniform blind runs; focus on under-represented classes, map families, and controller variants.",
+      "entry_gate": ["pilot_complete", "quality_thresholds_met"],
+      "exit_gate": ["all_22_classes_meet_v1_min_segments", "each_class_has_5+_controllers", "failure_or_switch_min_share_met_per_class"],
+      "actions": ["identify gaps per class from pilot coverage", "create directed manifests", "run directed collection", "verify coverage"]
+    },
+    {
+      "name": "ood_holdout",
+      "description": "Phase C: seal OOD test sets before training baselines.",
+      "entry_gate": ["directed_expansion_complete"],
+      "exit_gate": ["OOD_holdout_hashes_published", "train/val/test_zero_leakage_verified"],
+      "actions": ["select held-out map families and policy implementations", "lock and hash OOD test sets", "verify no episode or controller family crosses splits"]
+    },
+    {
+      "name": "human_audit",
+      "description": "Phase D: human replay sessions, human-inferred labels, and Grade B/C audit.",
+      "entry_gate": ["ood_holdout_complete"],
+      "exit_gate": ["1000_human_inferred_segments_collected", "grade_b_c_human_audit_complete", "inter_annotator_agreement_meets_thresholds"],
+      "actions": ["conduct human replay sessions", "collect human-inferred labels", "run Grade B/C audit on stratified sample", "compute inter-annotator agreement", "adjudicate disputes"]
+    }
+  ]
+}

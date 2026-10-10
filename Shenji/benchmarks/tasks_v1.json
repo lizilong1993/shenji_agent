@@ -1,0 +1,51 @@
+{
+  "dataset": "Shenji",
+  "version": "1.0.0",
+  "tasks": [
+    {
+      "code": "state_estimation",
+      "name": "Partial-observation state estimation",
+      "input_tables": ["observations", "actions", "relations"],
+      "target_tables": ["states"],
+      "prediction_unit": "episode, step, entity",
+      "metrics": ["entity_detection_f1", "hex_distance_error", "state_mae"],
+      "prohibited_inputs": ["truth observations at target step"]
+    },
+    {
+      "code": "trajectory_prediction",
+      "name": "Future trajectory prediction",
+      "input_tables": ["observations", "actions", "relations"],
+      "target_tables": ["states"],
+      "prediction_unit": "entity trajectory segment",
+      "metrics": ["ade_hex", "fde_hex", "topk_route_recall"],
+      "prohibited_inputs": ["future states", "future actions"]
+    },
+    {
+      "code": "activity_recognition",
+      "name": "Tactical activity recognition",
+      "input_tables": ["observations", "states"],
+      "target_tables": ["actions", "events", "relations"],
+      "prediction_unit": "episode time window",
+      "metrics": ["macro_f1", "event_map", "onset_error"]
+    },
+    {
+      "code": "intent_recognition",
+      "name": "Hierarchical multi-label intent recognition",
+      "input_tables": ["observations", "actions", "events", "relations"],
+      "target_tables": ["intent_segments"],
+      "target_label_kinds": ["commanded", "realized"],
+      "prediction_unit": "subject time segment",
+      "metrics": ["parent_macro_f1", "fine_macro_f1", "micro_f1", "segment_iou", "calibration_error"],
+      "prohibited_inputs": ["intent plan", "truth observations when evaluating partial-observation tracks"]
+    },
+    {
+      "code": "intent_transition_forecasting",
+      "name": "Next-intent and transition forecasting",
+      "input_tables": ["observations", "actions", "events", "relations", "past intent_segments"],
+      "target_tables": ["future intent_segments"],
+      "prediction_unit": "subject transition edge",
+      "metrics": ["next_intent_top1", "next_intent_top3", "transition_time_mae", "macro_f1"],
+      "prohibited_inputs": ["future commanded intent", "future actions"]
+    }
+  ]
+}

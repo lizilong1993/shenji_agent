@@ -1,0 +1,81 @@
+{
+  "dataset": "Shenji",
+  "version": "1.0.0",
+  "simulation_backend": "MiaoSuan",
+  "data_root": "../land_wargame_sdk/Data/Data",
+  "output_root": "raw/pilot_v3",
+  "canonical_root": "canonical/shenji_schema_v1/pilot_v3",
+  "max_steps": 1000,
+  "scenarios": [
+    {
+      "scenario_id": "1231",
+      "map_id": "map_123",
+      "scenario_path": "scenarios/1231.json",
+      "basic_path": "maps/map_123/basic.json",
+      "cost_path": "maps/map_123/cost.pickle",
+      "see_path": "maps/map_123/123see.npz",
+      "see_key": "data"
+    },
+    {
+      "scenario_id": "2120131194",
+      "map_id": "map_212",
+      "scenario_path": "scenarios/2120131194.json",
+      "basic_path": "maps/map_212/basic.json",
+      "cost_path": "maps/map_212/cost.pickle",
+      "see_path": "maps/map_212/212see.npz",
+      "see_key": "data"
+    },
+    {
+      "scenario_id": "9401",
+      "map_id": "map_94",
+      "scenario_path": "scenarios/2120131294.json",
+      "basic_path": "maps/map_94/basic.json",
+      "cost_path": "maps/map_94/cost.pickle",
+      "see_path": "maps/map_94/94see.npz",
+      "see_key": "data"
+    }
+  ],
+  "policies": [
+    {
+      "code": "baseline_rule_v1",
+      "profile": "baseline",
+      "agent_class": "ai.agent:Agent",
+      "artifacts_dir": "../ai/weights"
+    },
+    {
+      "code": "challenger_v1",
+      "profile": "challenger",
+      "agent_class": "ai.agent:Agent",
+      "artifacts_dir": "../ai/weights"
+    },
+    {
+      "code": "intent_controller_attack",
+      "profile": "challenger",
+      "agent_class": "ai.agent:Agent",
+      "artifacts_dir": "../ai/weights",
+      "pre_mission": {"mission_type": 0, "target_pos": null}
+    },
+    {
+      "code": "intent_controller_hold",
+      "profile": "challenger",
+      "agent_class": "ai.agent:Agent",
+      "artifacts_dir": "../ai/weights",
+      "pre_mission": {"mission_type": 1, "target_pos": null}
+    },
+    {
+      "code": "intent_controller_seize",
+      "profile": "challenger",
+      "agent_class": "ai.agent:Agent",
+      "artifacts_dir": "../ai/weights",
+      "pre_mission": {"mission_type": 3, "target_pos": null}
+    }
+  ],
+  "matchups": [
+    {"red": "baseline_rule_v1", "blue": "baseline_rule_v1"},
+    {"red": "challenger_v1", "blue": "baseline_rule_v1"},
+    {"red": "intent_controller_attack", "blue": "baseline_rule_v1"},
+    {"red": "intent_controller_hold", "blue": "baseline_rule_v1"},
+    {"red": "intent_controller_seize", "blue": "baseline_rule_v1"}
+  ],
+  "seeds": [20260713, 20260714, 20260715]
+}

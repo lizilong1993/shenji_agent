@@ -1,0 +1,55 @@
+{
+  "dataset": "Shenji",
+  "schema_name": "adjudication_schema",
+  "version": "1.0.0",
+  "description": "Schema for recording adjudication decisions on disputed annotation segments.",
+  "adjudication": {
+    "required_fields": [
+      "adjudication_id",
+      "episode_id",
+      "segment_id",
+      "labels_a",
+      "labels_b",
+      "agreement_metrics",
+      "dispute_level",
+      "adjudicator_id",
+      "adjudicator_decision",
+      "final_label",
+      "adjudication_date",
+      "notes"
+    ],
+    "fields": {
+      "adjudication_id": {"type": "string", "description": "SHA-256 of episode_id + segment_id + adjudicator_id, first 12 hex chars"},
+      "episode_id": {"type": "string", "description": "Shenji episode identifier"},
+      "segment_id": {"type": "string", "description": "Segment identifier from intent_segments"},
+      "labels_a": {"type": "object", "description": "Label set from annotator A (primary_intent, secondary_intents, status_layer, confidence)"},
+      "labels_b": {"type": "object", "description": "Label set from annotator B"},
+      "agreement": {
+        "type": "object",
+        "fields": {
+          "label_f1": {"type": "float", "description": "Pairwise F1 on primary_intent"},
+          "boundary_iou": {"type": "float", "description": "Intersection-over-union on start_step/end_step"},
+          "jaccard": {"type": "float", "description": "Jaccard similarity on full label set (including secondary)"},
+          "confidence_diff": {"type": "float", "description": "Absolute difference in confidence"}
+        }
+      },
+      "dispute_level": {
+        "type": "string",
+        "enum": ["no_dispute", "minor", "major", "fundamental"],
+        "description": "no_dispute: labels match within tolerance; minor: secondary intent mismatch; major: primary intent mismatch within same parent; fundamental: different parent categories, or one says BACKGROUND/UNKNOWN vs the other says a specific intent"
+      },
+      "adjudicator_id": {"type": "string", "description": "Annotator identifier for the third expert"},
+      "adjudicator_decision": {
+        "type": "object",
+        "fields": {
+          "chosen_label": {"type": "object", "description": "The final chosen label set"},
+          "reasoning": {"type": "string", "description": "Free-text reasoning"},
+          "confidence": {"type": "float", "description": "Adjudicator's confidence in the decision"}
+        }
+      },
+      "final_label": {"type": "object", "description": "The authoritative intent label after adjudication"},
+      "adjudication_date": {"type": "string", "format": "date-time"},
+      "notes": {"type": "string", "description": "Any additional notes about edge cases or ontology gaps discovered"}
+    }
+  }
+}

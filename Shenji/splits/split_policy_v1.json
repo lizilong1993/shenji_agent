@@ -1,0 +1,38 @@
+{
+  "dataset": "Shenji",
+  "version": "1.0.0",
+  "unit": "episode_id",
+  "principles": [
+    "All frames and labels from one episode remain in exactly one split.",
+    "Scenario variants generated from the same base scenario are grouped before assignment.",
+    "Human replays from one participant pair remain in one split.",
+    "No hidden intent plan is exposed as model input."
+  ],
+  "tracks": [
+    {
+      "code": "iid",
+      "splits": {"train": 0.70, "validation": 0.10, "test": 0.20},
+      "group_keys": ["scenario_family", "episode_id"],
+      "purpose": "in-distribution model development"
+    },
+    {
+      "code": "cross_map",
+      "train_condition": "training map families only",
+      "test_condition": "map families absent from training",
+      "purpose": "geographic and terrain generalization"
+    },
+    {
+      "code": "cross_policy",
+      "train_condition": "script and policy families assigned to training",
+      "test_condition": "unseen policy implementations for known intents",
+      "purpose": "resistance to controller fingerprints"
+    },
+    {
+      "code": "partial_observation",
+      "train_condition": "truth may be used only for targets",
+      "test_condition": "inputs are restricted to red or blue partial observations",
+      "purpose": "operational intent inference under fog of war"
+    }
+  ],
+  "release_rule": "Publish train and validation labels. Keep final test labels in a separate evaluation package when hosting a leaderboard."
+}

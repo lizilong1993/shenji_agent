@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shenji-dataset.org/schema/shenji_schema_v1.json",
+  "title": "Shenji canonical table contract",
+  "dataset": "Shenji",
+  "version": "1.0.0",
+  "schema_name": "shenji_schema_v1",
+  "storage": {
+    "exchange_format": "JSONL",
+    "publication_format": "Parquet",
+    "text_encoding": "UTF-8",
+    "parquet_compression": "zstd"
+  },
+  "table_order": ["episodes", "entities", "states", "observations", "actions", "events", "relations", "intent_segments"],
+  "common_rules": {
+    "identifiers": "Identifiers are categorical strings and must not be numerically normalized.",
+    "missing_values": "Unavailable values are null. Absence from a partial observation is not imputed.",
+    "time": "step is a non-negative integer in simulator order.",
+    "payload_json": "Original source records are retained as canonical sorted JSON strings."
+  },
+  "tables": {
+    "episodes": {
+      "primary_key": ["episode_id"],
+      "required": ["episode_id", "dataset", "schema_version", "simulation_backend", "num_truth_frames"],
+      "fields": {
+        "episode_id": "string",
+        "dataset": "string constant Shenji",
+        "schema_version": "string constant shenji_schema_v1",
+        "simulation_backend": "string",
+        "scenario_id": "string or null",
+        "map_id": "string or null",
+        "seed": "integer or null",
+        "policy_red": "string or null",
+        "policy_blue": "string or null",
+        "num_truth_frames": "integer",
+        "metadata_json": "string"
+      }
+    },
+    "entities": {
+      "primary_key": ["episode_id", "entity_id"],
+      "required": ["episode_id", "entity_id", "side", "first_step", "last_step"],
+      "fields": {
+        "episode_id": "string",
+        "entity_id": "string",
+        "side": "enum red, blue, neutral, unknown",
+        "unit_type_id": "string or null",
+        "subtype_id": "string or null",
+        "first_step": "integer",
+        "last_step": "integer"
+      }
+    },
+    "states": {
+      "primary_key": ["episode_id", "step", "entity_id"],
+      "required": ["episode_id", "step", "entity_id", "side", "payload_json"],
+      "fields": {
+        "episode_id": "string",
+        "step": "integer",
+        "entity_id": "string",
+        "side": "string",
+        "unit_type_id": "string or null",
+        "subtype_id": "string or null",
+        "hex_id": "string or null",
+        "longitude": "number or null",
+        "latitude": "number or null",
+        "altitude": "number or null",
+        "speed": "number or null",
+        "health": "number or null",
+        "fatigue": "number or null",
+        "suppression": "number or null",
+        "move_state": "integer or null",
+        "payload_json": "string"
+      }
+    },
+    "observations": {
+      "primary_key": ["episode_id", "step", "observer_side", "entity_id"],
+      "required": ["episode_id", "step", "observer_side", "entity_id", "visible", "payload_json"],
+      "fields": {
+        "episode_id": "string",
+        "step": "integer",
+        "observer_side": "enum truth, red, blue",
+        "entity_id": "string",
+        "observed_side": "string",
+        "hex_id": "string or null",
+        "visible": "boolean",
+        "payload_json": "string"
+      }
+    },
+    "actions": {
+      "primary_key": ["episode_id", "action_id"],
+      "required": ["episode_id", "step", "action_id", "action_type_id", "action_name", "payload_json"],
+      "fields": {
+        "episode_id": "string",
+        "step": "integer",
+        "action_id": "string",
+        "actor_id": "string or null",
+        "entity_id": "string or null",
+        "action_type_id": "string",
+        "action_name": "string",
+        "target_entity_id": "string or null",
+        "target_hex_id": "string or null",
+        "weapon_id": "string or null",
+        "path": "array of strings",
+        "payload_json": "string"
+      }
+    },
+    "events": {
+      "primary_key": ["episode_id", "event_id"],
+      "required": ["episode_id", "step", "event_id", "event_type", "source", "payload_json"],
+      "fields": {
+        "episode_id": "string",
+        "step": "integer",
+        "event_id": "string",
+        "event_type": "string",
+        "subject_id": "string or null",
+        "object_id": "string or null",
+        "location_id": "string or null",
+        "source": "enum action, judge_info",
+        "payload_json": "string"
+      }
+    },
+    "relations": {
+      "primary_key": ["episode_id", "relation_id"],
+      "required": ["episode_id", "step", "relation_id", "relation_type", "subject_id", "object_id"],
+      "fields": {
+        "episode_id": "string",
+        "step": "integer",
+        "relation_id": "string",
+        "relation_type": "string",
+        "subject_id": "string",
+        "object_id": "string",
+        "target_id": "string or null",
+        "source_event_id": "string"
+      }
+    },
+    "intent_segments": {
+      "primary_key": ["episode_id", "segment_id"],
+      "required": ["episode_id", "segment_id", "label_kind", "subject_scope", "subject_id", "start_step", "end_step", "parent_intent", "primary_intent", "secondary_intents", "status", "outcome", "evidence_source", "evidence_grade", "confidence"],
+      "fields": {
+        "episode_id": "string",
+        "segment_id": "string",
+        "label_kind": "enum commanded, realized, human_inferred",
+        "subject_scope": "enum entity, group, company, side",
+        "subject_id": "string",
+        "start_step": "integer",
+        "end_step": "integer",
+        "parent_intent": "ontology parent code",
+        "primary_intent": "ontology fine intent code",
+        "secondary_intents": "array of unique ontology fine intent codes",
+        "target_type": "string",
+        "target_id": "string or null",
+        "status": "enum planned, executing, completed, aborted, switched",
+        "outcome": "enum achieved, failed, partial, not_triggered, unknown",
+        "evidence_source": "enum scenario_plan, mission_command, deterministic_rule, human_review",
+        "evidence_grade": "enum A, B, C",
+        "evidence_refs": "array of strings",
+        "confidence": "number from 0 through 1"
+      }
+    }
+  }
+}

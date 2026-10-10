@@ -1,0 +1,91 @@
+{
+  "dataset": "Shenji",
+  "split_policy_name": "shenji_split_policy",
+  "version": "2.0.0",
+  "description": "v2 split policy. v2 adds: cross-scenario-family split track, visibility-stratified track, implementation-family (not just policy-code) isolation for cross-policy, and automated zero-leakage verification. All split generation runs before baseline training; OOD test sets are hashed and sealed.",
+  "changelog_v2": [
+    "Added cross-scenario-family split track",
+    "Added visibility-stratified / degraded-observation split track",
+    "Cross-policy now isolates by implementation family, not just policy code",
+    "Automatic zero-leakage verification: episode_id, scenario_family, controller_family, participant_pair, derived_seed_family must not cross splits",
+    "OOD test sets locked and hashed before baseline training"
+  ],
+  "global_constraints": {
+    "grouping_units": ["episode_id", "scenario_family", "controller_family", "participant_pair", "derived_seed_family"],
+    "grouping_rule": "All segments derived from the same grouping_unit must reside in the SAME split. No grouping_unit may appear in more than one split.",
+    "random_frame_split": false,
+    "min_train_episodes": 100,
+    "min_val_episodes": 10,
+    "min_test_episodes": 20,
+    "cross_validation_folds": 5
+  },
+  "tracks": [
+    {
+      "id": "iid",
+      "name": "In-distribution random split",
+      "split_ratios": {"train": 0.70, "val": 0.10, "test": 0.20},
+      "grouping": ["scenario_family", "episode_id"],
+      "sealing": false,
+      "description": "Standard IID split. Episodes are grouped by scenario_family first, then randomly assigned. Entire episode stays in one split."
+    },
+    {
+      "id": "cross_map",
+      "name": "Cross-map generalization",
+      "split_ratios": {"train": null, "val": null, "test": null},
+      "grouping": ["map_family", "episode_id"],
+      "sealing": true,
+      "description": "Map families seen in training are held out of test. Test uses only unseen map families. Train/val split within seen maps.",
+      "held_out_map_families": 2
+    },
+    {
+      "id": "cross_policy",
+      "name": "Cross-policy / cross-controller generalization",
+      "split_ratios": {"train": null, "val": null, "test": null},
+      "grouping": ["controller_implementation_family", "episode_id"],
+      "sealing": true,
+      "description": "Controller implementation families isolated: policies sharing the same codebase/architecture stay together. Test uses unseen controller families. Isolation is by IMPLEMENTATION FAMILY, not policy code alone.",
+      "held_out_policy_families": 1
+    },
+    {
+      "id": "cross_scenario_family",
+      "name": "Cross-scenario-family generalization",
+      "split_ratios": {"train": null, "val": null, "test": null},
+      "grouping": ["scenario_family", "episode_id"],
+      "sealing": true,
+      "description": "Entire scenario families held out of training. Tests whether model generalizes to unseen scenario configurations.",
+      "held_out_scenario_families": 1
+    },
+    {
+      "id": "visibility_stratified",
+      "name": "Visibility-stratified evaluation",
+      "split_ratios": {"train": 0.70, "val": 0.10, "test": 0.20},
+      "grouping": ["episode_id"],
+      "stratification": "by mean_visibility",
+      "stratification_bins": ["high_visibility (>0.7)", "medium_visibility (0.3-0.7)", "low_visibility (<0.3)"],
+      "sealing": false,
+      "description": "Episodes stratified by average entity visibility for the evaluated side. Tests model robustness to observation degradation. Each visibility bin must be represented in all splits."
+    }
+  ],
+  "zero_leakage_verification": {
+    "checks": [
+      "No scenario_family appears in more than one split",
+      "No controller_implementation_family appears in more than one split",
+      "No participant_pair appears in more than one split",
+      "No seed-derived episode appears in a different split than its parent seed",
+      "Auto-generated verification: run before every baseline training run",
+      "Output: verification_report.json with per-gate PASS/FAIL"
+    ],
+    "remediation": {
+      "leakage_detected": "Re-run split generation with updated grouping or re-seeded random state",
+      "metadata_high_accuracy": "If metadata-only baseline significantly exceeds random, flag data for re-sampling or split-grouping revision"
+    }
+  },
+  "implementation_family_policy": {
+    "description": "Cross-policy isolation uses implementation family, not just policy code. Implementation family is defined by the underlying model architecture and training regime, not by the policy rollout code.",
+    "families": {
+      "rule_based": ["baseline_rule_v1", "baseline_rule_v2"],
+      "learned_policy_v1": ["challenger_v1", "challenger_v2", "challenger_v3"],
+      "intent_conditioned": ["intent_controller_v1", "intent_controller_v2"]
+    }
+  }
+}

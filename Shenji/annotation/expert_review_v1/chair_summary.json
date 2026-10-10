@@ -1,0 +1,39 @@
+{
+  "chair_id": "exp_chair_001",
+  "consolidation": {
+    "accepted": [
+      {"item": "category_completeness", "changes": ["Note RAID, SCREEN, COUNTER_RECON as v3 candidates"]},
+      {"item": "hierarchy_target_guidance", "changes": ["TARGET_GUIDANCE under RECON_INFORMATION acceptable; add docstring noting doctrinal alternative SUPPORT_COORDINATION"]},
+      {"item": "discrimination_redeply_vs_recon", "changes": ["Add REDEPLOY↔RECON entry to confusion_matrix"]},
+      {"item": "minimum_duration_seize", "changes": ["SEIZE min_duration: 1→3", "Update boundary_rules accordingly"]},
+      {"item": "minimum_duration_target_guidance", "changes": ["TARGET_GUIDANCE min_duration: 1→3"]},
+      {"item": "minimum_duration_fire_support", "changes": ["FIRE_SUPPORT min_duration: 1→3"]},
+      {"item": "circular_dependency_pursuit", "changes": ["Add enemy-intent dependency note to PURSUIT necessary_conditions"]},
+      {"item": "multi_agent_complexity", "changes": ["ENCIRCLEMENT: units need not share command channel; spatial geometry sufficient"]},
+      {"item": "fire_support_retreat_inconsistency", "changes": ["Remove FIRE_SUPPORT from RETREAT.allowed_cooccurrence; keep RETREAT in FIRE_SUPPORT.conflicts_with"]}
+    ],
+    "rejected": [],
+    "unresolved": [
+      {"item": "assault_seize_enemy_held_objective", "status": "Both labels fire simultaneously on defended objective. Resolution via temporal precedence rule deferred to v2.1.", "blocking": true},
+      {"item": "hard_negative_computable_thresholds", "status": "Narrative hard_negatives need numerical thresholds. Automated labeler cannot enforce.", "blocking": true},
+      {"item": "feint_accidental_success_override", "status": "No rule for planned feint that accidentally achieves objective.", "blocking": true},
+      {"item": "background_minimum_duration", "status": "BACKGROUND has no minimum duration. Add >=2 steps.", "blocking": true},
+      {"item": "fire_support_boundary_circular", "status": "Boundary rule circular. Restate with temporal anchor.", "blocking": false}
+    ]
+  },
+  "immediate_actions": [
+    "Fix FIRE_SUPPORT↔RETREAT bidirectional inconsistency in ontology v2.0.1",
+    "Bump SEIZE min_duration 1→3, TARGET_GUIDANCE 1→3, FIRE_SUPPORT 1→3",
+    "Add REDEPLOY↔RECON confusion_matrix entry",
+    "Patch PURSUIT necessary_conditions with enemy-intent dependency note",
+    "Add doc comment to TARGET_GUIDANCE about doctrinal parent alternative"
+  ],
+  "blockers_for_pilot": [
+    "FIRE_SUPPORT↔RETREAT inconsistency will produce conflicting labels",
+    "SEIZE min_duration=1 allows trivial 1-step labels",
+    "BACKGROUND min_duration absent — status layer labeling ambiguous",
+    "FEINT accidental-success override rule absent",
+    "Hard negatives lack computable thresholds for Grade B labeler",
+    "ASSAULT/SEIZE tiebreaker rule needed for enemy-held objectives"
+  ]
+}

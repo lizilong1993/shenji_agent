@@ -1,0 +1,34 @@
+{
+  "dataset": "Shenji",
+  "probe_date": "2026-07-11",
+  "probe_type": "host_execution_bridge",
+  "ready": false,
+  "research_data_generated": false,
+  "checks": {
+    "scenario_1231": {
+      "ok": true,
+      "path": "../land_wargame_sdk/Data/Data/scenarios/1231.json"
+    },
+    "map_123_assets": {
+      "ok": true,
+      "files": [
+        "basic.json",
+        "cost.pickle",
+        "123see.npz"
+      ]
+    },
+    "simulator_wheel": {
+      "ok": true,
+      "python_tag": "cp310",
+      "platform_tag": "manylinux_2_17_x86_64.manylinux2014_x86_64"
+    },
+    "execution_bridge": {
+      "ok": false,
+      "host": "Windows",
+      "bridge": "WSL",
+      "error_type": "RuntimeUnavailable",
+      "error": "No usable WSL Linux distribution is installed, so the command runner cannot start Python inside Linux."
+    }
+  },
+  "required_action": "Run shenji-collect probe and shenji-collect run from Linux, a configured WSL distribution, or a Linux container."
+}

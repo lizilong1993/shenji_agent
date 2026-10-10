@@ -1,0 +1,26 @@
+{
+  "expert_id": "mil_exp_2",
+  "assessment": {
+    "confusion_pair_adequacy": "6 confusion pairs defined with discrimination_key, allowed_cooccurrence, and notes. Strengths: RETREAT/EVADE operationalized threshold; FLANK/BREAKTHROUGH permits co-occurrence; FIRE_SUPPORT always-secondary. Weaknesses: (1) HOLD/FORTIFY discrimination_key conflates area-control with posture; (2) no pair addresses sequential ambiguity resolution; (3) ASSAULT/SEIZE discrimination relies on target type, but terrain vs enemy distinction breaks when the objective IS an enemy-held town.",
+    "hard_negative_quality": "22 intents each have 1 hard_negative pattern. Quality tiered: FEINT→failed ASSAULT (excellent), RETREAT→EVADE (good), FLANK→BREAKTHROUGH (good). Weak: EVADE hard_negative ('obstacle avoidance without enemy threat') is a counterexample, not true hard negative. SEIZE-looking ASSAULT not addressed. Several patterns are descriptive narratives with no computable thresholds. Missing: no hard_negative for BACKGROUND resembling tactical movement.",
+    "feint_definition": "FEINT correctly Grade C, requires_plan_tag=true, prohibition against deriving from failed attack. Missing: (1) no multi-echelon feint; (2) no 'feint by negation'; (3) no guidance for feint that accidentally achieves objective. Resolution: add FEINT-override rule for accidental success.",
+    "fire_support_relationship": "FIRE_SUPPORT always-secondary constraint is correct. Concern: FIRE_SUPPORT allowed_cooccurrence includes RETREAT — doctrinally this is 'covering force' or 'rearguard action,' not SUPPORT_COORDINATION. Suggest restricting co-occurrence.",
+    "boundary_rule_adequacy": "Good: EVADE >5→RETREAT reclassification, FLANK >45° bearing change. Gaps: (1) no minimum duration for BACKGROUND; (2) ASSAULT→SEIZE transition during co-occurrence has no temporal anchor; (3) FIRE_SUPPORT boundary rule ('spans the fire support action(s)') is circular; (4) FEINT boundary rule defers to plan tag with no fallback duration."
+  },
+  "recommendations": [
+    "Add hard_negative for BACKGROUND resembling tactical movement",
+    "Specify ASSAULT/SEIZE temporal transition rule when objective contains both enemy and terrain",
+    "Add FEINT-override for accidental success",
+    "Restrict FIRE_SUPPORT co-occurrence with RETREAT",
+    "Convert hard_negative narratives to structured discriminator fields with thresholds",
+    "Add minimum_duration for BACKGROUND segments (>=3 steps recommended)",
+    "Define FIRE_SUPPORT boundary_rules concretely"
+  ],
+  "rejected_concepts": [],
+  "unresolved_issues": [
+    {"issue": "ASSAULT/SEIZE discrimination breaks when objective IS enemy-held", "reason": "Combatants and terrain co-locate", "suggested_resolution": "Add temporal precedence rule: ASSAULT→SEIZE transition at step enemy resistance drops below threshold"},
+    {"issue": "FIRE_SUPPORT + RETREAT allowed_cooccurrence is doctrinally problematic", "reason": "Retreat fire is rearguard action, not SUPPORT_COORDINATION", "suggested_resolution": "Remove RETREAT from FIRE_SUPPORT allowed_cooccurrence"},
+    {"issue": "FEINT has no 'accidental success' override rule", "reason": "Plan tag says FEINT but behavior seizes objective", "suggested_resolution": "Retain FEINT as primary, add SEIZE as secondary on accidental success"},
+    {"issue": "Hard_negative patterns lack operational metrics for automated labelers", "reason": "Narrative patterns not computable", "suggested_resolution": "Add structured discriminator sub-objects with numerical thresholds"}
+  ]
+}

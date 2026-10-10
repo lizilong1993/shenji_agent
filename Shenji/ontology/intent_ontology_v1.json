@@ -1,0 +1,310 @@
+{
+  "dataset": "Shenji",
+  "ontology_name": "shenji_intent_ontology",
+  "version": "1.0.0",
+  "description": "Hierarchical, temporal, multi-label intent ontology for the Shenji dataset.",
+  "parent_categories": [
+    {
+      "code": "OFFENSIVE_ACTION",
+      "name_zh": "进攻行动",
+      "name_en": "Offensive action",
+      "children": ["ASSAULT", "BREAKTHROUGH", "FLANK", "ENCIRCLEMENT", "PURSUIT", "AMBUSH"]
+    },
+    {
+      "code": "AREA_CONTROL",
+      "name_zh": "区域控制",
+      "name_en": "Area control",
+      "children": ["SEIZE", "HOLD", "INTERDICT"]
+    },
+    {
+      "code": "RECON_INFORMATION",
+      "name_zh": "侦察信息",
+      "name_en": "Reconnaissance and information",
+      "children": ["RECON", "SURVEILLANCE", "TARGET_GUIDANCE"]
+    },
+    {
+      "code": "SUPPORT_COORDINATION",
+      "name_zh": "支援协同",
+      "name_en": "Support and coordination",
+      "children": ["REINFORCE", "ESCORT", "FIRE_SUPPORT"]
+    },
+    {
+      "code": "MANEUVER_POSTURE",
+      "name_zh": "机动态势",
+      "name_en": "Maneuver and posture",
+      "children": ["REDEPLOY", "ASSEMBLE", "DISPERSE", "FORTIFY"]
+    },
+    {
+      "code": "DISENGAGEMENT_DECEPTION",
+      "name_zh": "脱离与欺骗",
+      "name_en": "Disengagement and deception",
+      "children": ["RETREAT", "EVADE", "FEINT"]
+    }
+  ],
+  "intents": [
+    {
+      "code": "ASSAULT",
+      "name_zh": "强攻",
+      "name_en": "Assault",
+      "parent_code": "OFFENSIVE_ACTION",
+      "definition": "Directly close with and attack a designated enemy or defended objective.",
+      "operational_criteria": ["sustained approach to target", "direct engagement after approach"],
+      "positive_evidence": ["mission_type=0", "MOVE followed by SHOOT", "charge state"],
+      "exclusions": ["contact caused only by route crossing"],
+      "auto_label_grade": "A",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "BREAKTHROUGH",
+      "name_zh": "突破",
+      "name_en": "Breakthrough",
+      "parent_code": "OFFENSIVE_ACTION",
+      "definition": "Force passage through a defended line, choke point, or blocking force.",
+      "operational_criteria": ["cross a declared defensive boundary", "maintain forward progress through contact"],
+      "positive_evidence": ["boundary crossing", "high forward velocity", "engagement near crossing"],
+      "exclusions": ["unopposed routine transit"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "FLANK",
+      "name_zh": "迂回侧击",
+      "name_en": "Flank",
+      "parent_code": "OFFENSIVE_ACTION",
+      "definition": "Bypass the frontal axis and approach a target from a lateral or rear sector.",
+      "operational_criteria": ["lateral route around frontal contact", "terminal approach from flank or rear"],
+      "positive_evidence": ["route geometry", "bearing change around target", "lateral engagement"],
+      "exclusions": ["ordinary obstacle avoidance"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "ENCIRCLEMENT",
+      "name_zh": "包围",
+      "name_en": "Encirclement",
+      "parent_code": "OFFENSIVE_ACTION",
+      "definition": "Multiple friendly elements reduce a target's escape space from distinct sectors.",
+      "operational_criteria": ["at least two approach sectors", "decreasing angular escape gap"],
+      "positive_evidence": ["multi-unit geometry", "persistent containment"],
+      "exclusions": ["incidental crowding around one target"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "PURSUIT",
+      "name_zh": "追击",
+      "name_en": "Pursuit",
+      "parent_code": "OFFENSIVE_ACTION",
+      "definition": "Maintain contact with and attack an enemy that is withdrawing.",
+      "operational_criteria": ["target is retreating", "pursuer follows target trajectory"],
+      "positive_evidence": ["correlated trajectories", "continued engagement while target withdraws"],
+      "exclusions": ["independent movement in the same direction"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "AMBUSH",
+      "name_zh": "伏击",
+      "name_en": "Ambush",
+      "parent_code": "OFFENSIVE_ACTION",
+      "definition": "Wait in concealment or a prepared position and initiate attack after a trigger.",
+      "operational_criteria": ["pre-contact waiting or concealment", "triggered first strike"],
+      "positive_evidence": ["hidden state", "FORTIFY", "stationary interval before SHOOT"],
+      "exclusions": ["ordinary static defense without a trigger"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "SEIZE",
+      "name_zh": "夺控",
+      "name_en": "Seize",
+      "parent_code": "AREA_CONTROL",
+      "definition": "Take control of an enemy or neutral objective.",
+      "operational_criteria": ["approach designated objective", "execute occupation or change ownership"],
+      "positive_evidence": ["action type 5", "city ownership change"],
+      "exclusions": ["passing through an objective without occupation"],
+      "auto_label_grade": "A",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "HOLD",
+      "name_zh": "固守",
+      "name_en": "Hold",
+      "parent_code": "AREA_CONTROL",
+      "definition": "Maintain control of a friendly objective or assigned area against threat.",
+      "operational_criteria": ["remain within hold radius", "deny enemy capture during interval"],
+      "positive_evidence": ["mission_type=1", "defensive positioning", "FORTIFY near objective"],
+      "exclusions": ["idle presence without assigned control responsibility"],
+      "auto_label_grade": "A",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "INTERDICT",
+      "name_zh": "阻滞",
+      "name_en": "Interdict",
+      "parent_code": "AREA_CONTROL",
+      "definition": "Block, delay, or channel enemy movement through a route or region.",
+      "operational_criteria": ["occupy or cover declared passage", "measurable enemy delay or diversion"],
+      "positive_evidence": ["choke-point control", "mine laying", "area fire"],
+      "exclusions": ["static defense unrelated to enemy movement"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "RECON",
+      "name_zh": "侦察",
+      "name_en": "Reconnaissance",
+      "parent_code": "RECON_INFORMATION",
+      "definition": "Actively search unknown space or locate enemy forces.",
+      "operational_criteria": ["move through unobserved or assigned search region", "generate new detections"],
+      "positive_evidence": ["mission_type=2", "new seen-enemy records", "high observation-to-engagement ratio"],
+      "exclusions": ["movement whose primary objective is attack or withdrawal"],
+      "auto_label_grade": "A",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "SURVEILLANCE",
+      "name_zh": "监视",
+      "name_en": "Surveillance",
+      "parent_code": "RECON_INFORMATION",
+      "definition": "Persistently observe a known target or area while avoiding unnecessary engagement.",
+      "operational_criteria": ["sustained target visibility", "limited displacement or controlled orbit"],
+      "positive_evidence": ["persistent seen-enemy record", "low engagement rate"],
+      "exclusions": ["brief incidental detection"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "TARGET_GUIDANCE",
+      "name_zh": "目标引导",
+      "name_en": "Target guidance",
+      "parent_code": "RECON_INFORMATION",
+      "definition": "Provide target information or correction support for another firing element.",
+      "operational_criteria": ["observer and firing element are distinct", "guidance contributes to a fire event"],
+      "positive_evidence": ["action type 9", "guided_obj_id", "correction radar"],
+      "exclusions": ["self-targeting direct fire"],
+      "auto_label_grade": "A",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "REINFORCE",
+      "name_zh": "增援",
+      "name_en": "Reinforce",
+      "parent_code": "SUPPORT_COORDINATION",
+      "definition": "Move toward a friendly element or area under pressure to increase combat power.",
+      "operational_criteria": ["friendly beneficiary is identified", "arrival increases local friendly strength"],
+      "positive_evidence": ["movement toward friendly contact", "subsequent coordinated engagement"],
+      "exclusions": ["routine redeployment without a beneficiary"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "ESCORT",
+      "name_zh": "护卫",
+      "name_en": "Escort",
+      "parent_code": "SUPPORT_COORDINATION",
+      "definition": "Accompany and protect a designated friendly unit or formation.",
+      "operational_criteria": ["maintain bounded proximity to beneficiary", "respond to threats against beneficiary"],
+      "positive_evidence": ["formation persistence", "protective engagement"],
+      "exclusions": ["temporary co-location without protection responsibility"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "FIRE_SUPPORT",
+      "name_zh": "火力支援",
+      "name_en": "Fire support",
+      "parent_code": "SUPPORT_COORDINATION",
+      "definition": "Apply direct, indirect, or suppressive fire in support of another friendly task.",
+      "operational_criteria": ["supported friendly task is identified", "fire affects its target or approach"],
+      "positive_evidence": ["action type 8", "action type 9", "support relation"],
+      "exclusions": ["independent self-defense fire"],
+      "auto_label_grade": "A",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "REDEPLOY",
+      "name_zh": "转移部署",
+      "name_en": "Redeploy",
+      "parent_code": "MANEUVER_POSTURE",
+      "definition": "Move from one task sector or posture to another without immediate contact as the primary purpose.",
+      "operational_criteria": ["task sector changes", "sustained movement between sectors"],
+      "positive_evidence": ["new target_pos", "long non-contact movement"],
+      "exclusions": ["local evasion or attack approach"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "ASSEMBLE",
+      "name_zh": "集结",
+      "name_en": "Assemble",
+      "parent_code": "MANEUVER_POSTURE",
+      "definition": "Converge multiple units or aggregate sub-elements into a formation.",
+      "operational_criteria": ["decreasing friendly pairwise distance", "aggregation or common rendezvous"],
+      "positive_evidence": ["action type 15", "action type 315", "group convergence"],
+      "exclusions": ["incidental crossing"],
+      "auto_label_grade": "A",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "DISPERSE",
+      "name_zh": "疏散",
+      "name_en": "Disperse",
+      "parent_code": "MANEUVER_POSTURE",
+      "definition": "Separate a formation or increase spacing to reduce concentration or expand coverage.",
+      "operational_criteria": ["increasing friendly spacing", "disaggregation or sector spreading"],
+      "positive_evidence": ["action type 14", "action type 314", "multi-direction separation"],
+      "exclusions": ["formation breakup caused by unit destruction"],
+      "auto_label_grade": "A",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "FORTIFY",
+      "name_zh": "隐蔽设防",
+      "name_en": "Fortify",
+      "parent_code": "MANEUVER_POSTURE",
+      "definition": "Adopt concealment, prepared defense, or fortification occupancy.",
+      "operational_criteria": ["enter concealed or fortified state", "maintain prepared posture"],
+      "positive_evidence": ["target_state=4", "action type 18", "weapon deployment"],
+      "exclusions": ["brief stop caused by route completion"],
+      "auto_label_grade": "A",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "RETREAT",
+      "name_zh": "撤退",
+      "name_en": "Retreat",
+      "parent_code": "DISENGAGEMENT_DECEPTION",
+      "definition": "Sustainably disengage from contact and increase separation from the principal threat.",
+      "operational_criteria": ["post-contact movement away from threat", "persistent separation growth"],
+      "positive_evidence": ["distance trend", "loss or suppression before withdrawal"],
+      "exclusions": ["short local threat avoidance"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "EVADE",
+      "name_zh": "规避",
+      "name_en": "Evade",
+      "parent_code": "DISENGAGEMENT_DECEPTION",
+      "definition": "Temporarily alter movement or posture to avoid a threat without abandoning the broader task.",
+      "operational_criteria": ["short threat-responsive maneuver", "return to task or route afterward"],
+      "positive_evidence": ["abrupt bearing change", "exit weapon or observation envelope"],
+      "exclusions": ["sustained withdrawal classified as RETREAT"],
+      "auto_label_grade": "B",
+      "requires_plan_tag": false
+    },
+    {
+      "code": "FEINT",
+      "name_zh": "佯动",
+      "name_en": "Feint",
+      "parent_code": "DISENGAGEMENT_DECEPTION",
+      "definition": "Present misleading movement or attack evidence to induce an incorrect adversary assessment.",
+      "operational_criteria": ["explicit deceptive objective", "observable false cue differs from hidden main task"],
+      "positive_evidence": ["scenario plan tag", "human-reviewed deception plan"],
+      "exclusions": ["failed attack", "aborted movement", "ordinary probing action"],
+      "auto_label_grade": "C",
+      "requires_plan_tag": true
+    }
+  ]
+}

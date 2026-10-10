@@ -1,0 +1,259 @@
+{
+  "dataset": "Shenji",
+  "contract_name": "shenji_input_contract",
+  "version": "2.0.0",
+  "description": "Field-level specification of which fields may be used as model input, which are label evidence, and which are targets, per task track. Prevents label leakage by documenting every field's role across all tracks.",
+  "tables": {
+    "observations": {
+      "description": "Three synchronized observation streams: truth (-1), red (0), blue (1)",
+      "fields": {
+        "observations.*.operators[].entity_id": {
+          "kind": "entity_identifier",
+          "label_evidence": false,
+          "model_input": {"all": true},
+          "target": false,
+          "available_time": "current_step"
+        },
+        "observations.*.operators[].hex_id": {
+          "kind": "position",
+          "label_evidence": false,
+          "model_input": {"all": true},
+          "target": false,
+          "available_time": "current_step"
+        },
+        "observations.*.operators[].side": {
+          "kind": "faction",
+          "label_evidence": false,
+          "model_input": {"all": true},
+          "target": false,
+          "available_time": "current_step"
+        },
+        "observations.*.operators[].health": {
+          "kind": "status",
+          "label_evidence": false,
+          "model_input": {"all": true, "commanded_intent_inference": false},
+          "target": false,
+          "available_time": "current_step",
+          "restriction_reason": "Health may leak engagement state that correlates with commanded intents"
+        },
+        "observations.*.operators[].move_state": {
+          "kind": "status",
+          "label_evidence": true,
+          "evidence_for": ["FORTIFY", "AMBUSH"],
+          "model_input": {"all": true, "commanded_intent_inference": false},
+          "target": false,
+          "available_time": "current_step",
+          "restriction_reason": "move_state=4 (concealed) is direct evidence for FORTIFY label in realized activity"
+        },
+        "observations.truth.*": {
+          "kind": "ground_truth",
+          "label_evidence": false,
+          "model_input": {"all": false},
+          "target_status": "state_estimation_target",
+          "available_time": "not_available_to_model",
+          "restriction_reason": "Truth observations must never be available as model input"
+        }
+      }
+    },
+    "actions": {
+      "description": "Agent-submitted actions recorded by EpisodeRecorder",
+      "fields": {
+        "actions.action_type_id": {
+          "kind": "action_code",
+          "label_evidence": true,
+          "evidence_for": ["SEIZE", "FORTIFY", "ASSEMBLE", "DISPERSE", "FIRE_SUPPORT", "TARGET_GUIDANCE"],
+          "model_input": {"all": true, "commanded_intent_inference": false},
+          "target": false,
+          "available_time": "current_step",
+          "restriction_reason": "action_type_id=5 directly triggers SEIZE label; must be excluded from commanded inference to prevent label leakage"
+        },
+        "actions.action_type_id=200": {
+          "kind": "mission_task",
+          "label_evidence": true,
+          "evidence_for": ["ASSAULT", "HOLD", "RECON"],
+          "model_input": {"all": false},
+          "target": false,
+          "available_time": "current_step",
+          "restriction_reason": "mission_type inside payload_json is the EXACT source of commanded labels. Must NEVER be model input."
+        },
+        "actions.payload_json.mission_type": {
+          "kind": "commanded_intent_code",
+          "label_evidence": true,
+          "evidence_for": ["ASSAULT (mission_type=0)", "HOLD (mission_type=1)", "RECON (mission_type=2)"],
+          "model_input": {"all": false},
+          "target": false,
+          "available_time": "current_step",
+          "restriction_reason": "This is the commanded intent label ground truth source. Zero model access allowed."
+        },
+        "actions.action_type_id=5": {
+          "kind": "seize_action",
+          "label_evidence": true,
+          "evidence_for": ["SEIZE"],
+          "model_input": {"all": false},
+          "target": false,
+          "available_time": "current_step",
+          "restriction_reason": "type=5 directly triggers SEIZE realized label"
+        },
+        "actions.entity_id": {
+          "kind": "subject",
+          "label_evidence": false,
+          "model_input": {"all": true},
+          "target": false,
+          "available_time": "current_step"
+        },
+        "actions.target_entity_id": {
+          "kind": "target",
+          "label_evidence": false,
+          "model_input": {"all": true},
+          "target": false,
+          "available_time": "current_step"
+        },
+        "actions.target_hex_id": {
+          "kind": "target_position",
+          "label_evidence": false,
+          "model_input": {"all": true},
+          "target": false,
+          "available_time": "current_step"
+        }
+      }
+    },
+    "events": {
+      "description": "Event stream derived from actions and adjudication",
+      "fields": {
+        "events.event_type": {
+          "kind": "event_code",
+          "label_evidence": true,
+          "evidence_for": ["MOVE (for trajectory patterns)", "SHOOT (for engagement evidence)"],
+          "model_input": {"all": true, "commanded_intent_inference": false},
+          "target": false,
+          "available_time": "current_step"
+        },
+        "events.subject_id": {
+          "kind": "subject",
+          "label_evidence": false,
+          "model_input": {"all": true},
+          "target": false,
+          "available_time": "current_step"
+        },
+        "events.object_id": {
+          "kind": "object",
+          "label_evidence": false,
+          "model_input": {"all": true},
+          "target": false,
+          "available_time": "current_step"
+        }
+      }
+    },
+    "states": {
+      "description": "Entity state at each step",
+      "fields": {
+        "states.health": {
+          "kind": "status",
+          "label_evidence": false,
+          "model_input": {"all": true, "commanded_intent_inference": false},
+          "target": true,
+          "target_task": "state_estimation",
+          "available_time": "current_step"
+        },
+        "states.hex_id": {
+          "kind": "position",
+          "label_evidence": false,
+          "model_input": {"all": true},
+          "target": true,
+          "target_task": "state_estimation, trajectory_prediction",
+          "available_time": "current_step"
+        },
+        "states.speed": {
+          "kind": "kinematic",
+          "label_evidence": false,
+          "model_input": {"all": true},
+          "target": false,
+          "available_time": "current_step"
+        },
+        "states.move_state": {
+          "kind": "posture",
+          "label_evidence": true,
+          "evidence_for": ["FORTIFY"],
+          "model_input": {"all": true, "commanded_intent_inference": false},
+          "target": false,
+          "available_time": "current_step"
+        }
+      }
+    },
+    "relations": {
+      "description": "Entity-entity relationships derived from actions",
+      "fields": {
+        "relations.relation_type": {
+          "kind": "relation",
+          "label_evidence": true,
+          "evidence_for": ["FIRE_SUPPORT", "TARGET_GUIDANCE"],
+          "model_input": {"all": true},
+          "target": false,
+          "available_time": "current_step"
+        }
+      }
+    },
+    "intent_segments": {
+      "description": "Intent segment labels (the target for intent tasks)",
+      "fields": {
+        "intent_segments.*": {
+          "kind": "label_target",
+          "label_evidence": false,
+          "model_input": {"all": false},
+          "target": true,
+          "target_task": "commanded_intent_inference, realized_activity, intent_onset_forecasting, human_inferred, open_set",
+          "available_time": "not_available_to_model"
+        }
+      }
+    }
+  },
+  "track_summary": {
+    "commanded_intent_inference": {
+      "allowed_observation_sides": ["red", "blue"],
+      "forbidden_field_categories": ["truth", "mission_type", "type-200 actions", "intent_segments", "future data"],
+      "label_leakage_risk": "CRITICAL — mission_type payload in actions table is the direct label source. Must be fully excluded from model input."
+    },
+    "realized_activity": {
+      "allowed_observation_sides": ["red", "blue"],
+      "forbidden_field_categories": ["commanded intents", "future data", "intent_segments"],
+      "label_leakage_risk": "MODERATE — action_type_id directly maps to some labels. Acceptable since the task is to recognize realized activity from behavior."
+    },
+    "intent_onset_forecasting": {
+      "allowed_observation_sides": ["red", "blue"],
+      "forbidden_field_categories": ["actions/events/states after cutoff", "commanded intents", "intent_segments"],
+      "label_leakage_risk": "LOW — cutoff enforces no access to onset-period data."
+    },
+    "command_realization_mismatch": {
+      "allowed_observation_sides": ["red", "blue"],
+      "forbidden_field_categories": ["commanded intents", "realized intents", "outcome fields", "intent_segments"],
+      "label_leakage_risk": "HIGH — outcome (success/failure/switch) must not be available to model."
+    },
+    "human_inferred": {
+      "allowed_observation_sides": ["red", "blue"],
+      "forbidden_field_categories": ["truth", "states", "actions", "events", "relations", "commanded intents", "realized intents"],
+      "label_leakage_risk": "CRITICAL — human annotator must only see replay-visible data."
+    },
+    "open_set": {
+      "allowed_observation_sides": ["red", "blue"],
+      "forbidden_field_categories": ["truth", "commanded intents", "intent_segments"],
+      "label_leakage_risk": "MODERATE — same as realized_activity but includes UNKNOWN/AMBIGUOUS."
+    }
+  },
+  "diagnostic_sets": {
+    "same_behavior_different_command": {
+      "description": "Episodes where the same action sequence occurred under different commanded intents",
+      "selection_criteria": "Compare episodes with matched action_type sequences but different mission_type values",
+      "purpose": "Test whether model learns to distinguish intent from pure behavior"
+    },
+    "same_command_different_outcome": {
+      "description": "Episodes with the same commanded intent but different success/failure outcomes",
+      "selection_criteria": "Filter episodes by mission_type, group by outcome",
+      "purpose": "Test whether model can predict outcome independent of intent signal"
+    },
+    "feint_vs_hard_negative": {
+      "description": "FEINT-labeled segments paired with similar failed-attack segments that are NOT FEINT",
+      "selection_criteria": "Match FEINT episodes with structurally similar non-FEINT episodes by trajectory and action features",
+      "purpose": "Test whether model can distinguish intentional deception from ordinary failure"
+    }
+  }
+}

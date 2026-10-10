@@ -1,0 +1,85 @@
+{
+  "artifacts": [
+    {
+      "bytes": 658,
+      "format": "jsonl",
+      "path": "episodes.jsonl",
+      "rows": 1,
+      "sha256": "40cf75e0b0edfac461180b811febb7b63ff4ed1fe7ed5a08332563298a00cab9",
+      "table": "episodes"
+    },
+    {
+      "bytes": 533,
+      "format": "jsonl",
+      "path": "entities.jsonl",
+      "rows": 4,
+      "sha256": "91e3a21c7d3f86508b3fbd907307522da4a83de886dee5ad4a8bd4c92b86cb45",
+      "table": "entities"
+    },
+    {
+      "bytes": 5095,
+      "format": "jsonl",
+      "path": "states.jsonl",
+      "rows": 12,
+      "sha256": "ee65aa1ee5abceb9f4e4db553ef75077ff5d59974b706ba30c5d6b56fbfa4b6a",
+      "table": "states"
+    },
+    {
+      "bytes": 7679,
+      "format": "jsonl",
+      "path": "observations.jsonl",
+      "rows": 27,
+      "sha256": "c64d230f2fb1645c9a99857f18b9ce466d2f3af86a8f7de180c1a08391f91804",
+      "table": "observations"
+    },
+    {
+      "bytes": 1486,
+      "format": "jsonl",
+      "path": "actions.jsonl",
+      "rows": 4,
+      "sha256": "f6189506ff28f59220e023afd84950be2cc3d5664413b50dfe9a844b16bba9bd",
+      "table": "actions"
+    },
+    {
+      "bytes": 1542,
+      "format": "jsonl",
+      "path": "events.jsonl",
+      "rows": 5,
+      "sha256": "496c2004e7aacdccfae90856522a14169b79d019fe6821722337ce15893ff426",
+      "table": "events"
+    },
+    {
+      "bytes": 232,
+      "format": "jsonl",
+      "path": "relations.jsonl",
+      "rows": 1,
+      "sha256": "0cd45e83b53e9581f93c281ceba6f774d8645935266345a4023067feeef88e26",
+      "table": "relations"
+    },
+    {
+      "bytes": 1540,
+      "format": "jsonl",
+      "path": "intent_segments.jsonl",
+      "rows": 3,
+      "sha256": "71b77b237ed70223316587a4ac9d9c0356ded909f54cf92a8b84bc0941b1a903",
+      "table": "intent_segments"
+    }
+  ],
+  "dataset": "Shenji",
+  "dataset_version": "1.0.0",
+  "formats": [
+    "jsonl"
+  ],
+  "ontology_version": "1.0.0",
+  "schema_version": "shenji_schema_v1",
+  "table_order": [
+    "episodes",
+    "entities",
+    "states",
+    "observations",
+    "actions",
+    "events",
+    "relations",
+    "intent_segments"
+  ]
+}

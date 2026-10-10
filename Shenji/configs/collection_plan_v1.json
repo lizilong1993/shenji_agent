@@ -1,0 +1,56 @@
+{
+  "dataset": "Shenji",
+  "version": "1.0.0",
+  "status": "design targets subject to pilot throughput review",
+  "intent_targets": {
+    "ASSAULT": {"pilot_min_segments": 40, "v1_min_segments": 400, "min_controller_variants": 3},
+    "BREAKTHROUGH": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "FLANK": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "ENCIRCLEMENT": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "PURSUIT": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "AMBUSH": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "SEIZE": {"pilot_min_segments": 40, "v1_min_segments": 400, "min_controller_variants": 3},
+    "HOLD": {"pilot_min_segments": 40, "v1_min_segments": 400, "min_controller_variants": 3},
+    "INTERDICT": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "RECON": {"pilot_min_segments": 40, "v1_min_segments": 400, "min_controller_variants": 3},
+    "SURVEILLANCE": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "TARGET_GUIDANCE": {"pilot_min_segments": 40, "v1_min_segments": 400, "min_controller_variants": 3},
+    "REINFORCE": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "ESCORT": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "FIRE_SUPPORT": {"pilot_min_segments": 40, "v1_min_segments": 400, "min_controller_variants": 3},
+    "REDEPLOY": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "ASSEMBLE": {"pilot_min_segments": 40, "v1_min_segments": 400, "min_controller_variants": 3},
+    "DISPERSE": {"pilot_min_segments": 40, "v1_min_segments": 400, "min_controller_variants": 3},
+    "FORTIFY": {"pilot_min_segments": 40, "v1_min_segments": 400, "min_controller_variants": 3},
+    "RETREAT": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "EVADE": {"pilot_min_segments": 60, "v1_min_segments": 600, "min_controller_variants": 3},
+    "FEINT": {"pilot_min_segments": 80, "v1_min_segments": 800, "min_controller_variants": 3}
+  },
+  "quality_targets": {
+    "failure_or_switch_min_share": 0.20,
+    "successful_outcome_max_share": 0.70,
+    "held_out_map_families": 2,
+    "held_out_policy_variants_per_intent": 1,
+    "seeds_per_scenario_variant": 5,
+    "minimum_distinct_map_families": 5,
+    "human_inferred_audit_segments": 1000
+  },
+  "phases": [
+    {
+      "code": "pilot",
+      "exit_gate": "All 22 intents meet pilot targets, schema validation passes, and sampled labels are auditable."
+    },
+    {
+      "code": "balanced_expansion",
+      "exit_gate": "All intents meet v1 targets without one controller contributing more than half of a label."
+    },
+    {
+      "code": "ood_holdout",
+      "exit_gate": "Cross-map and cross-policy test episodes are sealed before baseline training."
+    },
+    {
+      "code": "human_audit",
+      "exit_gate": "Grade B and human-inferred subsets have adjudicated quality reports."
+    }
+  ]
+}

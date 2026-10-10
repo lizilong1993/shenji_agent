@@ -1,0 +1,96 @@
+{
+  "metadata": {
+    "dataset": "Shenji",
+    "schema_version": "shenji_schema_v1",
+    "episode_id": "shenji_example_001",
+    "scenario_id": "scenario_1231_example",
+    "map_id": "map_123",
+    "seed": 20260711,
+    "simulation_backend": "MiaoSuan",
+    "policy_red": "shenji_rule_flank_v1",
+    "policy_blue": "shenji_rule_hold_v1",
+    "scenario_variant": "flank_seize_guided_fire"
+  },
+  "observations": {
+    "truth": [
+      {
+        "time": {"cur_step": 0, "tick": 0},
+        "operators": [
+          {"obj_id": 1001, "color": 0, "type": 1, "sub_type": 0, "cur_hex": 501, "speed": 0.0, "blood": 10.0, "fatigue": 0.1, "suppression": 0.0, "move_state": 0},
+          {"obj_id": 1002, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 490, "speed": 0.0, "blood": 8.0, "fatigue": 0.0, "suppression": 0.0, "move_state": 0},
+          {"obj_id": 1003, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 480, "speed": 0.0, "blood": 8.0, "fatigue": 0.0, "suppression": 0.0, "move_state": 0},
+          {"obj_id": 2001, "color": 1, "type": 1, "sub_type": 1, "cur_hex": 701, "speed": 0.0, "blood": 10.0, "fatigue": 0.1, "suppression": 0.0, "move_state": 0}
+        ],
+        "cities": [{"city_id": 7, "coord": 700, "flag": 1}],
+        "judge_info": []
+      },
+      {
+        "time": {"cur_step": 1, "tick": 1},
+        "operators": [
+          {"obj_id": 1001, "color": 0, "type": 1, "sub_type": 0, "cur_hex": 601, "speed": 3.5, "blood": 10.0, "fatigue": 0.2, "suppression": 0.0, "move_state": 2, "see_enemy_bop_ids": [2001]},
+          {"obj_id": 1002, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 490, "speed": 0.0, "blood": 8.0, "fatigue": 0.0, "suppression": 0.0, "move_state": 0, "see_enemy_bop_ids": [2001]},
+          {"obj_id": 1003, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 480, "speed": 0.0, "blood": 8.0, "fatigue": 0.0, "suppression": 0.0, "move_state": 0},
+          {"obj_id": 2001, "color": 1, "type": 1, "sub_type": 1, "cur_hex": 700, "speed": 1.0, "blood": 9.0, "fatigue": 0.2, "suppression": 0.3, "move_state": 0}
+        ],
+        "cities": [{"city_id": 7, "coord": 700, "flag": 1}],
+        "judge_info": [{"attack_obj_id": 1003, "target_obj_id": 2001, "weapon_id": 88, "damage": 1.0}]
+      },
+      {
+        "time": {"cur_step": 2, "tick": 2},
+        "operators": [
+          {"obj_id": 1001, "color": 0, "type": 1, "sub_type": 0, "cur_hex": 700, "speed": 1.0, "blood": 9.0, "fatigue": 0.3, "suppression": 0.1, "move_state": 0},
+          {"obj_id": 1002, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 490, "speed": 0.0, "blood": 8.0, "fatigue": 0.0, "suppression": 0.0, "move_state": 0},
+          {"obj_id": 1003, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 480, "speed": 0.0, "blood": 8.0, "fatigue": 0.0, "suppression": 0.0, "move_state": 0},
+          {"obj_id": 2001, "color": 1, "type": 1, "sub_type": 1, "cur_hex": 702, "speed": 2.5, "blood": 8.0, "fatigue": 0.3, "suppression": 0.4, "move_state": 0}
+        ],
+        "cities": [{"city_id": 7, "coord": 700, "flag": 0}],
+        "judge_info": []
+      }
+    ],
+    "red": [
+      {
+        "time": {"cur_step": 0, "tick": 0},
+        "operators": [
+          {"obj_id": 1001, "color": 0, "type": 1, "sub_type": 0, "cur_hex": 501, "speed": 0.0, "blood": 10.0},
+          {"obj_id": 1002, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 490, "speed": 0.0, "blood": 8.0},
+          {"obj_id": 1003, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 480, "speed": 0.0, "blood": 8.0}
+        ]
+      },
+      {
+        "time": {"cur_step": 1, "tick": 1},
+        "operators": [
+          {"obj_id": 1001, "color": 0, "type": 1, "sub_type": 0, "cur_hex": 601, "speed": 3.5, "blood": 10.0, "see_enemy_bop_ids": [2001]},
+          {"obj_id": 1002, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 490, "speed": 0.0, "blood": 8.0, "see_enemy_bop_ids": [2001]},
+          {"obj_id": 1003, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 480, "speed": 0.0, "blood": 8.0},
+          {"obj_id": 2001, "color": 1, "type": 1, "sub_type": 1, "cur_hex": 700, "speed": 1.0, "blood": 9.0}
+        ]
+      },
+      {
+        "time": {"cur_step": 2, "tick": 2},
+        "operators": [
+          {"obj_id": 1001, "color": 0, "type": 1, "sub_type": 0, "cur_hex": 700, "speed": 1.0, "blood": 9.0},
+          {"obj_id": 1002, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 490, "speed": 0.0, "blood": 8.0},
+          {"obj_id": 1003, "color": 0, "type": 1, "sub_type": 3, "cur_hex": 480, "speed": 0.0, "blood": 8.0},
+          {"obj_id": 2001, "color": 1, "type": 1, "sub_type": 1, "cur_hex": 702, "speed": 2.5, "blood": 8.0}
+        ]
+      }
+    ],
+    "blue": [
+      {"time": {"cur_step": 0, "tick": 0}, "operators": [{"obj_id": 2001, "color": 1, "type": 1, "sub_type": 1, "cur_hex": 701, "speed": 0.0, "blood": 10.0}]},
+      {"time": {"cur_step": 1, "tick": 1}, "operators": [{"obj_id": 2001, "color": 1, "type": 1, "sub_type": 1, "cur_hex": 700, "speed": 1.0, "blood": 9.0}]},
+      {
+        "time": {"cur_step": 2, "tick": 2},
+        "operators": [
+          {"obj_id": 2001, "color": 1, "type": 1, "sub_type": 1, "cur_hex": 702, "speed": 2.5, "blood": 8.0},
+          {"obj_id": 1001, "color": 0, "type": 1, "sub_type": 0, "cur_hex": 700, "speed": 1.0, "blood": 9.0}
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {"cur_step": 0, "actor": 1, "type": 200, "info": {"company_id": 1, "mission_type": 0, "target_pos": 700, "route": [501, 601, 700], "start_time": 0, "end_time": 2}},
+    {"cur_step": 1, "actor": 1, "obj_id": 1001, "type": 1, "move_path": [501, 601, 700]},
+    {"cur_step": 1, "actor": 1, "obj_id": 1002, "type": 9, "target_obj_id": 2001, "guided_obj_id": 1003, "weapon_id": 88},
+    {"cur_step": 2, "actor": 1, "obj_id": 1001, "type": 5}
+  ]
+}

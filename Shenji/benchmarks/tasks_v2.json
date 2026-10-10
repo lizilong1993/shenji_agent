@@ -1,0 +1,190 @@
+{
+  "dataset": "Shenji",
+  "benchmark_name": "shenji_benchmark",
+  "version": "2.0.0",
+  "description": "v2.0.0 splits intent_recognition into 4 subtasks, adds human_inferred and open_set tracks, and introduces field-level input contracts to prevent label leakage.",
+  "changelog_v2": [
+    "Split intent_recognition into: commanded_intent_inference, realized_activity_recognition, intent_onset_forecasting, command_realization_mismatch",
+    "Added human_inferred_intent track: input strictly equal to annotator replay visibility",
+    "Added open_set_intent track: supports abstain (UNKNOWN/AMBIGUOUS/BACKGROUND/OUT_OF_ONTOLOGY)",
+    "Every track now specifies: observation_cutoff, allowed_fields, denied_fields, target_label_kind, prediction_subject, prediction_window, truth_usage_boundary",
+    "Commanded inference explicitly denies mission_type, plan tags, and any type-200 action payload in model input",
+    "Field-level contracts externalized to input_contract_v2.json"
+  ],
+  "tasks": [
+    {
+      "id": "state_estimation",
+      "name": "Partial-observation state estimation",
+      "version": "1",
+      "observations": "current",
+      "target_label_kind": "truth",
+      "input_tables": ["observations", "actions", "relations"],
+      "target_tables": ["states"],
+      "metrics": ["entity_detection_f1", "hex_distance_error", "state_mae"],
+      "prohibited_inputs": ["truth observations at target step"],
+      "observation_cutoff": "current_step",
+      "allowed_fields": ["observations.{red,blue}.*", "actions.*", "relations.*"],
+      "denied_fields": ["observations.truth.*", "states.*", "intent_segments.*"]
+    },
+    {
+      "id": "trajectory_prediction",
+      "name": "Future trajectory prediction",
+      "version": "1",
+      "observations": "history",
+      "target_label_kind": "truth",
+      "input_tables": ["observations", "actions", "relations"],
+      "target_tables": ["states"],
+      "metrics": ["ade_hex", "fde_hex", "topk_route_recall"],
+      "prohibited_inputs": ["future states", "future actions"],
+      "observation_cutoff": "current_step",
+      "allowed_fields": ["observations.{red,blue}.*", "actions.* (up to current_step)", "relations.* (up to current_step)"],
+      "denied_fields": ["observations.truth.*", "states.*", "actions.* (after current_step)", "intent_segments.*", "future intent.*"]
+    },
+    {
+      "id": "activity_recognition",
+      "name": "Tactical activity recognition",
+      "version": "1",
+      "observations": "history",
+      "target_label_kind": "realized",
+      "input_tables": ["observations", "states", "actions", "events", "relations"],
+      "target_tables": ["actions", "events", "relations"],
+      "metrics": ["macro_f1", "event_map", "onset_error"],
+      "prohibited_inputs": [],
+      "observation_cutoff": "current_step",
+      "allowed_fields": ["observations.*", "states.* (up to current_step)", "actions.* (up to current_step)", "events.* (up to current_step)", "relations.* (up to current_step)"],
+      "denied_fields": ["intent_segments.*", "actions.* (after current_step)", "events.* (after current_step)"]
+    },
+    {
+      "id": "commanded_intent_inference",
+      "name": "Commanded intent inference",
+      "version": "2",
+      "observations": "history (partial only)",
+      "target_label_kind": "commanded",
+      "input_tables": ["observations", "states", "actions", "events", "relations"],
+      "target_tables": ["intent_segments"],
+      "metrics": ["parent_macro_f1", "fine_macro_f1", "micro_f1", "segment_iou", "calibration_error"],
+      "prohibited_inputs": ["commanded intents", "mission_type values", "type-200 action payloads", "plan tags", "truth observations"],
+      "observation_cutoff": "current_step",
+      "allowed_fields": [
+        "observations.{red,blue}.*",
+        "states.entity_id,states.side,states.hex_id,states.health,states.speed,states.move_state (up to current_step)",
+        "actions.action_type_id (except 200), actions.action_name, actions.entity_id, actions.target_entity_id, actions.target_hex_id (up to current_step)",
+        "events.* (up to current_step)",
+        "relations.* (up to current_step)"
+      ],
+      "denied_fields": [
+        "observations.truth.*",
+        "actions.payload_json.mission_type",
+        "actions with action_type_id=200 or action_name=MISSION_TASK",
+        "intent_segments.*",
+        "actions.* (after current_step)",
+        "events.* (after current_step)",
+        "states.* (after current_step)"
+      ],
+      "target_description": "Infer the hidden command intent (ASSAULT/HOLD/RECON from mission_type) that drove the agent's behavior, using only partial observations up to the current step. Model must NOT have access to mission_type, type-200 actions, or plan tags."
+    },
+    {
+      "id": "realized_activity_recognition",
+      "name": "Realized activity recognition",
+      "version": "1",
+      "observations": "history",
+      "target_label_kind": "realized",
+      "input_tables": ["observations", "states", "actions", "events", "relations"],
+      "target_tables": ["intent_segments"],
+      "metrics": ["parent_macro_f1", "fine_macro_f1", "micro_f1", "segment_iou"],
+      "prohibited_inputs": ["commanded intents", "future observations"],
+      "observation_cutoff": "current_step",
+      "allowed_fields": ["observations.*", "states.* (up to current_step)", "actions.* (up to current_step)", "events.* (up to current_step)", "relations.* (up to current_step)"],
+      "denied_fields": ["intent_segments.*", "commanded.*", "future.*"],
+      "target_description": "Recognize which tactical activities (SEIZE, FORTIFY, ASSEMBLE, etc.) have actually been executed, based on observed behavior up to the current step."
+    },
+    {
+      "id": "intent_onset_forecasting",
+      "name": "Intent onset forecasting",
+      "version": "1",
+      "observations": "history up to N steps before onset",
+      "target_label_kind": "future_intent",
+      "input_tables": ["observations", "states", "actions", "events", "relations"],
+      "target_tables": ["intent_segments"],
+      "metrics": ["parent_macro_f1", "fine_macro_f1", "segment_iou", "onset_error"],
+      "prohibited_inputs": ["actions or events after the forecasting cutoff (i.e., during the onset period)", "the intent label itself"],
+      "observation_cutoff": "onset_step - N (default N=5)",
+      "allowed_fields": [
+        "observations.{red,blue}.* (up to cutoff)",
+        "states.* (up to cutoff)",
+        "actions.* (up to cutoff)",
+        "events.* (up to cutoff)",
+        "relations.* (up to cutoff)"
+      ],
+      "denied_fields": ["observations.truth.* (after cutoff)", "actions.* (after cutoff)", "events.* (after cutoff)", "intent_segments.* (corresponding to the future onset)", "commanded intents"],
+      "target_description": "Forecast the onset of a tactical intent N steps before clear behavioral evidence emerges. Model must predict the upcoming intent and its start step using only observations before the onset window."
+    },
+    {
+      "id": "command_realization_mismatch",
+      "name": "Command-realization mismatch prediction",
+      "version": "1",
+      "observations": "history",
+      "target_label_kind": "mismatch",
+      "input_tables": ["observations", "states", "actions", "events", "relations"],
+      "target_tables": ["intent_segments"],
+      "metrics": ["macro_f1", "mismatch_detection_rate", "mismatch_kind_accuracy"],
+      "prohibited_inputs": ["future outcome", "commanded intent labels", "realized intent labels"],
+      "observation_cutoff": "current_step",
+      "allowed_fields": [
+        "observations.* (up to current_step)",
+        "states.* (up to current_step)",
+        "actions.* (up to current_step)",
+        "events.* (up to current_step)",
+        "relations.* (up to current_step)"
+      ],
+      "denied_fields": ["intent_segments.*", "future actions.*", "future events.*", "outcome fields"],
+      "target_description": "Predict whether the commanded intent will be achieved, fail, switch, or deviate from the plan, using only partial observations up to the current step."
+    },
+    {
+      "id": "human_inferred_intent",
+      "name": "Human-inferred intent benchmark",
+      "version": "1",
+      "observations": "replay (strictly annotator-visible data only)",
+      "target_label_kind": "human_inferred",
+      "input_tables": ["observations (red or blue only, no truth)"],
+      "target_tables": ["intent_segments"],
+      "metrics": ["human_model_agreement", "macro_f1", "segment_iou"],
+      "prohibited_inputs": ["truth observations", "commanded labels", "realized labels", "future observations", "full state"],
+      "observation_cutoff": "annotator_viewport (replay strict)",
+      "allowed_fields": [
+        "observations.{red|blue}.operators.* (only entities that are visible=True to the annotator's side)",
+        "observations.{red|blue}.cities",
+        "observations.{red|blue}.time",
+        "observations.{red|blue}.scores"
+      ],
+      "denied_fields": [
+        "observations.truth.*",
+        "observations.{red|blue}.operators.* where visible=False",
+        "intent_segments.*",
+        "states.*",
+        "actions.*",
+        "events.*",
+        "relations.*",
+        "plan tags",
+        "commanded intents",
+        "realized intents"
+      ],
+      "target_description": "Predict what a human annotator would infer as the intent, given only the same partial observation data available during replay. Models are evaluated against human-inferred labels, not against truth labels."
+    },
+    {
+      "id": "open_set_intent",
+      "name": "Open-set intent recognition",
+      "version": "1",
+      "observations": "partial observations only",
+      "target_label_kind": "all (including UNKNOWN, AMBIGUOUS, BACKGROUND, OUT_OF_ONTOLOGY)",
+      "input_tables": ["observations", "states", "actions", "events", "relations"],
+      "target_tables": ["intent_segments"],
+      "metrics": ["fine_macro_f1", "AUROC", "AUPR", "abstention_rate", "OSCR", "ECE"],
+      "prohibited_inputs": ["commanded intents", "truth observations"],
+      "observation_cutoff": "current_step",
+      "allowed_fields": ["observations.{red,blue}.*", "states.* (up to current_step)", "actions.* (up to current_step)", "events.* (up to current_step)", "relations.* (up to current_step)"],
+      "denied_fields": ["observations.truth.*", "intent_segments.*", "future.*"],
+      "target_description": "Recognize all possible intent states including BACKGROUND, UNKNOWN, AMBIGUOUS, and OUT_OF_ONTOLOGY. Model may abstain (predict UNKNOWN/AMBIGUOUS) rather than force a false classification. Handles open-set rejection for behavior outside the 22-class ontology."
+    }
+  ]
+}

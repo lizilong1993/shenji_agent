@@ -198,7 +198,7 @@ class Map:
     def get_road_type(self, pos: int) -> int:
         if not self.is_valid(pos):
             return 0
-        for i in self.basic[pos // 100][pos % 100]["roads"]:
+        for i in self.basic[pos // 100][pos % 100].get("roads", []):
             if i != 0:
                 return i
         return 0
@@ -272,11 +272,11 @@ class Map:
             return 0
         basic_data = self.basic[pos // 100][pos % 100]
         return {
-            "neighbors": basic_data["neighbors"],
-            "roads": basic_data["roads"],
-            "rivers": basic_data["rivers"],
-            "cond": basic_data["cond"],
-            "elev": basic_data["elev"],
+            "neighbors": basic_data.get("neighbors", []),
+            "roads": basic_data.get("roads", []),
+            "rivers": basic_data.get("rivers", []),
+            "cond": basic_data.get("cond", 0),
+            "elev": basic_data.get("elev", 0),
         }
 
 
@@ -549,6 +549,91 @@ class Agent:
                 name = self._action_name(int(available_action_type))
                 self.valid_action_type_counts[name] = self.valid_action_type_counts.get(name, 0) + 1
 
+    def set_mission(self, mission_type: int, target_pos: Any = None) -> None:
+        """Set an explicit mission intent for this agent.
+
+        Mission types:
+        0 = ATTACK: move toward enemy cities and shoot
+        1 = DEFENSE/HOLD: stay at position, fortify, engage approaching enemies
+        2 = RECON: move broadly, avoid engagement, search for enemies
+        3 = SEIZE: move toward target objective and occupy
+        """
+        self.my_mission = {
+            "info": {
+                "mission_type": mission_type,
+                "company_id": self.seat,
+                "target_pos": target_pos,
+                "start_time": 0,
+                "end_time": 9999,
+            }
+        }
+        self.logger.info("set_mission type=%s target=%s", mission_type, target_pos)
+
+    def _build_priority(self) -> List[int]:
+        """Build action priority list based on current mission intent."""
+        if not self.my_mission:
+            return [
+                ActionType.Shoot, ActionType.Move, ActionType.Occupy,
+                ActionType.GuideShoot, ActionType.JMPlan, ActionType.LayMine,
+                ActionType.ActivateRadar, ActionType.ChangeAltitude,
+                ActionType.GetOn, ActionType.GetOff, ActionType.Fork,
+                ActionType.Union, ActionType.EnterFort, ActionType.ExitFort,
+                ActionType.RemoveKeep, ActionType.ChangeState, ActionType.StopMove,
+                ActionType.WeaponLock, ActionType.WeaponUnFold, ActionType.CancelJMPlan,
+            ]
+
+        mission_type = int(self.my_mission.get("info", {}).get("mission_type", -1))
+
+        if mission_type == 0:  # ATTACK / ASSAULT
+            return [
+                ActionType.Shoot, ActionType.Move, ActionType.Occupy,
+                ActionType.EnterFort, ActionType.ExitFort, ActionType.JMPlan,
+                ActionType.ChangeState, ActionType.GuideShoot, ActionType.GetOn,
+                ActionType.GetOff, ActionType.LayMine, ActionType.ActivateRadar,
+                ActionType.ChangeAltitude, ActionType.Fork, ActionType.Union,
+                ActionType.RemoveKeep, ActionType.StopMove, ActionType.WeaponLock,
+                ActionType.WeaponUnFold, ActionType.CancelJMPlan,
+            ]
+        elif mission_type == 1:  # DEFENSE / HOLD
+            return [
+                ActionType.EnterFort, ActionType.Shoot, ActionType.StopMove,
+                ActionType.ChangeState, ActionType.Move, ActionType.Occupy,
+                ActionType.JMPlan, ActionType.LayMine, ActionType.GuideShoot,
+                ActionType.ActivateRadar, ActionType.ChangeAltitude,
+                ActionType.GetOn, ActionType.GetOff, ActionType.Fork,
+                ActionType.Union, ActionType.ExitFort, ActionType.RemoveKeep,
+                ActionType.WeaponLock, ActionType.WeaponUnFold, ActionType.CancelJMPlan,
+            ]
+        elif mission_type == 2:  # RECON
+            return [
+                ActionType.Move, ActionType.Shoot, ActionType.StopMove,
+                ActionType.EnterFort, ActionType.ExitFort, ActionType.ChangeState,
+                ActionType.Occupy, ActionType.GuideShoot, ActionType.JMPlan,
+                ActionType.GetOn, ActionType.GetOff, ActionType.LayMine,
+                ActionType.ActivateRadar, ActionType.ChangeAltitude,
+                ActionType.Fork, ActionType.Union, ActionType.RemoveKeep,
+                ActionType.WeaponLock, ActionType.WeaponUnFold, ActionType.CancelJMPlan,
+            ]
+        elif mission_type == 3:  # SEIZE
+            return [
+                ActionType.Move, ActionType.Occupy, ActionType.Shoot,
+                ActionType.EnterFort, ActionType.ExitFort, ActionType.ChangeState,
+                ActionType.GuideShoot, ActionType.JMPlan, ActionType.GetOn,
+                ActionType.GetOff, ActionType.LayMine, ActionType.ActivateRadar,
+                ActionType.ChangeAltitude, ActionType.Fork, ActionType.Union,
+                ActionType.RemoveKeep, ActionType.StopMove, ActionType.WeaponLock,
+                ActionType.WeaponUnFold, ActionType.CancelJMPlan,
+            ]
+        return [
+            ActionType.Shoot, ActionType.Move, ActionType.Occupy,
+            ActionType.GuideShoot, ActionType.JMPlan, ActionType.LayMine,
+            ActionType.ActivateRadar, ActionType.ChangeAltitude,
+            ActionType.GetOn, ActionType.GetOff, ActionType.Fork,
+            ActionType.Union, ActionType.EnterFort, ActionType.ExitFort,
+            ActionType.RemoveKeep, ActionType.ChangeState, ActionType.StopMove,
+            ActionType.WeaponLock, ActionType.WeaponUnFold, ActionType.CancelJMPlan,
+        ]
+
     def setup(self, setup_info: Dict[str, Any]) -> None:
         try:
             requested_policy = setup_info.get("policy_profile")
@@ -566,28 +651,7 @@ class Agent:
             self.role = setup_info.get("role")
             self.user_name = setup_info.get("user_name")
             self.user_id = setup_info.get("user_id")
-            self.priority = [
-                ActionType.Shoot,
-                ActionType.Move,
-                ActionType.Occupy,
-                ActionType.GuideShoot,
-                ActionType.JMPlan,
-                ActionType.LayMine,
-                ActionType.ActivateRadar,
-                ActionType.ChangeAltitude,
-                ActionType.GetOn,
-                ActionType.GetOff,
-                ActionType.Fork,
-                ActionType.Union,
-                ActionType.EnterFort,
-                ActionType.ExitFort,
-                ActionType.RemoveKeep,
-                ActionType.ChangeState,
-                ActionType.StopMove,
-                ActionType.WeaponLock,
-                ActionType.WeaponUnFold,
-                ActionType.CancelJMPlan,
-            ]
+            self.priority = self._build_priority()
             self.observation = None
             self._reset_action_diagnostics()
             self.map = Map(setup_info["basic_data"], setup_info["cost_data"], setup_info.get("see_data"))
@@ -665,6 +729,8 @@ class Agent:
                         self.my_mission = command
                     elif command.get("type") == 201:
                         self.my_direction = command
+            # Rebuild priority based on current mission intent
+            self.priority = self._build_priority()
             if observation.get("time", {}).get("stage") == 1:
                 actions: List[Dict[str, Any]] = []
                 for item in observation.get("operators", []):

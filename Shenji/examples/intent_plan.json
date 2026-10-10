@@ -1,0 +1,62 @@
+{
+  "episode_id": "shenji_example_001",
+  "segments": [
+    {
+      "segment_id": "commanded_red_company_01_001",
+      "label_kind": "commanded",
+      "subject_scope": "company",
+      "subject_id": "red_company_01",
+      "start_step": 0,
+      "end_step": 2,
+      "parent_intent": "AREA_CONTROL",
+      "primary_intent": "SEIZE",
+      "secondary_intents": ["FLANK", "FIRE_SUPPORT"],
+      "target_type": "objective_point",
+      "target_id": "city_07",
+      "status": "completed",
+      "outcome": "achieved",
+      "evidence_source": "scenario_plan",
+      "evidence_grade": "A",
+      "evidence_refs": ["mission_command:0", "hidden_plan:red_company_01:001"],
+      "confidence": 1.0
+    },
+    {
+      "segment_id": "realized_red_company_01_flank",
+      "label_kind": "realized",
+      "subject_scope": "company",
+      "subject_id": "red_company_01",
+      "start_step": 0,
+      "end_step": 1,
+      "parent_intent": "OFFENSIVE_ACTION",
+      "primary_intent": "FLANK",
+      "secondary_intents": ["FIRE_SUPPORT"],
+      "target_type": "enemy_entity",
+      "target_id": "2001",
+      "status": "completed",
+      "outcome": "achieved",
+      "evidence_source": "deterministic_rule",
+      "evidence_grade": "B",
+      "evidence_refs": ["action:1", "action:2", "trajectory:1001:0-1"],
+      "confidence": 0.9
+    },
+    {
+      "segment_id": "realized_red_company_01_seize",
+      "label_kind": "realized",
+      "subject_scope": "company",
+      "subject_id": "red_company_01",
+      "start_step": 2,
+      "end_step": 2,
+      "parent_intent": "AREA_CONTROL",
+      "primary_intent": "SEIZE",
+      "secondary_intents": [],
+      "target_type": "objective_point",
+      "target_id": "city_07",
+      "status": "completed",
+      "outcome": "achieved",
+      "evidence_source": "deterministic_rule",
+      "evidence_grade": "A",
+      "evidence_refs": ["action:3", "city_owner_change:7:1-2"],
+      "confidence": 1.0
+    }
+  ]
+}

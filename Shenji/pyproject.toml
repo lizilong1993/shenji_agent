@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shenji-dataset"
+version = "1.0.0"
+description = "Construction and validation toolkit for the Shenji wargame situation-awareness dataset"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+parquet = ["pyarrow>=14"]
+
+[project.scripts]
+shenji-dataset = "shenji_dataset.cli:main"
+shenji-collect = "shenji_dataset.collect_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
