@@ -75,6 +75,17 @@ for (const [k, url] of Object.entries(L.MODEL_MAP)) {
   if (fs.existsSync(p)) { pass++; } else { failures.push(`${k} 映射的模型文件不存在: ${p}`); }
 }
 
+
+// --- 8. 尺度：任意单位资产必须按真实长度缩放（否则模型被 minimumPixelSize 夹死）---
+eq(L.scaleFor('ship_large') > 10, true, 'ship_large 需放大 10 倍以上（13.1 单位 -> 155 m）');
+eq(Math.round(L.scaleFor('ship_medium') * 10) / 10, 12.7, 'ship_medium scale=135/10.6');
+eq(L.scaleFor('nope'), null, '未知形态 scale=null');
+eq(L.scaleFor(undefined), null, 'undefined 形态 scale=null');
+for (const k of Object.keys(L.MODEL_MAP)) {
+  if (L.scaleFor(k) === null) { failures.push(k + ' 在 MODEL_MAP 里但没有 scale（尺度表与映射表不同步）'); }
+  else { pass++; }
+}
+
 console.log(`entityLod 判据：${pass} 通过, ${failures.length} 失败`);
 if (failures.length) {
   failures.forEach(f => console.log('  FAIL ' + f));

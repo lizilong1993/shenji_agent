@@ -94,6 +94,46 @@
   }
 
   /**
+   * 各形态的**真实长度（米）**，以及资产的最长轴（**单位**，实测自 GLB 包围盒）。
+   *
+   * 为什么需要这张表：Kenney 这类 low-poly 包**不按米制建模**——`ship-large.glb`
+   * 的最长轴只有 **13.1 单位**。Cesium 的 `Entity.model` 默认 **1 单位 = 1 米**，
+   * 所以不设 `scale` 时，一艘驱逐舰会被当成 **13.1 m** 的船（真实约 155 m，差一个
+   * 数量级）。这会让模型小到 24 px 以下，于是被 `minimumPixelSize` **恒定夹在 24 px**，
+   * 「按高度切换 2D/3D」在视觉上就失去意义——阈值也就无从定稿。
+   *
+   * 所以：**按形态给出真实长度，除以资产单位长度得到 scale**。数值来源是公开的
+   * 舰艇全长量级（取整到 5 m），**是量级而非精确型别尺寸**——本批资产是民用
+   * low-poly，本来也表达不了具体型号（见 MODEL_MAP 注释）。
+   */
+  var REAL_LENGTH_M = {
+    ship_large: 155,    // 驱逐舰量级（052D 约 157 m）
+    ship_medium: 135,   // 护卫舰量级（054A 约 134 m）
+    ship_cargo: 130,    // 补给/运输舰量级
+    boat_speed: 35,     // 导弹艇量级（沱江级约 65 m，快艇更短，取 35）
+    boat_tug: 30,       // 拖船
+  };
+
+  // 资产最长轴（单位）。**实测值**，来自解 GLB accessor 的 min/max。
+  // 换了资产必须同步更新，否则尺度会错——entity_lod_test.js 会校验这张表与
+  // MODEL_MAP 的键集合一致。
+  var MODEL_UNITS = {
+    ship_large: 13.1,
+    ship_medium: 10.6,
+    ship_cargo: 10.5,
+    boat_speed: 3.9,
+    boat_tug: 3.5,
+  };
+
+  /** 该形态模型应设的 scale；缺任一侧数据时返回 null（调用点不加 scale）。 */
+  function scaleFor(formClass) {
+    var real = REAL_LENGTH_M[formClass];
+    var units = MODEL_UNITS[formClass];
+    if (!real || !units) return null;
+    return real / units;
+  }
+
+  /**
    * 由实体定义推断形态类别。**只做保守映射**：拿不准就返回 null（保留 2D）。
    *
    * def.form 若由数据显式给出则优先用它；否则按 domain + 平台类别粗判。
@@ -122,6 +162,9 @@
     DEFAULTS: DEFAULTS,
     decide: decide,
     modelUrlFor: modelUrlFor,
+    scaleFor: scaleFor,
+    REAL_LENGTH_M: REAL_LENGTH_M,
+    MODEL_UNITS: MODEL_UNITS,
     formClassOf: formClassOf,
     MODEL_MAP: MODEL_MAP,
   };

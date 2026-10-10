@@ -1269,6 +1269,13 @@ function isVisible(def) {
 // 「关了目标图层」和「离得远」变成同一件事，无法分别推理。所以这里只写
 // billboard.show / model.show，**不碰 isVisible**，避免与既有通路打架。
 
+/** 该目标模型应设的 scale（真实长度 ÷ 资产单位长度）；拿不准返回 undefined。 */
+function modelScaleForTarget(def) {
+  if (!window.EntityLod || !window.EntityLod.scaleFor) return undefined;
+  const s = window.EntityLod.scaleFor(window.EntityLod.formClassOf(def));
+  return (s && isFinite(s) && s > 0) ? s : undefined;
+}
+
 /** 该目标要用的 3D 模型 URL；拿不准返回 null（保留 2D）。 */
 function modelUrlForTarget(def) {
   if (!window.EntityLod) return null;
@@ -1346,7 +1353,14 @@ function createTargetEntities() {
         targetHasModel[def.id] = true;   // 供 applyTargetLod 判断，不读 Property
         return {
           uri: url,
-          minimumPixelSize: 24,
+          // **必须给 scale**：Kenney 资产不按米制建模（ship-large 最长轴仅 13.1
+          // 单位），Cesium 默认 1 单位 = 1 米，不缩放时驱逐舰被当成 13 m 的船，
+          // 于是恒被 minimumPixelSize 夹住、「按高度切换」失去视觉意义。
+          // 尺度表在 entityLod.js（按形态给真实长度 ÷ 资产单位长度）。
+          scale: modelScaleForTarget(def),
+          // 像素下限只作**极远处的可辨性兜底**，不能大到把距离语义抹平：
+          // 原先 24 与 2D 图标的 34 同量级，会把 3D 恒定成 24 px。
+          minimumPixelSize: 6,
           maximumScale: 20000,
           show: false,
         };
