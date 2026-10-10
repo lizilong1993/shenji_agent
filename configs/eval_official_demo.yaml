@@ -1,0 +1,51 @@
+# P1 步骤 2：非对称想定与外部对手的横向对比评估配置
+#
+# 标准依据：31007 6.1.1 三层框架之「横向对比分析」——
+#   原文：「将开发的算法与模型**与已有的同类算法和模型进行对比**，
+#          分析其优势和不足……可从决策速度、准确性、适应性、可扩展性等多个方面进行」
+#
+# ⚠ 本配置**尚未运行**：外部/官方对手在平台侧是否开放**未确认**（P1【前置条件】）。
+#   故此处把对手来源显式声明，使「拿不到外部对手」这件事在配置里可见，
+#   而不是把自博弈结果顶上去 —— P1【风险与回滚】要求标「待平台方配合」，**不虚报达成**。
+
+evaluation:
+  # 三层框架逐层声明（31007 6.1.1）
+  layers:
+    simulation:
+      enabled: true
+      note: 仿真环境验证 —— 本仓已有（自博弈/消融）
+    live:
+      enabled: false
+      note: 实际推演校验 —— 需组织实际推演并邀请专业推演人员（原文 6.1.1）
+    comparative:
+      enabled: true
+      note: 横向对比分析 —— 本配置的目的；对手见下
+
+  # 对手来源盘点（P1 步骤 1）
+  opponents:
+    - name: weights_incumbent_rule
+      source: self_baseline
+      note: 自家基线；**自博弈配对**，不是对外成绩
+    - name: baseline_rule_v1
+      source: self_baseline
+      note: 规则基线
+    # 外部/官方对手：**待平台方确认可获取性**
+    - name: official_demo_ai
+      source: external
+      available: false
+      note: 官方 Demo AI —— 平台侧可获取性未确认，取得前不得计入横向对比层
+
+  # 有效性守门（P1 步骤 4；阈值口径见 training/eval_validity.py 顶部说明）
+  validity_gate:
+    max_draw_rate: 0.5
+    min_discrimination: 0.2
+    min_games: 20
+    # 未达标时：**评估结论不予采信**，且对外材料必须带来源标签
+    on_failure: not_admissible
+    require_source_label: true
+
+  # 非对称想定（P1【目标】要求"引入非对称想定"）
+  asymmetry:
+    enabled: true
+    note: 非对称兵力/任务想定；具体想定编号待与平台侧对齐
+    scenarios: []
