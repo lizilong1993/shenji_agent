@@ -332,6 +332,56 @@ class Replay:
             self._tick_index = self._build_tick_index()
         return dict(self._tick_index)
 
+    # ── I15 步骤 1 的「六类记录」出口 ────────────────────────────────────
+    def timeline(self) -> List[Dict[str, Any]]:
+        """**时间线**一类：按帧序返回每帧的 `time` 段（外加帧序号）。
+
+        `I15` 步骤 1 要求六类记录，其中"时间线"此前只隐含在 `time` 里、
+        无显式出口。本方法把它显式化，**不新造数据** ——
+        就是逐帧取 `time`，并附上 `frame_index` 便于与按索引回放对齐。
+        """
+        out: List[Dict[str, Any]] = []
+        for i, frame in self.iter_frames():
+            t = frame.get("time")
+            if isinstance(t, dict):
+                out.append({"frame_index": i, **t})
+        return out
+
+    def adjudication_records(self) -> List[Dict[str, Any]]:
+        """**裁决**一类：返回所有非空 `judge_info` 条目（附帧序号）。
+
+        实测 v1 复盘里 `judge_info` **恒为空数组** ——
+        即"裁决"这一类**有声明、无数据**。本方法把这个事实**变成可检查的**：
+        返回空列表时即证明该主线确实缺失，不必靠读文档判断。
+        """
+        out: List[Dict[str, Any]] = []
+        for i, frame in self.iter_frames():
+            for rec in (frame.get("judge_info") or []):
+                out.append({"frame_index": i, "record": rec})
+        return out
+
+    def record_type_coverage(self) -> Dict[str, Any]:
+        """六类记录**实际有无数据**的体检（对应 `schema.record_types`）。
+
+        **只报事实，不报"通过"** —— 某类为空就如实记空。
+        """
+        frames = list(self.iter_frames())
+        n = len(frames)
+        cov: Dict[str, Any] = {
+            "frame_count": n,
+            "actions": sum(1 for _, f in frames if f.get("actions")),
+            "adjudication": sum(1 for _, f in frames if f.get("judge_info")),
+            "timeline": sum(1 for _, f in frames if isinstance(f.get("time"), dict)),
+            "agent_decisions": sum(1 for _, f in frames if f.get("agent")),
+            "seed": sum(1 for _, f in frames
+                        if isinstance(f.get("meta"), dict) and f["meta"].get("seed") is not None),
+            "human_ops": sum(1 for _, f in frames if f.get("human")),
+        }
+        cov["empty_types"] = [k for k in ("actions", "adjudication", "timeline",
+                                          "agent_decisions", "seed", "human_ops")
+                              if cov[k] == 0]
+        return cov
+
     def verify_precise_replay(self,
                               ticks: Optional[Iterable[int]] = None,
                               ) -> Dict[str, Any]:
