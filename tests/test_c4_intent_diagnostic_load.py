@@ -90,3 +90,66 @@ def test_diagnostic_reports_load_error_instead_of_silence(tmp_path: Path) -> Non
     model, payload = diag._load_intent_model(bad, "cpu")
     assert model is None
     assert payload and "load_error" in payload, "失败必须留下 load_error 供排查"
+
+# ── situation 路径：与 intent 路径**同一个 bug**（本轮补上） ──────────────
+#
+# `ai/weights/situation_gcn.pth` 同样是**裸 state_dict**，且键为 legacy 形式
+# `sage1.linear.weight`（**无 `backbone.` 前缀**）。原诊断只认
+# `payload["model_state"]` + `backbone.` 前缀，于是同样报 MISSING。
+# 主链路的处置是「把 legacy 键加 `backbone.` 前缀再 load」——这里钉住该行为。
+
+
+def _bare_legacy_situation_state_dict(num_features: int = 108, hidden_dim: int = 64):
+    """构造 legacy SituationGCN 的**裸** state_dict（无 backbone. 前缀、无包装）。"""
+    from ai.models import SituationGCN
+
+    # 注意：`SituationGCN.state_dict()` 的键**本来就没有** `backbone.` 前缀
+    # （`backbone.` 是外层 `GraphSituationModel` 加上的），故直接返回即可 ——
+    # 这正是仓库里 situation_gcn.pth 的形态。
+    return SituationGCN(num_features=num_features, hidden_dim=hidden_dim, output_dim=1).state_dict()
+
+
+def test_diagnostic_loads_bare_legacy_situation_state_dict(tmp_path: Path) -> None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "diag_sit", REPO / "scripts" / "diagnose_model_quality.py")
+    diag = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(diag)
+
+    sd = _bare_legacy_situation_state_dict(num_features=108, hidden_dim=64)
+    assert "sage1.linear.weight" in sd, "本用例要的是 legacy 无前缀形态"
+    assert not any(k.startswith("backbone.") for k in sd)
+    ckpt = tmp_path / "situation_gcn.pth"
+    torch.save(sd, ckpt)
+
+    model, payload = diag._load_situation_model(ckpt, "cpu")
+    assert model is not None, "裸 legacy state_dict 必须能加载（原先在这里失败）"
+    assert payload.get("hidden_dim") == 64
+    assert payload.get("input_dim") == 108
+    # 加载后必须能真的前向（否则只是"load_state_dict 没抛异常"）
+    adj = torch.eye(3)
+    x = torch.randn(3, 108)
+    with torch.no_grad():
+        out = model(x, adj)
+    assert out is not None
+
+
+def test_diagnostic_loads_wrapped_situation_with_backbone_prefix(tmp_path: Path) -> None:
+    """带 backbone. 前缀的包装型：原有路径不得回归。"""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "diag_sit2", REPO / "scripts" / "diagnose_model_quality.py")
+    diag = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(diag)
+
+    from ai.models import GraphSituationModel
+
+    m = GraphSituationModel(num_features=108, hidden_dim=64)
+    ckpt = tmp_path / "wrapped_sit.pt"
+    torch.save({"model_state": m.state_dict(), "input_dim": 108, "hidden_dim": 64}, ckpt)
+
+    model, payload = diag._load_situation_model(ckpt, "cpu")
+    assert model is not None
+    assert payload.get("hidden_dim") == 64

@@ -69,13 +69,41 @@ def _load_situation_model(weights_path: Path, device: str = "cpu") -> Tuple[Opti
         return None, None
     try:
         payload = torch.load(weights_path, map_location="cpu")
-        hidden_dim = int(payload.get("hidden_dim") or payload["model_state"]["backbone.sage1.linear.weight"].shape[0])
-        input_dim = int(payload.get("input_dim", 108))
-        model = GraphSituationModel(num_features=input_dim, hidden_dim=hidden_dim)
-        model.load_state_dict(payload["model_state"])
+        # ── C4 修正（situation 路径）：与 `ai/policy.py::_load_situation_model` 对齐 ──
+        # 与 intent 路径**同一个 bug**：原实现只支持包装型
+        # （`payload["model_state"]` + `backbone.` 前缀），而仓库实际的
+        # `ai/weights/situation_gcn.pth` 是**裸 state_dict**、键为 legacy 形式
+        # `sage1.linear.weight`（**无 `backbone.` 前缀**）。
+        # 于是同样 KeyError → 被吞 → 报 "Situation model: MISSING"，
+        # 并驱动 `train_situation_model` 这条**基于误判**的建议。
+        # 主链路的处置是：**把 legacy 键加 `backbone.` 前缀包一层**再 load。
+        state_dict = payload["model_state"] if ("model_state" in payload) else payload
+        sage_key = None
+        for candidate_key in ("backbone.sage1.linear.weight", "sage1.linear.weight"):
+            if candidate_key in state_dict:
+                sage_key = candidate_key
+                break
+        if sage_key is not None:
+            hidden_dim = int(state_dict[sage_key].shape[0])
+        else:
+            hidden_dim = int(payload.get("hidden_dim", 64))
+        has_backbone_prefix = any(k.startswith("backbone.") for k in state_dict)
+        if not has_backbone_prefix and "sage1.linear.weight" in state_dict:
+            num_features = int(state_dict["sage1.linear.weight"].shape[1] // 2)
+            model = GraphSituationModel(num_features=num_features, hidden_dim=hidden_dim)
+            model.load_state_dict({f"backbone.{k}": v for k, v in state_dict.items()})
+        else:
+            input_dim = int(payload.get("input_dim", 108))
+            model = GraphSituationModel(num_features=input_dim, hidden_dim=hidden_dim)
+            model.load_state_dict(state_dict)
         model.eval()
         if device != "cpu":
             model = model.to(device)
+        if isinstance(payload, dict):
+            payload.setdefault("input_dim", int(model.backbone.sage1.linear.weight.shape[1] // 2))
+            payload["hidden_dim"] = hidden_dim
+            payload["_resolved_state_dict"] = True
+            payload.pop("model_state", None)
         return model, payload
     except Exception as exc:
         return None, {"load_error": str(exc)}
