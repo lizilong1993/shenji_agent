@@ -179,14 +179,40 @@ def test_disabled_state_is_reported() -> None:
 
 # ─────────────────────────── ④ 判据 3：未启用 LLM 的降级路径
 
-def test_load_llm_model_disabled_returns_status_without_raising() -> None:
-    """**判据 3**：未启用时返回结构化「未启用」状态，**不抛异常**。"""
+def test_load_llm_model_disabled_returns_boolean_and_details_without_raising() -> None:
+    """**判据 3 + A.3.4**：返回 `Boolean`（标准要求），**且不抛异常**。
+
+    细节改从 `last_llm_status` 取 —— 接口只给布尔，诊断信息不能丢。
+    """
     api = AgentAPI(_fake_agent())
     got = api.load_llm_model()          # 不得抛
-    assert isinstance(got, dict)
-    assert got["status"] == STATUS_DISABLED
-    assert got["loaded"] is False
-    assert got["reason"], "必须给出可读原因"
+    assert isinstance(got, bool), "A.3.4 要求 Boolean，实际 %s" % type(got).__name__
+    assert got is False, "占位实现**不得**谎报加载成功"
+    st = api.last_llm_status
+    assert st["status"] == STATUS_DISABLED
+    assert st["loaded"] is False
+    assert st["reason"], "必须给出可读原因"
+
+
+def test_load_llm_model_accepts_the_standard_config_table(tmp_path) -> None:
+    """`A.3.4` / 表 A.20：`(model_path: str, config: Dict)`，config 四键。"""
+    api = AgentAPI(_fake_agent(), llm_adapter=LLMAdapter(enabled=True))
+    cfg = {"inference_precision": "fp16", "max_context_length": 4096,
+           "device": "cuda", "batch_size": 8}
+    got = api.load_llm_model(str(tmp_path / "m.bin"), cfg)
+    assert isinstance(got, bool) and got is False
+    rec = api.last_llm_status["config"]
+    assert rec["provided"] is True and rec["problems"] == [], rec
+    assert rec["keys"] == cfg
+
+
+def test_load_llm_model_records_missing_config_keys_instead_of_guessing() -> None:
+    """缺键必须**记下来**，不得猜默认值（"不隐式替代"）。"""
+    api = AgentAPI(_fake_agent(), llm_adapter=LLMAdapter(enabled=True))
+    api.load_llm_model("/tmp/x", {"device": "cpu"})
+    assert len(api.last_llm_status["config"]["problems"]) == 3
+    api.load_llm_model("/tmp/x", ["not", "a", "dict"])
+    assert api.last_llm_status["config"]["problems"]
 
 
 def test_load_llm_model_returns_fixed_field_set() -> None:
@@ -202,8 +228,9 @@ def test_load_llm_model_missing_file_degrades_not_raises(tmp_path: Path) -> None
     """**启用了但模型不存在** → 降级为 unavailable，而不是抛异常。"""
     api = AgentAPI(_fake_agent(), llm_adapter=LLMAdapter(enabled=True))
     got = api.load_llm_model(str(tmp_path / "nope.bin"))
-    assert got["status"] == STATUS_UNAVAILABLE
-    assert got["loaded"] is False
+    assert got is False
+    assert api.last_llm_status["status"] == STATUS_UNAVAILABLE
+    assert api.last_llm_status["loaded"] is False
 
 
 def test_load_llm_model_does_not_claim_loaded_without_inference() -> None:
@@ -217,7 +244,7 @@ def test_load_llm_model_does_not_claim_loaded_without_inference() -> None:
 
 def test_nl_parse_returns_required_fields() -> None:
     """步骤 3 点名要求：意图 / 目标对象 / 参数 / 置信度 / 是否降级。"""
-    got = AgentAPI(_fake_agent()).parse_natural_language_command(
+    got = _parse1(AgentAPI(_fake_agent()), 
         "对目标发起打击", obj_id=101, target_obj_id=202)
     for key in ("intent", "target", "params", "confidence", "degraded", "action"):
         assert key in got, "缺字段 %s" % key
@@ -232,7 +259,7 @@ def test_nl_parse_action_matches_step_action_shape() -> None:
     `step` 接受的是平台动作 dict（`actor`/`type`/`obj_id`/`target_obj_id`），
     字段名与本仓 `ai/action_safety.py` 的动作字典同源。
     """
-    got = AgentAPI(_fake_agent()).parse_natural_language_command(
+    got = _parse1(AgentAPI(_fake_agent()), 
         "打击", actor=0, obj_id=101, target_obj_id=202, weapon_id=1)
     act = got["action"]
     assert isinstance(act, dict)
@@ -249,7 +276,7 @@ def test_nl_parse_action_matches_step_action_shape() -> None:
 
 def test_nl_parse_unmatched_text_does_not_invent_an_action() -> None:
     """解析不出意图时**不得编一个动作**，且置信度为 0。"""
-    got = AgentAPI(_fake_agent()).parse_natural_language_command("随便说点什么")
+    got = _parse1(AgentAPI(_fake_agent()), "随便说点什么")
     assert got["intent"] is None
     assert got["action"] is None
     assert got["confidence"] == 0.0
@@ -258,14 +285,14 @@ def test_nl_parse_unmatched_text_does_not_invent_an_action() -> None:
 
 def test_nl_parse_missing_target_yields_no_action() -> None:
     """攻击类命令缺目标 → 返回不可用动作，而不是编一个 `target_obj_id`。"""
-    got = AgentAPI(_fake_agent()).parse_natural_language_command("打击", obj_id=101)
+    got = _parse1(AgentAPI(_fake_agent()), "打击", obj_id=101)
     assert got["action"] is None
     assert got["confidence"] == 0.0
 
 
 def test_nl_parse_handles_none_text() -> None:
     """容错：`None` 不得抛异常。"""
-    got = AgentAPI(_fake_agent()).parse_natural_language_command(None)
+    got = _parse1(AgentAPI(_fake_agent()), None)
     assert got["intent"] is None and got["degraded"] is True
 
 
@@ -317,7 +344,7 @@ def test_emitted_action_always_passes_repo_strict_validator() -> None:
     ]
     produced = 0
     for text, kw in cases:
-        got = api.parse_natural_language_command(text, **kw)
+        got = _parse1(api, text, **kw)
         if got["action"] is None:
             continue
         produced += 1
@@ -333,7 +360,7 @@ def test_emitted_action_always_passes_repo_strict_validator() -> None:
 ])
 def test_incomplete_command_yields_no_action_and_zero_confidence(text, kw) -> None:
     """**缺必需字段 → 不给中间置信度。** 首版对"缺 obj_id 的打击"仍报 `0.5`。"""
-    got = AgentAPI(_fake_agent()).parse_natural_language_command(text, **kw)
+    got = _parse1(AgentAPI(_fake_agent()), text, **kw)
     assert got["action"] is None, "字段不全却产出了动作: %s" % got["action"]
     assert got["confidence"] == 0.0, "字段不全却给置信度 %s" % got["confidence"]
     assert got["reason"], "必须说明缺什么"
@@ -344,7 +371,7 @@ def test_occupy_needs_only_obj_id() -> None:
 
     首版额外要求 `target_obj_id` → **一条完整合法的命令被丢弃**。
     """
-    got = AgentAPI(_fake_agent()).parse_natural_language_command("夺控", obj_id=101)
+    got = _parse1(AgentAPI(_fake_agent()), "夺控", obj_id=101)
     assert got["action"] is not None, "夺控只需 obj_id，不该被拒"
     assert got["confidence"] == 0.5
 
@@ -353,7 +380,7 @@ def test_move_accepts_move_path_and_is_reachable() -> None:
     """首版机动的守卫是**恒真式**（`params={"type":..}` 后又查 `"move_path" not in params`），
     且无法传入路径 → 机动**永远不可达**。"""
     api = AgentAPI(_fake_agent())
-    got = api.parse_natural_language_command("机动", obj_id=101, move_path=[1, 2, 3])
+    got = _parse1(api, "机动", obj_id=101, move_path=[1, 2, 3])
     assert got["intent"] == "move"
     assert got["action"] is not None and got["action"]["move_path"] == [1, 2, 3]
     assert got["confidence"] == 0.5
@@ -367,7 +394,7 @@ def test_stop_maps_to_stop_move_not_end_deployment() -> None:
     from ai.action_safety import ACTION_SPECS
 
     assert 10 in ACTION_SPECS and 333 in ACTION_SPECS
-    got = AgentAPI(_fake_agent()).parse_natural_language_command("停止机动", obj_id=101)
+    got = _parse1(AgentAPI(_fake_agent()), "停止机动", obj_id=101)
     assert got["intent"] == "stop_move"
     assert got["action"]["type"] == 10, "应映射到 type 10（停止机动），不是 333（结束部署）"
     assert got["action"]["type"] != 333
@@ -382,7 +409,7 @@ def test_negated_command_produces_no_action(text: str) -> None:
 
     这是本文件里**后果最严重**的一类：把"不要开火"解析成"开火"并交给调用方执行。
     """
-    got = AgentAPI(_fake_agent()).parse_natural_language_command(
+    got = _parse1(AgentAPI(_fake_agent()), 
         text, obj_id=1, target_obj_id=2, weapon_id=3)
     assert got["action"] is None, "否定句产出了动作: %s" % got["action"]
     assert got["confidence"] == 0.0
@@ -402,11 +429,14 @@ def test_load_llm_model_never_raises_on_non_path_objects(bad) -> None:
 def test_disabled_adapter_disables_the_llm_half_too() -> None:
     """首版 `enabled=False` **只禁用了前三个方法**，LLM 两个方法仍照常工作 —— "整层禁用"只禁了一半。"""
     api = AgentAPI(_fake_agent(), enabled=False, llm_adapter=LLMAdapter(enabled=True))
-    st = api.load_llm_model("/etc/hostname")
-    assert st["status"] == STATUS_DISABLED, "禁用态下 load_llm_model 仍走启用路径"
-    assert st["capabilities"]["natural_language"] is False
-    parsed = api.parse_natural_language_command("打击", obj_id=1, target_obj_id=2, weapon_id=3)
-    assert parsed["action"] is None and parsed["confidence"] == 0.0, "禁用态仍解析出动作"
+    # A.3.4 要求 Boolean；细节从 last_llm_status 取
+    assert api.load_llm_model("/etc/hostname") is False
+    assert api.last_llm_status["status"] == STATUS_DISABLED, "禁用态下仍走启用路径"
+    # A.3.5 要求 List[Dict]；禁用态返回**空队列**
+    assert api.parse_natural_language_command(
+        "打击", unit_id=1, target_obj_id=2, weapon_id=3) == [], "禁用态仍解析出动作"
+    # A.3.3 要求 Boolean
+    assert api.reset() is False, "禁用态的 reset 应返回 False"
 
 
 def test_forwarded_covers_appendix_c_methods() -> None:
@@ -442,7 +472,7 @@ def test_every_emitted_action_is_consumable_by_step_shape() -> None:
                      ("夺控", dict(obj_id=1)),
                      ("机动", dict(obj_id=1, move_path=[1, 2])),
                      ("停止机动", dict(obj_id=1))]:
-        got = api.parse_natural_language_command(text, **kw)
+        got = _parse1(api, text, **kw)
         act = got["action"]
         if act is None:
             continue
@@ -458,22 +488,56 @@ def test_every_emitted_action_is_consumable_by_step_shape() -> None:
 #         表 A.23 :923-932  actionList: List[Dict]，元素含
 #         unit_id(str) / action_type(str) / target(Dict) / actionP(Dict)
 
-def test_appendix_a3_coordinate_signatures_are_not_yet_implemented() -> None:
-    """**把"不符"写成断言，而不是只写在文档里。**
+def test_appendix_a3_signatures_are_now_implemented() -> None:
+    """**A.3 符合性（原为 xfail 哨兵，现改为正向断言）。**
 
-    用 `xfail(strict=True)`：若将来有人照 A.3 改好了，这条会变成 **XPASS → 失败**，
-    **强制更新本测试与文档**，避免"差距被悄悄忽略"。
+    第五十四轮前这里是 `xfail(strict=True)`，把"三项不符"钉住。
+    本轮按原文实现后 xfail 会 **XPASS → 失败**（这正是哨兵的设计意图），
+    故按约定**改写为正向断言**，而不是把哨兵删掉。
 
-    同时它是一条**可执行的证据**：说明当前实现与 A.3 的差距是**已知且被跟踪**的，
-    而不是无人知晓。
+    原文（`.scratch/std/s31006.txt`）：
+      A.3.3 :864  `BaseAgent::reset()->Boolean`
+      A.3.4 :877  `BaseAgent::load_llm_model(model_path: str, config: Dict)->Boolean`
+      A.3.5 :906  `BaseAgent::parse_natural_language_command(command: str) -> List[Dict]`
+            表 A.23 :923-932  元素含 `unit_id`/`action_type`/`target`/`actionP`
     """
-    pytest.xfail(
-        "31006 A.3 符合性缺口（已知、被跟踪）：reset 应返回 Boolean（实测 None）；"
-        "load_llm_model 应为 (model_path: str, config: Dict) -> Boolean（实测 *args/**kwargs -> Dict，"
-        "传两位置参数抛 TypeError）；parse_natural_language_command 应返回 List[Dict] 且元素含 "
-        "unit_id/action_type/target/actionP（实测返回 dict 且无这四个键）。"
-        "处置属独立一轮，需与 I04 一并设计。原文见 .scratch/std/s31006.txt:864/877/906, 表A.23:923-932"
-    )
+    import inspect
+
+    api = AgentAPI(_fake_agent())
+
+    # A.3.3：reset() -> Boolean
+    assert isinstance(api.reset(), bool), "A.3.3 要求 Boolean"
+
+    # A.3.4：(model_path, config) -> Boolean
+    sig = inspect.signature(AgentAPI.load_llm_model)
+    params = [p for p in sig.parameters if p != "self"]
+    assert params[:2] == ["model_path", "config"], "A.3.4 参数应为 (model_path, config)，实际 %s" % params
+    assert isinstance(api.load_llm_model("/tmp/x", {}), bool), "A.3.4 要求 Boolean"
+
+    # A.3.5：-> List[Dict]，元素含四个标准键
+    out = api.parse_natural_language_command("夺控", unit_id=101, platform_shape=False)
+    assert isinstance(out, list), "A.3.5 要求 List[Dict]，实际 %s" % type(out).__name__
+    assert out and isinstance(out[0], dict)
+    for key in ("unit_id", "action_type", "target", "actionP"):
+        assert key in out[0], "A.3.5 表 A.23 要求元素含 %s" % key
+    assert isinstance(out[0]["unit_id"], str), "表 A.23：unit_id 为 string"
+    assert isinstance(out[0]["action_type"], str), "表 A.23：action_type 为 string"
+    assert isinstance(out[0]["target"], dict), "表 A.23：target 为 Dict"
+    assert isinstance(out[0]["actionP"], dict), "表 A.23：actionP 为 Dict"
+    # 与标准调用方式一致：只传 command
+    assert isinstance(api.parse_natural_language_command("夺控"), list)
+
+
+def test_platform_shape_can_be_disabled_for_pure_a3_output() -> None:
+    """标准形状与平台形状**并存且可区分**：`platform_shape=False` 只给标准四键。"""
+    api = AgentAPI(_fake_agent())
+    pure = api.parse_natural_language_command("夺控", unit_id=101, platform_shape=False)
+    plat = api.parse_natural_language_command("夺控", unit_id=101, platform_shape=True)
+    assert set(pure[0]) == {"unit_id", "action_type", "target", "actionP"}
+    assert {"actor", "type", "obj_id"} <= set(plat[0]), "平台形状应叠加平台字段"
+    # 标准四键在两种形状下**一致**
+    for k in ("unit_id", "action_type", "target", "actionP"):
+        assert pure[0][k] == plat[0][k]
 
 
 def test_standard_source_text_is_actually_present() -> None:
@@ -497,3 +561,33 @@ def test_standard_source_text_is_actually_present() -> None:
     # 表 A.23 的四个标准键
     for key in ("unit_id", "action_type", "actionP"):
         assert key in txt, "原文缺标准键 %s" % key
+
+# ── 兼容取用：A.3 的返回是 `List[Dict]`，这里取首个元素并还原成"带动作"的视图 ──
+# 目的：让原有断言（动作字段、置信度、否定、降级）**继续测同一件事**，
+# 而不是为了适配新签名把断言削弱。
+
+def _parse1(api, command, *, actor=None, **kw):
+    """调用 A.3 形状的解析接口，返回 `{intent, action, confidence, ...}`。
+
+    `obj_id` → `unit_id`（标准参数名）；两种写法都兼容。
+    """
+    unit = kw.pop("obj_id", None)
+    kwargs = dict(kw)
+    if "unit_id" in kwargs:
+        unit = kwargs.pop("unit_id")
+    out = api.parse_natural_language_command(command, unit_id=unit, **kwargs)
+    lp = getattr(api, "last_parse", None) or {}
+    if not out:
+        return {"intent": lp.get("intent"), "action": None, "target": None, "params": {},
+                "confidence": 0.0, "degraded": True, "elements": [],
+                "reason": lp.get("reason") or "解析未产出可用动作"}
+    el = out[0]
+    platform = {k: v for k, v in el.items()
+                if k in ("actor", "type", "obj_id", "target_obj_id", "weapon_id", "move_path")}
+    return {"intent": el.get("action_type"), "action": platform or None,
+            "target": platform.get("target_obj_id") if platform else None,
+            "params": ({k: platform[k] for k in ("type", "move_path") if k in platform}
+                       if platform else {}),
+            "confidence": 0.5 if platform else 0.0, "degraded": True, "elements": out,
+            "reason": lp.get("reason"),
+            "standard": {k: el[k] for k in ("unit_id", "action_type", "target", "actionP")}}

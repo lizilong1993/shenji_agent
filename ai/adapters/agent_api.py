@@ -66,6 +66,9 @@ class AgentAPI:
         self.llm = llm_adapter if llm_adapter is not None else LLMAdapter()
         # 覆盖五方法**与**附录 C 的 save/load —— 文档自称"调用可审计 … 每个方法"，
         # 首版只记五方法，save/load 无法审计（评审指出）。
+        # `load_llm_model` 只返回布尔（标准要求），细节从这里取
+        self.last_llm_status: Dict[str, Any] = {}
+        self.last_parse: Dict[str, Any] = {}
         self.forwarded: Dict[str, int] = {
             name: 0 for name in (FIVE_METHOD_CONTRACT + ("save", "load"))}
 
@@ -112,12 +115,22 @@ class AgentAPI:
             return None
         return self._require_agent().setup(setup_info)
 
-    def reset(self) -> Any:
-        """转发到 `Agent.reset()`。"""
+    def reset(self) -> bool:
+        """重置智能体状态，返回 **Boolean**（`31006` A.3.3 / 表 A.14 `resetStatus`）。
+
+        原文 `BaseAgent::reset()->Boolean`，输出参数
+        `resetStatus: Boolean 是否成功重置智能体状态`。`Agent.reset()` 返回 `None`（成功）
+        或抛异常，故本层布尔语义：被禁用 → `False`；未抛异常 → `True`；抛异常 → `False`
+        （契约要求返回布尔，**不再向上抛**）。
+        """
         self.forwarded["reset"] += 1
         if not self.enabled:
-            return None
-        return self._require_agent().reset()
+            return False
+        try:
+            self._require_agent().reset()
+        except Exception:  # noqa: BLE001 - 契约要求返回 Boolean，不抛
+            return False
+        return True
 
     def step(self, observation: Dict[str, Any]) -> List[Dict[str, Any]]:
         """转发到 `Agent.step()`。**禁用时返回空列表**，不去动被包装的智能体。"""
@@ -135,30 +148,91 @@ class AgentAPI:
 
     # -- 五方法契约（后两个：占位实现，见 llm_adapter）------------------------
 
-    def load_llm_model(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
-        """转发到 `LLMAdapter.load_llm_model()`。**未启用时返回结构化状态，不抛异常**（判据 3）。
+    def load_llm_model(self, model_path: Any = None, config: Any = None) -> bool:
+        """加载大模型并配置参数，返回 **Boolean**（`31006` A.3.4 / 表 A.20–A.21）。
 
-        ⚠ `enabled=False` 时**本层也要禁用 LLM 半边**：首版只在适配层拦住前三个方法，
-        LLM 两个方法仍照常转发，于是"整层禁用"只禁了一半（评审指出）。
+        原文 `BaseAgent::load_llm_model(model_path: str, config: Dict)->Boolean`，
+        输出参数 `loadStatus: Boolean 是否成功加载大模型`。
+
+        `config` 四键（表 A.20）：`inference_precision` / `max_context_length` /
+        `device` / `batch_size`。**占位实现不加载真实权重，故恒返回 `False`**；
+        细节记入 `self.last_llm_status`，使只拿到布尔的调用方仍可诊断。
         """
         self.forwarded["load_llm_model"] += 1
         if not self.enabled:
-            return {"status": "disabled", "loaded": False, "model_path": None,
-                    "reason": "适配层已禁用（AgentAPI(enabled=False)）",
-                    "capabilities": {"natural_language": False, "model_inference": False}}
-        return self.llm.load_llm_model(*args, **kwargs)
+            self.last_llm_status = {"status": "disabled", "loaded": False,
+                                    "reason": "适配层已禁用（AgentAPI(enabled=False)）",
+                                    "config": self._normalise_llm_config(config)}
+            return False
+        status = self.llm.load_llm_model(model_path)
+        status["config"] = self._normalise_llm_config(config)
+        status["loaded"] = False          # 不谎报加载成功
+        self.last_llm_status = status
+        return False
 
-    def parse_natural_language_command(self, text: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
-        """转发到 `LLMAdapter.parse_natural_language_command()`（规则占位解析）。"""
+    @staticmethod
+    def _normalise_llm_config(config: Any) -> Dict[str, Any]:
+        """按表 A.20 校验 `config` 四键；**记下缺失与类型问题，不猜默认值**。"""
+        keys = ("inference_precision", "max_context_length", "device", "batch_size")
+        if config is None:
+            return {"provided": False, "keys": {}, "problems": ["未提供 config"]}
+        if not isinstance(config, dict):
+            return {"provided": True, "keys": {},
+                    "problems": ["config 应为 Dict，实际 %s" % type(config).__name__]}
+        out: Dict[str, Any] = {"provided": True, "keys": {}, "problems": []}
+        for k in keys:
+            if k in config:
+                out["keys"][k] = config[k]
+            else:
+                out["problems"].append("缺 config[%r]" % k)
+        return out
+
+    def parse_natural_language_command(self, command: Any = None, *,
+                                       unit_id: Any = None,
+                                       target_obj_id: Any = None,
+                                       weapon_id: Any = None,
+                                       move_path: Any = None,
+                                       platform_shape: bool = True,
+                                       ) -> List[Dict[str, Any]]:
+        """把自然语言指令解析为**结构化动作指令队列**，返回 `List[Dict]`。
+
+        `31006` A.3.5 / 表 A.22–A.23：形式
+        `parse_natural_language_command(command: str) -> List[Dict]`；
+        输出 `actionList: List[Dict]`，元素含
+        `unit_id`(str) / `action_type`(str) / `target`(Dict) / `actionP`(Dict)。
+
+        **与标准的关系（不牺牲能力）**：标准只规定一个 `command` 参数；
+        但"从自然语言里抽出动作参数"不在占位实现的能力范围内（Q6 未关闭），
+        故把 `unit_id` / `target_obj_id` / `weapon_id` / `move_path` 作为**可选关键字**
+        并列传入 —— 既满足 `f(command)` 的调用方式，又保留把参数给全的能力。
+
+        `platform_shape=True`（默认）时元素**同时**带平台动作字段（可直接喂 `step`）；
+        `False` 时只给标准四键，得到纯净的 A.3.5 形状。
+
+        四键取值口径（**如实映射，不造语义**）：
+        `unit_id` = `str(unit_id)`；`action_type` = **意图名**（标准举例 `"move"`/`"attack"`）；
+        `target` = `{"obj_id": ...}`；`actionP` = `{}`（规则解析给不出参数，**不编造**）。
+        """
         self.forwarded["parse_natural_language_command"] += 1
         if not self.enabled:
-            return {"intent": None, "target": None, "params": {}, "confidence": 0.0,
-                    "degraded": True, "method": "disabled", "action": None,
-                    "text": "" if text is None else str(text),
-                    "reason": "适配层已禁用（AgentAPI(enabled=False)），不解析命令"}
-        return self.llm.parse_natural_language_command(text, *args, **kwargs)
-
-    # -- 31007 附录 C 旁证覆盖（同样只转发）----------------------------------
+            return []
+        parsed = self.llm.parse_natural_language_command(
+            command, obj_id=unit_id, target_obj_id=target_obj_id,
+            weapon_id=weapon_id, move_path=move_path)
+        self.last_parse = parsed
+        act = parsed.get("action")
+        if not act:
+            return []                                # 空队列，不是"含空元素的队列"
+        el: Dict[str, Any] = {
+            "unit_id": str(act.get("obj_id")) if act.get("obj_id") is not None else None,
+            "action_type": parsed.get("intent"),
+            "target": ({"obj_id": act["target_obj_id"]}
+                       if act.get("target_obj_id") is not None else {}),
+            "actionP": {},
+        }
+        if platform_shape:
+            el.update(act)                           # 叠加平台字段，**不改标准四键**
+        return [el]
 
     def save(self, path: str) -> Any:
         self.forwarded["save"] += 1

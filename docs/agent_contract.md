@@ -40,31 +40,41 @@
 | 1 | `setup` | `AgentAPI.setup` → `Agent.setup` | **转发** | `setup(setup_info: Dict[str, Any]) -> Any` | 参数名 `setup_info` 取自本仓既有实现；**是否与标准同名未核** |
 | 2 | `reset` | `AgentAPI.reset` → `Agent.reset` | **转发** | `reset() -> Any` | 无参，无差异 |
 | 3 | `step` | `AgentAPI.step` → `Agent.step` | **转发** | `step(observation: Dict[str, Any]) -> List[Dict[str, Any]]` | 返回**平台动作 dict 列表**；列表元素字段与 `ai/action_safety.py` 的 `ACTION_SPECS` 同源 |
-| 4 | `load_llm_model` | `AgentAPI.load_llm_model` → `LLMAdapter.load_llm_model` | **占位** | `load_llm_model(*args, **kwargs) -> Dict[str, Any]` | 标准未给签名细节；本仓返回**结构化状态**而非抛异常（见 §3） |
-| 5 | `parse_natural_language_command` | `AgentAPI.parse_natural_language_command` → `LLMAdapter.parse_natural_language_command` | **占位（规则版）** | `parse_natural_language_command(text: str, *args, **kwargs) -> Dict[str, Any]` | 见 §4 的返回结构与降级语义 |
+| 4 | `load_llm_model` | `AgentAPI.load_llm_model` → `LLMAdapter.load_llm_model` | **占位** | `load_llm_model(model_path: Any = None, config: Any = None) -> bool` | 标准未给签名细节；本仓返回**结构化状态**而非抛异常（见 §3） |
+| 5 | `parse_natural_language_command` | `AgentAPI.parse_natural_language_command` → `LLMAdapter.parse_natural_language_command` | **占位（规则版）** | `parse_natural_language_command(command: Any = None, *, unit_id=None, target_obj_id=None, weapon_id=None, move_path=None, platform_shape=True) -> List[Dict[str, Any]]` | 见 §4 的返回结构与降级语义 |
 
-### 1.2 ⚠ 符合性差距（**实测，未达成**）
+### 1.2 A.3 符合性（**第五十四轮已达成**）
 
-按 §0.1 的原文逐项比对，**五项里有三项不符**：
+第五十一轮曾在此记录"五项里三项不符"。**本轮已按原文实现**，现逐项复核：
 
-| 方法 | 标准要求 | 本仓实测 | 结论 |
+| 方法 | 标准要求（原文行） | 本仓实现 | 结论 |
 | --- | --- | --- | --- |
-| `setup` | `(setup_info: Dict) -> None` | `(setup_info) -> Any`（转发 `Agent.setup`，返回 `None`） | **符合**（返回值实为 `None`） |
-| `step` | `(observation: Dict) -> List[Dict]` | `(observation) -> List[Dict]` | **符合** |
-| `reset` | `() -> Boolean` | `() -> Any`，实测返回 **`None`** | **不符**（应返回 `Boolean`） |
-| `load_llm_model` | `(model_path: str, config: Dict) -> Boolean` | `(*args, **kwargs) -> Dict`；传两个位置参数**抛 `TypeError`** | **不符**（参数个数与返回类型都不同） |
-| `parse_natural_language_command` | `(command: str) -> List[Dict]` | `(text) -> Dict`，返回 **dict 而非 list**，且**无** `unit_id`/`action_type`/`target`/`actionP` | **不符**（返回容器类型与键名都不同） |
+| `setup` | `(setup_info: Dict) -> None`（`:820`） | 转发 `Agent.setup`，返回 `None` | **符合** |
+| `step` | `(observation: Dict) -> List[Dict]`（`:838`） | 同 | **符合** |
+| `reset` | `() -> Boolean`（`:864`） | 返回 `bool`（禁用 → `False`；未抛异常 → `True`） | **符合** |
+| `load_llm_model` | `(model_path: str, config: Dict) -> Boolean`（`:877`） | 参数即 `(model_path, config)`；返回 `bool` | **符合** |
+| `parse_natural_language_command` | `(command: str) -> List[Dict]`（`:906`），元素含 `unit_id`/`action_type`/`target`/`actionP`（表 A.23 `:923`） | 返回 `List[Dict]`，元素含四标准键（类型也对：`str`/`str`/`Dict`/`Dict`） | **符合** |
 
-**这不是"签名细节"，是标准**明确规定的接口形状**。**
-本仓当前实现是"**平台动作格式优先**"的（产出可直接放进 `step` 的 dict），
-而标准要的是**智能体侧的结构化动作队列**（`List[Dict]` ＋ 四个标准键）。
+**判据不再是"看着像"，而是可执行的断言**：
+`tests/test_i03_agent_contract.py::test_appendix_a3_signatures_are_now_implemented`
+逐项检查返回类型与四键类型。
 
-**未做的处置**：本轮**只订正了文档与理由**，**没有改实现** ——
-改签名会同时影响 `I04`（依赖本适配层）与调用方，属独立一轮的改动，
-且必须与 `I04` 一起设计（"标准形状"与"平台形状"的转换点应只有一处）。
+### 1.2b 两处刻意的设计（**不是偏离**）
 
-**因此本契约表目前只能作为"接口已就位、但与 A.3 尚不符"的证据，
-不能作为符合性声明依据。**
+1. **`parse_natural_language_command` 允许额外的关键字参数**
+   （`unit_id` / `target_obj_id` / `weapon_id` / `move_path`）。标准只规定 `command`；
+   但"从自然语言里抽出动作参数"不在占位实现的能力范围内（Q6 未关闭）。
+   故：**标准的调用方式 `f(command)` 完全可用**，同时保留把参数给全的能力 ——
+   否则「打击」永远产不出合法动作（`ACTION_SPECS[2]` 要求 `weapon_id`）。
+   **额外参数是可选关键字，不影响标准兼容性。**
+
+2. **平台形状与标准形状并存，可用 `platform_shape=False` 取纯标准形状**。
+   默认 `True` 时元素**同时**带平台动作字段（可直接喂 `step`）；
+   `False` 时只给四标准键。**两种形状下标准四键取值完全一致**（有测试断言）。
+   这样既满足标准侧，也不牺牲本仓主链路的可用性 —— 且**不互相冒充**。
+
+3. **`load_llm_model` 只返回布尔**，细节移到 `AgentAPI.last_llm_status`
+   （含按表 A.20 校验后的 `config` 四键与缺失项）。**字段不减，只换出口。**
 
 **旁证（`31007` 附录 C 智能体必备函数）**：`__init__` / `save` / `load` ——
 本适配层一并提供，`save` / `load` 同样**只转发**。
@@ -209,7 +219,7 @@ ai.action_safety.validate_action(action, mode="strict")["ok"] is True
 | 与 `31006` 原文**逐字**核对签名 | **已做**（§0.1 逐字摘录 + §1.2 差距表）；**三项不符** |
 | 经闭源引擎的 TrainEnv 侧实盘联调 | **未做**（鉴权不通过） |
 | 首版六类缺陷的整改 | **已完成**（见 §6） |
-| **按 A.3 改造签名**（`reset` 返回 Boolean、`load_llm_model(model_path, config)` 返回 Boolean、`parse_...` 返回 `List[Dict]`＋四标准键） | **未做**（属独立一轮，需与 `I04` 一并设计） |
+| **按 A.3 改造签名** | **已完成**（第五十四轮，见 §1.2） |
 | 真实 LLM 权重加载与推理 | **未做**（Q6 未关闭；接口已就绪，替换 `llm_adapter` 实现即可） |
 | `parse_natural_language_command` 的**模型**解析 | **未做**（现为规则占位，`degraded` 恒 `True` 就是如实标注） |
 | 在 `TrainEnv` 侧**实盘**联调 | **未做**（需闭源引擎，本环境鉴权不通过） |
