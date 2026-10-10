@@ -73,19 +73,6 @@ PROBE = r"""
     L.forEach(function (x) { if (x && x.show) n++; });
     return n;
   }
-  // 目标：`state.targets[id]` 是**包装对象**（`{ def, entity, sensorEntity, trail, ... }`），
-  // **不是实体** —— 所以 `countShown(ST.targets)` 恒为 0（包装对象没有 `.show`）。
-  // 真正的落点是它里面的 `entity.show`，而 `entity.show` 由 `isVisible(def)` 算出
-  // （图层开关 + 阵营/域过滤 + 是否被移除），因此数它就是在数“图层开关的真实效果”。
-  function countTargetsShown() {
-    var m = ST.targets || {};
-    var n = 0;
-    Object.keys(m).forEach(function (k) {
-      var w = m[k];
-      if (w && w.entity && w.entity.show) n++;
-    });
-    return n;
-  }
 
   function modPlaces() {
     var s = window.Places ? String(Places.debugInfo()) : "";
@@ -179,6 +166,22 @@ PROBE = r"""
     return v[layerId] ? 1 : 0;
   }
 
+  // 目标图层族的显隐读取口。
+  //
+  // **替代原先的 `countTargetsShown()`**：旧实现数 `w.entity.show` 是否真值，
+  // 而 `entity.show` 是 Cesium 的 **Boolean Property 对象** —— 对象恒真，
+  // 于是它恒等于目标总数（实测 31），**与图层开关无关**：一条恒真的假断言。
+  // 现读 handler 的同步产物 `state.layers.<flag>`，随开关真实翻转（实测 0<->31）。
+  //
+  // 依据：`layerTargets`/`layerLabels`/`layerTracks` 走的是**逐层 handler**
+  // （`app.js`：`d.handler = function (id, want) { pair[1](want); }`），
+  // handler 里写 `state.layers.*` 并 `markScene()`，再由 `syncEntities()` 落到 `entity.show`。
+  // `state.layers.*` 是**同步**写入的，不受帧节流影响，故 read() 的「关=0/开>0」立即可满足。
+  function targetLayerShown(flag) {
+    var L = (ST.layers || {});
+    return L[flag] ? 1 : 0;
+  }
+
   var SPECS = [
     // —— 已有的 4 项（上一轮已验证）——
     { id: "places.labels",   what: "离线地名（模块自己缓存的 enabled）", read: modPlaces },
@@ -187,14 +190,6 @@ PROBE = r"""
     { id: "imagery.offline", what: "离线底图（两级 show 计数）", read: function () { return imageryShown("imagery.offline"); } },
     // —— 本轮新增：取数口已核实——
     { id: "tianditu.base",   what: "天地图底图（场景 show 计数）", read: function () { return imageryShown("tianditu.base"); } },
-    // ⚠ **`layerTargets` 暂不纳入**：实测 `state.targets` 里的值**不是带 `.show` 的实体**
-    // （`countShown(ST.targets)` 恒为 0），于是“关掉后=0”是 **0==0 恒真**、
-    // “开上后”必然失败 —— 那是**假失败**，不是产品缺陷。
-    // 宁可不盖，也不能放一条会嗧的断言进来。
-    // 要补它，先找到目标图层真正的场景落点（大概率是 `refilter()` 控制的
-    // 某个集合，而不是 `state.targets`），再把它加回来。
-    { id: "layerTargets",    what: "可见目标（包装对象里 entity.show 的计数）",
-      read: countTargetsShown },
     { id: "layerHotspots",   what: "热点区域（实体 show 计数）", read: function () { return countShown(ST.hotspotEntities); } },
     { id: "layerRoutes",     what: "计划航路（实体 show 计数）", entityPrefix: "route-", layerFlag: "routes", budget: 8000, read: function () { return countShown(ST.routeEntities); } },
     { id: "layerOverview",   what: "鸟瞰图（第二个 view 的可见性）", read: function () {
@@ -213,6 +208,13 @@ PROBE = r"""
     { id: "plot.defense",  what: "标绘·防御与障碍（sink 是否收到意图）", read: function () { return plotFlagShown("plot.defense"); } },
     { id: "plot.fire",     what: "标绘·火力（sink 是否收到意图）",     read: function () { return plotFlagShown("plot.fire"); } },
     { id: "plot.intel",    what: "标绘·侦察与空域（sink 是否收到意图）", read: function () { return plotFlagShown("plot.intel"); } },
+    // —— 目标图层族（此前 layerTargets 因读错对象而被标注「暂不纳入」，见上）——
+    { id: "layerTargets", what: "可见目标（state.layers.targets，handler 同步产物）",
+      read: function () { return targetLayerShown("targets"); } },
+    { id: "layerLabels",  what: "目标标牌（state.layers.labels）",
+      read: function () { return targetLayerShown("labels"); } },
+    { id: "layerTracks",  what: "历史轨迹（state.layers.tracks）",
+      read: function () { return targetLayerShown("tracks"); } },
   ];
 
   for (var i = 0; i < SPECS.length; i++) {
