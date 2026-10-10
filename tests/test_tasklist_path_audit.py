@@ -76,17 +76,20 @@ def test_tally_filename_correction_is_recorded() -> None:
 
 # ─────────────────── gen_eval_cases.py：与 Q7 直接相连的缺口
 
-def test_gen_eval_cases_absence_is_recorded() -> None:
-    """**最要紧的一条**：评测用例生成脚本全工作区不存在。
+def test_gen_eval_cases_now_exists() -> None:
+    """**原为「不存在」的哨兵，第 48 轮已按其设计退场。**
 
-    这与 `Q7`/`I16`「每种对抗强度>100 用例」直接相连 ——
-    **不只缺定义，也缺工具**。
+    第 47 轮这里断言 `gen_eval_cases.py` 全工作区不存在（并注明「不只缺定义，也缺工具」）。
+    第 48 轮**实现了该生成器**，故该断言必然失败 —— 这正是哨兵的作用：
+    **它迫使文档与测试同步**，而不是让过时的结论留在仓里。
+
+    现已改为正向断言：生成器存在，且审计文档已同步更新。
     """
+    hits = [h for h in REPO.rglob("gen_eval_cases.py") if "__pycache__" not in str(h)]
+    assert hits, "gen_eval_cases.py 仍不存在 —— 第 48 轮的工作丢失了"
     d = _doc()
-    assert "gen_eval_cases.py" in d
-    # 复核：仓库里确实没有
-    hits = list(REPO.rglob("gen_eval_cases*"))
-    assert hits == [], "仓库里出现了 gen_eval_cases —— 文档需更新"
+    # 审计文档必须已从「不存在」改为「已实现」
+    assert "现已实现" in d or "已实现" in d, "审计文档仍写着「不存在」"
 
 
 def test_audit_links_the_missing_generator_to_q7() -> None:

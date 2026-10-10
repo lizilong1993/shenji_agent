@@ -1,0 +1,6976 @@
+{
+ "cases": {
+  "L1": [
+   {
+    "case_id": "L1-AMBUSH-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "AMBUSH",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1680815320
+   },
+   {
+    "case_id": "L1-AMBUSH-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "AMBUSH",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 4037892432
+   },
+   {
+    "case_id": "L1-AMBUSH-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "AMBUSH",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 548584593
+   },
+   {
+    "case_id": "L1-AMBUSH-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "AMBUSH",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2203974281
+   },
+   {
+    "case_id": "L1-AMBUSH-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "AMBUSH",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1456020797
+   },
+   {
+    "case_id": "L1-ASSAULT-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ASSAULT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1514048558
+   },
+   {
+    "case_id": "L1-ASSAULT-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ASSAULT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3540955153
+   },
+   {
+    "case_id": "L1-ASSAULT-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ASSAULT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 499835632
+   },
+   {
+    "case_id": "L1-ASSAULT-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ASSAULT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3926544382
+   },
+   {
+    "case_id": "L1-ASSAULT-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ASSAULT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 18246504
+   },
+   {
+    "case_id": "L1-ASSEMBLE-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1690632605
+   },
+   {
+    "case_id": "L1-ASSEMBLE-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 683599323
+   },
+   {
+    "case_id": "L1-ASSEMBLE-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3823586221
+   },
+   {
+    "case_id": "L1-ASSEMBLE-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2996583150
+   },
+   {
+    "case_id": "L1-ASSEMBLE-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2681823962
+   },
+   {
+    "case_id": "L1-BREAKTHROUGH-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2510929343
+   },
+   {
+    "case_id": "L1-BREAKTHROUGH-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 208634779
+   },
+   {
+    "case_id": "L1-BREAKTHROUGH-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1163998299
+   },
+   {
+    "case_id": "L1-BREAKTHROUGH-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1050155340
+   },
+   {
+    "case_id": "L1-BREAKTHROUGH-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 387881727
+   },
+   {
+    "case_id": "L1-DISPERSE-000",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "DISPERSE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 786384303
+   },
+   {
+    "case_id": "L1-DISPERSE-001",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "DISPERSE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2702405801
+   },
+   {
+    "case_id": "L1-DISPERSE-002",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "DISPERSE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2254867882
+   },
+   {
+    "case_id": "L1-DISPERSE-003",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "DISPERSE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2167981615
+   },
+   {
+    "case_id": "L1-DISPERSE-004",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "DISPERSE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2981690082
+   },
+   {
+    "case_id": "L1-ENCIRCLEMENT-000",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1956572489
+   },
+   {
+    "case_id": "L1-ENCIRCLEMENT-001",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 4065972778
+   },
+   {
+    "case_id": "L1-ENCIRCLEMENT-002",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 505626123
+   },
+   {
+    "case_id": "L1-ENCIRCLEMENT-003",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3130729806
+   },
+   {
+    "case_id": "L1-ENCIRCLEMENT-004",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1106012177
+   },
+   {
+    "case_id": "L1-ESCORT-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ESCORT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3305229254
+   },
+   {
+    "case_id": "L1-ESCORT-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ESCORT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3686977704
+   },
+   {
+    "case_id": "L1-ESCORT-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ESCORT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2395991897
+   },
+   {
+    "case_id": "L1-ESCORT-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ESCORT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3720223975
+   },
+   {
+    "case_id": "L1-ESCORT-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "ESCORT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 188162123
+   },
+   {
+    "case_id": "L1-EVADE-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "EVADE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1377248783
+   },
+   {
+    "case_id": "L1-EVADE-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "EVADE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2175709787
+   },
+   {
+    "case_id": "L1-EVADE-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "EVADE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2744726764
+   },
+   {
+    "case_id": "L1-EVADE-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "EVADE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 898801006
+   },
+   {
+    "case_id": "L1-EVADE-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "EVADE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 749151276
+   },
+   {
+    "case_id": "L1-FEINT-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FEINT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3395209334
+   },
+   {
+    "case_id": "L1-FEINT-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FEINT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2147972388
+   },
+   {
+    "case_id": "L1-FEINT-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FEINT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 964318862
+   },
+   {
+    "case_id": "L1-FEINT-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FEINT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 115086763
+   },
+   {
+    "case_id": "L1-FEINT-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FEINT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3297421281
+   },
+   {
+    "case_id": "L1-FIRE_SUPPORT-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 293789028
+   },
+   {
+    "case_id": "L1-FIRE_SUPPORT-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 471365882
+   },
+   {
+    "case_id": "L1-FIRE_SUPPORT-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 4156523513
+   },
+   {
+    "case_id": "L1-FIRE_SUPPORT-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1054934834
+   },
+   {
+    "case_id": "L1-FIRE_SUPPORT-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 270589367
+   },
+   {
+    "case_id": "L1-FLANK-000",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FLANK",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1376042328
+   },
+   {
+    "case_id": "L1-FLANK-001",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FLANK",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2533258498
+   },
+   {
+    "case_id": "L1-FLANK-002",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FLANK",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2153020113
+   },
+   {
+    "case_id": "L1-FLANK-003",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FLANK",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1642312221
+   },
+   {
+    "case_id": "L1-FLANK-004",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FLANK",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1343250016
+   },
+   {
+    "case_id": "L1-FORTIFY-000",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FORTIFY",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1277379433
+   },
+   {
+    "case_id": "L1-FORTIFY-001",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FORTIFY",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3829879268
+   },
+   {
+    "case_id": "L1-FORTIFY-002",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FORTIFY",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2118430712
+   },
+   {
+    "case_id": "L1-FORTIFY-003",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FORTIFY",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3330799153
+   },
+   {
+    "case_id": "L1-FORTIFY-004",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "FORTIFY",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3857147152
+   },
+   {
+    "case_id": "L1-HOLD-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "HOLD",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3626922780
+   },
+   {
+    "case_id": "L1-HOLD-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "HOLD",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2882699526
+   },
+   {
+    "case_id": "L1-HOLD-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "HOLD",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1925585698
+   },
+   {
+    "case_id": "L1-HOLD-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "HOLD",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1328222609
+   },
+   {
+    "case_id": "L1-HOLD-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "HOLD",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 750156291
+   },
+   {
+    "case_id": "L1-INTERDICT-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "INTERDICT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 4111874894
+   },
+   {
+    "case_id": "L1-INTERDICT-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "INTERDICT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 4119936612
+   },
+   {
+    "case_id": "L1-INTERDICT-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "INTERDICT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2360276223
+   },
+   {
+    "case_id": "L1-INTERDICT-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "INTERDICT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1618172710
+   },
+   {
+    "case_id": "L1-INTERDICT-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "INTERDICT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 297956005
+   },
+   {
+    "case_id": "L1-PURSUIT-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "PURSUIT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3112532260
+   },
+   {
+    "case_id": "L1-PURSUIT-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "PURSUIT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 967647409
+   },
+   {
+    "case_id": "L1-PURSUIT-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "PURSUIT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2733493262
+   },
+   {
+    "case_id": "L1-PURSUIT-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "PURSUIT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3182016737
+   },
+   {
+    "case_id": "L1-PURSUIT-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "PURSUIT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1453324803
+   },
+   {
+    "case_id": "L1-RECON-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "RECON",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1099169604
+   },
+   {
+    "case_id": "L1-RECON-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "RECON",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2864440769
+   },
+   {
+    "case_id": "L1-RECON-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "RECON",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 171787664
+   },
+   {
+    "case_id": "L1-RECON-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "RECON",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2655094925
+   },
+   {
+    "case_id": "L1-RECON-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "RECON",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2746068310
+   },
+   {
+    "case_id": "L1-REDEPLOY-000",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3779219538
+   },
+   {
+    "case_id": "L1-REDEPLOY-001",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 926651923
+   },
+   {
+    "case_id": "L1-REDEPLOY-002",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1834645672
+   },
+   {
+    "case_id": "L1-REDEPLOY-003",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2608524868
+   },
+   {
+    "case_id": "L1-REDEPLOY-004",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1560744048
+   },
+   {
+    "case_id": "L1-REINFORCE-000",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "REINFORCE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3235844368
+   },
+   {
+    "case_id": "L1-REINFORCE-001",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "REINFORCE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 4264481685
+   },
+   {
+    "case_id": "L1-REINFORCE-002",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "REINFORCE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3255686314
+   },
+   {
+    "case_id": "L1-REINFORCE-003",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "REINFORCE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1906928194
+   },
+   {
+    "case_id": "L1-REINFORCE-004",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "REINFORCE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 23946365
+   },
+   {
+    "case_id": "L1-RETREAT-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "RETREAT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3838602423
+   },
+   {
+    "case_id": "L1-RETREAT-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "RETREAT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3071739579
+   },
+   {
+    "case_id": "L1-RETREAT-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "RETREAT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1758195518
+   },
+   {
+    "case_id": "L1-RETREAT-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "RETREAT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 574264310
+   },
+   {
+    "case_id": "L1-RETREAT-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "RETREAT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1887369266
+   },
+   {
+    "case_id": "L1-SEIZE-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "SEIZE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 926473461
+   },
+   {
+    "case_id": "L1-SEIZE-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "SEIZE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3490099863
+   },
+   {
+    "case_id": "L1-SEIZE-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "SEIZE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 521521859
+   },
+   {
+    "case_id": "L1-SEIZE-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "SEIZE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2242762198
+   },
+   {
+    "case_id": "L1-SEIZE-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "SEIZE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 663070711
+   },
+   {
+    "case_id": "L1-SURVEILLANCE-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 4129688618
+   },
+   {
+    "case_id": "L1-SURVEILLANCE-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1348675531
+   },
+   {
+    "case_id": "L1-SURVEILLANCE-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1455964154
+   },
+   {
+    "case_id": "L1-SURVEILLANCE-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3253226255
+   },
+   {
+    "case_id": "L1-SURVEILLANCE-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1621536642
+   },
+   {
+    "case_id": "L1-TARGET_GUIDANCE-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1563408997
+   },
+   {
+    "case_id": "L1-TARGET_GUIDANCE-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 1133650582
+   },
+   {
+    "case_id": "L1-TARGET_GUIDANCE-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 2585177824
+   },
+   {
+    "case_id": "L1-TARGET_GUIDANCE-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 4212949004
+   },
+   {
+    "case_id": "L1-TARGET_GUIDANCE-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "常规对抗",
+    "intensity_level": "L1",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.0,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 0,
+     "packet_loss": 0.0,
+     "time_compression": 1.0
+    },
+    "seed": 3774743845
+   }
+  ],
+  "L2": [
+   {
+    "case_id": "L2-AMBUSH-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "AMBUSH",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1759838436
+   },
+   {
+    "case_id": "L2-AMBUSH-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "AMBUSH",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2837985588
+   },
+   {
+    "case_id": "L2-AMBUSH-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "AMBUSH",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1655942506
+   },
+   {
+    "case_id": "L2-AMBUSH-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "AMBUSH",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1494852630
+   },
+   {
+    "case_id": "L2-AMBUSH-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "AMBUSH",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 4283548967
+   },
+   {
+    "case_id": "L2-ASSAULT-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ASSAULT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2241094073
+   },
+   {
+    "case_id": "L2-ASSAULT-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ASSAULT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2570775410
+   },
+   {
+    "case_id": "L2-ASSAULT-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ASSAULT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3501716695
+   },
+   {
+    "case_id": "L2-ASSAULT-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ASSAULT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1544589912
+   },
+   {
+    "case_id": "L2-ASSAULT-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ASSAULT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2206278002
+   },
+   {
+    "case_id": "L2-ASSEMBLE-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 727294642
+   },
+   {
+    "case_id": "L2-ASSEMBLE-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 4070718508
+   },
+   {
+    "case_id": "L2-ASSEMBLE-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 4122660126
+   },
+   {
+    "case_id": "L2-ASSEMBLE-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 774702009
+   },
+   {
+    "case_id": "L2-ASSEMBLE-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 228410867
+   },
+   {
+    "case_id": "L2-BREAKTHROUGH-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 898608499
+   },
+   {
+    "case_id": "L2-BREAKTHROUGH-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1933924664
+   },
+   {
+    "case_id": "L2-BREAKTHROUGH-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2860857459
+   },
+   {
+    "case_id": "L2-BREAKTHROUGH-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 464263955
+   },
+   {
+    "case_id": "L2-BREAKTHROUGH-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2586282492
+   },
+   {
+    "case_id": "L2-DISPERSE-000",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "DISPERSE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 262849725
+   },
+   {
+    "case_id": "L2-DISPERSE-001",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "DISPERSE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 4122672698
+   },
+   {
+    "case_id": "L2-DISPERSE-002",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "DISPERSE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3737478871
+   },
+   {
+    "case_id": "L2-DISPERSE-003",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "DISPERSE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3807542215
+   },
+   {
+    "case_id": "L2-DISPERSE-004",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "DISPERSE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2882584859
+   },
+   {
+    "case_id": "L2-ENCIRCLEMENT-000",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 4049920879
+   },
+   {
+    "case_id": "L2-ENCIRCLEMENT-001",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1218379034
+   },
+   {
+    "case_id": "L2-ENCIRCLEMENT-002",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2187317206
+   },
+   {
+    "case_id": "L2-ENCIRCLEMENT-003",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1963278020
+   },
+   {
+    "case_id": "L2-ENCIRCLEMENT-004",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 4060879575
+   },
+   {
+    "case_id": "L2-ESCORT-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ESCORT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 894371460
+   },
+   {
+    "case_id": "L2-ESCORT-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ESCORT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1927479988
+   },
+   {
+    "case_id": "L2-ESCORT-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ESCORT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 29259037
+   },
+   {
+    "case_id": "L2-ESCORT-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ESCORT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 4014250979
+   },
+   {
+    "case_id": "L2-ESCORT-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "ESCORT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 64382655
+   },
+   {
+    "case_id": "L2-EVADE-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "EVADE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2581573480
+   },
+   {
+    "case_id": "L2-EVADE-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "EVADE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1815159724
+   },
+   {
+    "case_id": "L2-EVADE-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "EVADE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 95235340
+   },
+   {
+    "case_id": "L2-EVADE-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "EVADE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1989780251
+   },
+   {
+    "case_id": "L2-EVADE-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "EVADE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3056927775
+   },
+   {
+    "case_id": "L2-FEINT-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FEINT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1784356217
+   },
+   {
+    "case_id": "L2-FEINT-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FEINT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3160361037
+   },
+   {
+    "case_id": "L2-FEINT-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FEINT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1231701379
+   },
+   {
+    "case_id": "L2-FEINT-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FEINT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2588640791
+   },
+   {
+    "case_id": "L2-FEINT-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FEINT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 804906709
+   },
+   {
+    "case_id": "L2-FIRE_SUPPORT-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1028996257
+   },
+   {
+    "case_id": "L2-FIRE_SUPPORT-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2037901746
+   },
+   {
+    "case_id": "L2-FIRE_SUPPORT-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1476419198
+   },
+   {
+    "case_id": "L2-FIRE_SUPPORT-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3232391087
+   },
+   {
+    "case_id": "L2-FIRE_SUPPORT-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2703802909
+   },
+   {
+    "case_id": "L2-FLANK-000",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FLANK",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3012470144
+   },
+   {
+    "case_id": "L2-FLANK-001",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FLANK",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 508041179
+   },
+   {
+    "case_id": "L2-FLANK-002",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FLANK",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3615410267
+   },
+   {
+    "case_id": "L2-FLANK-003",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FLANK",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 533667831
+   },
+   {
+    "case_id": "L2-FLANK-004",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FLANK",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2298140077
+   },
+   {
+    "case_id": "L2-FORTIFY-000",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FORTIFY",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 21159444
+   },
+   {
+    "case_id": "L2-FORTIFY-001",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FORTIFY",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 234457520
+   },
+   {
+    "case_id": "L2-FORTIFY-002",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FORTIFY",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1228719077
+   },
+   {
+    "case_id": "L2-FORTIFY-003",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FORTIFY",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 4217174115
+   },
+   {
+    "case_id": "L2-FORTIFY-004",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "FORTIFY",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1367633610
+   },
+   {
+    "case_id": "L2-HOLD-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "HOLD",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 238193943
+   },
+   {
+    "case_id": "L2-HOLD-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "HOLD",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3274047606
+   },
+   {
+    "case_id": "L2-HOLD-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "HOLD",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 787503459
+   },
+   {
+    "case_id": "L2-HOLD-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "HOLD",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1795651161
+   },
+   {
+    "case_id": "L2-HOLD-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "HOLD",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 478247228
+   },
+   {
+    "case_id": "L2-INTERDICT-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "INTERDICT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2525723103
+   },
+   {
+    "case_id": "L2-INTERDICT-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "INTERDICT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3665137095
+   },
+   {
+    "case_id": "L2-INTERDICT-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "INTERDICT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1122117960
+   },
+   {
+    "case_id": "L2-INTERDICT-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "INTERDICT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 844083682
+   },
+   {
+    "case_id": "L2-INTERDICT-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "INTERDICT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 161720161
+   },
+   {
+    "case_id": "L2-PURSUIT-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "PURSUIT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3757075740
+   },
+   {
+    "case_id": "L2-PURSUIT-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "PURSUIT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 4079629088
+   },
+   {
+    "case_id": "L2-PURSUIT-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "PURSUIT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 9224972
+   },
+   {
+    "case_id": "L2-PURSUIT-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "PURSUIT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 752257127
+   },
+   {
+    "case_id": "L2-PURSUIT-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "PURSUIT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3572860544
+   },
+   {
+    "case_id": "L2-RECON-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "RECON",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2048206512
+   },
+   {
+    "case_id": "L2-RECON-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "RECON",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 881254342
+   },
+   {
+    "case_id": "L2-RECON-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "RECON",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1057281688
+   },
+   {
+    "case_id": "L2-RECON-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "RECON",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1361103750
+   },
+   {
+    "case_id": "L2-RECON-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "RECON",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2423397649
+   },
+   {
+    "case_id": "L2-REDEPLOY-000",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1630505895
+   },
+   {
+    "case_id": "L2-REDEPLOY-001",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 297558076
+   },
+   {
+    "case_id": "L2-REDEPLOY-002",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 31176105
+   },
+   {
+    "case_id": "L2-REDEPLOY-003",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1611725334
+   },
+   {
+    "case_id": "L2-REDEPLOY-004",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3228451884
+   },
+   {
+    "case_id": "L2-REINFORCE-000",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "REINFORCE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3455919686
+   },
+   {
+    "case_id": "L2-REINFORCE-001",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "REINFORCE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1121594469
+   },
+   {
+    "case_id": "L2-REINFORCE-002",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "REINFORCE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2535215816
+   },
+   {
+    "case_id": "L2-REINFORCE-003",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "REINFORCE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 95995424
+   },
+   {
+    "case_id": "L2-REINFORCE-004",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "REINFORCE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3441444484
+   },
+   {
+    "case_id": "L2-RETREAT-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "RETREAT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 961706122
+   },
+   {
+    "case_id": "L2-RETREAT-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "RETREAT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1175947821
+   },
+   {
+    "case_id": "L2-RETREAT-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "RETREAT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3963844266
+   },
+   {
+    "case_id": "L2-RETREAT-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "RETREAT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3952744249
+   },
+   {
+    "case_id": "L2-RETREAT-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "RETREAT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 1671838452
+   },
+   {
+    "case_id": "L2-SEIZE-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "SEIZE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2010493618
+   },
+   {
+    "case_id": "L2-SEIZE-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "SEIZE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2500713919
+   },
+   {
+    "case_id": "L2-SEIZE-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "SEIZE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2677955736
+   },
+   {
+    "case_id": "L2-SEIZE-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "SEIZE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2318442760
+   },
+   {
+    "case_id": "L2-SEIZE-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "SEIZE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 653830320
+   },
+   {
+    "case_id": "L2-SURVEILLANCE-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2204306672
+   },
+   {
+    "case_id": "L2-SURVEILLANCE-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3373470928
+   },
+   {
+    "case_id": "L2-SURVEILLANCE-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2414733941
+   },
+   {
+    "case_id": "L2-SURVEILLANCE-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3649065412
+   },
+   {
+    "case_id": "L2-SURVEILLANCE-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 2561436113
+   },
+   {
+    "case_id": "L2-TARGET_GUIDANCE-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3895425234
+   },
+   {
+    "case_id": "L2-TARGET_GUIDANCE-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 874736658
+   },
+   {
+    "case_id": "L2-TARGET_GUIDANCE-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3754202115
+   },
+   {
+    "case_id": "L2-TARGET_GUIDANCE-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 4088546192
+   },
+   {
+    "case_id": "L2-TARGET_GUIDANCE-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "高强度对抗",
+    "intensity_level": "L2",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.35,
+     "jamming": 0.0,
+     "logistics_supply": 1.0,
+     "obs_latency_steps": 2,
+     "packet_loss": 0.1,
+     "time_compression": 1.0
+    },
+    "seed": 3509617589
+   }
+  ],
+  "L3": [
+   {
+    "case_id": "L3-AMBUSH-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "AMBUSH",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2739201487
+   },
+   {
+    "case_id": "L3-AMBUSH-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "AMBUSH",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 523116848
+   },
+   {
+    "case_id": "L3-AMBUSH-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "AMBUSH",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2508063005
+   },
+   {
+    "case_id": "L3-AMBUSH-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "AMBUSH",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 4099716026
+   },
+   {
+    "case_id": "L3-AMBUSH-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "AMBUSH",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 522464536
+   },
+   {
+    "case_id": "L3-ASSAULT-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ASSAULT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2440565733
+   },
+   {
+    "case_id": "L3-ASSAULT-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ASSAULT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 163951015
+   },
+   {
+    "case_id": "L3-ASSAULT-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ASSAULT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1516313732
+   },
+   {
+    "case_id": "L3-ASSAULT-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ASSAULT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2771180189
+   },
+   {
+    "case_id": "L3-ASSAULT-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ASSAULT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 526449098
+   },
+   {
+    "case_id": "L3-ASSEMBLE-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3747294463
+   },
+   {
+    "case_id": "L3-ASSEMBLE-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 977898558
+   },
+   {
+    "case_id": "L3-ASSEMBLE-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 4022789616
+   },
+   {
+    "case_id": "L3-ASSEMBLE-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2176862224
+   },
+   {
+    "case_id": "L3-ASSEMBLE-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ASSEMBLE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3856332266
+   },
+   {
+    "case_id": "L3-BREAKTHROUGH-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 4074878156
+   },
+   {
+    "case_id": "L3-BREAKTHROUGH-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3674072250
+   },
+   {
+    "case_id": "L3-BREAKTHROUGH-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3133839436
+   },
+   {
+    "case_id": "L3-BREAKTHROUGH-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2585798096
+   },
+   {
+    "case_id": "L3-BREAKTHROUGH-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "BREAKTHROUGH",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2343163950
+   },
+   {
+    "case_id": "L3-DISPERSE-000",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "DISPERSE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1047296073
+   },
+   {
+    "case_id": "L3-DISPERSE-001",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "DISPERSE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2113126639
+   },
+   {
+    "case_id": "L3-DISPERSE-002",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "DISPERSE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2754886469
+   },
+   {
+    "case_id": "L3-DISPERSE-003",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "DISPERSE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 953306715
+   },
+   {
+    "case_id": "L3-DISPERSE-004",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "DISPERSE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3266559021
+   },
+   {
+    "case_id": "L3-ENCIRCLEMENT-000",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3978899407
+   },
+   {
+    "case_id": "L3-ENCIRCLEMENT-001",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3125217118
+   },
+   {
+    "case_id": "L3-ENCIRCLEMENT-002",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1680985437
+   },
+   {
+    "case_id": "L3-ENCIRCLEMENT-003",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 954450161
+   },
+   {
+    "case_id": "L3-ENCIRCLEMENT-004",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ENCIRCLEMENT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3790001391
+   },
+   {
+    "case_id": "L3-ESCORT-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ESCORT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3723594352
+   },
+   {
+    "case_id": "L3-ESCORT-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ESCORT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 85508782
+   },
+   {
+    "case_id": "L3-ESCORT-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ESCORT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2470300676
+   },
+   {
+    "case_id": "L3-ESCORT-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ESCORT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 835019219
+   },
+   {
+    "case_id": "L3-ESCORT-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "ESCORT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 251711458
+   },
+   {
+    "case_id": "L3-EVADE-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "EVADE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3617570174
+   },
+   {
+    "case_id": "L3-EVADE-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "EVADE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2635983664
+   },
+   {
+    "case_id": "L3-EVADE-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "EVADE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3528071032
+   },
+   {
+    "case_id": "L3-EVADE-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "EVADE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 619539371
+   },
+   {
+    "case_id": "L3-EVADE-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "EVADE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2750514114
+   },
+   {
+    "case_id": "L3-FEINT-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FEINT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3987834675
+   },
+   {
+    "case_id": "L3-FEINT-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FEINT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 754880917
+   },
+   {
+    "case_id": "L3-FEINT-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FEINT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 251503120
+   },
+   {
+    "case_id": "L3-FEINT-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FEINT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3259747001
+   },
+   {
+    "case_id": "L3-FEINT-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FEINT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3810567718
+   },
+   {
+    "case_id": "L3-FIRE_SUPPORT-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3381003796
+   },
+   {
+    "case_id": "L3-FIRE_SUPPORT-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2896105307
+   },
+   {
+    "case_id": "L3-FIRE_SUPPORT-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1148300912
+   },
+   {
+    "case_id": "L3-FIRE_SUPPORT-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2230391559
+   },
+   {
+    "case_id": "L3-FIRE_SUPPORT-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FIRE_SUPPORT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 81657794
+   },
+   {
+    "case_id": "L3-FLANK-000",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FLANK",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1399373814
+   },
+   {
+    "case_id": "L3-FLANK-001",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FLANK",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 150832819
+   },
+   {
+    "case_id": "L3-FLANK-002",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FLANK",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 501441752
+   },
+   {
+    "case_id": "L3-FLANK-003",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FLANK",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1690153142
+   },
+   {
+    "case_id": "L3-FLANK-004",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FLANK",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1733046377
+   },
+   {
+    "case_id": "L3-FORTIFY-000",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FORTIFY",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 921536126
+   },
+   {
+    "case_id": "L3-FORTIFY-001",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FORTIFY",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2104990859
+   },
+   {
+    "case_id": "L3-FORTIFY-002",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FORTIFY",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3792280228
+   },
+   {
+    "case_id": "L3-FORTIFY-003",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FORTIFY",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3410766468
+   },
+   {
+    "case_id": "L3-FORTIFY-004",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "FORTIFY",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3369324306
+   },
+   {
+    "case_id": "L3-HOLD-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "HOLD",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1622835984
+   },
+   {
+    "case_id": "L3-HOLD-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "HOLD",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1148641971
+   },
+   {
+    "case_id": "L3-HOLD-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "HOLD",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3763047967
+   },
+   {
+    "case_id": "L3-HOLD-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "HOLD",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 736523943
+   },
+   {
+    "case_id": "L3-HOLD-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "HOLD",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2909874247
+   },
+   {
+    "case_id": "L3-INTERDICT-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "INTERDICT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3287792152
+   },
+   {
+    "case_id": "L3-INTERDICT-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "INTERDICT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2253201294
+   },
+   {
+    "case_id": "L3-INTERDICT-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "INTERDICT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 726526155
+   },
+   {
+    "case_id": "L3-INTERDICT-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "INTERDICT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3997722655
+   },
+   {
+    "case_id": "L3-INTERDICT-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "INTERDICT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3996964027
+   },
+   {
+    "case_id": "L3-PURSUIT-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "PURSUIT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 898351161
+   },
+   {
+    "case_id": "L3-PURSUIT-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "PURSUIT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2729787697
+   },
+   {
+    "case_id": "L3-PURSUIT-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "PURSUIT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 320005083
+   },
+   {
+    "case_id": "L3-PURSUIT-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "PURSUIT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1360909350
+   },
+   {
+    "case_id": "L3-PURSUIT-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "PURSUIT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "OFFENSIVE_ACTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3625366732
+   },
+   {
+    "case_id": "L3-RECON-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "RECON",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2270486287
+   },
+   {
+    "case_id": "L3-RECON-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "RECON",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 472760260
+   },
+   {
+    "case_id": "L3-RECON-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "RECON",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 332690819
+   },
+   {
+    "case_id": "L3-RECON-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "RECON",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1372605083
+   },
+   {
+    "case_id": "L3-RECON-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "RECON",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3635904390
+   },
+   {
+    "case_id": "L3-REDEPLOY-000",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 454613822
+   },
+   {
+    "case_id": "L3-REDEPLOY-001",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3444508541
+   },
+   {
+    "case_id": "L3-REDEPLOY-002",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 240115319
+   },
+   {
+    "case_id": "L3-REDEPLOY-003",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3080582274
+   },
+   {
+    "case_id": "L3-REDEPLOY-004",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "REDEPLOY",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "MANEUVER_POSTURE",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 70062258
+   },
+   {
+    "case_id": "L3-REINFORCE-000",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "REINFORCE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 4253640292
+   },
+   {
+    "case_id": "L3-REINFORCE-001",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "REINFORCE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1323918068
+   },
+   {
+    "case_id": "L3-REINFORCE-002",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "REINFORCE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2236685094
+   },
+   {
+    "case_id": "L3-REINFORCE-003",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "REINFORCE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 49430817
+   },
+   {
+    "case_id": "L3-REINFORCE-004",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "REINFORCE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "SUPPORT_COORDINATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 211025872
+   },
+   {
+    "case_id": "L3-RETREAT-000",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "RETREAT",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3191078466
+   },
+   {
+    "case_id": "L3-RETREAT-001",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "RETREAT",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2753900584
+   },
+   {
+    "case_id": "L3-RETREAT-002",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "RETREAT",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3748983830
+   },
+   {
+    "case_id": "L3-RETREAT-003",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "RETREAT",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3357221071
+   },
+   {
+    "case_id": "L3-RETREAT-004",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "RETREAT",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "DISENGAGEMENT_DECEPTION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3221009942
+   },
+   {
+    "case_id": "L3-SEIZE-000",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "SEIZE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 711325006
+   },
+   {
+    "case_id": "L3-SEIZE-001",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "SEIZE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3366758024
+   },
+   {
+    "case_id": "L3-SEIZE-002",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "SEIZE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3134548910
+   },
+   {
+    "case_id": "L3-SEIZE-003",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "SEIZE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3504711137
+   },
+   {
+    "case_id": "L3-SEIZE-004",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "SEIZE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "AREA_CONTROL",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 707292204
+   },
+   {
+    "case_id": "L3-SURVEILLANCE-000",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 852341419
+   },
+   {
+    "case_id": "L3-SURVEILLANCE-001",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 767064260
+   },
+   {
+    "case_id": "L3-SURVEILLANCE-002",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3268636009
+   },
+   {
+    "case_id": "L3-SURVEILLANCE-003",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2018720285
+   },
+   {
+    "case_id": "L3-SURVEILLANCE-004",
+    "decision_boundaries": [
+     "objective_contested"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "SURVEILLANCE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2049606260
+   },
+   {
+    "case_id": "L3-TARGET_GUIDANCE-000",
+    "decision_boundaries": [
+     "comms_degraded"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_123",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 1303521260
+   },
+   {
+    "case_id": "L3-TARGET_GUIDANCE-001",
+    "decision_boundaries": [
+     "supply_critical"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_124",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 4024177000
+   },
+   {
+    "case_id": "L3-TARGET_GUIDANCE-002",
+    "decision_boundaries": [
+     "time_pressure"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_125",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 2451525257
+   },
+   {
+    "case_id": "L3-TARGET_GUIDANCE-003",
+    "decision_boundaries": [
+     "force_ratio_near_parity"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_126",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 4285421306
+   },
+   {
+    "case_id": "L3-TARGET_GUIDANCE-004",
+    "decision_boundaries": [
+     "ammo_low"
+    ],
+    "intensity_label": "极限施压",
+    "intensity_level": "L3",
+    "intent_code": "TARGET_GUIDANCE",
+    "map_family": "map_127",
+    "max_steps": 1000,
+    "parent_code": "RECON_INFORMATION",
+    "perturbations": {
+     "fog_of_war": 0.6,
+     "jamming": 0.5,
+     "logistics_supply": 0.5,
+     "obs_latency_steps": 5,
+     "packet_loss": 0.25,
+     "time_compression": 0.75
+    },
+    "seed": 3937122208
+   }
+  ]
+ },
+ "dataset": "Shenji",
+ "intent_count": 22,
+ "level_labels": {
+  "L1": "常规对抗",
+  "L2": "高强度对抗",
+  "L3": "极限施压"
+ },
+ "min_cases_per_level": 101,
+ "perturbations": {
+  "L1": {
+   "fog_of_war": 0.0,
+   "jamming": 0.0,
+   "logistics_supply": 1.0,
+   "obs_latency_steps": 0,
+   "packet_loss": 0.0,
+   "time_compression": 1.0
+  },
+  "L2": {
+   "fog_of_war": 0.35,
+   "jamming": 0.0,
+   "logistics_supply": 1.0,
+   "obs_latency_steps": 2,
+   "packet_loss": 0.1,
+   "time_compression": 1.0
+  },
+  "L3": {
+   "fog_of_war": 0.6,
+   "jamming": 0.5,
+   "logistics_supply": 0.5,
+   "obs_latency_steps": 5,
+   "packet_loss": 0.25,
+   "time_compression": 0.75
+  }
+ },
+ "schema_version": "eval_cases/1",
+ "source_plan_version": "1.0.0"
+}
