@@ -1,24 +1,24 @@
 {
-  "label_count": 1480,
+  "label_count": 3702,
   "confidence_counts": {
-    "low": 27,
-    "medium": 1453
+    "high": 3181,
+    "low": 521
   },
   "label_kind_counts": {
-    "distance_to_objective_delta": 1453,
-    "final_outcome_credit": 27
+    "damage_kill_delta": 3004,
+    "heuristic_no_observable_progress": 521,
+    "occupy_success": 177
   },
   "action_type_counts": {
-    "Move": 1453,
-    "Shoot": 27
+    "None": 3702
   },
-  "positive_reward_count": 1453,
-  "negative_reward_count": 0,
-  "zero_reward_count": 27,
-  "reward_proxy_mean": 65.58682432432433,
+  "positive_reward_count": 1679,
+  "negative_reward_count": 1502,
+  "zero_reward_count": 521,
+  "reward_proxy_mean": 0.04781199351701783,
   "outputs": {
-    "objective_labels_jsonl": "experiments/shenji_agent/objective_labels/latest/objective_labels.jsonl",
-    "summary_json": "experiments/shenji_agent/objective_labels/latest/summary.json",
-    "readme": "experiments/shenji_agent/objective_labels/latest/README.md"
+    "objective_labels_jsonl": "/tmp/i06_labels2/objective_labels.jsonl",
+    "summary_json": "/tmp/i06_labels2/summary.json",
+    "readme": "/tmp/i06_labels2/README.md"
   }
 }
