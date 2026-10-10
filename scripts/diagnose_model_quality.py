@@ -94,17 +94,55 @@ def _load_intent_model(weights_path: Path, device: str = "cpu") -> Tuple[Optiona
         return None, None
     try:
         payload = torch.load(weights_path, map_location="cpu")
-        hidden_dim = int(payload.get("hidden_dim") or payload["model_state"]["lstm.weight_ih_l0"].shape[0] // 4)
+        # ── C4 修正：与主链路 `ai/policy.py::_load_intent_model` 对齐 ─────────
+        # 原先这里**只**支持 `{"model_state": {...}, "horizons":..., "num_classes":...}`
+        # 这种"包装型"检查点，并把 horizons/num_classes 写死为 5/7。
+        # 但仓库里实际的检查点 `ai/weights/intention_lstm.pth` 是**裸 state_dict**、
+        # 且是 legacy `fc_intent` 头、**8 个类别**。于是：
+        #   1) `payload["model_state"]` 抛 KeyError → 被下面 except 吞掉；
+        #   2) 诊断把**明明存在且主链路能正常加载**的模型报成 "Intent model: MISSING"；
+        #   3) 于是 `move_bias_estimate` 从未真正计算过，而它却驱动了
+        #      `address_intent_move_bias` 这条处置建议。
+        # 下面按主链路同样的规则解析：支持裸 state_dict、支持 legacy 头、
+        # 维度与类别数从权重形状**推断**而非写死。
+        state_dict = payload["model_state"] if ("model_state" in payload) else payload
+        lstm_key = "lstm.weight_ih_l0"
+        if lstm_key in state_dict:
+            hidden_dim = int(state_dict[lstm_key].shape[0] // 4)
+            feature_dim = int(state_dict[lstm_key].shape[1])
+        else:
+            hidden_dim = int(payload.get("hidden_dim", 128))
+            feature_dim = int(payload.get("feature_dim", 108))
         horizons = int(payload.get("horizons", 5))
-        num_classes = int(payload.get("num_classes", 7))
-        feature_dim = int(payload.get("feature_dim", 108))
-        model = MultiHorizonIntentionModel(
-            input_dim=feature_dim, hidden_dim=hidden_dim, horizons=horizons, num_classes=num_classes
-        )
-        model.load_state_dict(payload["model_state"])
+        if any(k.startswith("head.") for k in state_dict):
+            num_classes = int(payload.get("num_classes", 7))
+            model = MultiHorizonIntentionModel(
+                input_dim=feature_dim, hidden_dim=hidden_dim, horizons=horizons, num_classes=num_classes
+            )
+            model.load_state_dict(state_dict)
+        elif "fc_intent.weight" in state_dict:
+            # legacy IntentionLSTM：输出是 [batch, num_classes]（**2 维，没有 horizons 维**）
+            from ai.models import IntentionLSTM
+
+            num_classes = int(state_dict["fc_intent.weight"].shape[0])
+            model = IntentionLSTM(input_dim=feature_dim, hidden_dim=hidden_dim, num_classes=num_classes)
+            model.load_state_dict(state_dict)
+        else:
+            num_classes = int(payload.get("num_classes", 7))
+            model = MultiHorizonIntentionModel(
+                input_dim=feature_dim, hidden_dim=hidden_dim, horizons=horizons, num_classes=num_classes
+            )
+            model.load_state_dict(state_dict)
         model.eval()
         if device != "cpu":
             model = model.to(device)
+        # 把推断出的维度回传，供下面算分布时使用（避免再写死 7）
+        if isinstance(payload, dict):
+            payload.setdefault("feature_dim", feature_dim)
+            payload.setdefault("hidden_dim", hidden_dim)
+            payload["num_classes"] = num_classes
+            payload["_resolved_state_dict"] = True
+            payload.pop("model_state", None)
         return model, payload
     except Exception as exc:
         return None, {"load_error": str(exc)}
@@ -267,12 +305,30 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
             seq = _safe_to_device(torch.randn(4, history_len, feat_dim), device)
             with torch.no_grad():
                 logits = intent_model(seq)
-                probs = torch.softmax(logits[:, 0, :], dim=-1).detach().cpu().numpy()
+                # ── C4 修正：按输出维度取"第一批次、第 0 个 horizon" ──────────
+                # 主链路 `ai/policy.py::_intent_distribution` 就是这样做的（3 维取
+                # `output[0, 0]`，2 维取 `output[0]`）。
+                # 原实现无条件写 `logits[:, 0, :]`：当模型是 legacy IntentionLSTM
+                # （输出 **2 维** `[batch, num_classes]`）时，这会切出
+                # `[batch, 第0个logit]`——把"horizon 0 的第一个 logit"当成整个类别分布，
+                # 即**量错了对象**（测的是模型内部标量，不是类别概率）。
+                if logits.dim() == 3:
+                    logits0 = logits[:, 0, :]
+                else:
+                    logits0 = logits
+                probs = torch.softmax(logits0, dim=-1).detach().cpu().numpy()
 
             class_means = probs.mean(axis=0).tolist()
             result["intent_output_distribution"] = {f"class_{i}": float(v) for i, v in enumerate(class_means)}
-            # Horizon-0, class-0 (typically stay) vs classes 1-6 (move directions)
-            move_bias_estimate = float(np.sum(probs[:, 1:])) / 7.0 - float(np.mean(probs[:, 0]))
+            result["intent_num_classes"] = int(probs.shape[1])
+            # Horizon-0：class-0（通常为"原地/不动"）对 classes 1..n-1（移动方向）
+            #
+            # 原实现把除数写死为 7.0。本仓实际模型是 **8 类**（fc_intent.weight 形状
+            # (8,512)），故按**实际类别数**归一，否则偏差量纲随类别数漂移。
+            _n = int(probs.shape[1])
+            move_bias_estimate = (
+                float(np.sum(probs[:, 1:])) / float(max(1, _n - 1)) - float(np.mean(probs[:, 0]))
+            )
             result["move_bias_estimate"] = move_bias_estimate
 
             if move_bias_estimate < -0.1:
