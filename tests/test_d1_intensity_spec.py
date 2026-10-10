@@ -139,12 +139,54 @@ def test_doc_records_the_status_json_gap() -> None:
     assert "0" in d
 
 
-def test_doc_labels_unmeasured_items_as_unmeasured() -> None:
-    """**Q7 要求"不得虚报"**：未实测的耗时必须标为未实测，不得编数字。"""
+def test_doc_records_the_measured_single_episode_cost() -> None:
+    """**第 49 轮补上了实测单例耗时**（Q7 登记语明确要求的一项）。
+
+    实测：1000 步 42 秒、raw 94.4 MB。文档必须写入，否则等于放弃该项。
+    """
     d = _doc()
-    assert "未实测" in d or "未做" in d, "未标注未实测项"
-    # 不得出现看起来像实测的耗时数字（如 "秒/场" 带具体值）
-    assert "单场墙钟耗时未在本文实测" in d or "耗时未实测" in d
+    assert "42" in d and "1000" in d, "未记录「1000 步 42 秒」这一实测值"
+    assert "94.4" in d, "未记录单例 raw 体积 94.4 MB"
+    # 必须标为实测，且给出样本数
+    assert "实测" in d
+
+
+def test_doc_records_the_8x_yield_finding() -> None:
+    """**本轮最重要的发现**：单例产出量不是常量 —— 14 vs 108.6，差约 8 倍。
+
+    故「到 v1 需多少场」必须给区间，不能给单值。
+    """
+    d = _doc()
+    assert "14" in d and "108.6" in d, "未记录两种对局配置的产出差异"
+    assert "8" in d, "未指出约 8 倍差异"
+    assert "829" in d, "未给出低产出路线的场次估算"
+    assert "107" in d, "未给出高产出路线的场次估算"
+
+
+def test_doc_records_disk_constraint() -> None:
+    """磁盘是硬约束，必须记录可用量。"""
+    d = _doc()
+    assert "339.8" in d, "未记录可用磁盘 339.8 GB"
+    assert "5,951" in d or "5951" in d, "未记录总容量"
+
+
+def test_doc_corrects_the_over_attribution_of_engine_auth() -> None:
+    """**一项订正**：此前把「采集」归为「引擎鉴权阻塞」是过度归因。
+
+    第 49 轮实测：鉴权失败**不阻塞本地推演**（跑出了 completed / 1000 步）。
+    """
+    d = _doc()
+    assert "did not pass authentication" in d, "未记录鉴权失败这一事实"
+    assert "不阻塞" in d or "不影响" in d, "未澄清鉴权失败不阻塞采集"
+    assert "过度归因" in d, "未承认此前的过度归因"
+
+
+def test_doc_still_states_the_remaining_gap() -> None:
+    """收窄到 1 项后，**仍须**声明 Q7 开放（不得因为补了耗时就说已解决）。"""
+    d = _doc()
+    assert "换算" in d, "未写明「用例↔场次」换算缺口"
+    assert "开放" in d, "未声明 Q7 仍开放"
+    assert "仍缺" in d or "未定义" in d
 
 
 def test_doc_states_the_two_remaining_gaps() -> None:
