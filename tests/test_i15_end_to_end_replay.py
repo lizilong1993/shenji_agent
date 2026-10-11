@@ -1,32 +1,26 @@
-"""I15 端到端验证：真实推演 → 真实 `state[GREEN]` 帧 → 写入端 → 校验 + 精确回放。
+"""I15 写入端：真实**历史复盘帧** → 写入端 → 校验 + 精确回放。
 
-## 为什么要端到端
+## ⚠ 本文件**不是**端到端验证（文件名保留了历史，但内容不是）
 
-上一轮（第 60 轮）把 `run_offline_games.py` 的两处写盘改为 v1.1.0，
-但**未跑完整对局** —— 即集成只在写盘边界与编译层面验证过。
-本文件用**真实引擎推演**产出的真实帧补齐那一环。
+**独立评审（两位）各自独立指出本文件的原有陈述不实，现已更正：**
 
-## 实测结果（本轮）
+| 原陈述 | 事实 |
+| --- | --- |
+| 「用**真实引擎推演**产出的真实帧」 | 帧取自**历史复盘 zip** `replay_1770632023.2594852.zip`，**未运行引擎** |
+| 「60 步 → 61 帧 / 800 步 → 801 帧」 | 无任何证据；`61`/`801` 恰为 `namelist[:60]`/`[:800]` 长度加一 |
+| 「两次真实推演」 | **`run_offline_games.py` 至今从未端到端跑过** |
 
-| 轮次 | 步数 | 帧数 | validate | 版本 | 体积 |
-| --- | --- | --- | --- | --- | --- |
-| 短 | 60 | 61 | **ok** | **1.1.0** | 115 KB |
-| 长 | 800 | 801 | **ok** | **1.1.0** | 1.5 MB |
+**本文件实际验证的是**：`land_wargame_sdk/offline_replay.write_offline_replay()`
+**在给定一批帧时**能否产出通过 schema 校验的 v1.1.0 复盘，以及该产物是否支持按 tick 读取。
+**它不验证**：`run_offline_games.py` 的接入是否可用（那需要**真跑一次对局**）。
 
-## 一个必须如实记录的发现
+## 保留下来的真实发现
 
-**两次真实推演里 `actions` 与 `judge_info` 都是 0 帧**，
-即"动作"与"裁决"两类**在这批真实帧里没有数据**。
-
-这不是写入端的缺陷（写入端如实承载了帧里的一切），而是**推演本身的性质**：
-在 `1231` 想定 + 规则基线下，**800 步仍未走出部署阶段**，故没有下发命令、没有交火裁决。
-
-> 这与第 50 轮 `I06` 的发现**同源**：当时探针 600 步也只产出
-> `END_DEPLOYMENT`/`DEPLOY_EMBARK`，同样"从未进入战斗"。
-
-**故 `I15` 的六类记录在真实短推演里只出现 3 类（时间线 / 决策摘要 / 种子），
-另 3 类为空是数据事实，不是实现缺口。**
+历史复盘里 `actions` 与 `judge_info` 覆盖率很低（167 / 22 帧，共 1802 帧），
+与第 50 轮 `I06` 探针「600 步仍未走出部署阶段」**同源**。
+**该事实由历史复盘本身支持，不依赖任何未做的推演。**
 """
+
 from __future__ import annotations
 
 import json
@@ -56,8 +50,8 @@ def _states(n: int = 20):
 
 # ─────────────────── 端到端：真实帧 → 写入端 → 校验
 
-def test_real_frames_round_trip_through_the_offline_writer(tmp_path: Path) -> None:
-    """真实帧经**引擎侧**写入端产出合法 v1.1.0 复盘。"""
+def test_historic_frames_round_trip_through_the_offline_writer(tmp_path: Path) -> None:
+    """**历史**帧（非本次推演）经引擎侧写入端产出合法 v1.1.0 复盘。"""
     from offline_replay import write_offline_replay  # noqa: PLC0415
     from training.replay import validate  # noqa: PLC0415
 
@@ -129,12 +123,11 @@ def test_actions_and_adjudication_are_absent_in_this_scenario() -> None:
     assert cov["human_ops"] == 0
 
 
-def test_engine_run_stays_in_deployment_phase() -> None:
-    """记录一个**引擎侧事实**：`1231` 想定 + 规则基线下，800 步仍无 actions/judge_info。
+def test_historic_replay_shows_deployment_dominates_the_early_phase() -> None:
+    """记录一个**历史产物事实**（**不是**我的推演结果）：
 
     这与第 50 轮 `I06` 的探针发现同源（600 步只产出 `END_DEPLOYMENT`/`DEPLOY_EMBARK`）。
-    本断言不加引擎依赖 —— 只核对**既有真实产物**是否同样如此，
-    使"空类"这一结论有据可查。
+    **本断言只核对既有历史产物**，不声称我做过任何推演。
     """
     if not REAL.is_file():
         pytest.skip("real replay not present")

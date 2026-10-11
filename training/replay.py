@@ -11,7 +11,7 @@ v1 实测格式（依据 `replays/replay_1770632023.2594852.zip`，1802 帧 / 3.
 - 每帧：`json.dumps(state[GREEN], ensure_ascii=False, separators=(",",":"))`，
   共 14 个顶层键；**单一 GREEN 视角整帧快照**；
 - `actions[].message` 是原始下达命令，元素实测只有 `{cur_step, message, error}`；
-- **没有**随机种子、**没有**智能体内部决策摘要、`judge_info` 实测为空数组
+- **没有**随机种子、**没有**智能体内部决策摘要；`judge_info` **实测非空**（22 帧 / 24 条 —— 此处原有「实测为空数组」的说法已被证伪并更正）
   → 这三项正是 31006 4.4.2「双核心」要求的缺口。
 
 v1.1 扩展（本 schema 定义，写入端尚未实现）
@@ -116,7 +116,12 @@ def frame_entries(zf: zipfile.ZipFile) -> List[Tuple[int, str]]:
 def validate(size_limit_bytes: Optional[int] = None,
              path: Optional[Path] = None,
              schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """校验单个复盘 zip。返回报告 dict（不抛异常，便于批量扫描）。
+    """校验单个复盘 zip。返回报告 dict。
+
+    ⚠ **并非「不抛异常」**（原文如此声称，与行为不符，独立评审指出）：
+    输入本身无法作为 zip 打开时会抛 `zipfile.BadZipFile`，某帧 JSON 解析失败时
+    会抛 `json.JSONDecodeError`。**需要批量扫描的调用方必须自己捕获这两类异常。**
+    其余结构性问题（缺键、索引不连续、版本不可解析等）均记入返回的 report。
 
     报告字段：
       ok            是否通过（size 超限只记 warning，符合 31006 5.1.2「建议」口径）
@@ -189,7 +194,16 @@ def validate(size_limit_bytes: Optional[int] = None,
         # 当成 v1.1 来判，于是「缺 meta/agent/human」被报成失败 —— 而那恰恰是
         # I15 要记录的**缺口**，不是文件的错。缺 meta 即判定为 1.0.0。
         _meta = first.get("meta") if isinstance(first.get("meta"), dict) else {}
-        version = str(_meta.get("schema_version") or "1.0.0")
+        _raw_version = _meta.get("schema_version")
+        version = str(_raw_version or "1.0.0")
+        # ⚠ 非法版本必须**显式拒绝**，不能静默降级成 1.0.0：
+        # 独立评审实测 `schema_version="banana"` → `_ver_tuple`→(0,0,0) →
+        # `ok=True` 且**零条 v1.1 检查**，即用一个错字就能关掉全部校验。
+        if _raw_version is not None and not re.match(r"^\d+\.\d+(\.\d+)?$", str(_raw_version)):
+            rep["bad_entries"].append(
+                "unparsable meta.schema_version=%r; refusing to treat it as 1.0.0"
+                % (_raw_version,))
+            rep["unknown_version"] = str(_raw_version)
         req = _frame_required(schema, version)
         declared_v1 = _ver_tuple(version) < (1, 1, 0)
         rep["declared_version"] = version
@@ -350,9 +364,10 @@ class Replay:
     def adjudication_records(self) -> List[Dict[str, Any]]:
         """**裁决**一类：返回所有非空 `judge_info` 条目（附帧序号）。
 
-        实测 v1 复盘里 `judge_info` **恒为空数组** ——
-        即"裁决"这一类**有声明、无数据**。本方法把这个事实**变成可检查的**：
-        返回空列表时即证明该主线确实缺失，不必靠读文档判断。
+        **实测更正**：此处原写 `judge_info` 「恒为空数组」——**该说法已被证伪**：
+        真实复盘 `replay_1770632023.2594852.zip` 中 **22 帧有 judge_info、共 24 条**。
+        故「裁决」这一类在 v1 **确有数据**。本方法返回的列表**为空时才说明该主线缺失**，
+        调用方不应预设它为空。
         """
         out: List[Dict[str, Any]] = []
         for i, frame in self.iter_frames():
@@ -398,6 +413,19 @@ class Replay:
             `ok`、`checked`、`mismatches`、`missing_ticks`。
             **不粉饰**：任何不一致都会进 `mismatches` 并使 `ok=False`。
         """
+        # ── 能力边界（独立评审指出后如实写入）────────────────────────────
+        # ⚠ 本方法的"两条路径"（`frame_bytes(idx)` 与 `frame_at_tick(tick)` 再序列化）
+        # **读的是 zip 里同一份字节** —— 是**同源比较**，不是两次独立重放。
+        #
+        # 故它**只能**证明：① 按 tick 的定位正确（索引→条目映射没错）；
+        # ② 条目里的 JSON 是**规范化**形式（键序/分隔符与写入端一致）。
+        #
+        # 它**不能**证明：① 存储被整体篡改时仍能发现
+        # （评审实测：把两条路径都替换成同一份伪造内容，仍 ok=True、mismatches=[]）；
+        # ② 该帧忠实反映了原局 —— 那需要**独立重放**，本仓库目前没有该能力。
+        #
+        # **不得**再用"两条独立路径"描述它 —— 那是过度声明。
+        # 调用方若需证明"帧与原局一致"，必须另有独立重放通道。
         tindex = self.tick_index()
         targets = sorted(tindex) if ticks is None else sorted(set(int(t) for t in ticks))
         mismatches: List[Dict[str, Any]] = []

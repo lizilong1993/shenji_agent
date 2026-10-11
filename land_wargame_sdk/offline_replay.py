@@ -121,6 +121,7 @@ def write_offline_replay(all_states: List[Dict[str, Any]], *,
                          scenario: Optional[str] = None,
                          human_actor: int = 0,
                          frame_version: Optional[str] = None,
+                         allow_missing_seed: bool = False,
                          ) -> Dict[str, Any]:
     """写出复盘 zip。**返回结构化结论**，便于调用方取证。
 
@@ -131,6 +132,17 @@ def write_offline_replay(all_states: List[Dict[str, Any]], *,
     parent = os.path.dirname(zip_name)
     if parent and not os.path.exists(parent):
         os.makedirs(parent, exist_ok=True)
+
+    # ⚠ **不静默降级**：独立评审实测，产线调用曾完全不传 seed，
+    # 于是 1.1.0 校验必然失败、**每次都退回 1.0.0** ——
+    # 双核心写入端**从未在产线路径上真正执行**，而日志只有一行"falling back"。
+    # 故 1.1.0 且未给 seed 时**直接报错**，强制调用方显式提供种子。
+    if version == FRAME_VERSION_V1_1 and seed is None and not allow_missing_seed:
+        raise ValueError(
+            "frame_version=1.1.0 requires an explicit seed (I15 dual-core records the "
+            "random seed as one of its six record types). Callers that genuinely have no "
+            "seed must pass frame_version='1.0.0' or allow_missing_seed=True, and must not "
+            "claim the dual-core format.")
 
     frames = None
     if version == FRAME_VERSION_V1_1:
