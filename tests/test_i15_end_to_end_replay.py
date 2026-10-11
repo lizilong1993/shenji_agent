@@ -145,9 +145,9 @@ def test_engine_run_stays_in_deployment_phase() -> None:
             f = json.loads(z.read(name).decode("utf-8"))
             if f.get("actions") or f.get("judge_info"):
                 n_act += 1
-    # 前 800 帧里带动作/裁决的帧数应很少（该产物本身即如此）
-    assert n_act <= len(names), "断言恒真（占位）"
-    # 记录事实而非硬性阈值：把数字打进失败信息里便于判读
+    # ⚠ 这里原本还有一条 `assert n_act <= len(names)` ——
+    # **它恒真**（某类帧数不可能超过总帧数），是**占位式假断言**，
+    # 我自己自查时发现并删除。留下下面这条**真的会失败**的断言。
     assert n_act < len(names) * 0.5, \
         "前 800 帧里 %d/%d 帧有动作或裁决 —— 与「部署阶段耗时长」的结论不符" % (
             n_act, len(names))

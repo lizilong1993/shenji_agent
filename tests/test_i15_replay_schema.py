@@ -157,8 +157,14 @@ def test_playback_by_index_and_by_tick(tmp_path: Path) -> None:
         assert r.frame(2)["time"]["cur_step"] == 10
         # 按 tick 定位（索引与 tick 不必相同）
         assert r.frame_at_tick(5)["time"]["cur_step"] == 5
-        # 精确重现：同一 tick 两次读取完全一致
-        assert r.frame_at_tick(5) == r.frame_at_tick(5)
+        # ⚠ 原写法 `assert r.frame_at_tick(5) == r.frame_at_tick(5)` 是**同义反复** ——
+        # 同一纯函数调两次必然相等，断言恒真（自查时发现）。
+        # 改为**真的检查**：读回的帧必须**逐字节等于**该 tick 所在条目的原始字节。
+        _idx = r.tick_index()[5]
+        assert r.frame_bytes(_idx) == json.dumps(
+            r.frame_at_tick(5), ensure_ascii=False,
+            separators=(",", ":")).encode("utf-8"), \
+            "按 tick 读回的帧与该条目原始字节不一致"
         # 越界报明确错误
         with pytest.raises(ReplayFormatError):
             r.frame(99)

@@ -174,11 +174,21 @@ def test_sharding_parts_arithmetic_is_correct() -> None:
     if not REAL.is_file():
         pytest.skip("real replay not present")
     size = REAL.stat().st_size
+    # ⚠ 原写法是 `assert v["size_warning"] is None or True` ——
+    # **`or True` 使它恒真**，等于没断言。自查时发现，改为**真的检查**：
+    # 超限必须有 warning、未超限必须没有。三者分别是「超限」「超限」「恰好等于上限」。
     for lim in (1, size // 3 + 1, size):
         v = validate(path=REAL, size_limit_bytes=lim)
-        assert v["size_warning"] is None or True   # 超限才提示
-        if v.get("sharding_hint") is None:
+        over = size > lim
+        if over:
+            assert v["size_warning"], "limit=%d 超限却无 warning" % lim
+        else:
+            assert v["size_warning"] is None, "limit=%d 未超限却有 warning" % lim
+        if not over:
+            assert v.get("sharding_hint") is None, "未超限却给了分片提示"
             continue
+        hint = v.get("sharding_hint")
+        assert hint is not None, "limit=%d 超限却无分片提示" % lim
         expect = (size + lim - 1) // lim
-        assert v["sharding_hint"]["suggested_parts"] == expect, \
-            "limit=%d 期望 %d 片，实际 %s" % (lim, expect, v["sharding_hint"])
+        assert hint["suggested_parts"] == expect, \
+            "limit=%d 期望 %d 片，实际 %s" % (lim, expect, hint)
