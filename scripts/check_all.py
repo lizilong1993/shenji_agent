@@ -102,6 +102,10 @@ def main(argv=None) -> int:
         # ("已完成项落点", ...) 保留在 check_done_landing.py 供单独诊断用。
         # ⚠ §134 的分级版：把「找不到」分成 OK/NOTE/PLAN/EXT/MISS，
         #   **只有 MISS 需人工判定** —— 比旧的"一律报缺失"信息量大一个数量级。
+        # ⚠ §139/§140：判据数字与正文是否一致。**非严格** —— 已知 5 类假阳性
+        # （百分数/阈值符号/千分位/斜杠枚举/序号混判），故只报不判。
+        ("判据证据", [str(SCRIPTS / "check_criteria_evidence.py")], (0, 2),
+         "非严格：产出是清单，**已知假阳性**（见其输出说明）；rc=2 = 未拷入清单"),
         ("落点分级", [str(SCRIPTS / "grade_landing_refs.py")], (0, 2),
          "非严格：产出是分级清单；仅 MISS 需人工；rc=2 = 未拷入清单（环境不符）"),
         ("断言反模式", [str(SCRIPTS / "check_assertion_antipatterns.py"), "tests"],

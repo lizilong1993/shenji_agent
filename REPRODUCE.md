@@ -283,9 +283,10 @@ python3 scripts/check_all.py <含主清单的目录> --slow   # 另含落点引�
 | 2 | `check_metric_coverage.py` | **仓库侧** | 0/1 | 0.3 s | **是** |
 | 3 | `check_pending_readiness.py` | **仓库侧** | 0/1 | 0.4 s | **是** |
 | 4 | `check_snapshot_claims.py` | **仓库侧**（需 `docs/_snapshot_for_check.md`） | 0/**2** | 0.2 s | **是**；rc=2 = 未拷入 |
-| 5 | `grade_landing_refs.py` | **仓库侧**（需 `docs/_tasklist_for_check.md`） | 0/**2** | 1.5 s | **否** —— 产出是**分级清单**；**仅 `MISS` 需人工** |
-| 6 | `audit_tasklist_landing.py` | **仓库侧** | 0/2 | **4m37s** | **否** —— **默认跳过，加 `--slow`** |
-| 7 | `check_assertion_antipatterns.py` | **仓库侧** | 0/1 | 0.1 s | **否** —— **rc=1 是正常结果**，启发式 |
+| 5 | **判据证据** `check_criteria_evidence.py` | **仓库侧**（需 `docs/_tasklist_for_check.md`） | 0/**2** | 0.3 s | **否** —— **已知 5 类假阳性**（百分数/阈值符号/千分位/斜杠枚举/序号混判），须人工复核 |
+| 6 | `grade_landing_refs.py` | **仓库侧**（需 `docs/_tasklist_for_check.md`） | 0/**2** | 1.5 s | **否** —— 产出是**分级清单**；**仅 `MISS` 需人工** |
+| 7 | `audit_tasklist_landing.py` | **仓库侧** | 0/2 | **4m37s** | **否** —— **默认跳过，加 `--slow`** |
+| 8 | `check_assertion_antipatterns.py` | **仓库侧** | 0/1 | 0.1 s | **否** —— **rc=1 是正常结果**，启发式 |
 
 **入口的标记含义**（**勿误读**）：
 
