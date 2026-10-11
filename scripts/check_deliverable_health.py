@@ -86,6 +86,9 @@ REPO = Path("/remote-home/lizilong/shenji_agent")
 GIT = "/remote-home/lizilong/.local/bin/git"
 
 # 已知的**原始**编号缺口（非本轮所致），显式登记而非放行
+# §8 缺号：原始正文 §1—§9 本就没有 §8（§7 附录 / §9 台账，很可能原 §8 与之合并）。
+# 实测：全清单无 `## 8.` 标题，也无正文交叉引用「本清单 §8」。
+# **故这是原始编号习惯，不是本会话漏写** —— 清单 §9 之前亦已加同名说明。
 KNOWN_SECTION_GAPS = (8,)
 
 COMPONENTS = (
