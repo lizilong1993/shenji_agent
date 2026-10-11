@@ -31,7 +31,11 @@ for _s in (sys.stdout, sys.stderr):
 
 MIRROR = Path("/remote-home/lizilong/shenji_agent")
 DOC = MIRROR / "docs" / "_tasklist_for_check.md"
+# ⚠ 必须包含 outputs/ —— 多项的**实际产物就是 outputs/*.md**（如 P0-3 的标准条款核对表、
+# P0-4 的基线台账）。首版只查仓库与 docs/_outputs_for_check，故把这两个真实产物
+# 报成了"缺失"（见主清单 §130 的 6 条缺失：其中 2 条由此产生）。
 OUTSIDE = MIRROR / "docs" / "_outputs_for_check"
+OUTPUTS_DIR = MIRROR / "docs" / "_outputs_for_check"
 
 _bad: list = []
 
@@ -108,11 +112,16 @@ def main() -> int:
         if not land:
             continue
         text = land.group(1)
-        refs = re.findall(r"`([A-Za-z0-9_][A-Za-z0-9_./\\-]*[.](?:py|md|json|js|css|sh|txt|yaml|yml))`", text)
+        # ⚠ 旧正则把字符集限定为 [A-Za-z0-9_./\-]，**不含中文括号 `（` `）`**。
+        # 而订正备注写成「`outputs\x.md`（**落点订正**：原写 `docs\y.md`）」——
+        # 括号右侧紧跟 ``（**，故旧正则**抓不到新路径**，只抓到括号里的**旧**路径，
+        # 于是永远判"缺失"。现改为「反引号之间的任意短串」。
+        refs = re.findall(r"`([^`]{4,300}?[.](?:py|md|json|js|css|sh|txt|yaml|yml))`", text)
         # ⚠ 清单里写的是 **Windows 反斜杠**（如 docs\std_clause_audit.md），
         # 而本脚本在 Linux 上跑 —— Path 会把 \ 当**字面字符**，于是所有引用都"找不到"。
         # 故先归一为 / 再解析（我的第一版没做，导致 6 条假阳性）。
         refs = [r.replace(chr(92), "/") for r in refs]
+        refs = [r for r in refs if " " not in r]
         if not refs:
             continue
         found = missing = 0
