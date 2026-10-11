@@ -25,3 +25,6 @@ situation3d/intent_ablation_*.md
 # Python 虚拟环境（第 47 轮实测 Shenji/dataset/.venv 未被忽略，污染全仓检索）
 .venv/
 venv/
+
+# I08/I09 运行时测试用的 JS 引擎（pip --target，13MB 二进制，不入库）
+.tools/
