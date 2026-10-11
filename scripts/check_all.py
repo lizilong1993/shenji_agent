@@ -64,6 +64,10 @@ def main(argv=None) -> int:
         # 这里只判定"是否跑通"，rc=2（找不到主清单）视为环境不符而非失败。
         ("落点引用", [str(SCRIPTS / "audit_tasklist_landing.py")] + ([out_dir] if out_dir else []),
          (0, 2), "**只报是否跑通**；清单非空是常态；**该脚本只能在仓库侧跑**"),
+        # ⚠ 该脚本需先把快照拷到 docs/_snapshot_for_check.md（两机布局：快照在工作站侧）。
+        # 未拷入时它 rc=2 → 视为环境不符，不计失败。
+        ("快照断言", [str(SCRIPTS / "check_snapshot_claims.py")], (0, 2),
+         "严格：快照里的路径/命令引用必须存在；rc=2 = 未拷入快照（环境不符）"),
         ("断言反模式", [str(SCRIPTS / "check_assertion_antipatterns.py"), "tests"],
          (0, 1), "**退出 1 是正常结果**；命中需人工复核"),
     ]
