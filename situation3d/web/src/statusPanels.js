@@ -22,6 +22,38 @@
 (function () {
   'use strict';
 
+  // ── I08 步骤 2：禁止各页自建提示结构，一律经 `EventFeed` 投递 ────────────
+  //
+  // 本文件此前把空态文案（`未加载TS` / `未选择目标`）**直接写进 DOM**，
+  // 于是"加载状态"这条信息**只存在于界面上**，无法按级别/来源筛选，也无法导出。
+  //
+  // 改法：DOM 空态**保留**（界面仍需占位文案），**同时**投递一条 `info` 事件，
+  // 使该状态进入统一事件流。**去重**是必须的 —— 空态每帧重渲染，
+  // 若每次都投递会把事件队列刷满，反而淹没真正的告警。
+  var _lastEmptyKey = null;
+
+  function _emitEmptyState(obj, content, raw) {
+    if (_lastEmptyKey === content) return null;   // 状态未变 → 不重复投递
+    _lastEmptyKey = content;
+    try {
+      if (!window.EventFeed || typeof window.EventFeed.push !== 'function') {
+        // 与 dataHealth 同口径：**不静默**。但此处是**界面占位**，
+        // 事件模型缺失不应让面板整体渲染失败，故降级为控制台告警。
+        if (window.console && console.warn) {
+          console.warn('EventFeed 未加载：状态提示未进入事件流 — ' + content);
+        }
+        return null;
+      }
+      return window.EventFeed.push({
+        level: 'info', source: 'statusPanels', object: obj,
+        content: content, raw: raw || {},
+      });
+    } catch (err) {
+      if (window.console && console.warn) console.warn('状态事件投递失败: ' + err);
+      return null;
+    }
+  }
+
   // 行分组顺序，取自 `symbology.ICONS[*].family`。固定顺序让同一案例每次渲染的行位置
   // 一致；案例里没有的家族不占行。
   var FAMILY_ORDER = [
@@ -73,6 +105,7 @@
     if (!hostEl) return;
     if (!data || !data.targets || !data.targets.length) {
       hostEl.innerHTML = '<div class="os-empty">未加载TS</div>';
+      _emitEmptyState('overallTS', '未加载TS', { where: 'renderOverall' });
       return;
     }
 
@@ -279,6 +312,7 @@
     if (!hostEl) return;
     if (!def) {
       hostEl.innerHTML = '<div class="ts-empty">未选择目标</div>';
+      _emitEmptyState('targetTS', '未选择目标', { where: 'renderTargetStatus' });
       return;
     }
 
@@ -351,5 +385,8 @@
     deriveActivity: deriveActivity,
     headingStd: headingStd,
     _resetCache: function () { cache.key = null; cache.imgs = {}; },
+    // I08：暴露空态投递与去重复位，供测试断言"提示确实进入统一事件流"
+    _emitEmptyState: _emitEmptyState,
+    _resetEmptyState: function () { _lastEmptyKey = null; },
   };
 })();
