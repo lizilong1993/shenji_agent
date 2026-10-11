@@ -69,7 +69,19 @@ if OUT is None:
     raise SystemExit(2)
 MAIN = OUT / "兵棋推演9项团体标准对标任务清单_20261010.md"
 V11M = OUT / "兵棋推演9项团体标准对标任务清单_20261010.v1.1.md"
-SNAP = OUT / "当前可交付状态快照_20261011.v1.1.md"
+# ⚠ 快照改为**自动取版本号最大者** —— 硬编码 v1.1 会在出 v1.2 后误报（本轮实测）。
+def _latest_snapshot(out: Path) -> Path:
+    cands = sorted(out.glob("当前可交付状态快照_*.v*.md"))
+    def key(p: Path):
+        # ⚠ 版本号是**两段**（`.v1.2.md`），我首版写成 `[.]v([0-9]+)[.]md$` ——
+        # **少了一段** → 永不匹配 → 所有 key 都为 0 → max 取第一个（结果是旧的 v1.1）。
+        # 现按两段匹配，两段都取数以便排序。
+        m = re.search(r"[.]v([0-9]+)[.]([0-9]+)[.]md$", p.name)
+        return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+    return max(cands, key=key) if cands else out / "当前可交付状态快照_missing.md"
+
+
+SNAP = _latest_snapshot(OUT)
 REPO = Path("/remote-home/lizilong/shenji_agent")
 GIT = "/remote-home/lizilong/.local/bin/git"
 
