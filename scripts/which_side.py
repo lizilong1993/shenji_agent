@@ -84,7 +84,7 @@ def main() -> int:
     if full_repo and not has_tasklist:
         side = "仓库侧（完整）"
         print("     这一侧 = **%s**" % side)
-        print("     · 可跑：指标覆盖 / 待批准就绪度 / 快照断言 / 已完成项落点 / 落点分级 / 断言反模式")
+        print("     · 可跑：指标覆盖 / 待批准就绪度 / 快照断言 / **落点分级** / 断言反模式")
         print("     · **不可跑**：交付物健康（**需就地在工作站侧**，本侧无主清单）")
     elif has_tasklist and not full_repo:
         side = "交付物侧（残缺镜像）"

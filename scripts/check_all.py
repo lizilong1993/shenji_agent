@@ -96,15 +96,31 @@ def main(argv=None) -> int:
          "严格：快照里的路径/命令引用必须存在；rc=2 = 未拷入快照（环境不符）"),
         # ⚠ 该脚本需 docs/_tasklist_for_check.md 与 docs/_outputs_for_check/（两机布局：
         #   清单在工作站侧）。未拷入 → rc=2（环境不符）。
-        #   且**会用 DONE_LANDING_NO_INDEX=1 跑**：全树索引在 10 万+ 文件上要 ~18 s，
-        #   快速模式 ~0.23 s；两者结果不同（6 vs 19 条），差异全来自裸文件名。
-        ("已完成项落点", [str(SCRIPTS / "check_done_landing.py")], (0, 2),
-         "非严格：产出是清单（缺失需人工判定性质）；rc=2 = 未拷入清单（环境不符）"),
+        #   **会用 DONE_LANDING_NO_INDEX=1 跑**：全树索引在 10 万+ 文件上要 ~18 s，
+        #   快速模式 ~0.23 s；两者结果不同，差异全来自裸文件名。
+        #   ⚠ 已被下面的「落点分级」取代（分级信息量更大），故**默认不跑**。
+        # ("已完成项落点", ...) 保留在 check_done_landing.py 供单独诊断用。
+        # ⚠ §134 的分级版：把「找不到」分成 OK/NOTE/PLAN/EXT/MISS，
+        #   **只有 MISS 需人工判定** —— 比旧的"一律报缺失"信息量大一个数量级。
+        ("落点分级", [str(SCRIPTS / "grade_landing_refs.py")], (0, 2),
+         "非严格：产出是分级清单；仅 MISS 需人工；rc=2 = 未拷入清单（环境不符）"),
         ("断言反模式", [str(SCRIPTS / "check_assertion_antipatterns.py"), "tests"],
          (0, 1), "**退出 1 是正常结果**；命中需人工复核"),
     ]
 
     print("  统一核对（%d 项）" % len(checks))
+
+    # ⚠ **先报环境，再报结果**（§135/§136 的教训）：
+    # 本地镜像只有 ~2,000 个文件（远程 ~95,000），用它判仓库内容会系统性偏向"找不到"。
+    # 故在跑任何核对**之前**先判明"我在哪一侧" —— 不依赖我记住。
+    side_script = SCRIPTS / "which_side.py"
+    if side_script.is_file():
+        rs = _run([str(side_script)], timeout=120)
+        for line in ((rs.stdout or "") + (rs.stderr or "")).split("\n"):
+            if "这一侧" in line or "不可用于判仓库内容" in line or "不可信" in line \
+               or "不可跑" in line or "可跑：" in line:
+                print("  " + line.strip())
+        print()
     print()
     rows = []
     for name, args, ok_exits, note in checks:
