@@ -287,10 +287,13 @@ def main(argv) -> int:
             src = f.read_text(encoding="utf-8")
             tree = ast.parse(src)
         except (SyntaxError, UnicodeDecodeError) as e:
-            # **不静默跳过**：解析不了就等于漏检，必须让整体失败（见文件头 AP2 同类问题）
+            # **不静默跳过**：解析不了就等于漏检，必须让整体失败
+            # （这与 AP2「跳过即不验证」同类 —— 我第一版的替换因锚点不匹配**静默失败**，
+            #   于是该守卫实际从未生效；由自证测试 `test_parse_failure_is_fatal_not_skipped` 抓出。）
             print("  ! %s 解析失败: %s" % (f.name, str(e)[:80]))
-            print("    → 无法扫描该文件 = 漏检，**不应视为通过**")
+            print("    -> 无法扫描该文件 = 漏检，**不应视为通过**")
             return 3
+
         lines = src.split("\n")
         found = list(check_ap5(tree, lines, src))
         found += check_ap2(tree, lines, f)
