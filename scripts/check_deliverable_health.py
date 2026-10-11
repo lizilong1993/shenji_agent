@@ -143,6 +143,19 @@ def main() -> int:
         m2 = re.search(r"\*\*(\d+) 行\*\*", s)
         chk(m2 and int(m2.group(1)) == src.count("\n") + 1, "快照内嵌行数 == 实际",
             "快照=%s 实际=%d" % (m2.group(1) if m2 else "?", src.count("\n") + 1))
+
+        # ⚠ ④ 基线数字一致性 —— 本轮新增：
+        # 快照的 MD5 与行数**逐轮自动同步**，但**基线数字此前是手写的**，
+        # 于是每次新增测试后就变陈旧（实测发现快照写 1105，而实测是 1115）。
+        # 这与本会话反复记录的问题同类：一个「看起来是事实」的数字，其实没人核过。
+        pat = re.compile(r"([0-9]+)\s*failed\s*/\s*([0-9]+)\s*passed\s*/\s*([0-9]+)\s*skipped")
+        snap_hits = sorted({m.group(0) for m in pat.finditer(s)})
+        main_hits = sorted({m.group(0) for m in pat.finditer(src)})
+        chk(len(snap_hits) <= 1, "快照基线数字唯一",
+            "取值=%s" % (snap_hits or ["（无）"]))
+        if snap_hits and main_hits:
+            chk(snap_hits[0] in main_hits, "快照基线 == 主清单中已记录过的一档",
+                "快照=%s；清单含 %d 种取值" % (snap_hits[0], len(main_hits)))
     else:
         chk(False, "快照存在", "缺失")
 
