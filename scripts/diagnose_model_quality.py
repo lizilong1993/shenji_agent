@@ -114,6 +114,49 @@ def evaluate_move_bias_gate(measurement: "Optional[float]", *, threshold: float 
     return res
 
 
+def evaluate_distribution_gap_gate(p0_model: "Optional[float]", p0_label: "Optional[float]", *,
+                                   threshold: float = 0.1) -> Dict[str, Any]:
+    """**并行门（I06/C4 默认②）**：模型预测的"不动"占比与**标签自身**占比之差。
+
+    ## 为什么需要它
+
+    既有 `evaluate_move_bias_gate` 比较的是 `move_bias_estimate` 与 **0**。
+    而该量在实现上等价于 `(1 - p0)/k - p0` —— **把 0 当作基准，等于要求 `p0 ≈ 1/7`**，
+    即**要求数据近似平衡**。真实数据 `p0 = 0.565`，故该门**算术上不可通过**。
+
+    本门把基准换成**标签自身的 `p0`**，于是：
+
+      - 数据怎么分布，基准就怎么走 —— **不惩罚数据本身的失衡**；
+      - 只惩罚**模型比数据更偏**的部分。
+
+    ## 口径
+
+    `gap = p0_model - p0_label`；判据 `|gap| <= threshold`。
+    `None`（数据不足）→ **拒绝**（fail closed，与既有门同口径）。
+    `threshold <= 0` → 视为配置错误 → 拒绝。
+    """
+    res: Dict[str, Any] = {
+        "metric_source": "intent_real_data.label_vs_model_p0",
+        "threshold": float(threshold),
+        "p0_model": None if p0_model is None else float(p0_model),
+        "p0_label": None if p0_label is None else float(p0_label),
+        "gap": None,
+    }
+    if threshold <= 0:
+        res.update(accepted=False, reason="invalid_threshold")
+        return res
+    if p0_model is None or p0_label is None:
+        res.update(accepted=False, reason="measurement_unavailable")
+        return res
+    gap = float(p0_model) - float(p0_label)
+    res["gap"] = gap
+    if abs(gap) > float(threshold):
+        res.update(accepted=False, reason="distribution_gap_exceeds_threshold")
+        return res
+    res.update(accepted=True, reason="ok")
+    return res
+
+
 def _find_intent_train_json(datasets_dir) -> "Optional[Path]":
     """在 datasets 根下定位意图训练 json（与 `training/data.py` 同一份数据）。
 
@@ -217,6 +260,12 @@ def _intent_stats_on_real_data(intent_model, datasets_dir, history_len: int,
         "move_bias_estimate": move_bias_estimate_from_probs(probs),
         # 真实的 horizon-0 标签分布（one-hot argmax），用于判断类别失衡是否来自数据
         "label_horizon0_histogram": label_hist,
+        # I06/C4 默认②：标签侧的 7 类占比（供"分布对齐"门使用）。
+        # 与 class_distribution 同口径（占比而非计数），故二者可直接相减。
+        "label_distribution": {
+            "class_%d" % i: (float(label_hist.get(str(i), 0)) / float(len(head0)) if head0 else 0.0)
+            for i in range(int(probs.shape[1]))
+        },
         "note": ("标签为 7 类 one-hot；模型输出 8 类时 class_7 无对应标签"
                  if probs.shape[1] != 7 else ""),
     }
@@ -588,6 +637,23 @@ def diagnose(artifact_dir: Path, datasets_dir: Optional[Path] = None) -> Dict[st
     result["move_bias_gate_passed"] = bool(result["move_bias_gate"]["accepted"])
     if not result["move_bias_gate"]["accepted"]:
         result["recommended_next_actions"].append("address_intent_move_bias")
+
+    # ── I06/C4 默认②：**并行**的"分布对齐"门 ────────────────────────────────
+    # 既有门（上方）**一个字节都不动**；本门只做**并列报告**。
+    # 理由：既有门把基准取 0，等价于要求 p0 ≈ 1/7，与真实数据（p0≈0.565）算术不相容；
+    # 本门以**标签自身的 p0** 为基准，故能区分"复现数据分布"与"模型自己偏了"。
+    _p0_model = _p0_label = None
+    if isinstance(result.get("intent_real_data"), dict):
+        _cd = result["intent_real_data"].get("class_distribution") or {}
+        _ld = result["intent_real_data"].get("label_distribution") or {}
+        _p0_model = _cd.get("class_0")
+        _p0_label = _ld.get("class_0")
+    result["distribution_gap_gate"] = evaluate_distribution_gap_gate(
+        _p0_model, _p0_label, threshold=_gate_threshold)
+    result["distribution_gap_gate_passed"] = bool(result["distribution_gap_gate"]["accepted"])
+    # **两个门不一致时不得静默** —— 明确标出，使判据冲突可见可审。
+    result["gates_disagree"] = bool(
+        result["distribution_gap_gate"]["accepted"] != result["move_bias_gate"]["accepted"])
 
     # Tactical model diagnostics
     if tactical_model is not None:
