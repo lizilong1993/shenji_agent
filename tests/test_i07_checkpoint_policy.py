@@ -238,3 +238,44 @@ def test_ledger_reports_what_was_written(tmp_path: Path) -> None:
     assert kinds == ["periodic", "best", "crash"], kinds
     assert led["best_value"] == 0.9
     assert any(f.endswith(".pt") for f in led["files"])
+
+# ────────────── 实跑发现的缺陷：四个模型检查点互相覆盖
+
+def test_all_four_training_loops_are_wired() -> None:
+    """**四个**训练循环都必须接检查点（tactical 在配置里默认关闭，但接线要在）。
+
+    修前只接了意图模型；实跑发现另外三个没接。
+    """
+    src = (REPO / "training" / "supervised.py").read_text(encoding="utf-8")
+    assert src.count("CheckpointWriter(") == 4, \
+        "应有 4 个 CheckpointWriter 实例，实际 %d" % src.count("CheckpointWriter(")
+    # 每个实例都要有 period/best 调用
+    assert src.count("maybe_periodic(") == 4
+    assert src.count("maybe_best(") == 4
+
+
+def test_each_model_gets_its_own_checkpoint_directory() -> None:
+    """**实跑发现的缺陷**：四个模型共用 run 目录，若 `experiment_id` 只用 `run_dir.name`，
+    它们的 `best.pt` / `epoch_*.pt` 会**互相覆盖**。
+
+    故 `experiment_id` 必须**含模型标签**。这条断言直接把该缺陷钉住。
+    """
+    src = (REPO / "training" / "supervised.py").read_text(encoding="utf-8")
+    for label in ("intent", "tactical", "situation", "objective"):
+        assert 'run_dir.name + "/" + ' in src, "未发现带标签的 experiment_id 写法"
+        assert repr(label) in src, "缺模型标签 %r" % label
+    # 不得再有"裸 run_dir.name"作为 experiment_id 的写法
+    assert "experiment_id=run_dir.name," not in src, \
+        "仍有裸 run_dir.name —— 四个模型会互相覆盖"
+
+
+def test_checkpoint_path_includes_the_model_label(tmp_path: Path) -> None:
+    """行为验证：含标签的 experiment_id 应落到**不同**子目录。"""
+    m, _ = _model_and_opt()
+    a = CheckpointWriter(tmp_path, experiment_id="run1/intent")
+    b = CheckpointWriter(tmp_path, experiment_id="run1/situation")
+    pa = a.maybe_best(epoch=1, value=0.5, model_state=m.state_dict())
+    pb = b.maybe_best(epoch=1, value=0.5, model_state=m.state_dict())
+    assert pa != pb, "两个模型写到了同一路径"
+    assert pa.parent.name == "intent" and pb.parent.name == "situation"
+    assert pa.is_file() and pb.is_file()

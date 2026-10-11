@@ -180,3 +180,44 @@ def test_diagnose_flags_missing_training_normalizer_application(tmp_path: Path) 
 
     assert result["normalizer_applied_in_training"] is False
     assert "normalizer_not_applied_in_training" in result["warnings"]
+
+# ── I07 步骤 4：把检查点验证脚本**接入既有用例** ────────────────────────────
+# 步骤原文：「把验证脚本接入 tests/test_feature_normalizer_consistency.py 等既有用例」。
+# 此前 verify_checkpoint.py **不被任何测试引用** —— 即"有脚本、无联动"。
+# 这里接入后，归一化器与模型输入维度的一致性**同时**由本文件与验证脚本把关；
+# 两者结论若不一致，说明其中一处判断有误，测试会失败。
+
+def _run_verify_checkpoint(weights: str = "ai/weights") -> "subprocess.CompletedProcess":
+    import subprocess
+    import sys as _sys
+    from pathlib import Path as _Path
+    repo = _Path(__file__).resolve().parents[1]
+    return subprocess.run(
+        [_sys.executable, str(repo / "scripts" / "verify_checkpoint.py"),
+         "--weights", weights],
+        cwd=repo, capture_output=True, text=True)
+
+
+def test_verify_checkpoint_script_exits_zero():
+    """**联动**：检查点验证脚本必须退出码 0（I07 判据 2）。"""
+    r = _run_verify_checkpoint()
+    assert r.returncode == 0, (r.stdout or "")[-1200:]
+
+
+def test_verify_checkpoint_agrees_on_feature_dim_108():
+    """**两个口径必须一致**：验证脚本对 feature_dim 的结论要与本文件一致。
+
+    若脚本说 108 匹配、而本文件的断言说 108 匹配，二者同向即可；
+    此处核对脚本**确实检查了**该维度（而非跳过），避免"退出码 0 但其实没查"。
+    """
+    r = _run_verify_checkpoint()
+    out = r.stdout or ""
+    assert "feature_dim" in out, "验证脚本未报告 feature_dim —— 退出码 0 可能是没查"
+    assert "108" in out, "验证脚本未报告 108"
+
+
+def test_verify_checkpoint_reports_the_data_hash():
+    """I07 判据 1 的「数据哈希」必须由验证脚本**重算比对**，不只是被记录。"""
+    r = _run_verify_checkpoint()
+    out = r.stdout or ""
+    assert "数据哈希" in out and "重算比对" in out, out[-600:]

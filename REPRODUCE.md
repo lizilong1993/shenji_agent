@@ -162,3 +162,76 @@ python3 -m pytest tests/ -q
 `ai/weights/` 里可能存有**早于**本策略产生的权重（manifest 无 `environment` 段）。
 `verify_checkpoint.py` 对其**降级通过并标注 `legacy_artifact`**，不判失败 ——
 **旧权重不因为「没有新字段」就变坏**；若把它判成失败，验证脚本会永远红着，于是没人再看它。
+
+## 检查点与恢复（I07 / `31007 5.3.6`）
+
+### 检查点落盘位置与命名
+
+每次训练在 `<output_root>/<run>/checkpoints/<run>/<模型>/` 下落盘：
+
+| 文件 | 触发条件 | 说明 |
+| --- | --- | --- |
+| `epoch_{n:04d}.pt` | **定期保存**（每 `checkpoint_every_epochs` 轮，默认 5） | 超出 `checkpoint_keep_last`（默认 3）时删**最旧**一份 |
+| `best.pt` | **触发式**：监控指标较历史最优改善 | 监控量为该轮训练损失（越小越好） |
+| `crash.pt` | **触发式**：训练异常中断前 | 内含错误信息，便于定位 |
+
+`<模型>` 为 `intent` / `tactical` / `situation` / `objective` 之一。
+**注意**：四个模型共用同一 run 目录，故路径中**必须**含模型标签，否则同名检查点会互相覆盖。
+
+### 检查点内容（可用于**恢复**，不只推理）
+
+| 键 | 用途 |
+| --- | --- |
+| `model_state` | 权重 |
+| `optimizer` | **恢复所必需** —— 缺它只能推理 |
+| `epoch` | 续跑起点 |
+| `rng_state` | python / numpy / torch 随机流（**缺它续跑后随机流不一致**） |
+| `metric` | 该档的指标，便于追溯 |
+
+同名 `.json` 侧车文件含元数据（不含大对象），**不加载权重**即可查看某档指标。
+
+### 恢复步骤
+
+```bash
+# 1) 选择要恢复的检查点（示例：最近的定期档）
+CKPT=<output_root>/<run>/checkpoints/<run>/intent/epoch_0020.pt
+
+# 2) 用同一 Python 环境（依赖版本见 manifest.environment）
+set -a; . /remote-home/lizilong/py310env.sh; set +a
+export PYTHONPATH="$PYTHONPATH:$(pwd)/Shenji/src:$(pwd)"
+
+# 3) 载入并核对内容齐全（缺 optimizer/rng 则**不能**续跑）
+python3 - <<'PY'
+import torch
+d = torch.load("<CKPT>", map_location="cpu")
+for k in ("model_state", "optimizer", "epoch", "rng_state", "metric"):
+    print(k, "有" if d.get(k) is not None else "**缺**")
+PY
+
+# 4) 恢复随机流后再继续训练（顺序不可颠倒：先恢复 rng，再建 DataLoader）
+python3 - <<'PY'
+import random, numpy as np, torch
+d = torch.load("<CKPT>", map_location="cpu")
+random.setstate(d["rng_state"]["python"])
+np.random.set_state(d["rng_state"]["numpy"])
+torch.set_rng_state(d["rng_state"]["torch"])
+print("rng restored at epoch", d["epoch"])
+PY
+```
+
+### 环境前置（含 MAC 绑定鉴权限制）
+
+| 前置 | 说明 |
+| --- | --- |
+| Python / torch 版本 | 见 `ai/weights/model_manifest.json` 的 `environment.python_version` / `torch_version` |
+| 依赖锁 | `environment.requirements_lock_sha256`（对锁文件重算即可核对） |
+| **引擎鉴权（MAC 绑定）** | **本环境不通过** → 依赖闭源引擎的流程（自博弈、晋升）无法运行；**检查点保存与恢复不依赖引擎**，可独立使用 |
+
+### 独立校验
+
+```bash
+python3 scripts/verify_checkpoint.py --weights ai/weights   # 退出码 0 即通过
+```
+
+校验项含：权重哈希与声明一致、`feature_dim` 与模型输入维度匹配、
+**数据哈希对数据文件重算比对**、依赖版本 / 环境 / `experiment_id` 齐备。

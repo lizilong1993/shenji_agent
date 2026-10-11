@@ -114,7 +114,11 @@ def train_intent_model(
     # 监控量用**该轮训练损失**（如实标注：本循环内没有验证指标），
     # 方向为「越小越好」。崩溃时落 crash.pt，避免整轮白跑。
     _ckpt = CheckpointWriter(
-        run_dir / "checkpoints", experiment_id=run_dir.name,
+        run_dir / "checkpoints",
+        # ⚠ experiment_id 必须**含模型标签**：
+        # 四个模型共用同一 run_dir，若只用 run_dir.name，
+        # 它们的 `best.pt` / `epoch_*.pt` 会**互相覆盖**（实跑发现）。
+        experiment_id=run_dir.name + "/" + 'intent',
         every_n_epochs=int(config.get("checkpoint_every_epochs", 5)),
         keep_last=int(config.get("checkpoint_keep_last", 3)),
         monitor_name="train_loss", greater_is_better=False)
@@ -217,7 +221,17 @@ def train_tactical_model(
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=float(config["learning_rate"]))
     losses = []
-    for _ in range(int(config["epochs"])):
+    # I07 / 31007 5.3.6：定期保存 + 触发式保存（与意图模型同样接法）
+    _ckpt_tactical = CheckpointWriter(
+        run_dir / "checkpoints",
+        # ⚠ experiment_id 必须**含模型标签**：
+        # 四个模型共用同一 run_dir，若只用 run_dir.name，
+        # 它们的 `best.pt` / `epoch_*.pt` 会**互相覆盖**（实跑发现）。
+        experiment_id=run_dir.name + "/" + 'tactical',
+        every_n_epochs=int(config.get("checkpoint_every_epochs", 5)),
+        keep_last=int(config.get("checkpoint_keep_last", 3)),
+        monitor_name="train_loss", greater_is_better=False)
+    for _epoch_tactical in range(int(config["epochs"])):
         model.train()
         epoch_loss = 0.0
         batches = 0
@@ -230,6 +244,17 @@ def train_tactical_model(
             epoch_loss += float(loss.item())
             batches += 1
         losses.append(epoch_loss / max(batches, 1))
+        try:
+            _lw_tactical = losses[-1] if losses else None
+            if _lw_tactical is not None:
+                _ckpt_tactical.maybe_periodic(epoch=_epoch_tactical + 1,
+                    model_state=model.state_dict(),
+                    optimizer=optimizer.state_dict())
+                _ckpt_tactical.maybe_best(epoch=_epoch_tactical + 1, value=_lw_tactical,
+                    model_state=model.state_dict(),
+                    optimizer=optimizer.state_dict())
+        except Exception as _ck_exc:  # noqa: BLE001 - 检查点失败不得中断训练
+            print("[checkpoint] tactical skipped at epoch %d: %s" % (_epoch_tactical + 1, _ck_exc))
 
     model.eval()
     preds = []
@@ -290,7 +315,17 @@ def train_situation_model(
     criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=float(config["learning_rate"]))
     train_losses = []
-    for _ in range(int(config["epochs"])):
+    # I07 / 31007 5.3.6：定期保存 + 触发式保存（与意图模型同样接法）
+    _ckpt_situation = CheckpointWriter(
+        run_dir / "checkpoints",
+        # ⚠ experiment_id 必须**含模型标签**：
+        # 四个模型共用同一 run_dir，若只用 run_dir.name，
+        # 它们的 `best.pt` / `epoch_*.pt` 会**互相覆盖**（实跑发现）。
+        experiment_id=run_dir.name + "/" + 'situation',
+        every_n_epochs=int(config.get("checkpoint_every_epochs", 5)),
+        keep_last=int(config.get("checkpoint_keep_last", 3)),
+        monitor_name="train_loss", greater_is_better=False)
+    for _epoch_situation in range(int(config["epochs"])):
         model.train()
         epoch_loss = 0.0
         for idx in train_idx.tolist():
@@ -303,6 +338,17 @@ def train_situation_model(
             optimizer.step()
             epoch_loss += float(loss.item())
         train_losses.append(epoch_loss / max(len(train_idx), 1))
+        try:
+            _lw_situation = train_losses[-1] if train_losses else None
+            if _lw_situation is not None:
+                _ckpt_situation.maybe_periodic(epoch=_epoch_situation + 1,
+                    model_state=model.state_dict(),
+                    optimizer=optimizer.state_dict())
+                _ckpt_situation.maybe_best(epoch=_epoch_situation + 1, value=_lw_situation,
+                    model_state=model.state_dict(),
+                    optimizer=optimizer.state_dict())
+        except Exception as _ck_exc:  # noqa: BLE001 - 检查点失败不得中断训练
+            print("[checkpoint] situation skipped at epoch %d: %s" % (_epoch_situation + 1, _ck_exc))
 
     model.eval()
     hits: List[Tuple[str, bool]] = []
@@ -438,13 +484,34 @@ def train_objective_model(config, labels_path, device, run_dir):
     y_t = torch.from_numpy(y).to(device)
 
     train_losses = []
-    for _ in range(int(config.get("epochs", 20))):
+    # I07 / 31007 5.3.6：定期保存 + 触发式保存（与意图模型同样接法）
+    _ckpt_objective = CheckpointWriter(
+        run_dir / "checkpoints",
+        # ⚠ experiment_id 必须**含模型标签**：
+        # 四个模型共用同一 run_dir，若只用 run_dir.name，
+        # 它们的 `best.pt` / `epoch_*.pt` 会**互相覆盖**（实跑发现）。
+        experiment_id=run_dir.name + "/" + 'objective',
+        every_n_epochs=int(config.get("checkpoint_every_epochs", 5)),
+        keep_last=int(config.get("checkpoint_keep_last", 3)),
+        monitor_name="train_loss", greater_is_better=False)
+    for _epoch_objective in range(int(config.get("epochs", 20))):
         model.train()
         optimizer.zero_grad()
         loss = criterion(model(x_t[train_idx]), y_t[train_idx])
         loss.backward()
         optimizer.step()
         train_losses.append(float(loss.item()))
+        try:
+            _lw_objective = train_losses[-1] if train_losses else None
+            if _lw_objective is not None:
+                _ckpt_objective.maybe_periodic(epoch=_epoch_objective + 1,
+                    model_state=model.state_dict(),
+                    optimizer=optimizer.state_dict())
+                _ckpt_objective.maybe_best(epoch=_epoch_objective + 1, value=_lw_objective,
+                    model_state=model.state_dict(),
+                    optimizer=optimizer.state_dict())
+        except Exception as _ck_exc:  # noqa: BLE001 - 检查点失败不得中断训练
+            print("[checkpoint] objective skipped at epoch %d: %s" % (_epoch_objective + 1, _ck_exc))
 
     model.eval()
     with torch.no_grad():
