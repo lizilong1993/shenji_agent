@@ -447,7 +447,18 @@ class Replay:
             "agent_decisions": sum(1 for _, f in frames if f.get("agent")),
             "seed": sum(1 for _, f in frames
                         if isinstance(f.get("meta"), dict) and f["meta"].get("seed") is not None),
-            "human_ops": sum(1 for _, f in frames if f.get("human")),
+            # ⚠ 修：原实现只数"**该段是否存在**"，于是 `human={"operations": []}`
+            # 也被计为"有数据" —— 那是把"结构存在"当成了"内容存在"。
+            # 本轮逐条取证时**被自己的核对脚本暴露**（它据此错误地报"人类操作主线有内容 ✓"）。
+            # 现改为数"**确有内容**"：operations 非空，或 actions 非空。
+            "human_ops": sum(
+                1 for _, f in frames
+                if isinstance(f.get("human"), dict)
+                and (((f["human"].get("operations") or []) if isinstance(
+                    f["human"].get("operations"), list) else [])
+                     or ((f["human"].get("actions") or []) if isinstance(
+                         f["human"].get("actions"), list) else []))),
+            "human_section_present": sum(1 for _, f in frames if f.get("human")),
         }
         cov["empty_types"] = [k for k in ("actions", "adjudication", "timeline",
                                           "agent_decisions", "seed", "human_ops")

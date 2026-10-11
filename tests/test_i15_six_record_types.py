@@ -156,3 +156,78 @@ def test_upgraded_replay_covers_five_of_six_types() -> None:
             cov = r.record_type_coverage()
         assert cov["agent_decisions"] > 0, "升级后仍无 agent 决策段"
         assert cov["seed"] > 0, "升级后仍无 seed"
+
+# ────────────── 结构存在 ≠ 内容存在（本轮取证时被自己的核对暴露）
+
+def test_coverage_distinguishes_section_presence_from_content() -> None:
+    """**关键区分**：`human={"operations": []}` 是"**结构存在、内容为空**"。
+
+    修前 `record_type_coverage()` 只数 `f.get("human")` 是否存在，
+    于是空段也被计为"有数据" —— 我自己的核对脚本据此**错误地报出**
+    「人类操作主线有内容 ✓」，而实际 `operations == []`。
+
+    > 这类错误的危害与"永真断言"同源：**把"存在"当成了"有内容"**，
+    > 于是**数据缺口被掩盖成已满足**。
+
+    现要求两者**分别可查**：`human_section_present`（结构）与 `human_ops`（内容）。
+    """
+    if not REAL.is_file():
+        pytest.skip("real replay not present")
+    with Replay(REAL) as r:
+        cov = r.record_type_coverage()
+    assert "human_section_present" in cov, "未单独报告 human 段是否存在"
+    assert "human_ops" in cov
+    # v1 产物两者都为 0（连段都没有）
+    assert cov["human_section_present"] == 0
+    assert cov["human_ops"] == 0
+
+
+def test_empty_operations_are_not_counted_as_content(tmp_path: Path) -> None:
+    """**行为验证**：写出 `operations: []` 的帧，`human_ops` 必须仍为 0。"""
+    import json as _json
+    import zipfile as _zip
+    import sys as _sys
+    _sys.path.insert(0, str(REPO))
+    from training.replay import Replay as _Replay
+
+    if not REAL.is_file():
+        pytest.skip("real replay not present")
+    with _zip.ZipFile(REAL) as z:
+        f = _json.loads(z.read(z.namelist()[0]).decode("utf-8"))
+    f = dict(f)
+    f["meta"] = {"schema_version": "1.1.0", "seed": 1}
+    f["agent"] = {"timeline": {}, "decisions": []}
+    # **结构存在、内容为空** —— 正是实跑产物的形态
+    f["human"] = {"operations": [], "action_count": 0, "source": "no_human"}
+    p = tmp_path / "empty_ops.zip"
+    with _zip.ZipFile(p, "w", _zip.ZIP_DEFLATED) as z:
+        z.writestr("t/0", _json.dumps(f, ensure_ascii=False, separators=(",", ":")))
+    with _Replay(p) as r:
+        cov = r.record_type_coverage()
+    assert cov["human_section_present"] == 1, "段存在应被记为 1"
+    assert cov["human_ops"] == 0, "**空 operations 不得计为内容**"
+
+
+def test_non_empty_operations_are_counted(tmp_path: Path) -> None:
+    """**对照**：`operations` 非空时 `human_ops` 必须为 1（防"一律记 0"）。"""
+    import json as _json
+    import zipfile as _zip
+    import sys as _sys
+    _sys.path.insert(0, str(REPO))
+    from training.replay import Replay as _Replay
+
+    if not REAL.is_file():
+        pytest.skip("real replay not present")
+    with _zip.ZipFile(REAL) as z:
+        f = _json.loads(z.read(z.namelist()[0]).decode("utf-8"))
+    f = dict(f)
+    f["meta"] = {"schema_version": "1.1.0", "seed": 1}
+    f["agent"] = {"timeline": {}, "decisions": []}
+    f["human"] = {"operations": [{"cur_step": 0, "user_id": 1,
+                                  "user_name": "human", "actor_kind": "human"}]}
+    p = tmp_path / "with_ops.zip"
+    with _zip.ZipFile(p, "w", _zip.ZIP_DEFLATED) as z:
+        z.writestr("t/0", _json.dumps(f, ensure_ascii=False, separators=(",", ":")))
+    with _Replay(p) as r:
+        cov = r.record_type_coverage()
+    assert cov["human_ops"] == 1, "非空 operations 应被计为内容"
