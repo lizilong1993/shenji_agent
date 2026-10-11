@@ -36,21 +36,57 @@ OUTSIDE = MIRROR / "docs" / "_outputs_for_check"
 _bad: list = []
 
 
+_INDEX = None
+
+
+def _build_index():
+    """一次性建立 basename → 路径 索引。
+
+    ⚠ **性能**：原实现对每个未命中的引用调用 
+glob，而本仓有 **10 万+ 文件** ——
+    单次全树扫描虽只要 0.2 s，但测试里反复调用会把整个套件拖慢数分钟（实测 8 例 232 s）。
+    故改为**建一次索引、查多次**。
+    """
+    global _INDEX
+    if _INDEX is not None:
+        return _INDEX
+    import os
+    idx: dict = {}
+    skip = {".git", "__pycache__", "node_modules", ".venv"}
+    for base in (MIRROR, OUTSIDE):
+        if not base.is_dir():
+            continue
+        for root, dirs, files in os.walk(str(base)):
+            dirs[:] = [d for d in dirs if d not in skip]
+            for fn in files:
+                idx.setdefault(fn, Path(root) / fn)
+    _INDEX = idx
+    return idx
+
+
 def resolve(ref: str):
     rr = ref.replace("\\", "/")
     for base in (MIRROR, OUTSIDE):
         p = base / rr
         if p.is_file():
             return p, base
-    name = Path(rr).name
-    for base in (MIRROR, OUTSIDE):
-        for q in base.rglob(name):
-            if q.is_file() and ".git" not in q.parts and "__pycache__" not in q.parts:
-                return q, base
-    return None, None
+    # ⚠ 索引**懒建**，且可**用环境变量关闭**（DONE_LANDING_NO_INDEX=1）。
+    # 实测：10 万+ 文件的全树遍历在本机（网络文件系统）真实清单上要 **77 s
+    # （rglob 版 6m41s）**，故**不宜进默认测试套件**。
+    # 关闭回退后，只判"相对路径是否直接命中" —— 代价是裸文件名（如 theme.js）会判缺失。
+    if NO_INDEX:
+        return None, None
+    q = _build_index().get(Path(rr).name)
+    return (q, MIRROR) if q else (None, None)
+
+
+NO_INDEX = False
 
 
 def main() -> int:
+    global NO_INDEX
+    import os
+    NO_INDEX = os.environ.get("DONE_LANDING_NO_INDEX") == "1"
     if not DOC.is_file():
         print("  ! 未找到清单副本 %s" % DOC)
         return 2
