@@ -16,6 +16,7 @@ from torch.utils.data import DataLoader, Dataset, Subset
 
 from ai.models import GraphSituationModel, MultiHorizonIntentionModel, TacticalScorer
 from .common import copy_publish_artifacts, dump_yaml, ensure_dir, git_head_sha, load_config, now_tag, repo_root, safe_device, save_json, set_seed
+from .checkpoint_writer import CheckpointWriter
 from .data import IntentSequenceDataset, StateGraphDataset, TacticalPositionDataset, discover_training_files
 from .maps import build_map_catalog, map_bucket_lookup
 
@@ -109,7 +110,15 @@ def train_intent_model(
     optimizer = optim.Adam(model.parameters(), lr=float(config["learning_rate"]))
 
     train_losses: List[float] = []
-    for _ in range(int(config["epochs"])):
+    # I07 / 31007 5.3.6：**定期保存 + 触发式保存**（此前只有书面策略、无实现）。
+    # 监控量用**该轮训练损失**（如实标注：本循环内没有验证指标），
+    # 方向为「越小越好」。崩溃时落 crash.pt，避免整轮白跑。
+    _ckpt = CheckpointWriter(
+        run_dir / "checkpoints", experiment_id=run_dir.name,
+        every_n_epochs=int(config.get("checkpoint_every_epochs", 5)),
+        keep_last=int(config.get("checkpoint_keep_last", 3)),
+        monitor_name="train_loss", greater_is_better=False)
+    for _epoch in range(int(config["epochs"])):
         model.train()
         epoch_loss = 0.0
         batches = 0
@@ -125,7 +134,16 @@ def train_intent_model(
             optimizer.step()
             epoch_loss += float(loss.item())
             batches += 1
-        train_losses.append(epoch_loss / max(batches, 1))
+        _mean_loss = epoch_loss / max(batches, 1)
+        train_losses.append(_mean_loss)
+        try:
+            _ckpt.maybe_periodic(epoch=_epoch + 1, model_state=model.state_dict(),
+                                 optimizer=optimizer.state_dict())
+            _ckpt.maybe_best(epoch=_epoch + 1, value=_mean_loss,
+                             model_state=model.state_dict(),
+                             optimizer=optimizer.state_dict())
+        except Exception as _ck_exc:  # noqa: BLE001 - 检查点失败不得中断训练
+            print("[checkpoint] skipped at epoch %d: %s" % (_epoch + 1, _ck_exc))
 
     model.eval()
     all_hits: List[Tuple[str, bool]] = []
