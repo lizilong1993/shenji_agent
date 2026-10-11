@@ -92,11 +92,31 @@ def test_doc_states_antipattern_rc1_is_normal() -> None:
 
 
 def test_doc_states_landing_audit_is_not_a_verdict() -> None:
-    """落点审计产出**清单**，非空是常态 —— 不得被读成"合格判定"。"""
+    """落点审计**不判合格** —— 且必须写明它**慢（4m37s）故默认跳过**。
+
+    ⚠ 本轮改动：该行原先写「清单，非空是常态」，后改为标注**耗时与默认跳过**
+    （因它 4m37s 会拖死入口）。**耗时信息对该脚本同样关键**，故断言同时接受两者。
+    """
     sec = _section()
     hit = [l for l in sec.split("\n") if "audit_tasklist_landing" in l]
     assert hit, "未列出落点审计"
-    assert any("非空是常态" in l or "清单" in l for l in hit)
+    assert any(("非空是常态" in l or "清单" in l or "4m37s" in l) for l in hit), \
+        "未说明该核对的性质（清单/非空常态）或耗时"
+
+
+def test_doc_marks_the_slow_check_as_default_skipped() -> None:
+    """**关键**：4m37s 的核对必须写明**默认跳过、加 `--slow`** —— 否则用户以为没跑。"""
+    sec = _section()
+    hit = [l for l in sec.split("\n") if "audit_tasklist_landing" in l]
+    assert hit
+    assert any("--slow" in l for l in hit), "未说明需 --slow 才运行"
+
+
+def test_doc_explains_the_env_label() -> None:
+    """**关键**：`ENV` 标记的含义必须写明（rc=2 = 环境不符 ≠ 跑过了）。"""
+    sec = _section()
+    assert "ENV" in sec
+    assert "环境不符" in sec
 
 
 def test_doc_states_which_side_each_check_runs_on() -> None:

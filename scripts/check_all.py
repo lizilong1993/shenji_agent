@@ -43,15 +43,40 @@ REPO = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO / "scripts"
 
 
-def _run(args, note_ok_exit=(0,)):
+_ENV_OVERRIDES = {"check_done_landing.py": {"DONE_LANDING_NO_INDEX": "1"}}
+
+
+def _env_for(args):
+    import os
+    env = dict(os.environ)
+    for a in args:
+        env.update(_ENV_OVERRIDES.get(os.path.basename(a), {}))
+    return env
+
+
+def _run(args, note_ok_exit=(0,), timeout: int = 120):
     # ⚠ 必须显式 UTF-8：Windows 默认用 GBK 解码子进程输出，
     # 而脚本输出含中文/符号 → UnicodeDecodeError（实测）。
-    r = subprocess.run([sys.executable, *args], cwd=REPO,
-                       capture_output=True, encoding="utf-8", errors="replace")
+    # ⚠ 超时兜底：audit_tasklist_landing 实测 **4m37s**（10 万+ 文件全树扫描），
+    # 不设限会拖死整个入口。
+    try:
+        r = subprocess.run([sys.executable, *args], cwd=REPO, env=_env_for(args),
+                           capture_output=True, encoding="utf-8", errors="replace",
+                           timeout=timeout)
+    except subprocess.TimeoutExpired:
+        class _Timeout:
+            returncode = 124
+            stdout = "  ! 超时（> %d s）—— 该核对较慢，请单独运行" % timeout
+            stderr = ""
+        return _Timeout()
     return r
 
 
 def main(argv=None) -> int:
+    argv = list(argv or [])
+    # ⚠ 落点引用实测 4m37s，故默认跳过；加 --slow 才跑。
+    run_slow = "--slow" in argv
+    argv = [a for a in argv if a != "--slow"]
     out_dir = argv[0] if argv else None
 
     checks = [
@@ -62,12 +87,19 @@ def main(argv=None) -> int:
         # ⚠ 落点引用脚本**内含远程绝对路径**（REPO=/remote-home/...），
         # 故它**只能在仓库侧运行**；工作站侧运行会 FileNotFoundError。
         # 这里只判定"是否跑通"，rc=2（找不到主清单）视为环境不符而非失败。
+        # ⚠ 该脚本实测 **4m37s**（10 万+ 文件全树扫描）—— **默认跳过**，加 --slow 才跑。
         ("落点引用", [str(SCRIPTS / "audit_tasklist_landing.py")] + ([out_dir] if out_dir else []),
-         (0, 2), "**只报是否跑通**；清单非空是常态；**该脚本只能在仓库侧跑**"),
+         (0, 2), "**只报是否跑通**；清单非空是常态；**该脚本只能在仓库侧跑**；4m37s，故默认跳过"),
         # ⚠ 该脚本需先把快照拷到 docs/_snapshot_for_check.md（两机布局：快照在工作站侧）。
         # 未拷入时它 rc=2 → 视为环境不符，不计失败。
         ("快照断言", [str(SCRIPTS / "check_snapshot_claims.py")], (0, 2),
          "严格：快照里的路径/命令引用必须存在；rc=2 = 未拷入快照（环境不符）"),
+        # ⚠ 该脚本需 docs/_tasklist_for_check.md 与 docs/_outputs_for_check/（两机布局：
+        #   清单在工作站侧）。未拷入 → rc=2（环境不符）。
+        #   且**会用 DONE_LANDING_NO_INDEX=1 跑**：全树索引在 10 万+ 文件上要 ~18 s，
+        #   快速模式 ~0.23 s；两者结果不同（6 vs 19 条），差异全来自裸文件名。
+        ("已完成项落点", [str(SCRIPTS / "check_done_landing.py")], (0, 2),
+         "非严格：产出是清单（缺失需人工判定性质）；rc=2 = 未拷入清单（环境不符）"),
         ("断言反模式", [str(SCRIPTS / "check_assertion_antipatterns.py"), "tests"],
          (0, 1), "**退出 1 是正常结果**；命中需人工复核"),
     ]
@@ -81,6 +113,13 @@ def main(argv=None) -> int:
             rows.append((name, "缺失", "-", note))
             print("  %-12s %-8s %s" % (name, "缺失", script.name))
             continue
+        # ⚠ 落点引用实测 4m37s → **默认跳过**，加 --slow 才跑（否则入口不可用）。
+        if name == "落点引用" and (not out_dir or not run_slow):
+            why = ("未提供含主清单的目录（第 1 个参数传 outputs/）" if not out_dir
+                   else "默认跳过（该核对约 4m37s）—— 加 --slow 运行")
+            rows.append((name, "跳过", "-", why))
+            print("  %-12s %-8s %s" % (name, "跳过", why))
+            continue
         r = _run(args)
         tail = ((r.stdout or "") + (r.stderr or "")).strip().split("\n")
         summary = ""
@@ -90,8 +129,18 @@ def main(argv=None) -> int:
                 summary = s[:70]
                 break
         ok = r.returncode in ok_exits
-        rows.append((name, "OK" if ok else "见下文", str(r.returncode), note))
-        print("  %-12s %-8s rc=%-3s %s" % (name, "OK" if ok else "注意", r.returncode, summary))
+        # ⚠ rc=2 = **本机缺输入（环境不符）**，**不等于「跑过了、通过了」**。
+        # 首版把它与 rc=0 一并标为 OK —— 那会把"没跑"读成"通过"（与 §114 同类）。
+        env_miss = (r.returncode == 2)
+        timed_out = (r.returncode == 124)
+        if timed_out:
+            label, status = "TIMEOUT", "超时"
+        elif env_miss:
+            label, status = "ENV", "环境不符"
+        else:
+            label, status = ("OK" if ok else "注意"), ("OK" if ok else "见下文")
+        rows.append((name, status, str(r.returncode), note))
+        print("  %-12s %-8s rc=%-3s %s" % (name, label, r.returncode, summary))
 
     print()
     print("  ══════════ 结果解读（**避免误读**）══════════")
