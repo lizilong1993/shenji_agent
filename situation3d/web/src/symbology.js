@@ -38,11 +38,18 @@
 
   // 与 engine/symbology.py 的 AFFILIATIONS 保持一致；这里的值只在数据集
   // 尚未加载时作为兜底。
+  // ⚠ 这里必须**列全所有阵营**，否则下一段的 `Object.keys()` 循环覆盖不到它们 ——
+  // 实测：原先只列 red/blue，于是 green/neutral/unknown 取不到 `Theme` 的值，
+  // 回落到 `#6b7688`（状态边框色），**阵营维度静默失效**。
+  // （该缺陷由 quickjs 实际执行 `symbolSvg` 后检查 SVG 的 `fill` 值发现。）
   const FALLBACK_AFFILIATIONS = {
-    // 兜底色**必须与 theme.css / theme.js DEFAULTS 一致**（标准值）；
+    // 兜底色**必须与 theme.css / theme.js DEFAULTS 一致**（31004 表3 的标准值）；
     // 若留旧值，`Theme` 不可用时就会悄悄换成一个非标准的颜色。
     red: { color: '#E74C3C', ink: '#7d1611', label: '红方' },
     blue: { color: '#2E86C1', ink: '#123a78', label: '蓝方' },
+    green: { color: '#2f7d4f', ink: '#123a1c', label: '第三方/中立' },
+    neutral: { color: '#95A5A6', ink: '#3a4149', label: '未知/未归属' },
+    unknown: { color: '#F1C40F', ink: '#5a4600', label: '未知' },
   };
 
   // ── I09：语义色唯一来源 ──────────────────────────────────────────────
