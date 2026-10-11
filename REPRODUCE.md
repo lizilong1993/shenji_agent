@@ -235,3 +235,51 @@ python3 scripts/verify_checkpoint.py --weights ai/weights   # 退出码 0 即通
 
 校验项含：权重哈希与声明一致、`feature_dim` 与模型输入维度匹配、
 **数据哈希对数据文件重算比对**、依赖版本 / 环境 / `experiment_id` 齐备。
+
+
+---
+
+## 交付物核对（一条入口 + 四项）
+
+> **本仓与交付物清单分置两机**：清单（`outputs/兵棋推演9项团体标准对标任务清单_*.md`）
+> 在工作站侧，代码库在本仓库。**故没有任何一个位置能跑全部核对** ——
+> 下表写明**在哪跑什么**；**在错的一侧运行会看到环境类失败，那不是交付物有问题**。
+
+### 一条入口
+
+```bash
+# 仓库侧（指标覆盖 / 落点引用 / 断言反模式）
+python3 scripts/check_all.py <含主清单的目录，可选>
+
+# 工作站侧（交付物健康）
+python3 scripts/check_all.py <outputs 目录>
+```
+
+### 四项核对的**退出码语义**（**勿误读**）
+
+| 核对 | 在哪跑 | 退出码 | 是否用于判合格 |
+| --- | --- | --- | --- |
+| `check_deliverable_health.py` | **工作站侧** | 0 / 1 / **2** | **是**；**rc=2 = 本机没有主清单（环境不符），不是失败** |
+| `check_metric_coverage.py` | **仓库侧** | 0 / 1 | **是**；rc=1 表示某指标缺实现/缺导出/缺测试 |
+| `audit_tasklist_landing.py` | **仓库侧** | 0 / 2 | **否** —— 产出是**清单**，非空是常态（含"待创建"项） |
+| `check_assertion_antipatterns.py` | **仓库侧** | 0 / 1 | **否** —— **rc=1 是正常结果**，启发式命中需人工复核 |
+
+**`check_all.py` 只让前两项决定整体退出码**，并对后两项打印"需人工阅读"提示。
+
+### 另有两项自证测试
+
+```bash
+pytest tests/test_assertion_antipattern_detector.py -q   # 检测器必须真的会报
+pytest tests/test_i0809_runtime_js.py -q                 # 需先 bash scripts/setup_js_engine.sh
+```
+
+### 全量套件基线
+
+```bash
+python3 -m pytest tests/ -q
+```
+
+**基线：`23 failed / 1105 passed / 11 skipped`** —— 那 **23 条**的**性质已逐条定性**
+（见交付物清单 §107）：**12 条指向一个未实现的功能（`tactical_mode`）**，
+其余 **11 条为测试侧问题**（窗口/字面量/桩过时/权限位）。
+**"23 failed"不是 23 个散落的实现缺陷。**
