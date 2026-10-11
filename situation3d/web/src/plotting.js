@@ -337,7 +337,28 @@
     nbc: '#b8860b',         // 核化生：深黄
     annotation: '#101418',  // 注记/图廓/框线：黑
   };
-  var NATO_COLOR = { friendly: '#1f5fbf', enemy: '#d0342c', unknown: '#6b7a8d',
+  // ── I09：语义色唯一来源 ──────────────────────────────────────────────
+  // 阵营色由 `theme.css` 的 `--faction-*` 定义，经 `Theme` 读取。
+  // 下面的字面量**只是 `Theme` 不可用时的兜底**（与 `theme.js` 的
+  // "CSS 变量优先、内置默认兜底" 同一口径）—— 故它们不再是"第二份定义"，
+  // 而是与 `theme.js` DEFAULTS 同级的降级值。
+  function _semantic(key, fallback) {
+    try {
+      if (window.Theme && typeof window.Theme.color === 'function') {
+        var v = window.Theme.color(key);
+        if (v) return v;
+      }
+    } catch (e) { /* Theme 不可用时用兜底，不让渲染整体失败 */ }
+    return fallback;
+  }
+
+  // ⚠ 注意 **语义次序**：NATO 约定 friendly=蓝、enemy=红，与我国标准
+  // （31004 §8.4.1「红方=我方，蓝方=敌方」）**相反**。故此处按标准取色：
+  // friendly 取 faction-red、enemy 取 faction-blue —— 这是**约定映射**，
+  // 不是把两个色搞反。
+  var NATO_COLOR = { friendly: _semantic('faction-red', '#E74C3C'),
+                     enemy: _semantic('faction-blue', '#2E86C1'),
+                     unknown: _semantic('faction-neutral', '#95A5A6'),
                      nbc: '#b8860b', annotation: '#101418' };
   var colorStandard = 'CN';
   function palette() { return colorStandard === 'NATO' ? NATO_COLOR : CN_COLOR; }

@@ -73,8 +73,26 @@
   let maskUpdates = 0;
   let maskState = { tick: null, occupation: {}, hotspots: [], visible: false, key: '' };
 
+  // ── I09：语义色唯一来源 ──────────────────────────────────────────────
+  // 阵营色由 `theme.css` 的 `--faction-*` 定义，经 `Theme` 读取。
+  // 下面的字面量**只是 `Theme` 不可用时的兜底**（与 `theme.js` 的
+  // "CSS 变量优先、内置默认兜底" 同一口径）—— 故它们不再是"第二份定义"，
+  // 而是与 `theme.js` DEFAULTS 同级的降级值。
+  function _semantic(key, fallback) {
+    try {
+      if (window.Theme && typeof window.Theme.color === 'function') {
+        var v = window.Theme.color(key);
+        if (v) return v;
+      }
+    } catch (e) { /* Theme 不可用时用兜底，不让渲染整体失败 */ }
+    return fallback;
+  }
+
   const MASK_COLORS = {
-    red: '#d0342c', blue: '#1f5fbf', contested: '#d8a12a', neutral: '#7d8a99',
+    red: _semantic('faction-red', '#E74C3C'),
+    blue: _semantic('faction-blue', '#2E86C1'),
+    contested: _semantic('faction-contested', '#d8a12a'),
+    neutral: _semantic('faction-neutral', '#95A5A6'),
   };
 
   function maskColor(status) {

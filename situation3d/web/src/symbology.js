@@ -39,11 +39,34 @@
   // 与 engine/symbology.py 的 AFFILIATIONS 保持一致；这里的值只在数据集
   // 尚未加载时作为兜底。
   const FALLBACK_AFFILIATIONS = {
-    red: { color: '#d0342c', ink: '#7d1611', label: '红方' },
-    blue: { color: '#1f5fbf', ink: '#123a78', label: '蓝方' },
+    // 兜底色**必须与 theme.css / theme.js DEFAULTS 一致**（标准值）；
+    // 若留旧值，`Theme` 不可用时就会悄悄换成一个非标准的颜色。
+    red: { color: '#E74C3C', ink: '#7d1611', label: '红方' },
+    blue: { color: '#2E86C1', ink: '#123a78', label: '蓝方' },
   };
 
+  // ── I09：语义色唯一来源 ──────────────────────────────────────────────
+  // 阵营色由 `theme.css` 的 `--faction-*` 定义，经 `Theme` 读取。
+  // 下面的字面量**只是 `Theme` 不可用时的兜底**（与 `theme.js` 的
+  // "CSS 变量优先、内置默认兜底" 同一口径）—— 故它们不再是"第二份定义"，
+  // 而是与 `theme.js` DEFAULTS 同级的降级值。
+  function _semantic(key, fallback) {
+    try {
+      if (window.Theme && typeof window.Theme.color === 'function') {
+        var v = window.Theme.color(key);
+        if (v) return v;
+      }
+    } catch (e) { /* Theme 不可用时用兜底，不让渲染整体失败 */ }
+    return fallback;
+  }
+
   let AFFILIATIONS = Object.assign({}, FALLBACK_AFFILIATIONS);
+  // 阵营主色**改由 Theme 提供**（`--faction-*`）；`ink` 等非语义字段仍用兜底表。
+  Object.keys(AFFILIATIONS).forEach(function (k) {
+    AFFILIATIONS[k] = Object.assign({}, AFFILIATIONS[k], {
+      color: _semantic('faction-' + k, AFFILIATIONS[k].color),
+    });
+  });
   let ICONS = {};
   // 域的中文名。放在这里而不是从 state.data.symbology 读，是为了让信息面板
   // 不再依赖案例数据集——空态下同样要能渲染符号说明。
