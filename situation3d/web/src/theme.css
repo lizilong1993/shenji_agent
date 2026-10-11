@@ -25,11 +25,14 @@
 :root {
   /* ── 阵营主色（31004 8.2 阵营主色填充）───────────────────────────── */
   /* 浅色主题下取原 JS 画布用值，保证**默认观感不变** */
-  --faction-red: #d0342c;
-  --faction-blue: #1f5fbf;
+  --faction-red: #E74C3C;
+  --faction-blue: #2E86C1;
   --faction-green: #2f7d4f;   /* 第三方/中立（画布上用于 GREEN 视角） */
-  --faction-neutral: #7d8a99; /* 未知/未归属 */
+  --faction-neutral: #95A5A6; /* 未知/未归属 */
   --faction-contested: #d8a12a; /* 争夺中（原 OCCUPATION_STATUS_COLORS.contested） */
+  /* 未知：31004 表3 要求「未知黄 #F1C40F」—— 此前**缺失**，本轮补上。
+     注意与 --faction-contested（争夺中）区分：二者语义不同，不可复用同一色。 */
+  --faction-unknown: #F1C40F;
 
   /* ── 强度分级（31004 8.4.3 强度内环）────────────────────────────── */
   /* 5 档：0=未分级，1 和缓 → 4 高危。原 `app.js:438 levelColor()` 的同序取值。 */
@@ -73,10 +76,10 @@
   --topbar: #0b1119;
   --topbar-text: #dbe4f0;
   /* 深色底上提高明度，保持与浅色**同一语义**（红方仍是红方） */
-  --faction-red: #e2564c;
-  --faction-blue: #4a8ae0;
+  --faction-red: #ef6d5e;
+  --faction-blue: #4f9fd8;
   --faction-green: #47a86c;
-  --faction-neutral: #93a1b5;
+  --faction-neutral: #a7b6c7;
   --faction-contested: #e0b24a;
   --strength-0: #93a1b5;
   --strength-1: #5cb681;

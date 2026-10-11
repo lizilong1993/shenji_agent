@@ -29,11 +29,12 @@
   // 与 theme.css 的 :root 保持一致。改这里必须同步改 theme.css ——
   // `Theme.debug().mismatches` 会对两者做比对并把差异报出来。
   var DEFAULTS = {
-    'faction-red': '#d0342c',
-    'faction-blue': '#1f5fbf',
+    'faction-red': '#E74C3C',
+    'faction-blue': '#2E86C1',
     'faction-green': '#2f7d4f',
-    'faction-neutral': '#7d8a99',
+    'faction-neutral': '#95A5A6',
     'faction-contested': '#d8a12a',
+    'faction-unknown': '#F1C40F',
     'strength-0': '#7d8a99',
     'strength-1': '#4a9c6d',
     'strength-2': '#d8a12a',

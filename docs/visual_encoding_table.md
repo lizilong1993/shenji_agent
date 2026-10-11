@@ -20,37 +20,37 @@
 
 | 维度 | 变量 | 取值 | 文件 | 行号 |
 | --- | --- | --- | --- | --- |
-| 阵营 | `--faction-red` | `#d0342c` | `situation3d/web/src/theme.css` | 28 |
-| 阵营 | `--faction-blue` | `#1f5fbf` | `situation3d/web/src/theme.css` | 29 |
+| 阵营 | `--faction-red` | `#E74C3C` | `situation3d/web/src/theme.css` | 28 |
+| 阵营 | `--faction-blue` | `#2E86C1` | `situation3d/web/src/theme.css` | 29 |
 | 阵营 | `--faction-green` | `#2f7d4f` | `situation3d/web/src/theme.css` | 30 |
-| 阵营 | `--faction-neutral` | `#7d8a99` | `situation3d/web/src/theme.css` | 31 |
+| 阵营 | `--faction-neutral` | `#95A5A6` | `situation3d/web/src/theme.css` | 31 |
 | 阵营 | `--faction-contested` | `#d8a12a` | `situation3d/web/src/theme.css` | 32 |
-| 状态 | `--status-border-normal` | `#6b7688` | `situation3d/web/src/theme.css` | 44 |
-| 状态 | `--status-border-alert` | `#c8352c` | `situation3d/web/src/theme.css` | 45 |
-| 状态 | `--status-border-selected` | `#1668dc` | `situation3d/web/src/theme.css` | 46 |
-| 状态 | `--status-border-width` | `2px` | `situation3d/web/src/theme.css` | 43 |
-| 强度 | `--ring-strength-base-radius` | `6px` | `situation3d/web/src/theme.css` | 60 |
-| 强度 | `--ring-strength-step` | `2px` | `situation3d/web/src/theme.css` | 61 |
-| 强度 | `--ring-max-rings` | `4` | `situation3d/web/src/theme.css` | 62 |
-| 强度 | `--strength-0` | `#7d8a99` | `situation3d/web/src/theme.css` | 36 |
-| 强度 | `--strength-1` | `#4a9c6d` | `situation3d/web/src/theme.css` | 37 |
-| 强度 | `--strength-2` | `#d8a12a` | `situation3d/web/src/theme.css` | 38 |
-| 强度 | `--strength-3` | `#d9772a` | `situation3d/web/src/theme.css` | 39 |
-| 强度 | `--strength-4` | `#c8352c` | `situation3d/web/src/theme.css` | 40 |
-| 时效 | `--pulse-period-default` | `1.5s` | `situation3d/web/src/theme.css` | 50 |
-| 时效 | `--pulse-period-fast` | `0.8s` | `situation3d/web/src/theme.css` | 51 |
-| 时效 | `--pulse-speed-threshold-kmh` | `50` | `situation3d/web/src/theme.css` | 52 |
-| 时效 | `--pulse-enabled` | `1` | `situation3d/web/src/theme.css` | 53 |
-| 交互 | `--hover-offset` | `8px` | `situation3d/web/src/theme.css` | 56 |
-| 交互 | `--hover-transition` | `200ms` | `situation3d/web/src/theme.css` | 57 |
+| 状态 | `--status-border-normal` | `#6b7688` | `situation3d/web/src/theme.css` | 47 |
+| 状态 | `--status-border-alert` | `#c8352c` | `situation3d/web/src/theme.css` | 48 |
+| 状态 | `--status-border-selected` | `#1668dc` | `situation3d/web/src/theme.css` | 49 |
+| 状态 | `--status-border-width` | `2px` | `situation3d/web/src/theme.css` | 46 |
+| 强度 | `--ring-strength-base-radius` | `6px` | `situation3d/web/src/theme.css` | 63 |
+| 强度 | `--ring-strength-step` | `2px` | `situation3d/web/src/theme.css` | 64 |
+| 强度 | `--ring-max-rings` | `4` | `situation3d/web/src/theme.css` | 65 |
+| 强度 | `--strength-0` | `#7d8a99` | `situation3d/web/src/theme.css` | 39 |
+| 强度 | `--strength-1` | `#4a9c6d` | `situation3d/web/src/theme.css` | 40 |
+| 强度 | `--strength-2` | `#d8a12a` | `situation3d/web/src/theme.css` | 41 |
+| 强度 | `--strength-3` | `#d9772a` | `situation3d/web/src/theme.css` | 42 |
+| 强度 | `--strength-4` | `#c8352c` | `situation3d/web/src/theme.css` | 43 |
+| 时效 | `--pulse-period-default` | `1.5s` | `situation3d/web/src/theme.css` | 53 |
+| 时效 | `--pulse-period-fast` | `0.8s` | `situation3d/web/src/theme.css` | 54 |
+| 时效 | `--pulse-speed-threshold-kmh` | `50` | `situation3d/web/src/theme.css` | 55 |
+| 时效 | `--pulse-enabled` | `1` | `situation3d/web/src/theme.css` | 56 |
+| 交互 | `--hover-offset` | `8px` | `situation3d/web/src/theme.css` | 59 |
+| 交互 | `--hover-transition` | `200ms` | `situation3d/web/src/theme.css` | 60 |
 
 ## 3. 规则实现位置（`theme.js` 的纯函数）
 
 | 规则 | 函数 | 行号 |
 | --- | --- | --- |
-| 脉冲周期选择（>50km/h → 0.8s，否则 1.5s） | `pulsePeriodSeconds` | 109 |
-| 强度内环半径（强度 0 不画；1..4 递增；封顶） | `strengthRingRadius` | 118 |
-| 读取 CSS 变量 | `（见该行）` | 68 |
+| 脉冲周期选择（>50km/h → 0.8s，否则 1.5s） | `pulsePeriodSeconds` | 110 |
+| 强度内环半径（强度 0 不画；1..4 递增；封顶） | `strengthRingRadius` | 119 |
+| 读取 CSS 变量 | `（见该行）` | 69 |
 
 ## 4. 加载顺序（顺序错了只在运行时报错）
 
