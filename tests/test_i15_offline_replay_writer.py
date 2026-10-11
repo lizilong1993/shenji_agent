@@ -145,9 +145,36 @@ def test_falls_back_to_v1_when_upgrade_helper_is_unavailable(tmp_path: Path, mon
     os.environ.pop(m._ENV_KEY, None)
     states = [{"time": {"cur_step": i}} for i in range(4)]
     out = tmp_path / "fallback.zip"
-    rep = m.write_offline_replay(states, zip_name=str(out), run_id="fb")
+    # ⚠ 必须给 seed：本用例要测的是"**升级助手缺失**时的降级"，
+    # 而新增的"未给 seed 且要 1.1.0 则报错"守卫会**更早**触发
+    # （这正是本轮实跑后补的防静默降级措施）。二者是不同的降级原因，须分开测。
+    rep = m.write_offline_replay(states, zip_name=str(out), run_id="fb", seed=1)
     assert rep["frame_version"] == "1.0.0", "助手缺失时未降级"
     assert out.is_file() and rep["frames"] == 4
+
+
+def test_missing_seed_for_v11_raises_instead_of_degrading_silently(tmp_path: Path) -> None:
+    """**防静默降级守卫**：要写 1.1.0 却不给 seed 时必须**报错**。
+
+    端到端实跑（第 67 轮）证明：`run_offline_games.py` 曾**从不传 seed**，
+    于是 1.1.0 校验必然失败、**每次都静默退回 1.0.0** ——
+    双核心写入端在产线路径上**从未真正执行**，而日志只有一行 "falling back"。
+    本用例把该守卫钉住，防止它被后来者"顺手去掉"。
+    """
+    m = _helper()
+    states = [{"time": {"cur_step": 0}}]
+    with pytest.raises(ValueError):
+        m.write_offline_replay(states, zip_name=str(tmp_path / "x.zip"),
+                               run_id="ns", frame_version="1.1.0")
+    # 显式声明是 1.0.0 时**不应**报错（那是诚实的旧格式请求）
+    rep = m.write_offline_replay(states, zip_name=str(tmp_path / "y.zip"),
+                                 run_id="ns", frame_version="1.0.0")
+    assert rep["frame_version"] == "1.0.0"
+    # 逃生口：确实无种子的调用方须显式声明，不得默认
+    rep2 = m.write_offline_replay(states, zip_name=str(tmp_path / "z.zip"),
+                                  run_id="ns", frame_version="1.1.0",
+                                  allow_missing_seed=True)
+    assert rep2["frame_version"] == "1.0.0"   # 无 seed 仍会因校验失败而降级（且已显式知情）
 
 
 def test_creates_parent_directory(tmp_path: Path) -> None:

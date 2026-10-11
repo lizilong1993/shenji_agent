@@ -618,7 +618,21 @@ def write_replay(path: Path, frames: List[Dict[str, Any]], *, run_id: str,
     if not run_id:
         raise ReplayFormatError("run_id is required (entry names are <run_id>/<index>)")
 
-    tmp_fd, tmp_name = tempfile.mkstemp(suffix=".zip")
+    # ⚠ 临时文件必须落在**目标文件所在目录**，不能落在系统 /tmp。
+    #
+    # 端到端实跑（第 67 轮）暴露的真实缺陷：
+    # 本机 `/tmp` 是 **overlayfs**（dev=167275596），而仓库在 **NFS**（dev=51206302），
+    # 故 `os.replace(tmp, target)` 抛
+    #   `[Errno 18] Invalid cross-device link`
+    # → `write_offline_replay` 捕获后**又静默退回 v1.0.0** ——
+    # **即 v1.1.0 在产线上第二次因为一个与格式无关的原因而从未落地**。
+    #
+    # 这个缺陷**只有真跑才会暴露**：单元测试里目标在 `/tmp` 下，与暂存区同设备，故一直"通过"。
+    # 修法：把暂存文件放在目标目录内，保证同设备 → `os.replace` 原子成功。
+    target_for_tmp = Path(path)
+    target_for_tmp.parent.mkdir(parents=True, exist_ok=True)
+    tmp_fd, tmp_name = tempfile.mkstemp(
+        suffix=".zip", prefix=".replay_tmp_", dir=str(target_for_tmp.parent))
     os.close(tmp_fd)
     tmp_path = Path(tmp_name)
     try:
