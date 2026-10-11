@@ -554,6 +554,59 @@ def _artifact_sha256(names: "Sequence[str]", root: Path) -> Dict[str, str]:
     return out
 
 
+def _data_sha256() -> Dict[str, object]:
+    """**数据哈希**（I07 判据 1 六类之②）—— 对训练真正读入的数据文件算 SHA-256。
+
+    ## 为什么必须单独有这一项
+
+    已有 `environment.requirements_lock_sha256` 是**依赖锁**的哈希，**不是数据集哈希**；
+    独立评审指出拿它顶替数据哈希是不成立的。故此处对**数据本身**求哈希。
+
+    ## 记录什么
+
+    | 文件 | 为何是它 |
+    | --- | --- |
+    | `objective_labels.jsonl` | `train_objective_model()` 直接读它 |
+    | 意图 `train.json` | 意图模型的数据源（若缺失则如实记 null） |
+
+    同时记 `*_records`（行数）作为**覆盖面证据** —— 只记哈希无法说明读了多少。
+
+    ## 缺失时
+
+    **记 `null` 并写明原因，不编造哈希。** 数据缺失本就该让第三方看见，
+    而不是用一个假值把清单"凑齐六类"。
+    """
+    import hashlib  # noqa: PLC0415
+
+    def _hash_and_count(rel: str) -> Dict[str, object]:
+        path = repo_root() / rel
+        if not path.is_file():
+            return {"path": rel, "sha256": None, "records": None,
+                    "note": "file not found at manifest build time"}
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:            # ⚠ 二进制读，避免换行转换改变哈希
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        n = None
+        if rel.endswith(".jsonl"):
+            n = 0
+            with open(path, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    if line.strip():
+                        n += 1
+        return {"path": rel, "sha256": h.hexdigest(), "records": n}
+
+    out: Dict[str, object] = {
+        "objective_labels": _hash_and_count(
+            "experiments/shenji_agent/objective_labels/latest/objective_labels.jsonl"),
+        "intent_train": _hash_and_count(
+            "datasets/意图识别研究数据集WargameData_mini01/train.json"),
+        "note": ("数据哈希（区别于 environment.requirements_lock_sha256 —— 那是**依赖锁**）。"
+                 "缺失文件记 null，不编造。"),
+    }
+    return out
+
+
 def _build_environment_record(experiment_id: str, generated_at: str) -> Dict[str, object]:
     """环境记录（I07 步骤 2）。
 
@@ -578,6 +631,9 @@ def _build_environment_record(experiment_id: str, generated_at: str) -> Dict[str
         # 发布目录的**实际字节**填入 —— 这样声明的一定是随本次产物发布的那一份。
         # 放这里填会描述"发布位上已有的旧文件"，正是评审点出的静默漏发布隐患。
         "artifact_sha256": {},
+        # I07 判据 1 六类之②「数据哈希」—— **独立于依赖锁哈希**，
+        # 由 `_data_sha256()` 对训练实际读入的数据文件求值。
+        "data_sha256": _data_sha256(),
     }
     try:
         import torch  # noqa: PLC0415 - 缺 torch 也不该让清单构造失败

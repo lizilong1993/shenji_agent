@@ -42,7 +42,7 @@ from typing import Any, Dict, List, Optional, Tuple
 FIELDS_OF_INTEREST = ("intent_lstm", "situation_gcn", "situation_feature_normalizer", "tactical_model")
 # 与 `training/common.py::MANIFEST_NON_PATH_KEYS` 同源：这些键的字符串值**不是**文件路径。
 try:  # pragma: no cover - 单文件使用时也允许独立运行
-    from training.common import MANIFEST_NON_PATH_KEYS
+    from training.common import MANIFEST_NON_PATH_KEYS, repo_root
 except Exception:  # noqa: BLE001
     MANIFEST_NON_PATH_KEYS = frozenset({"generated_at", "managed_files", "environment"})
 
@@ -215,6 +215,46 @@ def verify(weights_dir: Path) -> Dict[str, Any]:
             check("数据/依赖哈希（requirements lock）", True, rl[:16])
         else:
             check("数据/依赖哈希（requirements lock）", False, "应为 64 位十六进制字符串: %r" % (rl,))
+        # ── ② 数据哈希（I07 判据 1 六类之②）────────────────────────────
+        # 本脚本 docstring 早已声称校验六类（含「数据哈希」），但实现里**没有** ——
+        # 本轮补上，使该字段**可被独立重算比对**，而不只是被记录。
+        # 注意与 ④ 的区别：`requirements_lock_sha256` 是**依赖锁**哈希，不是数据集哈希。
+        data_rec = env.get("data_sha256")
+        if not isinstance(data_rec, dict):
+            note("legacy_field: environment.data_sha256 缺失，未核验数据哈希")
+            check("数据哈希（历史产物降级通过）", True, "legacy_artifact")
+        else:
+            n_ok = n_bad = n_absent = 0
+            for key, rec in data_rec.items():
+                if not isinstance(rec, dict):
+                    continue
+                rel = rec.get("path")
+                declared = rec.get("sha256")
+                if not rel or not isinstance(declared, str):
+                    n_absent += 1
+                    note("unverifiable: data_sha256.%s 无路径或哈希（%s）"
+                         % (key, rec.get("note", "")))
+                    continue
+                try:
+                    _root = repo_root()
+                except Exception:      # noqa: BLE001 - 导入失败时退回 cwd
+                    _root = Path.cwd()
+                f = _root / rel
+                if not f.is_file():
+                    n_absent += 1
+                    note("data_sha256.%s 指向的文件不存在，无法核验: %s" % (key, rel))
+                    continue
+                actual = sha256_file(f)
+                if actual == declared:
+                    n_ok += 1
+                else:
+                    n_bad += 1
+                    check("数据哈希 %s" % key, False,
+                          "声明 %s… 实际 %s…" % (declared[:16], actual[:16]))
+            if n_bad == 0:
+                check("数据哈希（对数据文件重算比对）", True,
+                      "ok=%d absent=%d" % (n_ok, n_absent))
+
         eid = env.get("experiment_id")
         if eid is None:
             note("legacy_field: environment.experiment_id 缺失，未核验")
