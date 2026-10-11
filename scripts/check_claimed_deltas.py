@@ -54,7 +54,12 @@ def numstat(h: str):
     for line in (r.stdout or "").split("\n"):
         parts = line.split("\t")
         if len(parts) == 3:
-            out[parts[2].strip()] = parts[0]
+            try:
+                # ⚠ 必须同时存**新增与删除**：清单的口径是改动量 = 两者之和（§147 实证）。
+                # 首版只存 parts[0] → 比较与输出都不对，且我认为已改好（未生效）。
+                out[parts[2].strip()] = (int(parts[0]), int(parts[1]))
+            except ValueError:
+                out[parts[2].strip()] = None
     return out
 
 
@@ -98,18 +103,22 @@ def main() -> int:
         if ins == "-":
             n_nofile += 1
             continue
-        if int(ins) == want:
+        # 口径：清单用**改动量 = 新增 + 删除**（§147 实证）
+        changed = ins[0] + ins[1] if isinstance(ins, tuple) else int(ins)
+        if changed == want:
             n_ok += 1
         else:
             n_bad += 1
-            bad.append((h, path, want, int(ins)))
+            bad.append((h, path, want, changed, ins))
 
-    print("  ══════════ 自称改动量 vs git show --numstat ══════════")
+    print("  ══════════ 自称改动量 vs git show --numstat（口径：新增 + 删除）══════════")
     print("  一致 **%d** · **不一致 %d** · 该提交未改此文件 %d · 无法核对 %d"
           % (n_ok, n_bad, n_nofile, n_unres))
     print()
-    for h, path, want, real in bad:
-        print("  ✗ %s %-44s 称 +%d 行，实测 +%d" % (h, path[:44], want, real))
+    for it in bad:
+        h, path, want, real, raw = it
+        print("  ✗ %s %-40s 称 +%d 行；实测 新增 %d 删除 %d = %d"
+              % (h, path[:40], want, raw[0], raw[1], real))
     if unres:
         print()
         for h, why in unres:
@@ -117,11 +126,10 @@ def main() -> int:
     print()
     print("  ⚠ 只核**同一句里**出现的「哈希 + 文件 + 行数」三元组；跨句配对会造假阳性。")
     print()
-    print("  ⚠⚠ **口径**：实测清单用的是**改动量（insertions + deletions）**，不是纯新增 ——")
+    print("  ⚠⚠ **口径**：清单用的是**改动量（insertions + deletions）**，不是纯新增 ——")
     print("     两例验证：86535db 106+23=129（清单称 129）；d2b9a7f 101+6=107（清单称 107）。")
-    print("     **拿纯新增去比会误报**（这正是我首版的错）。")
+    print("     **拿纯新增去比会误报**（这正是我首版的错，见 §147）。")
     print("  ⚠ 仍不验证「改动内容与功能描述相符」—— 那需逐 diff 人工读。")
-
     return 1 if n_bad else 0
 
 
