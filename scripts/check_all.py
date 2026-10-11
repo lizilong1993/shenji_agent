@@ -57,6 +57,8 @@ def main(argv=None) -> int:
     checks = [
         ("交付物健康", [str(SCRIPTS / "check_deliverable_health.py")], (0,), "严格：不一致即失败"),
         ("指标覆盖", [str(SCRIPTS / "check_metric_coverage.py")], (0,), "严格：有缺口即失败"),
+        # ⚠ 该项把「待批准 = 实现侧已尽」这一定性变成可核对的（只查产物存在 + 已追踪）。
+        ("待批准就绪度", [str(SCRIPTS / "check_pending_readiness.py")], (0,), "严格：声称产物缺失即失败"),
         # ⚠ 落点引用脚本**内含远程绝对路径**（REPO=/remote-home/...），
         # 故它**只能在仓库侧运行**；工作站侧运行会 FileNotFoundError。
         # 这里只判定"是否跑通"，rc=2（找不到主清单）视为环境不符而非失败。
@@ -103,7 +105,7 @@ def main(argv=None) -> int:
     #   **这是环境不符（跑错一侧），不是交付物有缺口** —— 故同样豁免并提示。
     metric_env_ok = not (any(r[0] == "指标覆盖" and r[2] == "1" for r in rows)
                          and health_env_ok)
-    strict = [r for r in rows if r[0] in ("交付物健康", "指标覆盖")]
+    strict = [r for r in rows if r[0] in ("交付物健康", "指标覆盖", "待批准就绪度")]
     strict_fail = [r[0] for r in strict
                    if r[1] != "OK"
                    and not (r[0] == "交付物健康" and r[2] == "2")
