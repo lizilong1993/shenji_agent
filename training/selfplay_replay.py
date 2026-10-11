@@ -117,6 +117,8 @@ def build_selfplay_frame(
         "action_count": 0,
         "actions": [],
         "agent_action_count": len(frame["actions"]),
+        # schema 规范字段：自博弈**没有人类操作** → **空数组**，如实为空
+        "operations": [],
     }
     return frame
 

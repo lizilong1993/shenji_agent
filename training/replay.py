@@ -247,6 +247,63 @@ def validate(size_limit_bytes: Optional[int] = None,
             if not ok:
                 missing.add(k)
         rep["dual_core_present"] = agg_ok
+
+        # ── 结构下钻（I15 判据 2 的实质）────────────────────────────────
+        # 独立评审实测：原实现**只查顶层键存在、从不深入 `frame_fields.*.fields`**，
+        # 故 schema 声明 `human.operations`/`agent.decisions` 而写入端产出别的键，
+        # 也一路 `ok=True` —— 判据 2 的"通过"因此是**浅的**。
+        _type_map = {int: "integer", float: "number", str: "string",
+                     bool: "boolean", list: "array", dict: "object"}
+        fields_decl = {}
+        for _sec, _spec in (schema.get("frame_fields") or {}).items():
+            _fl = _spec.get("fields") if isinstance(_spec, dict) else None
+            if isinstance(_fl, dict) and _fl:
+                fields_decl[_sec] = _fl
+        struct_issues = []
+        undeclared = {}
+        n_struct_checked = 0
+        if (schema.get("structural_validation") or {}).get("enabled") and fields_decl:
+            for _, name in entries:
+                frame = json.loads(zf.read(name).decode("utf-8"))
+                if not isinstance(frame, dict):
+                    continue
+                for _sec, _fl in fields_decl.items():
+                    _val = frame.get(_sec)
+                    if not isinstance(_val, dict):
+                        continue          # 该段不存在 → 由上面的必需判定负责
+                    for _fk, _fspec in _fl.items():
+                        if not isinstance(_fspec, dict):
+                            continue
+                        _declared = _fspec.get("type")
+                        _emitters = _fspec.get("emitted_by")
+                        _present = _fk in _val
+                        # 无产出者的字段：不参与判定（如实声明，不假装已实现）
+                        _has_emitter = bool(_emitters)
+                        if _fspec.get("required_when_present") and _has_emitter and not _present:
+                            struct_issues.append(
+                                "%s.%s required_when_present but missing (frame %s)"
+                                % (_sec, _fk, name))
+                            continue
+                        if not _present:
+                            continue
+                        n_struct_checked += 1
+                        _expect = _type_map.get(type(_val[_fk]))
+                        if _declared and _expect and _declared != _expect:
+                            struct_issues.append(
+                                "%s.%s type mismatch: declared %s, got %s (frame %s)"
+                                % (_sec, _fk, _declared, _expect, name))
+                    # 未声明的键 → warning（便于发现新的差集）
+                    for _extra in set(_val) - set(_fl):
+                        undeclared.setdefault(_sec, set()).add(_extra)
+        rep["structural_checked"] = n_struct_checked
+        rep["structural_issues"] = struct_issues[:20]
+        rep["undeclared_keys"] = {k: sorted(v) for k, v in undeclared.items()}
+        if struct_issues:
+            rep["bad_entries"].extend(struct_issues[:20])
+        for _sec, _ks in rep["undeclared_keys"].items():
+            rep["warnings"].append(
+                "%s has keys not declared in schema.frame_fields.%s.fields: %s"
+                % (_sec, _sec, _ks))
         rep["missing_keys"] = sorted(missing)
 
     rep["ok"] = not rep["missing_keys"] and not rep["bad_entries"]

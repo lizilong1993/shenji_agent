@@ -174,8 +174,19 @@ def test_writer_does_not_invent_the_empty_types(tmp_path: Path) -> None:
         assert cov["seed"] == 5
         assert cov["actions"] == 0
         assert cov["adjudication"] == 0
+        # ⚠ 原断言是 `"decisions" not in agent` —— 那是**旧行为的快照**。
+        # 结构性修复后，写入端**确实**产出 `agent.decisions`（schema 规范字段），
+        # 内容由该帧自己的 `time.cur_step` 派生，故该断言已过时。
+        # 正确的断言是：**若产出 decisions，它必须与该帧的 time 一致**（是派生而非编造）。
         for _, f in r.iter_frames():
-            assert "decisions" not in (f.get("agent") or {}), "伪造了 decisions"
+            dec = (f.get("agent") or {}).get("decisions")
+            if dec is None:
+                continue
+            assert dec, "decisions 存在却为空"
+            for item in dec:
+                assert item["cur_step"] == (f.get("time") or {}).get("cur_step"), \
+                    "decisions.cur_step 与该帧 time 不一致 —— 疑似编造"
+                assert "seat" in item and "action_kinds" in item
 
 
 def test_writer_degrades_when_input_frames_are_not_valid_v1() -> None:

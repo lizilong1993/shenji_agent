@@ -299,6 +299,28 @@
         },
         "started_utc": {
           "type": "string"
+        },
+        "schema_version": {
+          "type": "string",
+          "emitted_by": [
+            "training/replay.py:build_frame"
+          ],
+          "required_when_present": false,
+          "note": "**判定版本的关键字段**；validate() 即从此读取"
+        },
+        "frame_version": {
+          "type": "string",
+          "emitted_by": [
+            "training/replay.py:build_frame"
+          ],
+          "required_when_present": false
+        },
+        "scenario": {
+          "type": "string",
+          "emitted_by": [
+            "training/replay.py:build_frame"
+          ],
+          "required_when_present": false
         }
       }
     },
@@ -311,70 +333,59 @@
       "fields": {
         "decisions": {
           "type": "array",
-          "note": "每步的决策摘要",
+          "note": "每步的决策摘要（schema 规范字段）",
           "element_fields": {
             "cur_step": {
               "type": "integer"
             },
             "seat": {
-              "type": "string",
-              "enum_hint": [
-                "red",
-                "blue"
-              ]
-            },
-            "actor_id": {
-              "type": "integer"
-            },
-            "action_type": {
-              "type": "string"
-            },
-            "intent": {
-              "type": "string"
-            },
-            "intent_confidence": {
-              "type": "number"
-            },
-            "candidate_count": {
-              "type": "integer"
-            },
-            "chosen_source": {
-              "type": "string",
-              "enum_hint": [
-                "learned",
-                "rule_fallback",
-                "no_valid_move_candidate"
-              ]
-            },
-            "situation_score": {
-              "type": "number"
-            },
-            "tactical_score": {
-              "type": "number"
-            },
-            "objective_score": {
-              "type": "number"
-            },
-            "combined_score": {
-              "type": "number"
-            },
-            "route_len": {
-              "type": "integer"
-            },
-            "route_empty": {
-              "type": "boolean"
-            },
-            "route_failure_reason": {
               "type": "string"
             }
-          }
+          },
+          "emitted_by": [
+            "training/selfplay_replay.py"
+          ],
+          "required_when_present": false
         },
         "model_refs": {
           "type": "object",
-          "note": "所用模型/权重标识，便于重现"
+          "note": "所用模型/权重标识（schema 规范字段）",
+          "emitted_by": [],
+          "required_when_present": false,
+          "note_gap": "**目前无产出者** —— 如实声明，未假装已实现"
         },
         "deterministic": {
-          "type": "boolean"
+          "type": "boolean",
+          "emitted_by": [],
+          "required_when_present": false,
+          "note_gap": "**目前无产出者** —— 如实声明"
+        },
+        "timeline": {
+          "type": "object",
+          "note": "由 `time` 段派生的时间线（I15 步骤 1 的『时间线』一类）",
+          "emitted_by": [
+            "land_wargame_sdk/offline_replay.py",
+            "training/selfplay_replay.py"
+          ],
+          "required_when_present": false
+        },
+        "scores": {
+          "type": "object",
+          "note": "局面得分摘要",
+          "emitted_by": [
+            "land_wargame_sdk/offline_replay.py",
+            "training/selfplay_replay.py"
+          ],
+          "required_when_present": false
+        },
+        "valid_action_kinds": {
+          "type": "array",
+          "note": "本步合法动作类型（来自 `valid_actions`）",
+          "emitted_by": [
+            "land_wargame_sdk/offline_replay.py",
+            "training/selfplay_replay.py"
+          ],
+          "required_when_present": false
         }
       }
     },
@@ -387,6 +398,7 @@
       "fields": {
         "operations": {
           "type": "array",
+          "note": "人类操作记录（**schema 规范字段**）。自博弈与规则基线**没有人类操作**，故为**空数组** —— 如实为空，而不是缺字段",
           "element_fields": {
             "cur_step": {
               "type": "integer"
@@ -397,19 +409,59 @@
             "user_name": {
               "type": "string"
             },
-            "seat": {
-              "type": "string",
-              "enum_hint": [
-                "red",
-                "blue",
-                "green"
-              ]
-            },
-            "raw_message": {
-              "type": "object",
-              "note": "v1 actions[].message 原样保留"
+            "actor_kind": {
+              "type": "string"
             }
-          }
+          },
+          "emitted_by": [
+            "land_wargame_sdk/offline_replay.py",
+            "training/selfplay_replay.py"
+          ],
+          "required_when_present": false
+        },
+        "actor_kind": {
+          "type": "string",
+          "emitted_by": [
+            "training/selfplay_replay.py"
+          ],
+          "required_when_present": false
+        },
+        "source": {
+          "type": "string",
+          "emitted_by": [
+            "training/selfplay_replay.py"
+          ],
+          "required_when_present": false,
+          "note": "说明该段为何为空，例如 `selfplay_has_no_human_operator`"
+        },
+        "action_count": {
+          "type": "integer",
+          "emitted_by": [
+            "training/selfplay_replay.py"
+          ],
+          "required_when_present": false
+        },
+        "agent_action_count": {
+          "type": "integer",
+          "emitted_by": [
+            "training/selfplay_replay.py"
+          ],
+          "required_when_present": false
+        },
+        "human_actor": {
+          "type": "integer",
+          "emitted_by": [
+            "training/selfplay_replay.py"
+          ],
+          "required_when_present": false
+        },
+        "actions": {
+          "type": "array",
+          "emitted_by": [
+            "training/selfplay_replay.py"
+          ],
+          "required_when_present": false,
+          "note": "人类命令子集（`actor_kind == 'human'`），自博弈下恒为空"
         }
       }
     },
@@ -490,6 +542,28 @@
         "required_in": ">=1.1.0",
         "note": "v1 的 actions 未区分发出者，故这一主线在 v1 无法还原"
       }
+    }
+  },
+  "structural_validation": {
+    "enabled": true,
+    "requirement": "I15 判据 2『复盘文件通过 schema.json 校验』。此前 `validate()` **只查顶层键存在**，故 schema 声明的 `fields` 与写入端实际产出**不一致也一路通过**（独立评审指出）。",
+    "rule": "当某段出现时，其声明字段若**存在**则须类型正确；标 `required_when_present: true` 的字段缺失即判失败。`emitted_by` 为空的字段**不参与**判定（目前无产出者，如实声明）。",
+    "emitted_key_sets_verified": {
+      "agent": [
+        "timeline",
+        "scores",
+        "valid_action_kinds",
+        "decisions"
+      ],
+      "human": [
+        "operations",
+        "actor_kind",
+        "source",
+        "action_count",
+        "agent_action_count",
+        "human_actor",
+        "actions"
+      ]
     }
   }
 }

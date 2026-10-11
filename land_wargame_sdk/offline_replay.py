@@ -70,7 +70,8 @@ def _load_upgrade_helpers():
     return None
 
 
-def _agent_summary(observation: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _agent_summary(observation: Dict[str, Any],
+                   seat: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """从 v1 帧里提取智能体侧摘要（只用已有字段，不编造）。"""
     agent: Dict[str, Any] = {}
     t = observation.get("time")
@@ -82,6 +83,16 @@ def _agent_summary(observation: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     va = observation.get("valid_actions")
     if isinstance(va, dict):
         agent["valid_action_kinds"] = sorted(str(k) for k in va)
+    # schema 规范字段 `agent.decisions`：本轮起由本写入端也产出。
+    # 内容**不是编造的** —— 就是该步的时间线与合法动作类型，
+    # 按 schema 的 element_fields（cur_step/seat）组织。
+    step = (t or {}).get("cur_step") if isinstance(t, dict) else None
+    if step is not None:
+        agent["decisions"] = [{
+            "cur_step": step,
+            "seat": seat,
+            "action_kinds": sorted(str(k) for k in (va or {})) if isinstance(va, dict) else [],
+        }]
     return agent or None
 
 
@@ -111,6 +122,25 @@ def _upgrade_frames(all_states: List[Dict[str, Any]], *,
                             scenario=scenario, frame_version=FRAME_VERSION_V1_1)
         if frame.get("actions"):
             frame = annotate_human_actions(frame, human_actor=human_actor)
+        # schema 规范字段 `human.operations`：按 element_fields 组织。
+        # 离线脚本的对局**没有人类操作**（两个座位都是智能体），
+        # 故 `operations` 为**空数组** —— 这是**如实为空**，不是缺字段。
+        # 若某帧确有 actor_kind=="human" 的命令，则逐条映射进去。
+        _h = dict(frame.get("human") or {})
+        _ops = []
+        for _a in (_h.get("actions") or []):
+            if isinstance(_a, dict) and _a.get("actor_kind") == "human":
+                _msg = _a.get("message") if isinstance(_a.get("message"), dict) else {}
+                _ops.append({
+                    "cur_step": _a.get("cur_step"),
+                    "user_id": _a.get("actor"),
+                    "user_name": _msg.get("user_name") if isinstance(_msg, dict) else None,
+                    "actor_kind": "human",
+                })
+        _h["operations"] = _ops
+        _h.setdefault("action_count", len(_ops))
+        _h.setdefault("source", "offline_runner_has_no_human_operator")
+        frame["human"] = _h
         out.append(frame)
     return out or None
 
