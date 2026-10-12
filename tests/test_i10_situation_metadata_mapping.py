@@ -143,17 +143,24 @@ def test_p3_scenario_json_really_lacks_metadata() -> None:
                 "%s 出现元数据键 %r —— 文档的「19 项里 0 项」需重写" % (f.name, meta_key)
 
 
-def test_doc_admits_p4_status_is_unverified() -> None:
-    """P4 无部署 → 现状**不可实测**，文档必须**自己标注为待核**，不得冒充实测。"""
+def test_doc_records_p4_as_measured() -> None:
+    """P4 已远程部署并实跑 → 文档必须写**实测**并给出部署落点，不得再冒「待核」。"""
     d = _doc()
-    assert "待核" in d, "P4 现状未标注为待核"
-    assert "无法实测" in d or "无 P4 部署" in d, "未说明 P4 无法实测"
+    assert "待核" not in d, "P4 已实测，文档仍标「待核」"
+    assert "实测" in d, "文档未标「实测」"
+    assert "/remote-home/lizilong/demo20260104" in d, "未给出远程部署落点，无法复核"
+
+
+def test_doc_admits_metadata_is_not_readable_back() -> None:
+    """`SituationOut` 保持旧结构 → 「可写不可回读」必须**自己写出来**，不得隐瞒。"""
+    d = _doc()
+    assert "回读" in d or "不可回读" in d, "未登记「元数据写入后不可回读」这一缺口"
 
 
 def test_doc_does_not_claim_i10_is_complete() -> None:
-    """**不得**把本条写成已完成 —— 步骤 2–6 仍被 P0-2 阻塞。"""
+    """**不得**把本条写成已完成 —— 步骤 5（P3 元数据块）与元数据回读仍未做。"""
     d = _doc()
-    assert "阻塞-P0-2" in d or "阻塞" in d, "未说明其余步骤仍被阻塞"
-    assert "步骤 1" in d
+    assert "步骤 5" in d, "未提步骤 5"
+    assert "未加元数据块" in d, "未如实说明步骤 5 只完成一半"
     for claim in ("已完成全部", "全部完成", "19 项已实现"):
         assert claim not in d, "出现过度声明 %r" % claim
