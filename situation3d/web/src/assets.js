@@ -438,6 +438,49 @@
   }
 
   /**
+   * 离线底图的**高倍段**：按 manifest 的逐层矩形，一层一个 provider。
+   *
+   * 数据来自 `manifest.offline_detail_imagery`，由
+   * `tools/analyze_mbtiles_coverage.py` 从**实际瓦片库**（mbtiles）算出：
+   * 这批瓦片不落文件树，由 `serve.py` 的 `/tiles_db/<source>/<z>/<x>/<y>.jpg` 直发
+   * （为什么不摊成文件：本机建小文件只有 17-59 个/秒，20 万张要三个多小时，
+   * 见 `server/serve.py` 的同名注释）。
+   *
+   * 为什么按层挂，而不是一个 provider 包住 z14-z20：实测各层范围差异极大——
+   * 2026-10-14 的谷歌卫星库，z14 覆盖 116.32-121.62E，z16 只有 120.03-120.73E，
+   * z17-z20 更是只有 120.11-120.24E / 23.74-23.84N 那一小块。用一个矩形包住
+   * 整段，Cesium 会在没有瓦片的地方一直请求（404 洪水，而且"看着在加载"却
+   * 永远等不到图）；收紧到该层自己的矩形后，域外一次请求都不发。
+   *
+   * 与 `attachUrbanImagery` 的分工：那一个按**案例的城区 AOI**、按相机高度挂，
+   * 覆盖 4 个城市框；这里挂的是**瓦片库的实测覆盖**，与案例无关。
+   */
+  function attachOfflineDetail(viewer, fromZoom) {
+    const m = manifest();
+    const d = m.offline_detail_imagery || {};
+    const bands = Array.isArray(d.bands) ? d.bands : [];
+    const url = d.url_template || IMAGERY_URL;
+    const from = fromZoom === undefined ? (d.min_zoom || 14) : fromZoom;
+    const layers = [];
+    bands.forEach(function (b) {
+      const z = b.zoom;
+      if (z < from) return;
+      if (!Array.isArray(b.bbox) || b.bbox.length !== 4) return;
+      const provider = attachCached(new Cesium.UrlTemplateImageryProvider({
+        url: url,
+        tilingScheme: new Cesium.WebMercatorTilingScheme(),
+        // 钉死在单层：矩形只保证"这一层有瓦片"，跨层共用一个矩形就会越界请求。
+        minimumLevel: z,
+        maximumLevel: z,
+        rectangle: aoiRectangle(b.bbox),
+        credit: '离线高清底图 z' + z + '（' + (d.source || 'mbtiles') + '）',
+      }), url);
+      layers.push({ zoom: z, layer: viewer.imageryLayers.addImageryProvider(provider) });
+    });
+    return layers;
+  }
+
+  /**
    * 鸟瞰图专用影像 provider。
    *
    * **不与主视图共用实例**：主视图的 provider 被 TileCache.attach 与 instrument
@@ -1147,6 +1190,7 @@
     terrainMaxLevel: terrainMaxLevel,
     createOverviewImageryProvider: createOverviewImageryProvider,
     attachUrbanImagery: attachUrbanImagery,
+    attachOfflineDetail: attachOfflineDetail,
     createTerrainProvider: createTerrainProvider,
     createWsf3dOverlayProvider: createWsf3dOverlayProvider,
     attachWsf3dOverlay: attachWsf3dOverlay,

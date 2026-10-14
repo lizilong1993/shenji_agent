@@ -93,6 +93,19 @@
       id: 'urban.imagery', kind: 'imagery', z: 40, default: true,
       label: '城区高清影像（米级）', group: '底图', checkbox: 'modelUrbanImagery',
     },
+    // 离线底图的**高倍段**（z14+），矩形来自 manifest 的逐层实测覆盖（见
+    // assets.js 的 attachOfflineDetail）。它比 `imagery.offline`（z=5）高、
+    // 比 wsf3d 覆盖层（z=50）低：
+    //
+    //   * 放在 z=5 是不行的——那一层在天地图（z=10）**下面**，是"断网兜底"的
+    //     定位；新烘焙的 z14-z20 是要被看见的高清影像，而且城区层（z=40）
+    //     会把它盖住；
+    //   * 放在 z=50 之上也不行——会盖住半透明的建筑高度覆盖层与注记的层次关系。
+    {
+      id: 'imagery.offline_detail', kind: 'imagery', z: 45, default: true,
+      label: '离线高清底图（z14+）', group: '底图', checkbox: 'modelOfflineDetail',
+      exclusives: [],
+    },
     {
       id: 'wsf3d.overlay', kind: 'imagery', z: 50, default: false,
       label: '建筑高度图层（WSF3D）', group: '底图', checkbox: 'modelWsf3dOverlay',

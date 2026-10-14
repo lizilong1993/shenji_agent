@@ -124,6 +124,7 @@ const state = {
   urbanEnabled: true,       // 城区高清影像是否启用（图层管理「底图」）
   globalLayer: null,        // 全球底图层（z0-6）
   hotspotLayers: [],        // 热点区域高清层（每框一个 provider）
+  offlineDetailLayers: [],  // 离线高倍段（z14+，每层一个 provider，矩形来自 manifest）
   imageryStats: null,       // 底图瓦片请求统计（诊断用）
   inference: null,          // inference_frames，与 frames 逐帧对齐
 
@@ -617,6 +618,13 @@ function initViewer() {
   // 离线底图是**两级**：全球层 z0-6 + 战区层 z7-11，共用一个 imagery.offline 意图。
   // 两个都要登记——只登记全球层的话，战区层会留在顺序之外，反而压到注记上面。
   registerImagerySlot('imagery.offline', [state.globalLayer, state.imageryLayer]);
+  // 离线底图的**高倍段**（z14+）：与案例/战区无关，只在启动时挂一次。
+  // 每个 provider 的矩形是该层实测覆盖（manifest.coverage.imagery.per_zoom），
+  // 所以看别的战区时它们一次请求都不会发。挂完立即登记，否则 applyLayers
+  // 算出的顺序里没有它们，会被城区层（z=40）压住。
+  state.offlineDetailLayers = OfflineAssets.attachOfflineDetail(viewer);
+  registerImagerySlot('imagery.offline_detail',
+    (state.offlineDetailLayers || []).map(function (r) { return r.layer; }));
   // 热点影像是**一层多实例**（每个热点框一个 provider），必须全部登记。
   registerImagerySlot('hotspot.imagery', state.hotspotLayers);
 
@@ -5082,6 +5090,13 @@ function applyCaseIndependentHooks() {
   if (params.get('imagery') === '0') {
     setSwitch('modelImagery', false);
     setImagery(false);
+  }
+  // 离线高倍段（manifest.offline_detail_imagery，z14+）。与 ?overlay= / ?terrain= 同一套写法：
+  // 走 setSwitch，注册表意图与面板保持一致。加上它是因为**其它每一层都有 URL 钩子**，
+  // 没有钩子这一层就无法在深链与自检里被单独开关（A/B 截图验证正是靠它）。
+  if (params.has('detail')) {
+    setSwitch('modelOfflineDetail', params.get('detail') !== '0');
+    applyLayers();
   }
   if (params.get('terrain') === '1') {
     setSwitch('modelTerrain', true);

@@ -76,7 +76,12 @@ COMPRESSIBLE = ("application/json", "application/javascript", "text/html",
 
 # Immutable asset roots: everything under web/tiles plus the vendored Cesium
 # bundle. These never change without a re-fetch, so they can be cached hard.
-IMMUTABLE_PREFIXES = ("/tiles/", "/vendor/")
+#
+# `/tiles_db/`（mbtiles 直发）与 `/tdt/`（天地图代理）也在这里：瓦片内容不会原地变化。
+# 这两个路径原先**不在**名单里，而它们的处理函数又各自 `send_header("Cache-Control", …)`
+# 了一遍 —— 于是响应里出现两个互相矛盾的 Cache-Control（`public, max-age` 与后面的
+# `no-store`），浏览器按最后一个走。所以这里既要加进名单，也要删掉那两处手动设置。
+IMMUTABLE_PREFIXES = ("/tiles/", "/vendor/", "/tiles_db/", "/tdt/")
 IMMUTABLE_MAX_AGE = 7 * 24 * 3600
 
 # Shared across handler instances. BaseHTTPRequestHandler runs the whole request
@@ -193,6 +198,35 @@ TDT_LAYERS = ("img", "cia", "vec", "cva", "ter")
 TDT_CACHE_DIR = os.path.join(WEB_ROOT, "tiles", "tdt")
 
 # ---------------------------------------------------------------------------
+# 离线瓦片库（mbtiles）—— 发布的瓦片**不摊成文件树**，直接按库发
+# ---------------------------------------------------------------------------
+# 为什么不摊开：这台机器的文件系统**建小文件极慢**（2026-10-14 实测：
+# 顺序读 405 MB/s，但新建 12 KB 文件只有 **17 个/秒**、空文件 59 个/秒，
+# 当时 load average ≈ 100）。20 万张瓦片摊开要三个多小时，还要多出 20 万个 inode；
+# 而 mbtiles 本来就是"瓦片按行存"的容器 —— 磁盘占用相同甚至更小，
+# 发布动作从"写 20 万个文件"变成"放一个文件"。
+#
+# 目录由 `.env` 的 `TILE_DB_DIR` 指定（默认 <repo>/tiles_db）。
+# `<source>` 只接受 `[A-Za-z0-9_]+` 且必须命中目录里真实存在的 `<source>.mbtiles`：
+# 这既挡住路径穿越，也让"库不在"表现为 404 而不是 500。
+TILE_DB_DIR = env("TILE_DB_DIR") or os.path.join(os.path.dirname(HERE), "tiles_db")
+TILE_DB_MAX_LEVEL = 24   # 再高就没有实际意义，且是明显的异常输入
+
+# 天地图图层 → 离线瓦片库：断网或未配 key 时也能出图（见 fetch_tdt_tile）。
+TDT_DB_SOURCE = {
+    "img": "tianditu_satellite",
+    "cia": "tianditu_satellite_label",
+    "cva": "tianditu_vector_label",
+    "ter": "tianditu_terrain_label",
+}
+
+# 连接与格式缓存。ThreadingHTTPServer 每个连接一个线程，按线程号存连接会随线程
+# 回收而泄漏，所以这里**每库一条连接 + 一把锁**：sqlite3 的 execute 会放掉 GIL，
+# 一次点查是几十微秒量级，串行化不影响这个量级的并发。
+_TILE_DB_CONN = {}
+_TILE_DB_LOCK = [None]
+
+# ---------------------------------------------------------------------------
 # TS 案例目录
 # ---------------------------------------------------------------------------
 #
@@ -220,6 +254,73 @@ _TDT_LOG_STATE = [None]
 # 4 是在本地缓存热起来之前，速度与"别把对方惹毛"之间的折中。
 _TDT_MAX_UPSTREAM = 4
 _TDT_SLOTS = None  # threading.Semaphore，用到时才建（模块导入期不建线程原语）
+
+
+def tile_db_path(source):
+    """把 `<source>` 解析成 tiles_db 下真实存在的 `<source>.mbtiles`，否则 None。"""
+    import re
+    if not source or not re.match(r"^[A-Za-z0-9_]+$", source or ""):
+        return None
+    p = os.path.join(TILE_DB_DIR, source + ".mbtiles")
+    return p if os.path.isfile(p) else None
+
+
+def _tile_db_lock():
+    global _TILE_DB_LOCK
+    if _TILE_DB_LOCK[0] is None:
+        import threading
+        _TILE_DB_LOCK[0] = threading.Lock()
+    return _TILE_DB_LOCK[0]
+
+
+def tile_db_sources():
+    """当前可用的瓦片库源名（按文件名列出，供 /api/status 与 /api/health 用）。"""
+    try:
+        return sorted(f[:-len(".mbtiles")] for f in os.listdir(TILE_DB_DIR)
+                      if f.endswith(".mbtiles"))
+    except OSError:
+        return []
+
+
+def tile_db_ctype(data):
+    """按**字节魔数**判瓦片类型，而不是信 mbtiles 的 metadata.format。
+
+    实测教训：`tianditu_satellite.mbtiles` 的 metadata 写 `format=jpg`，
+    但库里有相当一部分瓦片其实是 **PNG**（天地图对部分层级/瓦片返回带透明的 PNG）。
+    照 metadata 发 `image/jpeg` 就会出现"PNG 内容配 JPEG 类型"——浏览器多数能靠
+    嗅探显示出来，所以它是个**不会报错的错**，正因如此更该按字节判。
+    """
+    return "image/png" if data[:4] == b"\x89PNG" else "image/jpeg"
+
+
+def _tile_db_conn(path):
+    """取（必要时建）该库的只读连接。调用方必须已持有 _tile_db_lock()。"""
+    import sqlite3
+    conn = _TILE_DB_CONN.get(path)
+    if conn is None:
+        conn = sqlite3.connect("file:%s?mode=ro" % path, uri=True,
+                               check_same_thread=False)
+        _TILE_DB_CONN[path] = conn
+    return conn
+
+
+def tile_db_get(path, z, x, y):
+    """取一张瓦片，命中返回 bytes，否则 None。
+
+    **mbtiles 的行号是 TMS（自南向北）**，而 URL 里的 y 是 XYZ（自北向南），
+    所以这里必须翻转：row = 2^z - 1 - y。翻错的表现是整幅图南北镜像 ——
+    不报错，只是"看着不对"。
+    """
+    if z < 0 or z > TILE_DB_MAX_LEVEL or x < 0 or y < 0 or x >= (1 << z) or y >= (1 << z):
+        return None
+    try:
+        with _tile_db_lock():
+            row = _tile_db_conn(path).execute(
+                "SELECT tile_data FROM tiles WHERE zoom_level=? AND tile_column=?"
+                " AND tile_row=?", (z, x, (1 << z) - 1 - y)).fetchone()
+    except Exception:  # noqa: BLE001 - 库损坏/被换掉都不该让请求 500
+        return None
+    return row[0] if row else None
 
 
 def _tdt_slot():
@@ -277,7 +378,10 @@ def _tdt_upstream(layer, z, x, y, mode):
 
 def fetch_tdt_tile(layer, z, x, y):
     """
-    取一块瓦片，返回 (bytes, content_type)。命中磁盘缓存则直接返回。
+    取一块瓦片，返回 (bytes, content_type)：**磁盘缓存 → 上游**。
+
+    （离线瓦片库在上游之前由 `_tdt_tile` 先查 —— 那里查是为了让"库里命中"
+    不必先满足"配了 key"这个前置条件。）
 
     key 类型未知，所以两种 UA 都试一遍：先用记忆中的组合，失败再换另一种。
     成功的组合被记住，后续请求不再多花一次往返。
@@ -285,7 +389,11 @@ def fetch_tdt_tile(layer, z, x, y):
     cache = os.path.join(TDT_CACHE_DIR, layer, str(z), str(x), "%d.jpg" % y)
     try:
         with open(cache, "rb") as fh:
-            return fh.read(), "image/jpeg"
+            data = fh.read()
+        # 缓存里既有 jpg 也有 png（cia/cva/ter 上游本来就是 PNG）。按魔数判类型：
+        # 原先把一切都当 image/jpeg 发，PNG 内容配 JPEG 类型，属于"碰巧能显示"。
+        ctype = "image/png" if data[:4] == b"\x89PNG" else "image/jpeg"
+        return data, ctype
     except OSError:
         pass
 
@@ -454,6 +562,7 @@ class Handler(SimpleHTTPRequestHandler):
             # 这里只回答"配没配、通不通、按哪种 UA"。keyLen 用于区分"没配"与
             # "配错成空串"，不足以还原 key。
             key = tianditu_key()
+            db_map = {ly: s for ly, s in TDT_DB_SOURCE.items() if tile_db_path(s)}
             self._send_json({
                 "configured": key is not None,
                 "keyLen": len(key) if key else 0,
@@ -462,6 +571,9 @@ class Handler(SimpleHTTPRequestHandler):
                 "proxyTemplate": "/tdt/{layer}/{z}/{x}/{y}",
                 "layers": list(TDT_LAYERS),
                 "cacheDir": os.path.relpath(TDT_CACHE_DIR, WEB_ROOT),
+                # 离线库里有哪些层：命中它们时**不需要 key、不需要联网**。
+                "offlineLayers": sorted(db_map),
+                "offlineDbDir": os.path.relpath(TILE_DB_DIR, os.path.dirname(HERE)),
                 "hint": ("已配置天地图 key（服务端代理取瓦片，key 不下发到浏览器）"
                          if key else
                          "未配置：把 TIANDITU_KEY 写进仓库根目录的 .env"),
@@ -696,6 +808,9 @@ class Handler(SimpleHTTPRequestHandler):
 
         _check("ion_token", lambda: read_ion_token() is not None)
         _check("tianditu_key", lambda: tianditu_key() is not None)
+        # 离线瓦片库：有它就说明"上传的瓦片已经发布成服务"，且天地图/离线底图的
+        # 高倍段即便没有 key 也能出图。缺库只算 warn（低倍静态树仍在）。
+        _check("tile_dbs", lambda: len(tile_db_sources()) > 0, required=False)
 
         types = None
         try:
@@ -749,6 +864,8 @@ class Handler(SimpleHTTPRequestHandler):
             "env_file": ENV_PATH,
             "wfs_types": types,
             "web_root": WEB_ROOT,
+            # 离线瓦片库（mbtiles 直发）里有哪些源；空列表=还没发布任何库。
+            "tile_dbs": tile_db_sources(),
             # ── I08 新增 ──
             "level": level,
             "subchecks": subchecks,
@@ -772,6 +889,45 @@ class Handler(SimpleHTTPRequestHandler):
         }, 404)
         return
 
+    def _send_tile(self, data, ctype):
+        """发一张瓦片。Cache-Control 由 end_headers() 按 IMMUTABLE_PREFIXES 统一加，
+        这里**不再重复设置**（两处都设会出现两个矛盾的 Cache-Control）。"""
+        self.send_response(200)
+        self.send_header("Content-Type", ctype or "image/jpeg")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        try:
+            self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def _tile_db_tile(self):
+        """GET /tiles_db/<source>/<z>/<x>/<y>.<ext> —— 从 mbtiles 直接发瓦片。
+
+        路径形状与静态瓦片树 `/<dir>/<z>/<x>/<y>.<ext>` 保持一致，这样
+        `UrlTemplateImageryProvider` 的 url 模板只需换个前缀。
+        任何失败都回 404：缺一块瓦片不该让整个图层报错。
+        """
+        parts = self.path.split("?")[0].strip("/").split("/")
+        if len(parts) != 5 or parts[0] != "tiles_db":
+            self.send_error(404, "bad tile path")
+            return
+        source = parts[1]
+        try:
+            z, x, y = int(parts[2]), int(parts[3]), int(parts[4].split(".")[0])
+        except ValueError:
+            self.send_error(400, "bad tile coords")
+            return
+        path = tile_db_path(source)
+        if not path:
+            self.send_error(404, "unknown tile db")
+            return
+        data = tile_db_get(path, z, x, y)
+        if not data:
+            self.send_error(404, "no such tile")
+            return
+        self._send_tile(data, tile_db_ctype(data))
+
     def _tdt_tile(self):
         """
         GET /tdt/<layer>/<z>/<x>/<y> —— 天地图瓦片代理（见 fetch_tdt_tile 的说明）。
@@ -779,6 +935,9 @@ class Handler(SimpleHTTPRequestHandler):
         放在 `/tdt/` 而不是 `/api/` 下：它是给 Cesium 的 URL 模板直接用的。
         任何失败都回 404 而不是 500 —— 底下的离线底图仍在，缺一块瓦片不该让整个
         图层报错或让控制台刷满异常。
+
+        **顺序**：离线瓦片库 → 磁盘缓存/上游。库放最前，是为了让"有库里那块瓦片"
+        不需要任何前置条件（key 没配、断网都照样出图）—— 这正是离线底图的意义。
         """
         parts = self.path.split("?")[0].strip("/").split("/")
         if len(parts) != 5 or parts[0] != "tdt":
@@ -794,8 +953,18 @@ class Handler(SimpleHTTPRequestHandler):
                 or x < 0 or y < 0):
             self.send_error(404, "bad tile")
             return
+
+        src = TDT_DB_SOURCE.get(layer)
+        db_path = tile_db_path(src) if src else None
+        if db_path:
+            data = tile_db_get(db_path, z, x, y)
+            if data:
+                self._send_tile(
+                    data, tile_db_ctype(data))
+                return
+
         if not tianditu_key():
-            self.send_error(503, "TIANDITU_KEY 未配置")
+            self.send_error(503, "TIANDITU_KEY 未配置，且离线瓦片库里没有这块")
             return
         try:
             data, ctype = fetch_tdt_tile(layer, z, x, y)
@@ -808,17 +977,20 @@ class Handler(SimpleHTTPRequestHandler):
                 _TDT_LOG_STATE[0] = reason
             self.send_error(404, "tile unavailable")
             return
-        self.send_response(200)
-        self.send_header("Content-Type", ctype or "image/jpeg")
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "public, max-age=%d" % IMMUTABLE_MAX_AGE)
-        self.end_headers()
-        try:
-            self.wfile.write(data)
-        except (BrokenPipeError, ConnectionResetError):
-            pass
+        self._send_tile(data, ctype)
 
     def do_GET(self):
+        if self.path.split("?")[0].startswith("/tiles_db/"):
+            try:
+                self._tile_db_tile()
+            except Exception:  # noqa: BLE001 - never leave the client hanging
+                import traceback
+                traceback.print_exc()
+                try:
+                    self.send_error(500, "tile db error")
+                except Exception:  # noqa: BLE001
+                    pass
+            return
         if self.path.split("?")[0].startswith("/tdt/"):
             try:
                 self._tdt_tile()
