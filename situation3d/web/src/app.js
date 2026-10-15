@@ -124,7 +124,11 @@ const state = {
   urbanEnabled: true,       // 城区高清影像是否启用（图层管理「底图」）
   globalLayer: null,        // 全球底图层（z0-6）
   hotspotLayers: [],        // 热点区域高清层（每框一个 provider）
-  offlineDetailLayers: [],  // 离线高倍段（z14+，每层一个 provider，矩形来自 manifest）
+  hotspotImageryEnabled: true,  // 热点高清影像是否启用（与 urbanEnabled 同构）
+  hotspotImageryMounted: false, // 当前是否因相机高度而挂着（区别于"用户想不想要"）
+  offlineDetailLayers: [],  // 已挂的离线高倍段实例 [{zoom, layer}]
+  offlineDetailZooms: [],   // 已挂的层级（用于判断"要不要动"）
+  offlineDetailEnabled: true,   // 离线高倍段是否启用（图层管理「底图」）
   imageryStats: null,       // 底图瓦片请求统计（诊断用）
   inference: null,          // inference_frames，与 frames 逐帧对齐
 
@@ -201,6 +205,17 @@ let loadingSettleTimer = null;
  * 归零后再等一小段时间确认稳定，避免在两次细化之间反复闪烁。
  */
 function setLoadingTiles(queued) {
+  // **先压掉过期计数**：`tileLoadProgressEvent` 只在队列**变化**时触发，而实测存在
+  // "最后几块是被移除/取消而不是加载完成"的路径 —— 事件停在"剩余 2"，
+  // 而同一时刻 `globe.tilesLoaded === true`、三条加载队列全空、零在途请求
+  // （2026-10-15 用 CDP 把队列摊开核对过）。那条路径下徽标会一直挂着
+  // "正在加载瓦片… 剩余 2"，看起来就像卡了半小时 —— 实际上什么都没在加载。
+  // 所以这里以 `tilesLoaded` 为准做一次纠正：它说加载完了，就当 0。
+  if (queued > 0 && viewer && viewer.scene && viewer.scene.globe
+      && viewer.scene.globe.tilesLoaded) {
+    queued = 0;
+  }
+
   // 底图空闲时才让缓存开始预热：预热与当前视野的渲染共用同一批连接和 CPU，
   // 同时进行会把 Cesium 的影像请求挤掉，表现为底图一直画不出来。
   if (window.TileCache && TileCache.setIdle) TileCache.setIdle(queued === 0);
@@ -294,6 +309,12 @@ function renderDiagnostics() {
   }
   lines.push('imagery layers  ' + viewer.imageryLayers.length + ' [' + layerInfo.join(' ') +
              ']  urban ' + (state.urbanLayers ? 'on' : 'off'));
+  // 按需挂载的决策过程：光看"现在挂了哪几层"看不出**为什么**是这几层。
+  lines.push('detail bands    L=' + cameraImageryLevel() + ' (渲染中 ' + surfaceRenderLevel()
+    + ')  挂 z[' + ((state.offlineDetailZooms || []).join(',') || '-') + ']  可用 '
+    + (window.OfflineAssets ? (OfflineAssets.offlineDetailBands() || []).length : 0) + ' 层');
+  lines.push('hotspot imagery ' + (state.hotspotImageryMounted ? 'on' : 'off')
+    + '  阈值 ' + (HOTSPOT_IMAGERY_TRIGGER_M / 1000) + ' km');
   lines.push('ground atmos    ' + viewer.scene.globe.showGroundAtmosphere +
              '  fog ' + viewer.scene.fog.enabled +
              '  cache ' + (window.__situation3dNoTileCache ? 'off' : 'on'));
@@ -545,10 +566,10 @@ function initViewer() {
     OfflineAssets.instrument(OfflineAssets.createImageryProvider(), state.imageryStats));
   state.imageryLayer.show = false;
 
-  // 热点层：每个热点框一个 provider，到 z12。三亚/冲绳/关岛完全在战区之外，
-  // 只能靠这一层；与战区重叠的部分因 URL 相同会命中 TileCache 内存缓存。
-  const hboxes = (OfflineAssets.manifest().hotspot_imagery || {}).boxes || [];
-  state.hotspotLayers = OfflineAssets.attachHotspotImagery(viewer, hboxes);
+  // 热点层：每个热点框一个 provider，到 z12（三亚/冲绳/关岛完全在战区之外，
+  // 只能靠这一层）。**不在这里挂**：它由 syncHotspotImagery() 按相机高度决定，
+  // 战区级视图（>400 km）下 9 个 provider 的重复代价换不来任何可见收益。
+  state.hotspotLayers = state.hotspotLayers || [];
 
   // ---- 图层注册表 ----------------------------------------------------------
   // 到这里所有**常驻** imagery 层都已挂上（天地图影像/注记、离线全球/战区、
@@ -569,6 +590,10 @@ function initViewer() {
       // 绑定在复选框删除后已经不会触发 —— 于是用户在面板里关掉城区影像，相机高度
       // 一变化它又会被挂回来（挂载判据读的正是 state.urbanEnabled）。
       if (id === 'urban.imagery') state.urbanEnabled = !!want;
+      // 同 urban：热点高清与离线高倍段都是**按需挂载**的，挂载判据要读它们，
+      // 所以开关一变就记下来 —— 否则用户在面板里关掉，相机一动作又被挂回来。
+      if (id === 'hotspot.imagery') state.hotspotImageryEnabled = !!want;
+      if (id === 'imagery.offline_detail') state.offlineDetailEnabled = !!want;
 
       // 这里本来还想把 `setTiandituLabel` / `setHotspotImagery` 里的提示文案接过来，
       // 查证后**没有必要**：`setSwitchNote()` 本身就是一个空函数
@@ -618,14 +643,13 @@ function initViewer() {
   // 离线底图是**两级**：全球层 z0-6 + 战区层 z7-11，共用一个 imagery.offline 意图。
   // 两个都要登记——只登记全球层的话，战区层会留在顺序之外，反而压到注记上面。
   registerImagerySlot('imagery.offline', [state.globalLayer, state.imageryLayer]);
-  // 离线底图的**高倍段**（z14+）：与案例/战区无关，只在启动时挂一次。
-  // 每个 provider 的矩形是该层实测覆盖（manifest.coverage.imagery.per_zoom），
-  // 所以看别的战区时它们一次请求都不会发。挂完立即登记，否则 applyLayers
-  // 算出的顺序里没有它们，会被城区层（z=40）压住。
-  state.offlineDetailLayers = OfflineAssets.attachOfflineDetail(viewer);
-  registerImagerySlot('imagery.offline_detail',
-    (state.offlineDetailLayers || []).map(function (r) { return r.layer; }));
-  // 热点影像是**一层多实例**（每个热点框一个 provider），必须全部登记。
+  // 离线底图的**高倍段**（z14+）与热点高清**都不在启动时挂**：它们由
+  // syncOfflineDetail() / syncHotspotImagery() 按"当前实际渲染层级 / 相机高度"
+  // 决定，首次由 applySituationData 与 camera.changed 触发（见那两处的说明）。
+  // 启动时挂上任何一层，Cesium 都会立刻为每个表面瓦片去要一遍深层瓦片 —— 那正是
+  // "半个屏幕在加载"的来源。
+  registerImagerySlot('imagery.offline_detail', state.offlineDetailLayers);
+  // 热点影像是**一层多实例**（每个热点框一个 provider），挂载时才登记。
   registerImagerySlot('hotspot.imagery', state.hotspotLayers);
 
   registerLayerProviders();
@@ -762,9 +786,15 @@ function loadCase(caseId) {
  */
 function remountHotspotImagery() {
   if (!viewer || !window.OfflineAssets) return 0;
-  (state.hotspotLayers || []).forEach(function (L) {
-    try { viewer.imageryLayers.remove(L, true); } catch (e) { /* already gone */ }
-  });
+  // 相机太高时**不挂**：热点高清是 z0-12 的一层多实例（每个热点框一个 provider，
+  // 台海案例有 9 个），常挂时每个表面瓦片都要为每个框去要一遍 —— 在 1939 km 的
+  // 战区级视图下纯属浪费（那些瓦片本来也不会被看到）。降到阈值以下再由
+  // syncHotspotImagery() 挂回来。
+  if (!hotspotImageryWanted()) {
+    unmountHotspotImagery();
+    return 0;
+  }
+  unmountHotspotImagery();
 
   const boxes = (OfflineAssets.manifest().hotspot_imagery || {}).boxes || [];
   const declared = (state.data && state.data.hotspots) || [];
@@ -811,7 +841,167 @@ function remountHotspotImagery() {
 
   state.hotspotLayers = OfflineAssets.attachHotspotImagery(viewer, want);
   registerImagerySlot('hotspot.imagery', state.hotspotLayers);
+  state.hotspotImageryMounted = true;
   return state.hotspotLayers.length;
+}
+
+// --------------------------------------------------------------------------
+// 按需挂载：热点高清影像 / 离线高倍段
+// --------------------------------------------------------------------------
+//
+// 两者都遵循 urban.imagery 已经用过的那条做法：**相机用不到的层就不挂**。
+// 为什么这件事重要：每多挂一个 imagery 层，Cesium 就要为**每个表面瓦片**去要一遍
+// 该层的瓦片 —— 代价是相乘的。实测（2026-10-15）把高倍段常挂之后，1939 km 机位
+// 下 Cesium 准备了 28.7 万个影像瓦片，加载徽标停在"剩余 2"半小时不动。
+//
+// 判据不写死高度：**高倍段按"当前实际在渲染的表面层级"选层**（同一个数据源
+// 诊断面板已经在用），所以相机一动就自动对齐，不需要维护"多少米对应哪一级"的换算表。
+// 热点影像用高度阈值即可 —— 它是战区级的一整层，本来就没有层级概念。
+
+// 热点高清影像的挂载阈值。取 400 km：战区级视图（数百公里以上）看不到热点框内的
+// 米级细节，而那一层是 9 个 provider，挂着就是 9 份重复代价。
+const HOTSPOT_IMAGERY_TRIGGER_M = 400000;
+
+function hotspotImageryWanted() {
+  if (!state.hotspotImageryEnabled) return false;
+  if (!viewer) return false;
+  return viewer.camera.positionCartographic.height <= HOTSPOT_IMAGERY_TRIGGER_M;
+}
+
+/** 摘掉全部热点高清层并注销槽位（幂等）。 */
+function unmountHotspotImagery() {
+  (state.hotspotLayers || []).forEach(function (L) {
+    try { viewer.imageryLayers.remove(L, true); } catch (e) { /* already gone */ }
+  });
+  state.hotspotLayers = [];
+  state.hotspotImageryMounted = false;
+  if (window.LayerRegistry) LayerRegistry.dropImagery('hotspot.imagery');
+}
+
+/** 相机高度跨过阈值时挂/卸热点高清影像。与 syncUrbanImagery 同构。 */
+function syncHotspotImagery() {
+  if (!viewer) return;
+  const want = hotspotImageryWanted();
+  if (want === state.hotspotImageryMounted) return;   // 状态没变，不动场景
+  if (want) {
+    remountHotspotImagery();
+    applyLayers();
+  } else {
+    unmountHotspotImagery();
+    applyLayers();
+  }
+}
+
+/**
+ * 当前视野"该用哪一级影像"。由相机几何算出，**不依赖渲染器状态**。
+ *
+ * 为什么不用 `globe._surface._tilesToRender`：那是渲染器的内部状态，在两种情况下
+ * 拿不到有用值 —— 页面刚起来还没画第一帧、以及软件光栅化（无头）环境里整帧都没渲染。
+ * 实测：无头 CDP 下它恒为 -1，于是按它选层的实现**一层都不会挂**（低空该有高清影像
+ * 却没有）。相机几何是随时可算的，与环境无关，也便于用脚本断言。
+ *
+ * 公式：地面分辨率 = 2·h·tan(fovy/2) / 视口高度（米/像素），
+ *       层级 = log2(156543.033928 / 地面分辨率)（156543.033928 是 z0 在赤道上的米/像素）。
+ * 它给的是量级正确的层级；调用方再留 ±2/±3 的层带余量，所以不必追求逐帧精确。
+ */
+function cameraImageryLevel() {
+  try {
+    if (!viewer) return -1;
+    const cam = viewer.camera;
+    const h = cam.positionCartographic.height;
+    if (!(h > 0)) return -1;
+    const canvas = viewer.scene.canvas;
+    const px = Math.max(1, canvas.clientHeight || canvas.height || 800);
+    const fovy = (cam.frustum && cam.frustum.fovy) ? cam.frustum.fovy : (60 * Math.PI / 180);
+    const groundRes = (2 * h * Math.tan(fovy / 2)) / px;
+    if (!(groundRes > 0)) return -1;
+    const lvl = Math.log2(156543.033928 / groundRes);
+    if (!isFinite(lvl)) return -1;
+    return Math.max(0, Math.min(22, Math.round(lvl)));
+  } catch (e) {
+    return -1;
+  }
+}
+
+/**
+ * 当前**实际在渲染**的表面瓦片层级；拿不到时返回 -1。
+ *
+ * 只作为相机估算的**上调**参考：渲染器真在画更深层时，说明视野确实需要更细的影像。
+ */
+function surfaceRenderLevel() {
+  try {
+    const surface = viewer && viewer.scene && viewer.scene.globe && viewer.scene.globe._surface;
+    const tiles = surface && surface._tilesToRender ? surface._tilesToRender : [];
+    if (!tiles.length) return -1;
+    let mx = -1;
+    tiles.forEach(function (t) { if (t.level > mx) mx = t.level; });
+    return mx;
+  } catch (e) {
+    return -1;
+  }
+}
+
+// 围绕当前层级取多宽的层带：向下 2 级（略粗的兜底）、向上 3 级（压近时不至于空窗）。
+const DETAIL_BAND_BELOW = 2;
+const DETAIL_BAND_ABOVE = 3;
+
+/** 当前应挂的高倍段层级（按"该用的影像层级"从 manifest 的 bands 里挑）。 */
+function offlineDetailWantedZooms() {
+  if (!state.offlineDetailEnabled || !window.OfflineAssets) return [];
+  const all = OfflineAssets.offlineDetailBands();
+  if (!all || !all.length) return [];
+  // 相机估算为准；渲染器真在画更深层时按更深的来（视野确实需要）。
+  let L = cameraImageryLevel();
+  const rendered = surfaceRenderLevel();
+  if (rendered >= 0) L = Math.max(L, rendered);
+  if (L < 0) return [];
+  return all
+    .filter(function (b) {
+      return b.zoom >= L - DETAIL_BAND_BELOW && b.zoom <= L + DETAIL_BAND_ABOVE;
+    })
+    .map(function (b) { return b.zoom; })
+    .sort(function (a, b) { return a - b; });
+}
+
+/**
+ * 按需挂载/卸载离线高倍段（z14+）。
+ *
+ * 只在**层级集合真的变了**时才动 imageryLayers —— 每帧增删会让 Cesium 反复重建
+ * 表面瓦片顺序（applyLayers 的注释里有同样一条警告）。
+ */
+function syncOfflineDetail() {
+  if (!viewer || !window.OfflineAssets) return;
+  const want = offlineDetailWantedZooms();
+  const have = state.offlineDetailZooms || [];
+  if (want.length === have.length && want.every(function (z, i) { return z === have[i]; })) {
+    return;
+  }
+
+  // 摘掉不再需要的（同 zoom 的层保留，避免"摘了又挂"）
+  const keep = {};
+  want.forEach(function (z) { keep[z] = true; });
+  state.offlineDetailLayers = (state.offlineDetailLayers || []).filter(function (rec) {
+    if (keep[rec.zoom]) return true;
+    try { viewer.imageryLayers.remove(rec.layer, true); } catch (e) { /* already gone */ }
+    return false;
+  });
+
+  // 挂上新增的
+  const haveZooms = {};
+  state.offlineDetailLayers.forEach(function (rec) { haveZooms[rec.zoom] = true; });
+  const bands = OfflineAssets.offlineDetailBands();
+  want.forEach(function (z) {
+    if (haveZooms[z]) return;
+    const band = bands.filter(function (b) { return b.zoom === z; })[0];
+    const rec = band && OfflineAssets.attachOfflineDetailBand(viewer, band);
+    if (rec) state.offlineDetailLayers.push(rec);
+  });
+
+  state.offlineDetailZooms = want;
+  LayerRegistry.dropImagery('imagery.offline_detail');
+  registerImagerySlot('imagery.offline_detail',
+    state.offlineDetailLayers.map(function (r) { return r.layer; }));
+  applyLayers();
 }
 
 /**
@@ -896,6 +1086,10 @@ function applySituationData(data, caseId) {
     state.urbanAoi = data.urban_aoi || [];
   }
   syncUrbanImagery();
+  // 同一批"按相机决定挂不挂"的层在这里一起对齐：案例加载后必须重判一次，
+  // 否则用 ?case= 深链直接进来时会停在"启动时的高度"这个错误判断上。
+  syncHotspotImagery();
+  syncOfflineDetail();
 
       dom.scenarioName.textContent = data.region + ' · ' + data.case_name;
       document.title = '三维ZCTS生成系统 — ' + data.case_name;
@@ -1121,12 +1315,19 @@ function renderCaseMenu() {
 
 const MENUS = [];
 
-/** 顶栏下拉菜单的通用开合。三个菜单互斥，点空白处全部收起。 */
-function bindMenu(buttonId, listId) {
+/**
+ * 顶栏下拉菜单的通用开合。各菜单互斥，点空白处全部收起。
+ *
+ * `opts.keepOpen` 是一个谓词：为真时**外部点击 / Esc 不收这个菜单**。
+ * 标绘面板靠它实现"绘制进行中不自动收起" —— 在图上点第一个控制点会触发 document
+ * 的点击，面板若被收掉，用户就看不见提示、也按不到"取消"。显式点按钮仍照收
+ * （那是用户的明确意图，不该被拦住）。
+ */
+function bindMenu(buttonId, listId, opts) {
   const btn = document.getElementById(buttonId);
   const list = document.getElementById(listId);
   if (!btn || !list) return;
-  MENUS.push({ btn: btn, list: list });
+  MENUS.push({ btn: btn, list: list, keepOpen: (opts && opts.keepOpen) || null });
   btn.addEventListener('click', function (e) {
     e.stopPropagation();
     const wasOpen = list.classList.contains('open');
@@ -1134,12 +1335,17 @@ function bindMenu(buttonId, listId) {
     if (!wasOpen) {
       list.classList.add('open');
       btn.setAttribute('aria-expanded', 'true');
+    } else {
+      // 显式点按钮 = 收起，即便这个菜单声明了 keepOpen。
+      list.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
     }
   });
 }
 
 function closeAllMenus() {
   MENUS.forEach(function (m) {
+    if (m.keepOpen && m.list.classList.contains('open') && m.keepOpen()) return;
     m.list.classList.remove('open');
     m.btn.setAttribute('aria-expanded', 'false');
   });
@@ -1505,24 +1711,26 @@ function createRouteEntities() {
 }
 
 /**
- * 热点区域框的高度（米）。
+ * 热点区域面的**固定高度**（米）：10000。
  *
- * 原先矩形是 `height: 0` 的一张**平面**：贴在椭球面上，一来没有"高度"可言，
- * 二来开了 DEM 地形后会被地形盖住（陆上区域尤其明显）。
- * 现在改成从地面拔起的**立体框**（`height` 作底、`extrudedHeight` 作顶），
- * 于是它同时解决了两个问题：有了可见的高度、且必然高过地形。
+ * 演进过程值得留着，因为两个版本的取舍不同：
+ *   ① 最早是 `height: 0` 的一张**平面**贴在椭球面上 —— 开了 DEM 地形后会被地形
+ *      盖住（陆上区域尤其明显），而且没有"高度"可言；
+ *   ② 后来改成从地面拔起的**立体框**（`height` 作底、`extrudedHeight` 作顶），
+ *      解决了遮挡，但在战区级视图下多个框的侧面互相穿插，把区域本身糊住了；
+ *   ③ 现在（2026-10-15，按用户要求）改为**悬在 10 km 的平面矩形**：
+ *      只保留"范围"这一条信息，不与地形打架，也不互相遮挡。
  *
- * 取 25 km：这些区域的经纬跨度约 0.5–1.5°（数十至一百多公里），25 km 的高度
- * 在默认机位（视高数百公里）下看得清，又不会把区域本身糊住。若某个热点自带
- * `height_m` 字段则以它为准，便于个别区域单独调整。
+ * 10 km 仍远高于地形（全球陆地最高约 4 km），所以②里"必须高过地形"的那条理由
+ * 依然成立 —— 这一步不是退回①，而是把"高度"从一个立体维度改成一个**抬升量**。
  *
- * 注意 `outlineWidth` 在 Windows/ANGLE 上被 Cesium 忽略（只能画 1px），
- * 所以"框"的立体感主要来自侧面与顶面，而不是加粗的棱线。
+ * **低于该视点不可见**：由 `refreshEntityVisibility()` 按相机高度置 `show`
+ * （与图层开关、单条隐藏都是"与"的关系，见那一段）。
  */
-const HOTSPOT_HEIGHT_M = 25000;
+const HOTSPOT_SURFACE_ALT_M = 10000;
 // 方向 4：热点按 kind 区分呈现。port / airport 是「设施」——加一个锚点图元，并把文字收进
 // 显式层级门槛（默认取 places.js LOD 的 rank-5 档 700 km：相机高于门槛时只留锚点、不显示文字）；
-// 其余 kind 保持既有矩形棱柱 + 名称不变。符号集里没有港口/机场图标，先用颜色区分，不引入新资源。
+// 其余 kind 保持既有的矩形面 + 名称不变。符号集里没有港口/机场图标，先用颜色区分，不引入新资源。
 const FACILITY_KINDS = {
   port: Cesium.Color.fromCssColorString('#1f6feb'),
   airport: Cesium.Color.fromCssColorString('#7b3fa0'),
@@ -1551,12 +1759,11 @@ function createHotspots() {
   state.data.hotspots.forEach(function (hs, i) {
     const w = hs.bbox[0], s = hs.bbox[1], e = hs.bbox[2], n = hs.bbox[3];
     const centerLat = hs.center[0], centerLon = hs.center[1];
-    const boxH = Number.isFinite(hs.height_m) ? hs.height_m : HOTSPOT_HEIGHT_M;
     const facility = FACILITY_KINDS[hs.kind] || null;
     const tint = facility || Cesium.Color.fromCssColorString('#f0a020');
 
-    // 热点区域按真实经纬范围绘制成矩形棱柱，而不是一个点 —— 面板展示的是"范围"，
-    // 一个点无法表示一条海峡或一个群岛。
+    // 热点区域按真实经纬范围绘制成**悬在固定高度的面状矩形**，而不是一个点 ——
+    // 面板展示的是"范围"，一个点无法表示一条海峡或一个群岛。
     const entity = viewer.entities.add({
       id: 'hotspot-' + i,
       name: hs.name,
@@ -1566,12 +1773,11 @@ function createHotspots() {
         outline: true,
         outlineColor: tint.withAlpha(0.85),
         outlineWidth: 1,
-        // 底在椭球面、顶在 boxH：得到一个立起来的框，而不是贴地的一张纸。
-        height: 0,
-        extrudedHeight: boxH,
+        // **不再有 extrudedHeight**：高度就是一个抬升量，见 HOTSPOT_SURFACE_ALT_M 的说明。
+        height: HOTSPOT_SURFACE_ALT_M,
       },
-      // 标签放到框顶：区域范围一高，标签留在底部会与侧面重叠、看起来像在框里。
-      position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, boxH),
+      // 标签跟着面走：放在同一个抬升高度上，不再"挂在框顶"。
+      position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, HOTSPOT_SURFACE_ALT_M),
       // 方向 4：设施类热点补一个锚点图元（符号集暂无港口/机场图标）。
       point: facility ? {
         pixelSize: 9,
@@ -1674,10 +1880,14 @@ function syncEntities() {
     e.show = !!state.layers.routes && !(key && state.hiddenRoutes[key]);
   });
   const camHeightM = viewer.camera.positionCartographic.height;
+  // 热点面固定在 10 km：**低于该视点不可见**（面就悬在头顶之上，从下面看不出范围）。
+  // 这条与图层开关、单条隐藏是"与"的关系 —— 三者任一不满足就不画。
+  const hotspotAboveSurface = camHeightM > HOTSPOT_SURFACE_ALT_M;
   state.hotspotEntities.forEach(function (e) {
     var id = typeof e.id === 'string' ? e.id : '';
     var key = id.indexOf('hotspot-') === 0 ? id.slice(8) : null;
-    e.show = !!state.layers.hotspots && !(key && state.hiddenHotspots[key]);
+    e.show = hotspotAboveSurface && !!state.layers.hotspots
+             && !(key && state.hiddenHotspots[key]);
       if (e.hsKind && e.label) e.label.show = e.show && camHeightM <= FACILITY_TEXT_MAX_HEIGHT_M;
   });
   updateOccupationAreas();
@@ -4599,6 +4809,8 @@ function bindUI() {
   // 不再需要 bindMenu。
   bindMenu('menuCase', 'menuCaseList');
   if (dom.menuCase) dom.menuCase.addEventListener('click', function () { openCaseMenu(); });
+  // 标绘面板：与 TS案例 同一套开合，外加"绘制进行中不因外部点击/Esc 收起"。
+  bindMenu('menuPlot', 'menuPlotPanel', { keepOpen: function () { return !!plotDraw; } });
   document.addEventListener('click', function () { closeAllMenus(); });
 
   // TS菜单：输入 / 管理 / 数据下载，三标签页共用一个模态框
@@ -4692,6 +4904,15 @@ function bindUI() {
   // 底图加载进度。queued 为 0 表示当前视野的瓦片已经全部就位。
   viewer.scene.globe.tileLoadProgressEvent.addEventListener(setLoadingTiles);
 
+  // 兜底看门狗：事件不来的话，上面那条"以 tilesLoaded 为准"的纠正就没有触发时机。
+  // 每 3 秒看一眼，若渲染器说加载完了而徽标还挂着，就按 0 收掉。代价是一次布尔读。
+  setInterval(function () {
+    if (!viewer || !viewer.scene || !viewer.scene.globe) return;
+    if (!viewer.scene.globe.tilesLoaded) return;
+    if (!dom.loadingBadge || dom.loadingBadge.classList.contains('hidden')) return;
+    setLoadingTiles(0);
+  }, 3000);
+
   viewer.camera.changed.addEventListener(function () {
     camChangedCount++;
     const now = Date.now();
@@ -4699,6 +4920,8 @@ function bindUI() {
     lastGeoUpdate = now;
     updateGeoReadout();
     syncUrbanImagery();
+    syncHotspotImagery();
+    syncOfflineDetail();
     guardFollow();
     if (window.Overview) Overview.onMainCameraChanged();
     if (window.Places) Places.onCameraChanged(false);

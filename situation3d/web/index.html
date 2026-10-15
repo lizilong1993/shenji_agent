@@ -32,6 +32,43 @@
       <button type="button" class="menu-btn" data-situation-cmd="download"
               title="导出当前帧 / 全帧 CSV / TS定义">TS下载</button>
 
+      <!-- 标绘：**创建**标绘的地方，原先在左栏的「标绘工具」里。
+           搬到顶栏的理由：它是"动作"，不是"图层开关"；左栏那个位置要滚过图层管理才看得见，
+           而它每次标绘都要用一次。
+           打开逻辑见 app.js 的 bindMenu('menuPlot', …) 那条调用：
+             · 点按钮开合；点面板外或按 Esc 收起；
+             · **绘制进行中不因外部点击而收起**（`keepOpen`），否则在图上点第一个控制点
+               就会把面板收掉，用户看不到提示、也按不到"取消"；
+             · 面板是按钮下方的**浮层，不是模态框**——绘制要在图上点，覆盖地图的模态框
+               会挡住操作（这正是原先不把它放进 TS注册 模态框的同一条理由）。
+           控件 id 全部沿用：bindPlotPanel() 与绘制逻辑一行都不用改。 -->
+      <div class="menu">
+        <button id="menuPlot" type="button" class="menu-btn" aria-haspopup="true" aria-expanded="false">
+          标绘 <span class="caret">▾</span>
+        </button>
+        <div id="menuPlotPanel" class="menu-list menu-plot-panel" role="menu">
+          <div class="plot-add">
+            <select id="plotType" class="plot-sel" title="标绘类型"></select>
+            <div class="plot-row">
+              <select id="plotSide" class="plot-sel">
+                <option value="friendly">红方</option>
+                <option value="enemy">蓝方</option>
+              </select>
+              <select id="plotLayer" class="plot-sel" title="归属图层"></select>
+            </div>
+            <input id="plotLabel" class="plot-input" type="text" placeholder="标注" maxlength="40">
+            <textarea id="plotPoints" class="plot-input" rows="2"
+                      placeholder="控制点：每行 经度, 纬度"></textarea>
+            <div class="plot-row">
+              <button type="button" id="plotDraw" class="mini">地图绘制</button>
+              <button type="button" id="plotAddByText" class="mini">按坐标添加</button>
+              <button type="button" id="plotCancel" class="mini">取消</button>
+            </div>
+            <div id="plotHint" class="switch-note"></div>
+          </div>
+        </div>
+      </div>
+
       <button id="btnRun" type="button" class="primary">TS自动推演</button>
     </nav>
 
@@ -49,32 +86,10 @@
       <!-- 图层管理现在独占左栏（目标列表已移除），不再需要"只让这一块滚动"的妥协，
            整列即它的滚动区。 -->
       <div class="layer-groups">
-      <!-- 标绘工具：**创建**标绘的地方，与「图层管理」分开。
-           原先它嵌在「标绘」图层组里，与图层开关混在一起 —— 开关回答"看不看"，
-           这里回答"画不画"，两件事放一块既难找也难讲清。
-           也**不放进 TS注册 模态框**：那个模态框会盖住地图，而绘制必须在图上点。 -->
-      <details class="layer-group panel-block" open>
-        <summary>标绘工具</summary>
-        <div class="plot-add">
-          <select id="plotType" class="plot-sel" title="标绘类型"></select>
-          <div class="plot-row">
-            <select id="plotSide" class="plot-sel">
-              <option value="friendly">红方</option>
-              <option value="enemy">蓝方</option>
-            </select>
-            <select id="plotLayer" class="plot-sel" title="归属图层"></select>
-          </div>
-          <input id="plotLabel" class="plot-input" type="text" placeholder="标注" maxlength="40">
-          <textarea id="plotPoints" class="plot-input" rows="2"
-                    placeholder="控制点：每行 经度, 纬度"></textarea>
-          <div class="plot-row">
-            <button type="button" id="plotDraw" class="mini">地图绘制</button>
-            <button type="button" id="plotAddByText" class="mini">按坐标添加</button>
-            <button type="button" id="plotCancel" class="mini">取消</button>
-          </div>
-          <div id="plotHint" class="switch-note"></div>
-        </div>
-      </details>
+      <!-- 标绘工具已移到顶栏【标绘】下拉（见 .topbar-actions 里的 #menuPlot）。
+           原因：它是"动作"（画什么），不是"图层开关"（看不看）；放在左栏要滚过图层管理
+           才看得见，而它每次标绘都要用。控件的 id 与绑定逻辑全部沿用，只是换了个位置。 -->
+
 
       <!-- 顶栏的「图层管理」下拉已移除，批量操作就近放在这里，功能不丢。 -->
       <div class="layer-cmds">

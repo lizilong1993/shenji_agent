@@ -54,6 +54,17 @@
   // Cesium 自己的影像请求就会饿死——底图变黑，而日志里什么错都没有。
   const WARM_CONCURRENCY = 2;
 
+  // 预热队列的**上界**。必须有：每一张影像未命中都会 warm() 一次，而队列只在
+  // "底图空闲"时才排空 —— 一旦场景长期不空闲（战区级视图下 Cesium 会为每个表面
+  // 瓦片准备成千上万张深层瓦片），队列与 warming 集合就会无界增长。实测
+  // 2026-10-15：1939 km 机位下一次页面加载积了 **287,099** 条 URL，全是内存里的
+  // 死重量。超上界的一律不排队（也不占 warming），并计入 warmDropped 供诊断。
+  const WARM_QUEUE_LIMIT = 1024;
+  // 空闲判定从"queued === 0"放宽为"连续这么多毫秒没有新的瓦片活动"：
+  // queued 归零是**充分**条件但不是必要条件 —— 只要有一个表面瓦片长期不完成，
+  // 它就永远不归零，预热于是永远不开始，形成"越卡越不预热"的死锁。
+  const IDLE_SETTLE_MS = 1500;
+
   const memory = new Map();     // url -> canvas（Map 保持插入序，用作 LRU）
   const warming = new Set();    // 正在预热的 url，避免重复取
   const stats = {
@@ -64,11 +75,15 @@
     stored: 0,
     evicted: 0,
     preloaded: 0,
+    warmDropped: 0,             // 因队列满而未排队的**尝试**数：同一张瓦片每次重试都会再计一次
+                                // （被丢弃的 URL 不进 warming 集合，所以不记忆，这是有意的：
+                                //  记住它们等于把刚刚才裁掉的内存又长回来）
     // 内存里当前的瓦片数。放在 stats 上是为了让诊断浮层能直接读，而不必
     // 走一次异步的 snapshot()。
     get memoryCount() { return memory.size; },
     get memoryLimit() { return MEMORY_LIMIT; },
     get warmingCount() { return warming.size; },
+    get warmQueueCount() { return warmQueue.length; },
     get idleFlag() { return sceneIdle; },
     lastError: null,
     errorLog: [],
@@ -342,11 +357,12 @@
     throw lastError || new Error('tile fetch failed: ' + url);
   }
 
-  // 预热队列。只有底图空闲（tileLoadProgressEvent 归零）时才会排空，保证
-  // 预热永远不和当前视野的渲染抢连接。
+  // 预热队列。只有底图空闲（tileLoadProgressEvent 归零，或安静到 IDLE_SETTLE_MS）
+  // 时才会排空，保证预热永远不和当前视野的渲染抢连接。
   const warmQueue = [];
   let warmInflight = 0;
   let sceneIdle = false;
+  let lastTileActivity = Date.now();
 
   /**
    * 通知缓存当前底图是否已经加载完。
@@ -355,8 +371,10 @@
    * 底图还在加载时，任何额外请求都是净损失。
    */
   function setIdle(idle) {
+    if (!idle) lastTileActivity = Date.now();   // 有瓦片活动：重新计时
     sceneIdle = !!idle;
     if (!sceneIdle) return;
+    lastTileActivity = Date.now();
     drainWarmQueue();
     if (!preloadStarted) {
       preloadStarted = true;
@@ -364,9 +382,25 @@
     }
   }
 
+  // 兜底闸门：即使 setIdle(true) 一直没来（表面瓦片长期不完成 → queued 永不归零），
+  // 只要安静了 IDLE_SETTLE_MS 就允许排空。每秒只读一个时间戳，代价可忽略；
+  // 真正取图的并发仍受 WARM_CONCURRENCY 限制，所以它不会反噬渲染。
+  setInterval(function () {
+    if (!sceneIdle && Date.now() - lastTileActivity >= IDLE_SETTLE_MS) {
+      sceneIdle = true;
+      drainWarmQueue();
+    }
+  }, 1000);
+
   /** 后台预热一张瓦片。同一张瓦片不会重复取，失败静默。 */
   function warm(url) {
     if (memory.has(url) || warming.has(url)) return;
+    if (warmQueue.length >= WARM_QUEUE_LIMIT) {
+      // 队列已满：**不排队、也不占 warming**。丢掉的是"下次能不能命中"，
+      // 不影响这一帧能不能画出来 —— 这正是缓存设计原则里那条边界。
+      stats.warmDropped++;
+      return;
+    }
     warming.add(url);
     warmQueue.push(url);
     if (sceneIdle) drainWarmQueue();

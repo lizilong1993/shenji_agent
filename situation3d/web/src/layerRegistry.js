@@ -48,9 +48,26 @@
   /**
    * z 序号按「栈内从下到上」编号，中间留出空档以便插入新层而不必重排。
    *
-   * 参考层级（自下而上）：
-   *   在线底图 → 离线底图 → 热点/城区高清影像 → 建筑高度覆盖 → 三维实景/体块
-   *   → TS几何（航迹/计划路线）→ 热点区域面 → 目标/标牌 → 地名 → 目标元数据面板
+   * **imagery 栈**（自下而上，数值即 `imageryLayers` 的 index 顺序）：
+   *   z=5   离线底图 `imagery.offline` —— **垫在在线底图之下**，是断网 / 上游失败时的
+   *         兜底：有在线瓦片的地方被盖住，没有的地方露出它，而不是露出球体底色
+   *         （以前底图"变蓝"就是这个）。⚠ 本条注释早先写成"在线底图 → 离线底图"，
+   *         与数值相反，2026-10-15 订正 —— **注释与值不一致比没有注释更坏**。
+   *   z=10  天地图影像 `tianditu.base`（在线底图）
+   *   z=30  热点区域高清影像 `hotspot.imagery`（按相机高度挂，见 app.js syncHotspotImagery）
+   *   z=40  城区高清影像 `urban.imagery`（**只到 z13**）
+   *   z=45  离线高清底图 `imagery.offline_detail`（**从 z14 起**，mbtiles 由 /tiles_db 直发）
+   *   z=50  建筑高度覆盖 `wsf3d.overlay`（半透明叠加）
+   *   z=90  天地图注记 `tianditu.label`（注记永远最上）
+   *
+   * ⚠ 城区(40) 与 离线高倍段(45) **按 z 分段、互不重叠**：z≤13 读静态瓦片树（Esri），
+   * z≥14 读瓦片库（谷歌）。若两者都覆盖 z14-17，同一片城区会被**两个 provider 各取
+   * 一遍**（数据源还不同），而画面上只有上面那层可见 —— 纯浪费。分段后规则只剩一条：
+   * **看 z 就知道是哪个源**。实现见 assets.js 的 `URBAN_TREE_MAX_ZOOM`。
+   *
+   * **其它栈**（各自独立，与 imagery 不同轴，见文件头）：
+   *   三维实景/体块（primitive）→ TS几何（航迹/计划路线）→ 热点区域面 → 目标/标牌
+   *   → 地名 → 目标元数据面板
    *
    * 标绘栈（`kind: 'plot'`）**单独占最高段 z=80—93**，与上面这条链不同轴、不可比：
    *   80 机动/集结 → 83 进攻 → 85 占领区域 → 87 防御/障碍 → 90 火力 → 93 侦察/空域
@@ -660,6 +677,18 @@
     // 顺序必须在可见性之后重排：刚挂上的层还没有正确 index。
     // 只重排「已挂载」的，城区/热点未挂载时自动跳过。
     out.imagery = reorderImagery(list('imagery').map(function (l) { return l.id; }));
+
+    // 自检：锚定完成后，已登记影像层必须**正好**占据 0..n-1。若不是，说明声明的 z
+    // 顺序与实际栈顺序不一致 —— 面板上的层级关系就是错的，而画面**不会报错**
+    // （只表现为"某个东西莫名被盖住"）。这条把"看不出来的错"变成一条可见告警。
+    var ord = out.imagery && out.imagery.order;
+    if (ord && ord.length) {
+      out.imagery.consistent = ord.every(function (v, i) { return v === i; });
+      if (!out.imagery.consistent) {
+        out.skipped.push('imagery 栈顺序与注册表 z 不一致（期望 0..' + (ord.length - 1)
+                         + '，实际 ' + ord.join(',') + '）');
+      }
+    }
     return out;
   }
 
