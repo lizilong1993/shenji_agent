@@ -203,13 +203,42 @@
 
   /** 中文注记层：影像底图必须叠这一层才有地名。 */
   function createTiandituLabelProvider() {
+    // ⚠ 取 **cia（影像注记）**，不是 cva（矢量注记）—— 2026-10-16 订正。
+    // 依据：这一层叠的是**卫星影像底图**（`img`），与 img 配套的注记是 cia；
+    // cva 是给矢量底图（vec）用的，它在低层级几乎没有瓦片（实测库内 cva 只有 z7 的
+    // 20 张、z1-6 一张都没有），大视野下用它等于"没反应"；同一视野 cia 有内容比例
+    // 19/20、中位 5.5 KB。
     return new Cesium.UrlTemplateImageryProvider({
-      url: tiandituUrl('cva'),
+      url: tiandituUrl('cia'),
       tilingScheme: new Cesium.WebMercatorTilingScheme(),
       minimumLevel: 1,
       maximumLevel: 18,
       credit: '天地图注记',
     });
+  }
+
+  /**
+   * 在线 Esri World Imagery：底图分组里的一个可选底图。
+   *
+   * **浏览器直连，不经服务端代理**。实测（2026-10-16）Esri 瓦片响应带
+   * `Access-Control-Allow-Origin: *`，所以不需要像天地图那样做代理 ——
+   * 也就不需要重启服务。（对照：带 Origin 直连天地图返回 **418**，那才是必须代理的原因。）
+   * 代价：断网时这一层为空 —— 它是"在线"层，离线兜底由「Esri 影像（离线）」负责。
+   *
+   * 模板里 **`{y}` 在 `{x}` 之前**（ArcGIS REST 是 tile/{z}/{row}/{col}），
+   * 与 manifest.imagery.url_template 记的一致。
+   */
+  const ESRI_ONLINE_URL =
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+
+  function createEsriProvider() {
+    return attachCached(new Cesium.UrlTemplateImageryProvider({
+      url: ESRI_ONLINE_URL,
+      tilingScheme: new Cesium.WebMercatorTilingScheme(),
+      minimumLevel: 0,
+      maximumLevel: 19,
+      credit: 'Esri World Imagery (online)',
+    }), ESRI_ONLINE_URL);
   }
 
   /**
@@ -1201,6 +1230,7 @@
     createGlobalImageryProvider: createGlobalImageryProvider,
     createTiandituProvider: createTiandituProvider,
     createTiandituLabelProvider: createTiandituLabelProvider,
+    createEsriProvider: createEsriProvider,
     // 天地图可用性探测。**不再导出 key**——key 只存在服务端 .env，
     // 浏览器这一侧根本不需要知道它（这正是改走代理的目的之一）。
     probeTianditu: probeTianditu,

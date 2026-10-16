@@ -122,7 +122,8 @@ const state = {
   urbanLayers: null,        // 城区 z12-z14 高清影像层（按相机高度挂载）
   urbanAoi: [],             // 城区 AOI 列表
   urbanEnabled: true,       // 城区高清影像是否启用（图层管理「底图」）
-  globalLayer: null,        // 全球底图层（z0-6）
+  globalLayer: null,        // 离线全球层（z0-6，Esri 瓦片树）
+  esriLayer: null,          // 在线 Esri 底图（浏览器直连，无代理）
   hotspotLayers: [],        // 热点区域高清层（每框一个 provider）
   hotspotImageryEnabled: true,  // 热点高清影像是否启用（与 urbanEnabled 同构）
   hotspotImageryMounted: false, // 当前是否因相机高度而挂着（区别于"用户想不想要"）
@@ -149,8 +150,10 @@ let lastFrameMs = 0;
 let lastGeoRefresh = 0;
 let camChangedCount = 0;      // camera.changed 触发次数（诊断用）
 
-// base.json 缺失时的兜底机位（台海全景）
-const FALLBACK_CAMERA = { lon: 119.6, lat: 24.4, height: 900000, heading: 0, pitch: -75 };
+// base.json 缺失时的兜底机位：**中国全景**（2026-10-16 由"台海全景"改）。
+// 需求是"初始化时把视点中心定位在中国"；base.json 里的 camera 是同一组值，
+// 两者保持一致，这样 base.json 缺失时行为不变。加载具体案例仍飞回案例机位。
+const FALLBACK_CAMERA = { lon: 104.0, lat: 35.5, height: 8000000, heading: 0, pitch: -90 };
 
 // 已移除的 id（连同对应的面板一起）：targetList / targetCountHint（左栏目标列表）、
 // healthSummary / healthBody / healthRefresh（数据健康栏）、
@@ -553,6 +556,12 @@ function initViewer() {
 
   // 注记层紧贴天地图影像之上（index 1）。
   viewer.imageryLayers.add(state.tiandituLabelLayer);
+
+  // 在线 Esri 底图：与天地图并列的**可选底图**（默认关，见注册表 esri.online）。
+  // 浏览器直连 Esri（其瓦片带 CORS 头，无需服务端代理，见 assets.js 的说明）；
+  // 与其它底图一样**始终存在**，切换只动 .show，不重建 provider。
+  state.esriLayer = new Cesium.ImageryLayer(OfflineAssets.createEsriProvider());
+  viewer.imageryLayers.add(state.esriLayer);
   // 离线全球层：默认关闭（天地图是默认底图），但**始终存在**，切回离线时只是
   // 把 show 打开，不再重建 provider——避免重复初始化与重复请求。
   // 反过来，离线底图是唯一"离线环境下一定有图"的图层，所以不能删。
@@ -640,6 +649,8 @@ function initViewer() {
   // 常驻 imagery 槽位登记（动态层在挂载时登记，见 registerImagerySlot）。
   registerImagerySlot('tianditu.base', state.tiandituLayer);
   registerImagerySlot('tianditu.label', state.tiandituLabelLayer);
+  // 在线 Esri 底图（默认关，但常驻，顺序由注册表的 z=11 决定）
+  registerImagerySlot('esri.online', state.esriLayer);
   // 离线底图是**两级**：全球层 z0-6 + 战区层 z7-11，共用一个 imagery.offline 意图。
   // 两个都要登记——只登记全球层的话，战区层会留在顺序之外，反而压到注记上面。
   registerImagerySlot('imagery.offline', [state.globalLayer, state.imageryLayer]);
@@ -1318,16 +1329,26 @@ const MENUS = [];
 /**
  * 顶栏下拉菜单的通用开合。各菜单互斥，点空白处全部收起。
  *
- * `opts.keepOpen` 是一个谓词：为真时**外部点击 / Esc 不收这个菜单**。
- * 标绘面板靠它实现"绘制进行中不自动收起" —— 在图上点第一个控制点会触发 document
- * 的点击，面板若被收掉，用户就看不见提示、也按不到"取消"。显式点按钮仍照收
- * （那是用户的明确意图，不该被拦住）。
+ * `opts.keepOpen` 是一个谓词：为真时**外部点击不收这个菜单**（Esc 仍能收，
+ * 走 `closeAllMenus(true)` 的强制通道 —— 两者语义不同：外部点击是"你可能想干别的"，
+ * Esc 是"我明确要关它"）。
+ *
+ * ⚠ 2026-10-16 修一个真实缺陷：原先只在**按钮**上 `stopPropagation`，而
+ * `document` 上挂着 `click → closeAllMenus`。于是**点面板内部的任何控件**
+ * （类型下拉、红蓝方下拉、输入框…）都会冒泡到 document，把面板自己关掉 ——
+ * 表现就是"在标绘过程中点选项会直接退出标绘工具"。
+ * 现在给面板本身也加 `stopPropagation`：面板内部的操作不再影响菜单开合。
  */
 function bindMenu(buttonId, listId, opts) {
   const btn = document.getElementById(buttonId);
   const list = document.getElementById(listId);
   if (!btn || !list) return;
   MENUS.push({ btn: btn, list: list, keepOpen: (opts && opts.keepOpen) || null });
+  // 面板内的点击不冒泡到 document：否则 document 的 closeAllMenus 会把面板关掉。
+  // 用 capture 之外的两个事件都拦：select 在部分浏览器上只发 pointerdown/click 之一。
+  ['click', 'pointerdown', 'mousedown'].forEach(function (ev) {
+    list.addEventListener(ev, function (e) { e.stopPropagation(); });
+  });
   btn.addEventListener('click', function (e) {
     e.stopPropagation();
     const wasOpen = list.classList.contains('open');
@@ -1343,9 +1364,12 @@ function bindMenu(buttonId, listId, opts) {
   });
 }
 
-function closeAllMenus() {
+/**
+ * 收起菜单。`force = true` 时忽略 `keepOpen`（Esc 走这条）。
+ */
+function closeAllMenus(force) {
   MENUS.forEach(function (m) {
-    if (m.keepOpen && m.list.classList.contains('open') && m.keepOpen()) return;
+    if (!force && m.keepOpen && m.list.classList.contains('open') && m.keepOpen()) return;
     m.list.classList.remove('open');
     m.btn.setAttribute('aria-expanded', 'false');
   });
@@ -4809,8 +4833,11 @@ function bindUI() {
   // 不再需要 bindMenu。
   bindMenu('menuCase', 'menuCaseList');
   if (dom.menuCase) dom.menuCase.addEventListener('click', function () { openCaseMenu(); });
-  // 标绘面板：与 TS案例 同一套开合，外加"绘制进行中不因外部点击/Esc 收起"。
-  bindMenu('menuPlot', 'menuPlotPanel', { keepOpen: function () { return !!plotDraw; } });
+  // 标绘面板：与 TS案例 同一套开合，但它是**工具面板**，不因外部点击而收起
+  // （keepOpen 恒真）——只有点【标绘】按钮或按 Esc 才关。
+  // 面板内部控件的 stopPropagation 由 bindMenu 统一加上，所以点类型/红蓝方
+  // 下拉不会再把它关掉。
+  bindMenu('menuPlot', 'menuPlotPanel', { keepOpen: function () { return true; } });
   document.addEventListener('click', function () { closeAllMenus(); });
 
   // TS菜单：输入 / 管理 / 数据下载，三标签页共用一个模态框
@@ -4833,7 +4860,9 @@ function bindUI() {
     });
   document.addEventListener('keydown', function (e) {
     // 浮动目标面板已移除，Esc 改为清除选中态 + 复位目标TS栏。
-    if (e.key === 'Escape') { closeCaseMenu(); clearTargetSelection(); }
+    // Esc 走**强制**关菜单：它区别于"外部点击"——后者对工具面板（标绘）是豁免的，
+    // 而按 Esc 是用户明确要关掉。
+    if (e.key === 'Escape') { closeAllMenus(true); clearTargetSelection(); }
   });
 
   document.getElementById('btnPlay').addEventListener('click', function () { setPlaying(!state.playing); });

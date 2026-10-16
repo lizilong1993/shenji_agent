@@ -229,12 +229,7 @@
       // 实景瓦片与本机离线 DEM 几何冲突，必须让 globe 让位。
       // 记录原值，关掉这个图层时恢复。
       state.globeWasShowing = viewer.scene.globe.show;
-      viewer.scene.globe.show = false;
-
-      // globe 关掉后地面氛围光失效，海面会读成纯黑；给一个接近海色的背景兜底，
-      // 保证"关掉 globe"不至于看起来像渲染坏了。
-      viewer.scene.globe.showGroundAtmosphere = false;
-      viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#0a1520');
+      syncGlobeVisibility();
 
       setPhase('live', 'Google Photorealistic 3D Tiles（在线，不可离线缓存）');
       return tileset;
@@ -247,8 +242,37 @@
       } else {
         setPhase('failed', '无法加载在线实景：' + msg);
       }
+      // 失败时把 globe 交还给用户：没有任何实景瓦片要显示，却让地球继续隐形，
+      // 结果就是"底图与注记全没了"（实测过）。
+      syncGlobeVisibility();
       return null;
     });
+  }
+
+  /**
+   * 让地球的显隐跟着"实景瓦片**此刻是否真的在显示**"走。
+   *
+   * 这一条是 2026-10-16 的订正。原先的注释写着"隐藏时不恢复 globe：globe 的开关
+   * 跟着**图层是否存在**走"，于是 `setVisible(false)` 只把 tileset 的 `.show` 置否、
+   * globe 继续 `show=false` —— 而注册表的 primitive sink 走的**正是 setVisible**。
+   * 后果：用户在图层管理里取消勾选「在线三维实景建筑」之后，**地球仍然是隐形的**，
+   * 于是天地图影像、天地图注记这些**栅格图层全部消失**（它们都画在 globe 上）。
+   * 这正是"注记图层没反应"的一条真实原因。
+   *
+   * 新语义：`globe.show = !(tileset 存在 且 正在显示)`。
+   *   · 实景在显示 → globe 让位（原设计目的：避免与离线 DEM 几何冲突）；
+   *   · 取消勾选 / 加载失败 / 已卸载 → globe 回来。
+   * 背景色同理：只有实景在显示时才用那个"接近海色"的兜底色。
+   */
+  function syncGlobeVisibility() {
+    var viewer = state.viewer;
+    if (destroyed(viewer)) return;
+    var showing = !!(state.tileset && state.tileset.show);
+    viewer.scene.globe.show = !showing && state.globeWasShowing !== false;
+    viewer.scene.globe.showGroundAtmosphere = !showing;
+    viewer.scene.backgroundColor = showing
+      ? Cesium.Color.fromCssColorString('#0a1520')
+      : Cesium.Color.BLACK;
   }
 
   function removeTileset() {
@@ -259,12 +283,8 @@
       } catch (e) { /* 已经不在集合里就算了 */ }
     }
     state.tileset = null;
-    if (!destroyed(viewer)) {
-      // 恢复本机 DEM：这是"关掉在线层就能回到离线能力"的关键一步。
-      viewer.scene.globe.show = state.globeWasShowing !== false;
-      viewer.scene.globe.showGroundAtmosphere = true;
-      viewer.scene.backgroundColor = Cesium.Color.BLACK;
-    }
+    // 恢复本机 DEM：这是"关掉在线层就能回到离线能力"的关键一步。
+    syncGlobeVisibility();
   }
 
   /**
@@ -274,12 +294,13 @@
    * setVisible 管"此刻画不画"（纯 .show）。图层注册表的 primitive sink 用后者，
    * 因为互斥解算每轮都会调一次，不能每次都去联网。
    *
-   * 注意隐藏时不恢复 globe：globe 的开关跟着**图层是否存在**走，不是跟着某帧的
-   * show。否则来回切一次就会把地形闪出来又盖回去。
+   * globe 的显隐**跟着 `.show` 一起变**（见 syncGlobeVisibility 的说明）：
+   * 否则"取消勾选"会把地球连同所有栅格底图一起留在隐形状态。
    */
   function setVisible(on) {
     if (!state.tileset) return false;
     state.tileset.show = !!on;
+    syncGlobeVisibility();
     emit();
     return true;
   }

@@ -49,16 +49,20 @@
    * z 序号按「栈内从下到上」编号，中间留出空档以便插入新层而不必重排。
    *
    * **imagery 栈**（自下而上，数值即 `imageryLayers` 的 index 顺序）：
-   *   z=5   离线底图 `imagery.offline` —— **垫在在线底图之下**，是断网 / 上游失败时的
-   *         兜底：有在线瓦片的地方被盖住，没有的地方露出它，而不是露出球体底色
-   *         （以前底图"变蓝"就是这个）。⚠ 本条注释早先写成"在线底图 → 离线底图"，
-   *         与数值相反，2026-10-15 订正 —— **注释与值不一致比没有注释更坏**。
-   *   z=10  天地图影像 `tianditu.base`（在线底图）
+   *   z=10  天地图影像 `tianditu.base`（在线底图，默认开）
+   *   z=11  Esri 影像（在线）`esri.online`（浏览器直连 Esri，无需代理）
+   *   z=12  Esri 影像（离线）`imagery.offline`（静态瓦片树 z0-11）
    *   z=30  热点区域高清影像 `hotspot.imagery`（按相机高度挂，见 app.js syncHotspotImagery）
    *   z=40  城区高清影像 `urban.imagery`（**只到 z13**）
    *   z=45  离线高清底图 `imagery.offline_detail`（**从 z14 起**，mbtiles 由 /tiles_db 直发）
    *   z=50  建筑高度覆盖 `wsf3d.overlay`（半透明叠加）
    *   z=90  天地图注记 `tianditu.label`（注记永远最上）
+   *
+   * 三行底图的次序是 **天地图(10) < Esri 在线(11) < Esri 离线(12)**：离线在上，符合
+   * 本项目"离线优先"的取向；两两都开时靠 z 决定谁可见，不做互斥解算。
+   * （历史：`imagery.offline` 原为 z=5、垫在天地图之下当兜底 —— 结果是勾上它画面
+   *   毫无变化。2026-10-16 按"Esri 图层要能作为底图加载管理"的要求改为 z=12，
+   *   理由与代价写在下面那一行的注释里。）
    *
    * ⚠ 城区(40) 与 离线高倍段(45) **按 z 分段、互不重叠**：z≤13 读静态瓦片树（Esri），
    * z≥14 读瓦片库（谷歌）。若两者都覆盖 z14-17，同一片城区会被**两个 provider 各取
@@ -82,19 +86,30 @@
   // "HTML 里勾着、注册表里以为关着"这种两边不一致。
   var LAYERS = [
     // ---- imagery 栈：序号即 imageryLayers 的 index，越大越靠上 ----
-    // 离线底图**垫在天地图下面**（z=5 < z=10），两者不再互斥。
+    // 【2026-10-16 改】离线 Esri 底图由 z=5 提到 **z=12**，并改名「Esri 影像（离线）」。
     //
-    // 原先是互斥的：两边都开时"后动的一方赢"，另一方判为不可见。规则本身没问题，
-    // 但前提假设错了——它假设两个底图是**二选一**。实际发生的是：天地图 key 配额
-    // 耗尽后返回 429，整张底图变成一片深蓝（地球底色），而离线底图被互斥规则按住，
-    // 明明有瓦片却不肯显示。
+    // 原先它 z=5、**垫在天地图（z=10）之下**，定位是"兜底层"：天地图有瓦片的地方
+    // 盖住它，没瓦片的地方露出它，避免 key 失效时看到球体底色。那个设计本身没错，
+    // 但用户的实际观感是——**勾上「影像底图（离线）」画面没有任何变化**，因为
+    // 天地图在线底图把它整个盖住了。用户的要求是"Esri 图层也要能作为底图加载并管理"，
+    // 所以这里把语义从"兜底层"改为"**可独立加载的底图**"：开它、关天地图即切换。
     //
-    // 垫一层就没有这个单点：天地图有瓦片的地方盖住离线层；没瓦片的地方（离线、
-    // key 失效、瓦片还在路上）露出离线影像，而不是露出球体底色。代价是天地图加载
-    // 期间会短暂看到较粗的离线影像——这比看到空洞好。
+    // 代价（明说）：Esri 离线层打开时会**盖住天地图影像**；要看天地图就关掉它。
+    // 保留了原设计真正想防的那件事——它仍在**天地图之上**却默认关闭，所以默认视图
+    // 与以前一致（天地图在线影像）；只有用户主动打开它时才改变。
+    //
+    // 互斥规则仍然不用：两边都开时靠 z 决定谁在上，不判"谁不可见"。
+    //
+    // 三行底图的相对次序：天地图(10) < Esri 在线(11) < Esri 离线(12) —— 离线优先，
+    // 与本项目"离线兜底"的取向一致。
     {
-      id: 'imagery.offline', kind: 'imagery', z: 5, default: false,
-      label: '影像底图（离线）', group: '底图', checkbox: 'modelImagery',
+      id: 'imagery.offline', kind: 'imagery', z: 12, default: false,
+      label: 'Esri 影像（离线）', group: '底图', checkbox: 'modelImagery',
+      exclusives: [],
+    },
+    {
+      id: 'esri.online', kind: 'imagery', z: 11, default: false,
+      label: 'Esri 影像（在线）', group: '底图', checkbox: 'modelEsriOnline',
       exclusives: [],
     },
     {
@@ -157,16 +172,24 @@
       group: '底图', default: false, checkbox: 'modelWeather' },
     // ---- scene primitive 栈：mesh 类，两两互斥（同一块地面不能同时铺两套网格）
     {
-      id: 'tiles.google3d', kind: 'primitive', z: 10, default: true,
+      // 【2026-10-16 改】默认由 **true → false**。
+      // 原因（实测）：这一层挂载成功后会**把地球关掉**（`globe.show=false`，为避免在线
+      // 实景与本机 DEM 几何冲突）。而「天地图影像」「天地图注记」「Esri 影像」等都是
+      // **画在地球上的栅格图层** —— 地球一关，它们全都消失。默认打开它，等于默认状态
+      // 下没有影像、没有注记，用户看到的现象就是"注记图层没反应"。
+      // 关掉它、需要时再打开：栅格底图与注记照常工作；关闭/失败时 globe 会由
+      // `buildings3d.js` 的 `syncGlobeVisibility()` 恢复（同批改动）。
+      // 想恢复"默认开"就把这一行改回 true —— 但请一并接受"默认看不到天地图与注记"。
+      id: 'tiles.google3d', kind: 'primitive', z: 10, default: false,
       label: '在线三维实景建筑（Google 3D Tiles）', group: '底图',
       checkbox: 'modelBuildingsOnline',
       // 实测：Google 实景瓦片与本机离线 DEM 几何冲突，启用时必须关掉 globe。
       //
       // ⚠ 这里原先写的是 `requires: { globeHidden: true }` —— **那是一句空话**：
       // `resolve()` 只处理 `exclusives`，全仓**没有任何代码读 `requires`**（它只出现过
-      // 这唯一一次）。真正关掉 globe 的地方是 `buildings3d.js` 挂载在线瓦片时：
-      //   `state.globeWasShowing = viewer.scene.globe.show; viewer.scene.globe.show = false;`
-      // 卸载时再恢复（同文件 264-265 行）。
+      // 这唯一一次）。真正关掉 globe 的地方在 `buildings3d.js`：
+      // 挂载时 `syncGlobeVisibility()` 让 globe 让位（因为 tileset 正在显示）；
+      // 取消勾选 / 加载失败 / 卸载时它再把 globe 还回来。
       //
       // 之所以不改成"在 resolve() 里实现它"：`resolve()` 算的是**可见性**，
       // 而 `globeHidden` 是**场景副作用**，还带保存/恢复语义 —— 放进去反而更绕。
