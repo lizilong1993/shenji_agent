@@ -348,6 +348,7 @@ function renderDiagnostics() {
                '  disk-preload ' + tc.preloaded + '  idle ' + tc.idleFlag);
     lines.push('prefetch        取回 ' + tc.prefetched + '  在途 ' + tc.prefetchInflightCount +
                '  排队 ' + tc.prefetchQueueCount + '  丢弃 ' + tc.prefetchDropped +
+               '  404跳过 ' + tc.prefetchMiss404Count + '（已知没有 ' + tc.prefetchMissedCount + '）' +
                '  ' + (window.TileCache.prefetchConfig ? JSON.stringify(TileCache.prefetchConfig()) : ''));
     if (tc.lastError) lines.push('cache error     ' + String(tc.lastError).slice(0, 120));
   }
@@ -1266,7 +1267,13 @@ function applyPrefetchParams() {
     if (pf === 'off' || pf === '0' || pf === 'false') cfg.enabled = false;
     else if (pf === 'all') { cfg.enabled = true; cfg.range = ['children', 'parents', 'siblings']; }
     else if (pf === 'on' || pf === '1') cfg.enabled = true;
-    else cfg.range = pf.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    else {
+      // 显式给出范围（如 `?prefetch=children`）本身就意味着"要开"：
+      // 否则会静默不生效 —— 实测 `?prefetch=children` 曾把 range 设好却仍是
+      // enabled:false（因为 base.json 里默认关），看起来像"这个参数没用"。
+      cfg.enabled = true;
+      cfg.range = pf.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    }
   }
   const num = { prefetchConcurrency: 'concurrency', prefetchIdleMs: 'idleDelayMs',
                 prefetchPerSec: 'maxPerSecond', prefetchQueue: 'queueLimit',

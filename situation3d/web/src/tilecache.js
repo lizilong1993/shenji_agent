@@ -73,6 +73,7 @@
     evicted: 0,
     preloaded: 0,
     prefetched: 0,              // 预加载真正取回来的张数
+    prefetchMiss404: 0,         // 预取问到"本来就不存在"的瓦片（瓦片库 bbox 边界处天然为空）的次数
     prefetchDropped: 0,         // 因队列满而未排队的**尝试**数：同一张瓦片每次重试都会再计一次
                                 // （被丢弃的 URL 不进 prefetchPending 集合，所以不记忆，这是有意的：
                                 //  记住它们等于把刚刚才裁掉的内存又长回来）
@@ -83,6 +84,8 @@
     get prefetchPendingCount() { return prefetchPending.size; },
     get prefetchQueueCount() { return prefetchQueue.length; },
     get prefetchInflightCount() { return prefetchInflight; },
+    get prefetchMiss404Count() { return stats.prefetchMiss404; },
+    get prefetchMissedCount() { return missed.size; },
     get idleFlag() { return sceneIdle; },
     lastError: null,
     errorLog: [],
@@ -346,14 +349,34 @@
         return canvas;
       } catch (e) {
         lastError = e;
-        noteError((e && e.status ? 'HTTP ' + e.status : (e && e.message) || String(e)) +
-                  ' ' + url);
-        if (e.status === 404) break;
+        if (e.status === 404) {
+          // 预加载是**猜**——它会去问一些本来就不存在的瓦片（瓦片库的 bbox 填充率
+          // 只有 55%~84%，边界处天然是空的）。这类 404 是预期内的，不该混进错误日志
+          // （否则 diag 上会冒出一串"cache error"，看起来像坏了），但要计数，并且
+          // 记进"已知没有"的集合，后续不再重复问。实测 42 次预取里有 18 次是这种。
+          noteMiss(url);
+          stats.prefetchMiss404++;
+          break;
+        }
+        noteError((e && e.message) || String(e) + ' ' + url);
         await new Promise(function (r) { setTimeout(r, 200 * (i + 1)); });
       }
     }
-    stats.errors++;
+    // 404 是预加载的预期结果（猜到了不存在的瓦片），只在 prefetchMiss404 里计数；
+    // 真正的错误（超时/网络/解码）才进 errors —— 否则 diag 上会一直挂着几条"cache error"。
+    if (!(lastError && lastError.status === 404)) stats.errors++;
     throw lastError || new Error('tile fetch failed: ' + url);
+  }
+
+  /**
+   * "这张瓦片不存在"的负缓存。只记 URL，且有上界：预加载会反复猜同一片区域的
+   * 相邻层级，没有这张表就会一刻不停地重问同一批空瓦片。
+   */
+  const missed = new Set();
+  const MISSED_LIMIT = 4096;
+  function noteMiss(url) {
+    if (missed.size >= MISSED_LIMIT) missed.clear();
+    missed.add(url);
   }
 
   // ----------------------------------------------------------------------
@@ -425,7 +448,7 @@
     let queued = 0;
     for (let i = 0; i < urls.length; i++) {
       const url = urls[i];
-      if (!url || prefetchPending.has(url) || memory.has(url)) continue;
+      if (!url || prefetchPending.has(url) || memory.has(url) || missed.has(url)) continue;
       if (prefetchQueue.length + prefetchInflight >= prefetchCfg.queueLimit) {
         stats.prefetchDropped++;
         continue;
@@ -633,6 +656,8 @@
       prefetchQueue: prefetchQueue.length,
       prefetchInflight: prefetchInflight,
       prefetchDropped: stats.prefetchDropped,
+      prefetchMiss404: stats.prefetchMiss404,
+      prefetchMissed: missed.size,
       preloaded: stats.preloaded,
       queued: prefetchQueue.length,
       idle: sceneIdle,
@@ -659,9 +684,10 @@
     }
     stats.memoryHits = stats.diskHits = stats.network = stats.errors = 0;
     stats.stored = stats.evicted = stats.preloaded = 0;
-    stats.prefetched = stats.prefetchDropped = 0;
+    stats.prefetched = stats.prefetchDropped = stats.prefetchMiss404 = 0;
     prefetchQueue.length = 0;
     prefetchPending.clear();
+    missed.clear();
     stats.lastError = null;
     stats.errorLog = [];
     return true;
