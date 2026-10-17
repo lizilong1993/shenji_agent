@@ -42,31 +42,28 @@
 
   const DB_OPEN_TIMEOUT_MS = 1500;
   const IDB_OP_TIMEOUT_MS = 2000;
-  // 预热取图的整体上限。预热不阻塞渲染，所以这里超时只是放弃这张瓦片。
-  const WARM_BUDGET_MS = 8000;
+  // 预加载单张瓦片的整体上限。它不阻塞渲染，超时只是放弃这一张。
+  const PREFETCH_BUDGET_MS = 8000;
   // 持久化不可用时的重试间隔。
   const DB_RETRY_INTERVAL_MS = 15000;
-  // 启动预热的批量与并发。预热的唯一目的是"下次本地命中"，它比当前视野的
-  // 渲染次要得多，所以一次只搬一小批，且必须等底图空闲。
+  // 启动时把磁盘缓存搬回内存的批量与并发。这件事的唯一目的是"下次本地命中"，
+  // 它比当前视野的渲染次要得多，所以一次只搬一小批，且必须等底图空闲。
   const PRELOAD_CONCURRENCY = 1;
   const PRELOAD_BATCH = 16;
-  // 预热取图的最大并发。浏览器每域只开 6 条连接，预热一旦无节制地并发，
-  // Cesium 自己的影像请求就会饿死——底图变黑，而日志里什么错都没有。
-  const WARM_CONCURRENCY = 2;
 
-  // 预热队列的**上界**。必须有：每一张影像未命中都会 warm() 一次，而队列只在
-  // "底图空闲"时才排空 —— 一旦场景长期不空闲（战区级视图下 Cesium 会为每个表面
-  // 瓦片准备成千上万张深层瓦片），队列与 warming 集合就会无界增长。实测
-  // 2026-10-15：1939 km 机位下一次页面加载积了 **287,099** 条 URL，全是内存里的
-  // 死重量。超上界的一律不排队（也不占 warming），并计入 warmDropped 供诊断。
-  const WARM_QUEUE_LIMIT = 1024;
+  // 预加载队列的**上界**（可配，见 PREFETCH_DEFAULTS.queueLimit）。
+  //
+  // 必须有上界。历史教训（2026-10-15，当时的实现是"每张未命中都排队等空闲"）：
+  // 战区级视图下一次页面加载积了 **287,099** 条 URL —— 全是内存里的死重量，
+  // 因为队列只在"底图空闲"时才排空，而那种视图下底图长期不空闲。
+  // 现在超过上界的一律丢弃并计入 `prefetchDropped` 供诊断。
+  //
   // 空闲判定从"queued === 0"放宽为"连续这么多毫秒没有新的瓦片活动"：
   // queued 归零是**充分**条件但不是必要条件 —— 只要有一个表面瓦片长期不完成，
-  // 它就永远不归零，预热于是永远不开始，形成"越卡越不预热"的死锁。
+  // 它就永远不归零，预加载于是永远不开始，形成"越卡越不预加载"的死锁。
   const IDLE_SETTLE_MS = 1500;
 
   const memory = new Map();     // url -> canvas（Map 保持插入序，用作 LRU）
-  const warming = new Set();    // 正在预热的 url，避免重复取
   const stats = {
     memoryHits: 0,
     diskHits: 0,
@@ -75,15 +72,17 @@
     stored: 0,
     evicted: 0,
     preloaded: 0,
-    warmDropped: 0,             // 因队列满而未排队的**尝试**数：同一张瓦片每次重试都会再计一次
-                                // （被丢弃的 URL 不进 warming 集合，所以不记忆，这是有意的：
+    prefetched: 0,              // 预加载真正取回来的张数
+    prefetchDropped: 0,         // 因队列满而未排队的**尝试**数：同一张瓦片每次重试都会再计一次
+                                // （被丢弃的 URL 不进 prefetchPending 集合，所以不记忆，这是有意的：
                                 //  记住它们等于把刚刚才裁掉的内存又长回来）
     // 内存里当前的瓦片数。放在 stats 上是为了让诊断浮层能直接读，而不必
     // 走一次异步的 snapshot()。
     get memoryCount() { return memory.size; },
     get memoryLimit() { return MEMORY_LIMIT; },
-    get warmingCount() { return warming.size; },
-    get warmQueueCount() { return warmQueue.length; },
+    get prefetchPendingCount() { return prefetchPending.size; },
+    get prefetchQueueCount() { return prefetchQueue.length; },
+    get prefetchInflightCount() { return prefetchInflight; },
     get idleFlag() { return sceneIdle; },
     lastError: null,
     errorLog: [],
@@ -357,17 +356,125 @@
     throw lastError || new Error('tile fetch failed: ' + url);
   }
 
-  // 预热队列。只有底图空闲（tileLoadProgressEvent 归零，或安静到 IDLE_SETTLE_MS）
-  // 时才会排空，保证预热永远不和当前视野的渲染抢连接。
-  const warmQueue = [];
-  let warmInflight = 0;
-  let sceneIdle = false;
+  // ----------------------------------------------------------------------
+  // 预加载（prefetch）
+  //
+  // 与"渲染路径"的分工：渲染必须拿到当前视野的瓦片，预加载只做"提前量"。
+  // 因此它有三重闸门，缺一不可：
+  //   1. 只在**底图空闲**时取（否则和当前视野抢那 6 条连接 —— 底图会变黑）；
+  //   2. 只取**视口内、另一档层级**的瓦片（候选 URL 由 app.js 用公开 API 算出，
+  //      见 app.js 的 collectPrefetchUrls；越出视口的 siblings 默认关闭）；
+  //   3. 并发/队列/每秒上限都可配，且都**有上界**（无界的教训见文件上方常量区里
+  //      那段 287,099 条 URL 的历史注释）。
+  // ----------------------------------------------------------------------
+  const PREFETCH_DEFAULTS = {
+    // **默认关闭** —— 这是实测结论，不是保守起见。
+    //
+    // 2026-10-17 在本项目环境实测（200 ms 人工延迟，模拟跨网）：
+    //   · 单级拉近 400→200 km：关 2566 ms / 开 2552 ms（无差别）
+    //   · 跨两级 400→100 km  ：关 3582 ms / 开 3614 ms（无差别，且请求 117 → 135）
+    //   · 逐级 200→12 km     ：更深各档两臂都是"已在内存"（0 请求）
+    // 原因是结构性的：在"只取视口内"这条约束下，可预取的只剩"同一片地面的相邻层级"，
+    // 而 **Cesium 自己的四叉树精化本来就会把下一级取回来**；拉近时的等待主要来自
+    // 逐级精化管线（CPU/解码/合成），不是单张瓦片的网络延迟。
+    // 所以默认打开它只是净增请求。需要时用 `?prefetch=children` 或 base.json 显式打开；
+    // 想让它真正有所作为，得放开 `siblings`（预取相邻一圈）—— 那会越出视口，
+    // 与"视口外不发请求"的约束冲突，故不设为默认。
+    enabled: false,
+    range: ['children', 'parents'],   // siblings 天然越出视口，默认不开
+    idleDelayMs: 1200,
+    concurrency: 2,
+    queueLimit: 512,
+    maxPerSecond: 12,
+    // 往更深处预取几级（enabled=true 时生效）。默认 2。
+    levelsAhead: 2,
+  };
+  const prefetchCfg = Object.assign({}, PREFETCH_DEFAULTS);
+  const prefetchQueue = [];
+  const prefetchPending = new Set();   // 已排队/在途的 url，避免重复排队
+  let prefetchInflight = 0;
+  let prefetchWindowStart = 0;
+  let prefetchWindowCount = 0;
+  let sceneIdle = false;               // 渲染侧是否已安静（setIdle 或 IDLE_SETTLE_MS 兜底）
   let lastTileActivity = Date.now();
+
+  /** 合并预加载配置（app.js 从 base.json + URL 参数调用）。非法值一律忽略，保留默认。 */
+  function configurePrefetch(cfg) {
+    if (!cfg || typeof cfg !== 'object') return Object.assign({}, prefetchCfg);
+    if (typeof cfg.enabled === 'boolean') prefetchCfg.enabled = cfg.enabled;
+    if (Array.isArray(cfg.range)) {
+      prefetchCfg.range = cfg.range.filter(function (r) {
+        return r === 'children' || r === 'parents' || r === 'siblings';
+      });
+    }
+    ['idleDelayMs', 'concurrency', 'queueLimit', 'maxPerSecond', 'levelsAhead'].forEach(function (k) {
+      const v = Number(cfg[k]);
+      if (isFinite(v) && v > 0) prefetchCfg[k] = Math.floor(v);
+    });
+    return Object.assign({}, prefetchCfg);
+  }
+
+  function prefetchConfig() { return Object.assign({}, prefetchCfg); }
+
+  /**
+   * 排队一批预加载 URL。越界的一律丢弃并计数（`stats.prefetchDropped`）。
+   * 完全不阻塞调用方：真正的取图在空闲窗口里按并发上限进行。
+   */
+  function prefetch(urls) {
+    if (!prefetchCfg.enabled || !urls || !urls.length) return 0;
+    let queued = 0;
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      if (!url || prefetchPending.has(url) || memory.has(url)) continue;
+      if (prefetchQueue.length + prefetchInflight >= prefetchCfg.queueLimit) {
+        stats.prefetchDropped++;
+        continue;
+      }
+      prefetchPending.add(url);
+      prefetchQueue.push(url);
+      queued++;
+    }
+    if (queued && sceneIdle) drainPrefetchQueue();
+    return queued;
+  }
+
+  function drainPrefetchQueue() {
+    while (sceneIdle && prefetchInflight < prefetchCfg.concurrency && prefetchQueue.length) {
+      // 每秒上限：把预加载的带宽占用摊平，避免一次性打满（否则帧时会尖起来 ——
+      // 那正是本 feature 要消除的东西）。
+      const now = Date.now();
+      if (now - prefetchWindowStart >= 1000) { prefetchWindowStart = now; prefetchWindowCount = 0; }
+      if (prefetchWindowCount >= prefetchCfg.maxPerSecond) {
+        setTimeout(drainPrefetchQueue, 250);
+        return;
+      }
+      prefetchWindowCount++;
+      runPrefetch(prefetchQueue.shift());
+    }
+  }
+
+  function runPrefetch(url) {
+    prefetchInflight++;
+    let timer = null;
+    const budget = new Promise(function (_resolve, reject) {
+      timer = setTimeout(function () { reject(new Error('prefetch budget exceeded')); }, PREFETCH_BUDGET_MS);
+    });
+    Promise.race([loadTile(url), budget])
+      .catch(function () { /* 预加载失败不影响任何东西 */ })
+      .then(function () {
+        if (timer) clearTimeout(timer);
+        prefetchPending.delete(url);
+        prefetchInflight--;
+        stats.prefetched++;
+        if (prefetchInflight === 0 && !prefetchQueue.length) sceneIdle = false;
+        drainPrefetchQueue();
+      });
+  }
 
   /**
    * 通知缓存当前底图是否已经加载完。
    *
-   * 由 app.js 的 tileLoadProgressEvent 驱动。这是预热与渲染之间的调度闸门：
+   * 由 app.js 的 tileLoadProgressEvent 驱动。这是预加载与渲染之间的调度闸门：
    * 底图还在加载时，任何额外请求都是净损失。
    */
   function setIdle(idle) {
@@ -375,7 +482,7 @@
     sceneIdle = !!idle;
     if (!sceneIdle) return;
     lastTileActivity = Date.now();
-    drainWarmQueue();
+    drainPrefetchQueue();
     if (!preloadStarted) {
       preloadStarted = true;
       preloadBatch().catch(function () {});
@@ -384,54 +491,13 @@
 
   // 兜底闸门：即使 setIdle(true) 一直没来（表面瓦片长期不完成 → queued 永不归零），
   // 只要安静了 IDLE_SETTLE_MS 就允许排空。每秒只读一个时间戳，代价可忽略；
-  // 真正取图的并发仍受 WARM_CONCURRENCY 限制，所以它不会反噬渲染。
+  // 真正取图的并发仍受 prefetchCfg.concurrency 限制，所以它不会反噬渲染。
   setInterval(function () {
     if (!sceneIdle && Date.now() - lastTileActivity >= IDLE_SETTLE_MS) {
       sceneIdle = true;
-      drainWarmQueue();
+      drainPrefetchQueue();
     }
   }, 1000);
-
-  /** 后台预热一张瓦片。同一张瓦片不会重复取，失败静默。 */
-  function warm(url) {
-    if (memory.has(url) || warming.has(url)) return;
-    if (warmQueue.length >= WARM_QUEUE_LIMIT) {
-      // 队列已满：**不排队、也不占 warming**。丢掉的是"下次能不能命中"，
-      // 不影响这一帧能不能画出来 —— 这正是缓存设计原则里那条边界。
-      stats.warmDropped++;
-      return;
-    }
-    warming.add(url);
-    warmQueue.push(url);
-    if (sceneIdle) drainWarmQueue();
-  }
-
-  function drainWarmQueue() {
-    while (sceneIdle && warmInflight < WARM_CONCURRENCY && warmQueue.length) {
-      runWarm(warmQueue.shift());
-    }
-  }
-
-  function runWarm(url) {
-    warmInflight++;
-    let timer = null;
-    const budget = new Promise(function (_resolve, reject) {
-      timer = setTimeout(function () {
-        reject(new Error('warm budget exceeded'));
-      }, WARM_BUDGET_MS);
-    });
-
-    Promise.race([loadTile(url), budget])
-      .catch(function () { /* 预热失败不影响任何东西 */ })
-      .then(function () {
-        if (timer) clearTimeout(timer);
-        warming.delete(url);
-        warmInflight--;
-        // 队列排空后停手，等下一次空闲通知再继续，避免持续占用连接。
-        if (warmInflight === 0 && !warmQueue.length) sceneIdle = false;
-        drainWarmQueue();
-      });
-  }
 
   // ----------------------------------------------------------------------
   // 启动时把磁盘缓存搬回内存
@@ -523,9 +589,23 @@
         return Promise.resolve(hit);
       }
 
-      // 未命中：原生路径负责这一次的渲染，预热负责下一次的命中。
-      warm(url);
-      return original(x, y, level, request);
+      // 未命中：让原生路径取这一次，并**把它自己的结果收进内存缓存**。
+      //
+      // 2026-10-17 改：原先这里是 `warm(url); return original(...)` —— 同一张瓦片会发
+      // **两次请求**（预热一条、渲染一条）。实测 200 km 档 129 次请求里 22 次是重复、
+      // 20 km 档 969 次里 156 次是重复。既然渲染器已经把这张图取回来了，直接收进缓存
+      // 就没有第二次请求的必要。
+      //
+      // 只进内存、不落盘：这里手上只有解码后的 canvas，重新编码成 PNG 写 IndexedDB 会把
+      // JPEG 瓦片撑大数倍。落盘交给预加载路径（它拿得到原始 blob）。
+      const p = original(x, y, level, request);
+      if (p && typeof p.then === 'function') {
+        p.then(function (img) {
+          if (img) memoryPut(url, img);
+          return img;
+        }, function () { /* 渲染器自己会处理失败 */ });
+      }
+      return p;
     };
 
     provider.__tileCache = true;
@@ -547,9 +627,14 @@
       memoryLimit: MEMORY_LIMIT,
       disk: diskCount,
       diskLimit: DISK_LIMIT,
-      warming: warming.size,
+      prefetch: Object.assign({}, prefetchCfg),
+      prefetched: stats.prefetched,
+      prefetchPending: prefetchPending.size,
+      prefetchQueue: prefetchQueue.length,
+      prefetchInflight: prefetchInflight,
+      prefetchDropped: stats.prefetchDropped,
       preloaded: stats.preloaded,
-      queued: warmQueue.length,
+      queued: prefetchQueue.length,
       idle: sceneIdle,
       usageBytes: quota ? quota.usage : null,
       quotaBytes: quota ? quota.quota : null,
@@ -574,8 +659,9 @@
     }
     stats.memoryHits = stats.diskHits = stats.network = stats.errors = 0;
     stats.stored = stats.evicted = stats.preloaded = 0;
-    warmQueue.length = 0;
-    warming.clear();
+    stats.prefetched = stats.prefetchDropped = 0;
+    prefetchQueue.length = 0;
+    prefetchPending.clear();
     stats.lastError = null;
     stats.errorLog = [];
     return true;
@@ -585,7 +671,10 @@
     attach: attach,
     setIdle: setIdle,
     preloadBatch: preloadBatch,
-    warm: warm,
+    // 预加载（提前取"视口内、另一档层级"的瓦片，只在空闲窗口里进行）
+    prefetch: prefetch,
+    configurePrefetch: configurePrefetch,
+    prefetchConfig: prefetchConfig,
 
     snapshot: snapshot,
     clear: clear,

@@ -345,8 +345,10 @@ function renderDiagnostics() {
   if (tc) {
     lines.push('tile cache      hit ' + tc.memoryHits + '  net ' + tc.network +
                '  err ' + tc.errors + '  mem ' + tc.memoryCount + '/' + tc.memoryLimit +
-               '  preload ' + tc.preloaded + '  warming ' + tc.warmingCount +
-               '  idle ' + tc.idleFlag);
+               '  disk-preload ' + tc.preloaded + '  idle ' + tc.idleFlag);
+    lines.push('prefetch        取回 ' + tc.prefetched + '  在途 ' + tc.prefetchInflightCount +
+               '  排队 ' + tc.prefetchQueueCount + '  丢弃 ' + tc.prefetchDropped +
+               '  ' + (window.TileCache.prefetchConfig ? JSON.stringify(TileCache.prefetchConfig()) : ''));
     if (tc.lastError) lines.push('cache error     ' + String(tc.lastError).slice(0, 120));
   }
   // 跟随与参考系状态。unlocked 必须是 true：camera.lookAt 会把 camera.transform
@@ -876,6 +878,8 @@ const HOTSPOT_IMAGERY_TRIGGER_M = 400000;
 function hotspotImageryWanted() {
   if (!state.hotspotImageryEnabled) return false;
   if (!viewer) return false;
+  // 地球不可见时这张影像也画不出来 —— 别为不可见的东西取瓦片（与高倍段同一条规则）。
+  if (viewer.scene && viewer.scene.globe && !viewer.scene.globe.show) return false;
   return viewer.camera.positionCartographic.height <= HOTSPOT_IMAGERY_TRIGGER_M;
 }
 
@@ -952,24 +956,40 @@ function surfaceRenderLevel() {
   }
 }
 
-// 围绕当前层级取多宽的层带：向下 2 级（略粗的兜底）、向上 3 级（压近时不至于空窗）。
-const DETAIL_BAND_BELOW = 2;
-const DETAIL_BAND_ABOVE = 3;
+// 围绕"**实际渲染层级**"取多宽的层带：向下 1 级、向上 1 级。
+//
+// 2026-10-17 收紧（原为向下 2 / 向上 3，且锚点取 `max(相机估算, 渲染层级)`）。
+// 实测 20 km 机位：相机几何算出 z13，而**表面实际只渲染到 z11**，于是挂上 z14/15/16
+// 三个钉死层级的 provider —— 一个 z11 表面瓦片要 64 个 z14 瓦片才能盖满，
+// 结果是 **969 次瓦片请求 / tilesLoaded 144.4 s / fps 2 / p95 帧时 617 ms**。
+// 现在的规则：**只按正在渲染的层级下单，绝不预订"还不存在的细节"**。
+const DETAIL_BAND_BELOW = 1;
+const DETAIL_BAND_ABOVE = 1;
 
-/** 当前应挂的高倍段层级（按"该用的影像层级"从 manifest 的 bands 里挑）。 */
+/**
+ * 当前应挂的高倍段层级（从 manifest 的 bands 里挑）。
+ *
+ * 锚点是 `surfaceRenderLevel()` —— **渲染器此刻真正在画的层级**，它才是"视野正在用的
+ * 细节等级"。相机几何只用来**封顶**（视野不需要比它更深），不再用来抬高下限：
+ * `max()` 那条会把层带整体推到远超实际渲染的深度，正是上面那组实测数字的来源。
+ *
+ * 拿不到渲染层级（还没画第一帧）或地球不可见时一律返回空：**不下单**比下错单便宜，
+ * 下一帧相机变化时会再同步一次。
+ */
 function offlineDetailWantedZooms() {
   if (!state.offlineDetailEnabled || !window.OfflineAssets) return [];
+  // 地球不可见（例如被在线三维实景层让位）时一张都不订：栅格图层根本画不出来。
+  // 实测该状态下 12 s 内仍有 232 次高倍段请求。
+  if (!viewer || !viewer.scene || !viewer.scene.globe || !viewer.scene.globe.show) return [];
   const all = OfflineAssets.offlineDetailBands();
   if (!all || !all.length) return [];
-  // 相机估算为准；渲染器真在画更深层时按更深的来（视野确实需要）。
-  let L = cameraImageryLevel();
-  const rendered = surfaceRenderLevel();
-  if (rendered >= 0) L = Math.max(L, rendered);
-  if (L < 0) return [];
+  const S = surfaceRenderLevel();
+  if (S < 0) return [];
+  const lo = S - DETAIL_BAND_BELOW;
+  const hi = Math.min(cameraImageryLevel(), S + DETAIL_BAND_ABOVE);
+  if (hi < lo) return [];   // 相机已经拉远到比表面还粗：这一档不要了
   return all
-    .filter(function (b) {
-      return b.zoom >= L - DETAIL_BAND_BELOW && b.zoom <= L + DETAIL_BAND_ABOVE;
-    })
+    .filter(function (b) { return b.zoom >= lo && b.zoom <= hi; })
     .map(function (b) { return b.zoom; })
     .sort(function (a, b) { return a - b; });
 }
@@ -1207,7 +1227,155 @@ function applyBase(base) {
   state.urbanAoi = (base && base.urban_aoi) || [];
   state.baseCamera = (base && base.camera) || null;
   state.baseRegion = (base && base.region) || '未加载TS';
+  // 预加载参数：base.json 给基线，URL 参数可覆盖（见 applyPrefetchParams）。
+  if (window.TileCache && TileCache.configurePrefetch) {
+    if (base && base.prefetch) TileCache.configurePrefetch(base.prefetch);
+    applyPrefetchParams();
+  }
   syncUrbanImagery();
+}
+
+/**
+ * 预加载的 URL 覆盖项。默认值在 tilecache.js 的 PREFETCH_DEFAULTS 里；
+ * 这里只做"现场可调"，并且**默认什么都不写就是默认行为**。
+ *
+ *   ?prefetch=off                     关闭预加载（回到纯按需加载）
+ *   ?prefetch=children                只预取下一档（拉近用的提前量）
+ *   ?prefetch=children,parents        默认值
+ *   ?prefetch=all                     再加上 siblings（同层相邻一圈，会越出视口）
+ *   ?prefetchConcurrency=4            并发（默认 2）
+ *   ?prefetchIdleMs=3000              空闲多久才开始预取（默认 1200）
+ *   ?prefetchPerSec=30                每秒最多几张（默认 12）
+ *   ?prefetchQueue=2048               队列上限（默认 512）
+ */
+function applyPrefetchParams() {
+  if (!window.TileCache || !TileCache.configurePrefetch) return;
+  let q = '';
+  try { q = String(window.location.search || ''); } catch (e) { q = ''; }
+  if (!q) return;
+  const get = function (name) {
+    // 值里排除 `&` 与 `/`：`?prefetch=off` 后面若还跟着路径（例如被脚本拼成
+    // `?prefetch=off/`）也应当被当作 `off`，否则会静默降级成"空 range"——
+    // 功能上等于关，但配置里读出来还是 enabled:true，验收时对不上。
+    const m = new RegExp('[?&]' + name + '=([^&/]*)').exec(q);
+    return m ? decodeURIComponent(m[1]) : null;
+  };
+  const cfg = {};
+  const pf = get('prefetch');
+  if (pf !== null) {
+    if (pf === 'off' || pf === '0' || pf === 'false') cfg.enabled = false;
+    else if (pf === 'all') { cfg.enabled = true; cfg.range = ['children', 'parents', 'siblings']; }
+    else if (pf === 'on' || pf === '1') cfg.enabled = true;
+    else cfg.range = pf.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  const num = { prefetchConcurrency: 'concurrency', prefetchIdleMs: 'idleDelayMs',
+                prefetchPerSec: 'maxPerSecond', prefetchQueue: 'queueLimit',
+                prefetchAhead: 'levelsAhead' };
+  Object.keys(num).forEach(function (p) {
+    const v = get(p);
+    if (v !== null && isFinite(Number(v)) && Number(v) > 0) cfg[num[p]] = Number(v);
+  });
+  TileCache.configurePrefetch(cfg);
+}
+
+/**
+ * 预加载的候选 URL：**只取视口内、另一档层级**的瓦片。
+ *
+ * 为什么由这里算而不是 tilecache 算：几何信息（相机视锥、各 provider 的 tilingScheme
+ * 与矩形）都在这一侧；tilecache 只负责"排队 + 限流 + 取回来 + 存缓存"。
+ *
+ * 规则（对每个 `show === true` 的影像层）：
+ *   · 缓存里没有、且不在途的 URL 才交给 TileCache.prefetch（重复的由它再过滤一次）；
+ *   · 层级取 `S+1`（children，拉近时的提前量）与 `S-1`（parents，缩小时的过渡），
+ *     `S` = 当前**实际渲染**的表面层级；越出 provider 的 min/max 就跳过；
+ *   · 瓦片范围由视口矩形的四角 + 中心用 `tilingScheme.positionToTileXY`（公开 API）
+ *     算出，再与**图层自身的矩形**求交 —— 图层不在视野里就整层跳过，
+ *     这正是"瓦片只在视口内"的保证；
+ *   · 一次最多 256 张，避免宽视野下一次丢进上千个 URL。
+ */
+function collectPrefetchUrls() {
+  if (!viewer || !window.TileCache || !TileCache.prefetch) return [];
+  const cfg = TileCache.prefetchConfig ? TileCache.prefetchConfig() : null;
+  if (!cfg || !cfg.enabled) return [];
+  const scene = viewer.scene;
+  if (!scene || !scene.globe || !scene.globe.show) return [];
+  const S = surfaceRenderLevel();
+  if (S < 0) return [];
+  const rect = viewer.camera.computeViewRectangle();
+  if (!rect) return [];
+  const want = {};
+  (cfg.range || []).forEach(function (r) { want[r] = true; });
+  const out = [];
+  for (let i = 0; i < viewer.imageryLayers.length && out.length < 256; i++) {
+    const layer = viewer.imageryLayers.get(i);
+    if (!layer.show || !layer.imageryProvider) continue;
+    const p = layer.imageryProvider;
+    const tpl = p.url || p._url;
+    if (typeof tpl !== 'string' || tpl.indexOf('{') < 0) continue;
+    const ts = p.tilingScheme;
+    if (!ts || !ts.positionToTileXY) continue;
+    // 图层矩形与视野不相交 → 整层跳过（高倍段/热点/城区都是窄矩形，这条最省）
+    if (p.rectangle && !Cesium.Rectangle.intersection(rect, p.rectangle)) continue;
+    const levels = [];
+    if (want.children) {
+      // 预取深度可配（默认 2）。为什么默认不是 1：Cesium 自己的四叉树精化在
+      // SSE=2 下**本来就会把下一级取回来**（实测：200 km 档预取了 z8，下一档 100 km
+      // 因此 0 请求）—— 深度 1 的预取和它重叠，等于白做。深度 2 才是"渲染器不会
+      // 主动做、而用户下一格就可能要"的那一档。
+      const ahead = Math.max(1, Math.min(4, (cfg.levelsAhead | 0) || 2));
+      for (let d = 1; d <= ahead; d++) levels.push(S + d);
+    }
+    if (want.parents) levels.push(S - 1);
+    levels.forEach(function (z) {
+      if (z < 0) return;
+      if (p.minimumLevel !== undefined && z < p.minimumLevel) return;
+      if (p.maximumLevel !== undefined && z > p.maximumLevel) return;
+      const lr = p.rectangle || Cesium.Rectangle.MAX_VALUE;
+      const view = Cesium.Rectangle.intersection(rect, lr) || rect;
+      const pts = [[view.west, view.north], [view.east, view.north],
+                   [view.west, view.south], [view.east, view.south],
+                   [(view.west + view.east) / 2, (view.north + view.south) / 2]];
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      pts.forEach(function (pt) {
+        let t = null;
+        try { t = ts.positionToTileXY(Cesium.Cartographic.fromDegrees(pt[0], pt[1]), z); } catch (e) { t = null; }
+        if (!t) return;
+        x0 = Math.min(x0, t.x); x1 = Math.max(x1, t.x);
+        y0 = Math.min(y0, t.y); y1 = Math.max(y1, t.y);
+      });
+      if (!isFinite(x0)) return;
+      for (let y = y0; y <= y1 && out.length < 256; y++) {
+        for (let x = x0; x <= x1 && out.length < 256; x++) {
+          // 模板里 {z}/{x}/{y} 的顺序各源不同（Esri 是 {z}/{y}/{x}），
+          // 逐个替换占位符即可，与顺序无关。
+          out.push(tpl.replace('{z}', z).replace('{x}', x).replace('{y}', y));
+        }
+      }
+    });
+  }
+  return out;
+}
+
+/**
+ * 预加载的触发闸门：**底图已加载完 + 相机停稳**才收一次候选 URL。
+ *
+ * 三条都满足才触发，缺一不可：还在加载时预取会抢那 6 条连接；相机在动时预取的是
+ * 马上要作废的视野；地球不可见时预取的瓦片根本画不出来。
+ */
+function startPrefetchLoop() {
+  let lastMove = Date.now();
+  if (viewer && viewer.camera && viewer.camera.changed) {
+    viewer.camera.changed.addEventListener(function () { lastMove = Date.now(); });
+  }
+  setInterval(function () {
+    if (!viewer || !viewer.scene || !viewer.scene.globe) return;
+    if (!viewer.scene.globe.show || !viewer.scene.globe.tilesLoaded) return;
+    const cfg = window.TileCache && TileCache.prefetchConfig ? TileCache.prefetchConfig() : null;
+    if (!cfg || !cfg.enabled) return;
+    if (Date.now() - lastMove < (cfg.idleDelayMs || 1200)) return;   // 相机还在动
+    const urls = collectPrefetchUrls();
+    if (urls.length) TileCache.prefetch(urls);
+  }, 2000);
 }
 
 // --------------------------------------------------------------------------
@@ -3415,7 +3583,9 @@ const URBAN_IMAGERY_TRIGGER_M = 200000;
 function syncUrbanImagery() {
   if (!viewer || !state.urbanAoi || !state.urbanAoi.length) return;
   const height = viewer.camera.positionCartographic.height;
-  const want = state.urbanEnabled && height <= URBAN_IMAGERY_TRIGGER_M;
+  // 地球不可见时城区层同样画不出来，不挂（见 hotspotImageryWanted 的同类守卫）。
+  const globeOn = !(viewer.scene && viewer.scene.globe) || viewer.scene.globe.show;
+  const want = state.urbanEnabled && globeOn && height <= URBAN_IMAGERY_TRIGGER_M;
 
   if (want && !state.urbanLayers) {
     state.urbanLayers = OfflineAssets.attachUrbanImagery(viewer, state.urbanAoi);
@@ -4169,6 +4339,15 @@ window.SituationHost = {
   // 图层顺序取证：imagery 的真实 index 顺序 + 每个图层的意图/事实。
   // 「哪个层压在哪个层上面」光看画面猜不出来，必须能读到 index。
   debugLayers: debugLayers,
+  // 预加载的取证出口：配置、候选 URL 与缓存侧统计。
+  // 没有它就只能靠"感觉快了"，而本 feature 的验收要求给数（请求数/耗时/帧时）。
+  prefetchConfig: function () {
+    return window.TileCache && TileCache.prefetchConfig ? TileCache.prefetchConfig() : null;
+  },
+  prefetchCandidates: function () { return collectPrefetchUrls(); },
+  prefetchStats: function () {
+    return window.TileCache ? TileCache.snapshot() : null;
+  },
   // 数据健康诊断的出口。左栏「数据健康」面板已随界面重构移除，但诊断结论仍需可查：
   // 否则"开关开着、图层没生效"就失去了唯一的证据出口。
   health: healthReport,
@@ -4941,6 +5120,25 @@ function bindUI() {
     if (!dom.loadingBadge || dom.loadingBadge.classList.contains('hidden')) return;
     setLoadingTiles(0);
   }, 3000);
+
+  // 预加载循环：空闲且相机停稳时，把"视口内、另一档层级"的瓦片提前取回来。
+  // 默认开启，`?prefetch=off` 可关（见 applyPrefetchParams）。
+  startPrefetchLoop();
+
+  // 地球可见性看门狗：`globe.show` 只被在线三维实景层（buildings3d.js）改，改完没有
+  // 事件通知到这里；而"不可见就不该取瓦片"与"恢复可见要把按需层挂回来"两条都依赖它。
+  // 1 秒比一次布尔值，代价可忽略；只在**真的变了**时才重排图层。
+  let lastGlobeShow = null;
+  setInterval(function () {
+    if (!viewer || !viewer.scene || !viewer.scene.globe) return;
+    const on = !!viewer.scene.globe.show;
+    if (on === lastGlobeShow) return;
+    lastGlobeShow = on;
+    syncUrbanImagery();
+    syncHotspotImagery();
+    syncOfflineDetail();
+    applyLayers();
+  }, 1000);
 
   viewer.camera.changed.addEventListener(function () {
     camChangedCount++;
