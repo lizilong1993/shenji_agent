@@ -596,6 +596,34 @@ def tiles3d_get(path, rel):
     return data, ctype, etag
 
 
+def warm_tiles3d():
+    """启动时后台打开所有 zip，把**中央目录解析**的代价从第一个请求里挪走。
+
+    实测（2026-10-19，load ≈ 90）：`ZipFile('taibei101.zip')` 打开要 **19.2 s**
+    （3.5 GB / 36.4 万条目的中央目录，在慢盘上读+解析），而打开之后单条目读取
+    只要 0.01 s。Cesium 打开图层时先取 tileset.json —— 不预热的话用户点开关
+    要干等近 20 s 且没有任何提示。放到启动后台线程里，这段时间就与"等用户点开关"
+    重叠了。
+    """
+    import threading
+
+    def run():
+        for name in tiles3d_sources():
+            path = tiles3d_dataset(name)
+            if not path:
+                continue
+            t0 = time.time()
+            try:
+                with _tiles3d_lock():
+                    _tiles3d_zip(path)
+                print("[tiles3d] 预热 %s 完成（%.1f s）"
+                      % (name, time.time() - t0), flush=True)
+            except Exception as exc:  # noqa: BLE001 - 预热失败不影响其它数据集
+                print("[tiles3d] 预热 %s 失败：%s" % (name, exc), flush=True)
+
+    threading.Thread(target=run, name="tiles3d-warm", daemon=True).start()
+
+
 def _tdt_slot():
     global _TDT_SLOTS
     if _TDT_SLOTS is None:
@@ -1481,6 +1509,12 @@ def main() -> int:
         threading.Thread(target=warm_situations_index, daemon=True).start()
     except Exception as exc:            # noqa: BLE001
         print("[situations] 预热线程未启动：%s" % exc, flush=True)
+
+    # 3D Tiles 的 zip 中央目录解析要 ~20 s/个（见 warm_tiles3d 的注释），同样放后台。
+    try:
+        warm_tiles3d()
+    except Exception as exc:            # noqa: BLE001
+        print("[tiles3d] 预热线程未启动：%s" % exc, flush=True)
 
     sys.stderr.write("serving %s on http://%s:%d/  (started %s)\n"
                      % (WEB_ROOT, args.host, args.port,
