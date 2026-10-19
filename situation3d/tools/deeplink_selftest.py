@@ -240,25 +240,36 @@ def main(argv=None):
         return 2
 
     tmpdir = tempfile.mkdtemp(prefix="deeplink_selftest_")
-    print("深度链接自检：%d 条 URL" % len(CASES))
+    print("深度链接自检：%d 条 URL（3 个浏览器并行）" % len(CASES))
     print("判据是「案例真的加载了」，不是「pageErrors 为空」——")
     print("启动链里的异常会被 boot 的 catch 吞掉，pageErrors 照样是空的。")
     print()
 
+    # 串行跑 16 条 URL 在本环境要 15 min 以上（每条都要起一个 headless 浏览器、
+    # 等瓦片队列排空、再静置 12 s）。3 路并行把总时长压到 1/3，且每条仍独立
+    # 计时、独立重试；输出顺序按 CASES 不变。
+    from concurrent.futures import ThreadPoolExecutor
+
+    def run_one(i, item):
+        query = item[0]
+        budget = item[2] if len(item) > 2 else args.wait_ms
+        ev, pe = run_probe(args.base, query, budget, tmpdir, i)
+        retried = False
+        if ev is None:
+            # **超时重试一次，预算放宽 1.6 倍。**（见下）
+            ev, pe = run_probe(args.base, query, int(budget * 1.6),
+                               tmpdir, i + 100)
+            retried = ev is not None
+        return ev, pe, retried
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        results = list(ex.map(lambda t: run_one(*t), enumerate(CASES)))
+
     for i, item in enumerate(CASES):
         query, want = item[0], item[1]
-        # 第三项是可选的本例预算（见 terrain 那条的说明）
-        budget = item[2] if len(item) > 2 else args.wait_ms
-        ev, page_errors = run_probe(args.base, query, budget, tmpdir, i)
-        if ev is None:
-            # **超时重试一次，预算放宽 1.6 倍。**
-            # `?terrain=1` 会真正加载 DEM，落定时间贴着预算边界；连跑十几条 URL 时
-            # 机器上还叠着上一轮的浏览器进程，同一条 URL 单独跑 30s 够、连跑 26s 不够。
-            # 自检里的假失败比没有自检更糟 —— 会让人去修没坏的东西，或者干脆不再看它。
-            ev, page_errors = run_probe(args.base, query, int(budget * 1.6),
-                                        tmpdir, i + 100)
-            if ev is not None:
-                print("       （首次超时，放宽预算后通过：%s）" % query)
+        ev, page_errors, retried = results[i]
+        if retried:
+            print("       （首次超时，放宽预算后通过：%s）" % query)
         if ev is None:
             check(query, False, "probe 无结果（超时或页面未起来，已重试一次）")
             continue

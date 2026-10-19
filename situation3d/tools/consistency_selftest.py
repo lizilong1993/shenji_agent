@@ -248,11 +248,15 @@ PROBE = r"""
     // **这是本自检原本漏掉的一环** —— 意图对了、场景也变了，
     // 但面板上的勾还是旧的，就是“界面与事实不符”。本会话修过好几处这类。
     row.panelOff = null;
-    for (var _po = 0; _po < 12 && row.panelOff !== false; _po++) {
+    // 面板按帧差分重建；无头 SwiftShader 下 rAF 只有 ~2.7 fps，固定 12×150 ms 会偶发
+    // 超时（实测同步 102-320 ms，但帧率抖动时窗口不够）。轮询时**主动调 tick()**
+    // ——那是生产环境的刷新函数，只是不再依赖本环境的帧率；上限放宽到 10 s。
+    for (var _po = 0; _po < 40 && row.panelOff !== false; _po++) {
+      if (window.LayerPanel && LayerPanel.tick) LayerPanel.tick();
       var _bo = document.getElementById("layerRow-" + s.id);
       row.panelOff = _bo ? !!_bo.checked : null;
       if (row.panelOff === false) break;
-      await new Promise(function (r) { setTimeout(r, 150); });
+      await new Promise(function (r) { setTimeout(r, 250); });
     }
     try { LayerRegistry.setDesired(s.id, true); } catch (e) { row.error = String(e); }
     LayerRegistry.apply();
@@ -282,13 +286,14 @@ PROBE = r"""
     // 无条件等几帧：上面的轮询**只在读数为 0/-1 时才跑**，
     // 而 imagery 类的 `.show` 是 sink 同步设的、立即就非零，于是一帧都不过。
     // 面板却是按签名差分在**帧里**重建的 —— 不等就读到旧值。
-    await frames(5);
+    if (window.LayerPanel && LayerPanel.tick) LayerPanel.tick();
     row.panelOn = null;
-    for (var _pn = 0; _pn < 12 && row.panelOn !== true; _pn++) {
+    for (var _pn = 0; _pn < 40 && row.panelOn !== true; _pn++) {
+      if (window.LayerPanel && LayerPanel.tick) LayerPanel.tick();
       var _bn = document.getElementById("layerRow-" + s.id);
       row.panelOn = _bn ? !!_bn.checked : null;
       if (row.panelOn === true) break;
-      await new Promise(function (r) { setTimeout(r, 150); });
+      await new Promise(function (r) { setTimeout(r, 250); });
     }
     row.desired1 = (LayerRegistry.runtime[s.id] || {}).desired;
     // 复原初始意图
