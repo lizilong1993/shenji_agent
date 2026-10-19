@@ -81,7 +81,7 @@ COMPRESSIBLE = ("application/json", "application/javascript", "text/html",
 # 这两个路径原先**不在**名单里，而它们的处理函数又各自 `send_header("Cache-Control", …)`
 # 了一遍 —— 于是响应里出现两个互相矛盾的 Cache-Control（`public, max-age` 与后面的
 # `no-store`），浏览器按最后一个走。所以这里既要加进名单，也要删掉那两处手动设置。
-IMMUTABLE_PREFIXES = ("/tiles/", "/vendor/", "/tiles_db/", "/tdt/")
+IMMUTABLE_PREFIXES = ("/tiles/", "/vendor/", "/tiles_db/", "/tdt/", "/tiles3d/")
 IMMUTABLE_MAX_AGE = 7 * 24 * 3600
 
 # Shared across handler instances. BaseHTTPRequestHandler runs the whole request
@@ -464,6 +464,136 @@ def tile_db_get(path, z, x, y):
     except Exception:  # noqa: BLE001 - 库损坏/被换掉都不该让请求 500
         return None
     return row[0] if row else None
+
+
+# ---------------------------------------------------------------------------
+# 3D Tiles / quantized-mesh 地形：**zip 直发**，不摊成文件树
+# ---------------------------------------------------------------------------
+# 这批数据集是"几十万个小文件"的形态（2026-10-19 上传：TAIBEI101 36.4 万、
+# TAIZHONG 26.1 万、TAOYUAN 22.7 万、TW2024 2.4 万、台湾 20m DEM 7.6 万），
+# 而本机文件系统建小文件只有 17-59 个/秒（见上面 mbtiles 的注释）—— 摊开要
+# 数小时且白白多出近百万 inode。zip 本身就是"按中央目录索引"的容器，和 mbtiles
+# 同理：**保留上传的 zip 原样，请求时按条目取**。
+#
+# 目录由 `.env` 的 `TILES3D_DIR` 指定（默认 <repo>/tiles3d_db）。
+# `<dataset>` 只接受 `[A-Za-z0-9_]+` 且必须命中真实存在的 `<dataset>.zip`。
+TILES3D_DIR = env("TILES3D_DIR") or os.path.join(os.path.dirname(HERE), "tiles3d_db")
+
+# 3D Tiles 与 quantized-mesh 的扩展名 → Content-Type。Cesium 对 .terrain 的
+# 类型不挑剔，但按规范发 `application/vnd.quantized-mesh` 更利于排错。
+TILES3D_TYPES = {
+    ".json": "application/json; charset=utf-8",
+    ".glb": "model/gltf-binary",
+    ".gltf": "model/gltf+json",
+    ".bin": "application/octet-stream",
+    ".terrain": "application/vnd.quantized-mesh",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".ktx2": "image/ktx2",
+    ".webp": "image/webp",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+}
+
+# path -> {"key": (size, mtime_ns), "zf": ZipFile, "root": 顶层前缀}
+_TILES3D_ZIPS = {}
+_TILES3D_LOCK = [None]
+
+
+def _tiles3d_lock():
+    global _TILES3D_LOCK
+    if _TILES3D_LOCK[0] is None:
+        import threading
+        _TILES3D_LOCK[0] = threading.Lock()
+    return _TILES3D_LOCK[0]
+
+
+def tiles3d_dataset(name):
+    """把 `<dataset>` 解析成 tiles3d_db 下真实存在的 `<dataset>.zip`，否则 None。"""
+    import re
+    if not name or not re.match(r"^[A-Za-z0-9_]+$", name or ""):
+        return None
+    p = os.path.join(TILES3D_DIR, name + ".zip")
+    return p if os.path.isfile(p) else None
+
+
+def tiles3d_sources():
+    """当前可用的 3D 数据集名（供 /api/status 与 /api/health 用）。"""
+    try:
+        return sorted(f[:-len(".zip")] for f in os.listdir(TILES3D_DIR)
+                      if f.endswith(".zip"))
+    except OSError:
+        return []
+
+
+def _tiles3d_zip(path):
+    """取（必要时重开）该数据集的 ZipFile，并探测导出包的顶层目录前缀。
+
+    导出工具普遍在 zip 里再套一层与压缩包同名的目录（如 `TAIBEI101/Data/...`）。
+    如果**所有条目都在同一个顶层目录下**，就把那个目录当作 URL 的根，于是
+    `/tiles3d/taibei101/tileset.json` 而不是 `.../TAIBEI101/tileset.json`。
+    调用方必须已持有 _tiles3d_lock()。
+    """
+    import zipfile
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    key = (st.st_size, st.st_mtime_ns)
+    ent = _TILES3D_ZIPS.get(path)
+    if ent and ent["key"] == key:
+        return ent
+
+    zf = zipfile.ZipFile(path)
+    tops = set()
+    common = True
+    for n in zf.namelist():
+        if n.endswith("/"):          # 目录占位条目不参与前缀判定
+            continue
+        if "/" not in n:             # 有顶层散文件 -> 没有统一前缀
+            common = False
+            break
+        tops.add(n.split("/", 1)[0])
+        if len(tops) > 1:
+            common = False
+            break
+    root = (tops.pop() + "/") if (common and len(tops) == 1) else ""
+
+    old = _TILES3D_ZIPS.get(path)
+    if old:
+        try:
+            old["zf"].close()
+        except Exception:  # noqa: BLE001 - 旧句柄关不掉不该影响新请求
+            pass
+    ent = {"key": key, "zf": zf, "root": root}
+    _TILES3D_ZIPS[path] = ent
+    return ent
+
+
+def tiles3d_get(path, rel):
+    """取一个条目，返回 (bytes, content_type, etag)；不存在返回 None。
+
+    ZipFile 的读路径共用同一个文件句柄（seek + read），多线程并发读会互相
+    踩位置，所以整段读取串行化。单个条目是几十 KB 的 glb/json，串行不构成
+    瓶颈；真要更快可以给每个 zip 建句柄池，但没必要先复杂化。
+    """
+    ent = _tiles3d_zip(path)
+    if not ent:
+        return None
+    name = ent["root"] + rel
+    try:
+        with _tiles3d_lock():
+            info = ent["zf"].getinfo(name)
+            data = ent["zf"].read(info)
+    except KeyError:
+        return None
+    except Exception:  # noqa: BLE001 - 坏条目/坏 zip 都回 404，不 500
+        return None
+    ext = os.path.splitext(name)[1].lower()
+    ctype = TILES3D_TYPES.get(ext) or "application/octet-stream"
+    etag = '"%x-%x"' % (info.CRC, info.file_size)
+    return data, ctype, etag
 
 
 def _tdt_slot():
@@ -926,6 +1056,9 @@ class Handler(SimpleHTTPRequestHandler):
         # 离线瓦片库：有它就说明"上传的瓦片已经发布成服务"，且天地图/离线底图的
         # 高倍段即便没有 key 也能出图。缺库只算 warn（低倍静态树仍在）。
         _check("tile_dbs", lambda: len(tile_db_sources()) > 0, required=False)
+        # 3D Tiles / quantized-mesh 数据集（zip 直发）。缺它只影响三维城市与
+        # 台湾 20m 地形这两个可选图层，所以是 warn 而不是 error。
+        _check("tiles3d_sets", lambda: len(tiles3d_sources()) > 0, required=False)
 
         types = None
         try:
@@ -981,6 +1114,8 @@ class Handler(SimpleHTTPRequestHandler):
             "web_root": WEB_ROOT,
             # 离线瓦片库（mbtiles 直发）里有哪些源；空列表=还没发布任何库。
             "tile_dbs": tile_db_sources(),
+            # 3D Tiles / quantized-mesh 数据集（zip 直发）。
+            "tiles3d_sets": tiles3d_sources(),
             # ── I08 新增 ──
             "level": level,
             "subchecks": subchecks,
@@ -1043,6 +1178,49 @@ class Handler(SimpleHTTPRequestHandler):
             return
         self._send_tile(data, tile_db_ctype(data))
 
+    def _tiles3d_item(self):
+        """GET /tiles3d/<dataset>/<路径> —— 从 zip 直发 3D Tiles / quantized-mesh。
+
+        路径即 zip 内相对路径（顶层同名目录已被 `_tiles3d_zip` 去掉），查询串
+        （Cesium 的 `?v=版本`）忽略。任何失败回 404：缺一块内容不该让整个
+        tileset 报错。
+        """
+        parts = self.path.split("?")[0].strip("/").split("/")
+        if len(parts) < 3 or parts[0] != "tiles3d":
+            self.send_error(404, "bad tiles3d path")
+            return
+        name = parts[1]
+        rel = "/".join(parts[2:])
+        if ".." in rel.split("/"):
+            self.send_error(400, "bad tiles3d path")
+            return
+        path = tiles3d_dataset(name)
+        if not path:
+            self.send_error(404, "unknown tiles3d dataset")
+            return
+        hit = tiles3d_get(path, rel)
+        if not hit:
+            self.send_error(404, "no such tiles3d item")
+            return
+        data, ctype, etag = hit
+        # Cache-Control 由 end_headers() 按 IMMUTABLE_PREFIXES 统一加（/tiles3d/ 在名单里）。
+        if etag and self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        if etag:
+            self.send_header("ETag", etag)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        try:
+            self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def _tdt_tile(self):
         """
         GET /tdt/<layer>/<z>/<x>/<y> —— 天地图瓦片代理（见 fetch_tdt_tile 的说明）。
@@ -1095,6 +1273,17 @@ class Handler(SimpleHTTPRequestHandler):
         self._send_tile(data, ctype)
 
     def do_GET(self):
+        if self.path.split("?")[0].startswith("/tiles3d/"):
+            try:
+                self._tiles3d_item()
+            except Exception:  # noqa: BLE001 - never leave the client hanging
+                import traceback
+                traceback.print_exc()
+                try:
+                    self.send_error(500, "tiles3d error")
+                except Exception:  # noqa: BLE001
+                    pass
+            return
         if self.path.split("?")[0].startswith("/tiles_db/"):
             try:
                 self._tile_db_tile()

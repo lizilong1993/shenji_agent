@@ -166,8 +166,19 @@
     //
     // `checkbox` 字段仍然写上：URL 钩子（`?terrain=` / `?weather=`）靠它把
     // 复选框 id 反查成图层 id（见 app.js 的 layerIdForCheckbox）。
-    { id: 'terrain.model', kind: 'globe', z: 10, label: '地形模型',
-      group: '底图', default: false, checkbox: 'modelTerrain' },
+    {
+      id: 'terrain.model', kind: 'globe', z: 10, label: '地形模型',
+      group: '底图', default: false, checkbox: 'modelTerrain',
+      // 与 20m 网格互斥：Cesium 只有一个 terrainProvider，两者同时开时后动的赢
+      // （见 resolve() 的对称仲裁）。对称互斥在另一边也有声明。
+      exclusives: ['terrain.mesh'] },
+    {
+      // 2026-10-19 上传的台湾 20m DEM（quantized-mesh，z0–z14，zip 直发）。与
+      // 上面的 Terrarium 高程度图是**并列的两个地形源**，不是替换：前者全球
+      // 低层 + 台海区域 z14，后者只在台湾区域有数据但精度是 20 m 网格。
+      id: 'terrain.mesh', kind: 'globe', z: 11, label: '地形模型（台湾 20m 网格）',
+      group: '底图', default: false, checkbox: 'modelTerrainMesh',
+      exclusives: ['terrain.model'] },
     { id: 'weather.model', kind: 'globe', z: 20, label: '气象模型',
       group: '底图', default: false, checkbox: 'modelWeather' },
     // ---- scene primitive 栈：mesh 类，两两互斥（同一块地面不能同时铺两套网格）
@@ -202,6 +213,31 @@
       label: '建筑体块（三维，本机离线）', group: '底图',
       checkbox: 'modelBuildings',
       exclusives: ['tiles.google3d'],
+    },
+
+    // ---- 本地 3D Tiles（2026-10-19 上传的台湾城市实景）----
+    //
+    // 与在线 Google 实景（`tiles.google3d`）**不互斥**：两者可以同时开，但
+    // 同时开时 Google 那条会把地球关掉（它自己的约束），本机 3D Tiles 不依赖
+    // globe，因此仍会显示——这是设计允许的状态，不是 bug。
+    // 默认全关：四套 tileset 加起来 80 万+ 瓦片，只有用户明确要看某座城市时才挂。
+    // 实际上 Cesium 只请求视野内的瓦片，但 tileset.json 的解析与根瓦片加载
+    // 仍要花时间，默认关能保证首屏不受影响。
+    {
+      id: 'tiles3d.taipei', kind: 'primitive', z: 40, default: false,
+      label: '台北 3D Tiles（实景）', group: '底图', checkbox: 'modelTaipei3d',
+    },
+    {
+      id: 'tiles3d.taichung', kind: 'primitive', z: 41, default: false,
+      label: '台中 3D Tiles（实景）', group: '底图', checkbox: 'modelTaichung3d',
+    },
+    {
+      id: 'tiles3d.taoyuan', kind: 'primitive', z: 42, default: false,
+      label: '桃园 3D Tiles（实景）', group: '底图', checkbox: 'modelTaoyuan3d',
+    },
+    {
+      id: 'tiles3d.tw2024', kind: 'primitive', z: 43, default: false,
+      label: 'TW2024 三维样例', group: '底图', checkbox: 'modelTw2024',
     },
 
     // ---- 标签栈：不贴地，靠 disableDepthTestDistance 保证在几何之上 ----
