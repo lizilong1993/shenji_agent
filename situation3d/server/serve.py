@@ -246,7 +246,7 @@ SITUATION_DEFAULT = env("SITUATION_DEFAULT") or None
 _SITUATIONS_CACHE = {"key": None, "body": None}
 # 持久化的那一份：让**重启服务后的第一个请求**也是毫秒级（内存缓存随进程消失）。
 # 放 /tmp 而不是 web/data：这是服务端的派生数据，不该被当作项目数据文件。
-_SITUATION_INDEX_PATH = "/tmp/situation3d_situations_index.json"
+_SITUATIONS_INDEX_PATH = "/tmp/situation3d_situations_index.json"
 
 # 案例分片缓存（core / inference）。理由见 _case_parts()：39.6 MB 的案例里
 # inference_frames 占 35 MB，首屏不需要它；但**不能让每次请求都重新解析**，
@@ -298,24 +298,45 @@ def _case_parts(path):
         stem = hashlib.sha1(path.encode("utf-8")).hexdigest()[:12] + "-" + key
         core_p = os.path.join(CASE_PARTS_DIR, stem + ".core.json")
         inf_p = os.path.join(CASE_PARTS_DIR, stem + ".inference.json")
-        if os.path.isfile(core_p) and os.path.isfile(inf_p):
+        core_gz_p = core_p + ".gz"
+        inf_gz_p = inf_p + ".gz"
+        if (os.path.isfile(core_p) and os.path.isfile(inf_p)
+                and os.path.isfile(core_gz_p) and os.path.isfile(inf_gz_p)):
             with open(core_p, "rb") as fh:
                 core = fh.read()
             with open(inf_p, "rb") as fh:
                 inf = fh.read()
+            with open(core_gz_p, "rb") as fh:
+                core_gz = fh.read()
+            with open(inf_gz_p, "rb") as fh:
+                inf_gz = fh.read()
         else:
-            with open(path, "r") as fh:
-                doc = json.load(fh)
-            frames = None
-            if isinstance(doc, dict):
-                frames = doc.pop("inference_frames", None)
-            core = json.dumps(doc, ensure_ascii=False).encode("utf-8")
-            inf = json.dumps(frames if frames is not None else [],
-                             ensure_ascii=False).encode("utf-8")
-            _write_case_part(core_p, core)
-            _write_case_part(inf_p, inf)
+            if os.path.isfile(core_p) and os.path.isfile(inf_p):
+                # 旧缓存（只有原文）：直接压缩，不必重新解析 39 MB。
+                with open(core_p, "rb") as fh:
+                    core = fh.read()
+                with open(inf_p, "rb") as fh:
+                    inf = fh.read()
+            else:
+                with open(path, "r") as fh:
+                    doc = json.load(fh)
+                frames = None
+                if isinstance(doc, dict):
+                    frames = doc.pop("inference_frames", None)
+                core = json.dumps(doc, ensure_ascii=False).encode("utf-8")
+                inf = json.dumps(frames if frames is not None else [],
+                                 ensure_ascii=False).encode("utf-8")
+                _write_case_part(core_p, core)
+                _write_case_part(inf_p, inf)
+            # **预压缩**：服务器 load average ~90 且进程 nice 10，请求时现压
+            # 4.6 MB 实测要 5-11 s；压一次存起来，之后请求只写字节。
+            core_gz = gzip.compress(core, 6)
+            inf_gz = gzip.compress(inf, 6)
+            _write_case_part(core_gz_p, core_gz)
+            _write_case_part(inf_gz_p, inf_gz)
 
-        ent = {"key": key, "core": core, "inference": inf}
+        ent = {"key": key, "core": core, "core_gz": core_gz,
+               "inference": inf, "inference_gz": inf_gz}
         _CASE_PARTS[path] = ent
         return ent
 
@@ -938,15 +959,16 @@ class Handler(SimpleHTTPRequestHandler):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self._send_json_bytes(body, status)
 
-    def _send_json_bytes(self, body, status=200):
-        """发 JSON 字节；≥1 KB 且客户端支持时 gzip（案例 core 从 4.6 MB 降到几百 KB）。"""
+    def _send_json_bytes(self, body, status=200, gz_body=None):
+        """发 JSON 字节；客户端支持 gzip 时优先用预压缩体（案例分片已预先压好）。"""
         enc = None
         wants = "gzip" in (self.headers.get("Accept-Encoding") or "")
-        if wants and status == 200 and len(body) >= 1024:
-            buf = io.BytesIO()
-            with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=6, mtime=0) as gz:
-                gz.write(body)
-            body = buf.getvalue()
+        if wants and status == 200 and gz_body is not None:
+            body = gz_body
+            enc = "gzip"
+        elif wants and status == 200 and len(body) >= 1024:
+            # 小响应现压即可；大响应（案例分片）走上面的预压缩路径。
+            body = gzip.compress(body, 6)
             enc = "gzip"
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -1061,7 +1083,11 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as exc:      # noqa: BLE001
                 self._send_json({"error": "案例解析失败：%s" % exc}, 500)
                 return
-            self._send_json_bytes(parts[part])
+            if part == "core":
+                self._send_json_bytes(parts["core"], gz_body=parts["core_gz"])
+            else:
+                self._send_json_bytes(parts["inference"],
+                                      gz_body=parts["inference_gz"])
             return
         if path == "/api/health":
             self._api_health()
