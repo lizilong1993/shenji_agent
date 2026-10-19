@@ -84,6 +84,12 @@
   // `default` 是该图层的**初始意图**。面板由本表生成之后，HTML 的 `checked`
   // 不再是默认值的来源（那些复选框已经删掉了）；用同一份声明，才不会出现
   // "HTML 里勾着、注册表里以为关着"这种两边不一致。
+  //
+  // **显示优先级在注册阶段确定**：影像栈的 `z` 就是固定优先级（大范围/粗分辨率
+  // 在下，小范围/高分辨率在上）。运行期的挂载/卸载只改变"是否参与显示"，不改变
+  // `z`，也不写回任何顺序；同一图层内部的多个实例（热点框、高倍段）由
+  // `compareImagery()` 按 provider 声明的 maximumLevel 和覆盖矩形排序，
+  // 同样与挂载先后无关。
   var LAYERS = [
     // ---- imagery 栈：序号即 imageryLayers 的 index，越大越靠上 ----
     // 【2026-10-16 改】离线 Esri 底图由 z=5 提到 **z=12**，并改名「Esri 影像（离线）」。
@@ -610,6 +616,48 @@
   // 高度动态挂载和卸载。所以不能只在启动时排一次，每次结构变化都要重排。
 
   var imagerySlots = {};   // id -> Cesium.ImageryLayer
+  // 登记序号：**只**用于"同 z、同分辨率、同覆盖范围"时的最终并列裁决。
+  // 它不参与跨层排序（跨层顺序永远由 z 决定），所以挂载先后不会改变层级。
+  var imagerySeq = 0;
+
+  /**
+   * 同层多实例的稳定顺序键 —— **只读 provider 的静态声明**，与挂载先后无关。
+   *
+   * 一个注册表图层可能对应多个真实 imagery 实例（热点 9 个框、城区 4 个 AOI、
+   * 高倍段多个 z）。以前它们的相对顺序 = `imagerySlots[id]` 的 push 顺序 =
+   * **挂载顺序**，于是"先挂 z15 后补 z14"就会把 z14（粗）排到 z15（细）上面，
+   * 与"小范围高分辨率在上"相反。重挂一次，顺序还可能整个翻过来。
+   *
+   * 这里按注册时声明的空间属性排序：
+   *   1. `maximumLevel` 小的在下（粗分辨率垫底）；
+   *   2. 同层级时覆盖范围大的在下（大范围垫底，小范围高分辨率覆盖其上）；
+   *   3. 再按矩形西南角、最后按登记序号，保证完全可重复。
+   */
+  function imageryRank(layer) {
+    var p = layer && layer.imageryProvider;
+    var max = (p && typeof p.maximumLevel === 'number') ? p.maximumLevel : 30;
+    var r = p && p.rectangle;
+    var area = 0, west = 0, south = 0;
+    if (r && typeof r.west === 'number') {
+      west = r.west;
+      south = r.south;
+      var w = Math.abs(r.east - r.west);
+      var h = Math.abs(r.north - r.south);
+      // 跨 180° 的矩形 east-west 为负；取补一次即可（本项目的框都不跨）。
+      if (r.east < r.west) w = Math.abs(r.east + 2 * Math.PI - r.west);
+      area = w * h;
+    }
+    return { max: max, area: area, west: west, south: south };
+  }
+
+  function compareImagery(a, b) {
+    var ra = imageryRank(a), rb = imageryRank(b);
+    if (ra.max !== rb.max) return ra.max - rb.max;       // 粗的在下
+    if (ra.area !== rb.area) return rb.area - ra.area;   // 大范围在下
+    if (ra.west !== rb.west) return ra.west - rb.west;
+    if (ra.south !== rb.south) return ra.south - rb.south;
+    return (a._l3dSeq || 0) - (b._l3dSeq || 0);
+  }
   var sinks = {};          // kind -> 应用函数
   var ctxViewer = null;    // 由 bind 注入。viewer 在 app.js 里是闭包变量，拿不到全局，
                            // 所以这里不做隐式查找，必须显式交进来。
@@ -669,7 +717,10 @@
   function addImagery(id, layer) {
     if (!imagerySlots[id]) imagerySlots[id] = [];
     // 去重：registerImagerySlot 可能因重复挂载被调用多次。
-    if (imagerySlots[id].indexOf(layer) < 0) imagerySlots[id].push(layer);
+    if (imagerySlots[id].indexOf(layer) < 0) {
+      if (!layer._l3dSeq) layer._l3dSeq = ++imagerySeq;
+      imagerySlots[id].push(layer);
+    }
     return layer;
   }
 
@@ -678,9 +729,16 @@
     delete imagerySlots[id];
   }
 
-  /** 某槽位当前挂载的所有层，已按登记顺序。 */
+  /**
+   * 某槽位当前挂载的所有层，**按稳定顺序**返回（粗/大范围在前，细/小范围在后）。
+   *
+   * 返回副本：调用方（reorderImagery、面板）不应通过它改内部数组；排序本身
+   * 也不写回 `imagerySlots`，保证"动态挂卸只影响可见性，不改变登记顺序"。
+   */
   function layersOf(id) {
-    return imagerySlots[id] || [];
+    var arr = imagerySlots[id] || [];
+    if (arr.length < 2) return arr.slice();
+    return arr.slice().sort(compareImagery);
   }
 
   /**
@@ -779,7 +837,7 @@
     _debug: function () {
       var rows = [];
       Object.keys(imagerySlots).forEach(function (id) {
-        imagerySlots[id].forEach(function (layer, n) {
+        layersOf(id).forEach(function (layer, n) {
           rows.push({
             id: id + (imagerySlots[id].length > 1 ? ('#' + n) : ''),
             slot: id,
@@ -799,5 +857,7 @@
           .filter(function (id) { return !imagerySlots[id]; }),
       };
     },
+    // 同层多实例的稳定排序（纯函数，tools/imagery_order_test.js 直接测）。
+    _compareImagery: compareImagery,
   };
 })();
