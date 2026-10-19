@@ -2160,10 +2160,17 @@ function syncEntities() {
     const rec = state.targets[id];
     const def = rec.def;
     const visible = isVisible(def);
+    // 形态（2D 图标 / 3D 模型）必须在这里一起解算：syncEntities 会在每次脏标记
+    // 重跑时把 billboard.show 写回 visible，如果只让 applyTargetLod 管 billboard，
+    // 下一次 syncEntities 就会把已经切到 3D 的图标重新点亮 —— 实测低空下 31 个
+    // 目标全部"图标+模型同时显示"。所以两处用同一套判据。
+    const useModel = !!(window.EntityLod && lastTargetForm === window.EntityLod.MODE_MODEL
+      && targetHasModel[id]);
 
     rec.entity.show = visible;
     rec.entity.label.show = visible && state.layers.labels;
-    rec.entity.billboard.show = visible;
+    rec.entity.billboard.show = visible && !useModel;
+    if (rec.entity.model) rec.entity.model.show = visible && useModel;
     rec.sensorEntity.show = visible && state.filters.sensors === true;
 
     // 航迹单调累积。回退时不是简单清空，而是从第 0 帧重建，
