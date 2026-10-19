@@ -1117,7 +1117,10 @@ function switchTheatre(theatre) {
     // a non-default case kept the previously mounted hotspot set (measured: the
     // Ladakh case showed 9 Taiwan hotspot providers because the initial mount in
     // `initViewer` is case-independent and this path returned early).
+    // 这里同样要重排：remountHotspotImagery 会把新层 add 到 imageryLayers 末尾，
+    // 不 apply 就会临时压在注记之上（相机不动时这个"临时"可能一直不消失）。
     remountHotspotImagery();
+    applyLayers();
     return;
   }
   try {
@@ -1135,6 +1138,11 @@ function switchTheatre(theatre) {
       state.imageryLayer.show = !!state.layers.imagery;
     }
     markScene('switchTheatre');
+    // ⚠ 必须显式 apply：上面 remove + addImageryProvider 把战区影像层加到了
+    // imageryLayers **末尾**，而 markScene 只驱动 syncEntities，不会重排 imagery。
+    // 不补这一句，"切案例后底图压住注记/热点"会一直保持到下一次相机触发
+    // syncOfflineDetail 才自愈——这正是"动态加载后层级变了"的现象之一。
+    applyLayers();
   } catch (e) {
     // A failed rebuild must not abort loading the case: the data, targets and
     // panels are independent of the basemap rectangle. Report it on the status
