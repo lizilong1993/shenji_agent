@@ -1,0 +1,3 @@
+armor.glb — Quaternius "Animated Tanks Pack", Tank.glb
+License: CC0 1.0 (public domain) — https://quaternius.com/packs/animatedtanks.html
+Converted/copied without modification; animations included.

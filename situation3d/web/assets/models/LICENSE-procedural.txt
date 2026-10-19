@@ -1,0 +1,3 @@
+awacs.glb, helicopter.glb, apc.glb, artillery.glb, sam_launcher.glb, coastal_missile.glb
+Generated procedurally by situation3d/tools/modelgen/build_models.py (Blender 4.5).
+License: CC0 1.0 — same terms as the rest of this asset set.
