@@ -696,6 +696,126 @@ function flyTo(lon, lat, height, pitchDeg) {
   });
 }
 
+// --------------------------------------------------------------------------
+// 图层自动定位：用户打开图层后，平滑飞到该图层的空间范围
+// --------------------------------------------------------------------------
+//
+// 需求（用户 2026-10-19）：选择并加载图层后，视点自动平滑移到图层中心，并按
+// 覆盖范围和视窗尺寸给出合适缩放，让内容完整、清晰地显示。
+//
+// 为什么用 `flyTo({destination: Rectangle})` 而不是自己算高度：
+// Cesium 内部的 `Camera.getRectangleCameraCoordinates` 会按**当前视窗宽高比**和
+// 视锥计算能完整容纳矩形的位置，这正是"自适应缩放"要的；且 `flyTo` 自带平滑
+// 动画。自己用 span → 高度公式反而在不同宽高比下会裁掉内容。
+//
+// 触发点只有**面板的 onChange**（用户显式打开图层）。URL 钩子、批量「全部显示/
+// 隐藏/恢复默认」、以及按相机高度自动挂载/卸载（syncHotspot/syncUrban/
+// syncOfflineDetail）都**不触发飞行** —— 否则相机自己动一下就被自己的 LOD 逻辑
+// 拽走，交互会打架。
+const LAYER_FOCUS_MAX_SPAN_DEG = 60;   // 跨度超过它视为全球底图，不做自动定位
+// 正在进行的图层定位飞行。token 用于**作废旧飞行的回调**：连续点两个图层时，
+// Cesium 会取消上一个飞行并触发它的 cancel 回调，若没有 token，取消回调会把
+// 新飞行的状态一起清掉（随后用户点画布就无法中断新飞行）。
+let layerFlight = { token: 0, id: null };
+
+/** 把 [w,s,e,n]（度）并入累加器；非法值忽略。 */
+function _unionBbox(acc, b) {
+  if (!Array.isArray(b) || b.length !== 4) return;
+  const w = Number(b[0]), s = Number(b[1]), e = Number(b[2]), n = Number(b[3]);
+  if (![w, s, e, n].every(isFinite)) return;
+  acc.w = Math.min(acc.w, w);
+  acc.s = Math.min(acc.s, s);
+  acc.e = Math.max(acc.e, e);
+  acc.n = Math.max(acc.n, n);
+}
+
+/**
+ * 不做自动定位的图层：它们的显示/挂载由**相机高度**驱动
+ * （syncHotspotImagery / syncUrbanImagery / syncOfflineDetail）。
+ * 若在打开时把相机拖到"看全整个图层"的高度，很可能越过这些层自己的挂载阈值，
+ * 落地后立刻被卸载 —— 用户看到的是"飞过去又消失"。把它们排除，交给原有的
+ * 相机驱动逻辑，才是 2026-10-17 那轮"按相机挂/卸"的既定设计。
+ */
+const LAYER_FOCUS_EXCLUDED = {
+  'hotspot.imagery': true,
+  'urban.imagery': true,
+  'imagery.offline_detail': true,
+};
+
+/**
+ * 某图层的空间范围 [W,S,E,N]（度）。取不到或等于全球范围时返回 null。
+ *
+ * 优先用注册表声明的 `bbox`（primitive/globe 层没有 provider 矩形）；否则
+ * 合并已挂载 provider 的 `rectangle`（例如 WSF3D 覆盖层）。
+ */
+function layerExtent(id) {
+  if (LAYER_FOCUS_EXCLUDED[id]) return null;
+  const def = window.LayerRegistry && LayerRegistry.def ? LayerRegistry.def(id) : null;
+  if (def && Array.isArray(def.bbox) && def.bbox.length === 4) {
+    return def.bbox.slice();
+  }
+  const acc = { w: Infinity, s: Infinity, e: -Infinity, n: -Infinity };
+  const layers = (window.LayerRegistry && LayerRegistry.layersOf)
+    ? LayerRegistry.layersOf(id) : [];
+  layers.forEach(function (L) {
+    const r = L && L.imageryProvider && L.imageryProvider.rectangle;
+    if (!r) return;
+    _unionBbox(acc, [Cesium.Math.toDegrees(r.west), Cesium.Math.toDegrees(r.south),
+                     Cesium.Math.toDegrees(r.east), Cesium.Math.toDegrees(r.north)]);
+  });
+  if (!isFinite(acc.w)) return null;
+  if (acc.e < acc.w) return null;                      // 跨 180°：本项目没有这种层
+  if (acc.e - acc.w > LAYER_FOCUS_MAX_SPAN_DEG
+      || acc.n - acc.s > LAYER_FOCUS_MAX_SPAN_DEG) {
+    return null;                                       // 全球底图：不抢视点
+  }
+  return [acc.w, acc.s, acc.e, acc.n];
+}
+
+/**
+ * 平滑飞到图层范围。返回 true 表示真的发起了飞行。
+ *
+ * 外扩 12%（最小 0.004°）作为留白，避免内容贴边；`flyTo` 的 `cancel` 回调与
+ * 画布上的 pointer/wheel 中断保证用户随时能接管，不会"点了一下图层就被锁死视点"。
+ */
+function focusLayer(id) {
+  if (!viewer || !window.Cesium) return false;
+  const ext = layerExtent(id);
+  if (!ext) return false;
+  const w = ext[0], s = ext[1], e = ext[2], n = ext[3];
+  const padX = Math.max((e - w) * 0.12, 0.004);
+  const padY = Math.max((n - s) * 0.12, 0.004);
+  const rect = Cesium.Rectangle.fromDegrees(w - padX, s - padY, e + padX, n + padY);
+  detachFollow('图层定位');
+  const token = ++layerFlight.token;
+  layerFlight.id = id;
+  try {
+    viewer.camera.flyTo({
+      destination: rect,
+      duration: 1.6,
+      easingFunction: Cesium.EasingFunction.QUINTIC_IN_OUT,
+      complete: function () {
+        if (token === layerFlight.token) layerFlight.id = null;
+      },
+      cancel: function () {
+        if (token === layerFlight.token) layerFlight.id = null;
+      },
+    });
+  } catch (e2) {
+    if (token === layerFlight.token) layerFlight.id = null;
+    return false;
+  }
+  return true;
+}
+
+/** 用户一碰画布就取消正在进行的图层定位飞行（不干扰其它交互）。 */
+function cancelLayerFlightOnInput() {
+  if (!layerFlight.id) return;
+  layerFlight.id = null;
+  layerFlight.token++;                 // 让被取消飞行的回调作废
+  try { viewer.camera.cancelFlight(); } catch (e) { /* 没有活动飞行时忽略 */ }
+}
+
 function applyCamera(camera) {
   if (!camera) return;
   detachFollow('复位机位');
@@ -4547,6 +4667,10 @@ window.SituationHost = {
   // 图层顺序取证：imagery 的真实 index 顺序 + 每个图层的意图/事实。
   // 「哪个层压在哪个层上面」光看画面猜不出来，必须能读到 index。
   debugLayers: debugLayers,
+  // 图层自动定位：取证/测试入口（面板开关是唯一会触发飞行的用户路径）。
+  focusLayer: focusLayer,
+  layerExtent: layerExtent,
+  layerFlight: function () { return { id: layerFlight.id, token: layerFlight.token }; },
   // 预加载的取证出口：配置、候选 URL 与缓存侧统计。
   // 没有它就只能靠"感觉快了"，而本 feature 的验收要求给数（请求数/耗时/帧时）。
   prefetchConfig: function () {
@@ -5025,8 +5149,24 @@ function bindUI() {
       onChange: function (id, want) {
         LayerRegistry.setDesired(id, want);
         applyLayers();
+        if (want) {
+          // 打开图层后平滑定位到它的空间范围（见 focusLayer；没有范围/全球
+          // 底图/相机驱动的按需层都会返回 false，不影响开关本身）。
+          focusLayer(id);
+        } else if (layerFlight.id === id) {
+          // 飞行途中把同一图层关掉：这次定位已无意义，立即交还视点控制。
+          cancelLayerFlightOnInput();
+        }
       },
     });
+    // 用户一碰画布就中断图层定位飞行：Cesium 的飞行默认不会因为拖动而停，
+    // 不主动取消会让用户"点了一下图层就抢不回视点"。
+    if (viewer && viewer.scene && viewer.scene.canvas) {
+      ['pointerdown', 'wheel', 'touchstart'].forEach(function (ev) {
+        viewer.scene.canvas.addEventListener(ev, cancelLayerFlightOnInput,
+                                            { passive: true });
+      });
+    }
   }
 
   // 迁移进注册表的图层行：**不再逐个 bindCheck**，改为把回调体挂成逐层 `handler`。
