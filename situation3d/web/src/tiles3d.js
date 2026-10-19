@@ -48,6 +48,38 @@
     },
   };
 
+  /**
+   * 运行时优化参数（对应《3DTiles 模型太大、层级太深，到底怎么优化》第五节）。
+   *
+   * 数据侧（纹理降分辨率、剪枝、geometricError 重排）是离线流水线的活，见
+   * `tools/tileset_stats.py` 的体检/演练输出；这里只处理**运行时**能直接拿到的收益：
+   *
+   *   maximumScreenSpaceError 16 → 24
+   *       每屏挑选的瓦片数约降 2.25 倍（SSE 是屏幕误差上界，越大越少选），
+   *       对城市级倾斜摄影 24 在 1.5 km 视距下与 16 肉眼差别很小，但显存/带宽
+   *       明显下降。文章建议 32；本项目仍要看塔楼轮廓，取折中值 24。
+   *   （skipLevelOfDetail 本数据集**不可用**：实测打开后 12 s 内只访问 3 个节点、
+   *   0 个内容就绪 —— 本项目的 tileset 是"根节点无内容 + 子节点全为外部 tileset"
+   *   的深链（见 tools/tileset_stats.py 的 depth 输出），跳级遍历找不到可渲染的
+   *   祖先内容就停住了。保持 false，层级问题交给数据侧合并/剪枝。）
+   *   cacheBytes / maximumCacheOverflowBytes
+   *       显式给缓存封顶（256 MB / 128 MB）：默认 512 MB 对本项目的城市数据
+   *       偏大，切换视角时更容易触发 GC 尖峰；封顶后卸载由 Cesium 自己按 LRU 做。
+   *   dynamicScreenSpaceError / foveatedScreenSpaceError
+   *       高空远瓦片降精度、屏幕边缘降精度。Cesium 1.145 默认已开，这里显式写出，
+   *       避免换构建后默认值变化导致性能回退而无人察觉。
+   */
+  var TILESET_OPTIONS = {
+    maximumScreenSpaceError: 24,
+    skipLevelOfDetail: false,
+    baseScreenSpaceError: 1024,
+    skipScreenSpaceErrorFactor: 16,
+    dynamicScreenSpaceError: true,
+    foveatedScreenSpaceError: true,
+    cacheBytes: 256 * 1024 * 1024,
+    maximumCacheOverflowBytes: 128 * 1024 * 1024,
+  };
+
   var viewerRef = null;
   var state = {};    // id -> {phase, tileset, detail}
   var seq = {};      // id -> 请求代次；关掉后晚到的 Promise 必须作废
@@ -112,7 +144,7 @@
     try {
       // fromUrl 是 Cesium 1.104+ 的静态入口；极老的构建没有它，退回构造器。
       start = Cesium.Cesium3DTileset.fromUrl
-        ? Cesium.Cesium3DTileset.fromUrl(src.url, { maximumScreenSpaceError: 16 })
+        ? Cesium.Cesium3DTileset.fromUrl(src.url, TILESET_OPTIONS)
         : Promise.resolve(new Cesium.Cesium3DTileset({ url: src.url }));
     } catch (e) {
       start = Promise.reject(e);

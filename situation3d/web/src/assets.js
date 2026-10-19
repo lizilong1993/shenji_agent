@@ -509,7 +509,40 @@
     return Array.isArray(d.bands) ? d.bands : [];
   }
 
-  /** 挂**一层**高倍段。挂哪几层由 app.js 的 syncOfflineDetail() 决定。 */
+  /**
+   * 低层级占位瓦片（全透明，共用一个 256×256 canvas）。
+   *
+   * 高倍段的数据只存在于 band.zoom 这一级。若 provider 把
+   * `minimumLevel = maximumLevel = z` 钉死，Cesium 为**低层级表面瓦片**准备
+   * 影像时会按 z 级枚举覆盖矩形内的**全部**瓦片：一个 z0 表面瓦片覆盖整幅
+   * 台海 z14 矩形（实测 241×224 = 54k 张），7 个 band 相乘可达每帧几十万次
+   * `requestImage`/URL 构造 —— 主线程被 URL 归一化与影像准备占满，帧率掉到 2 fps，
+   * 表面瓦片永远追不上相机，形成"越低越卡"的正反馈（2026-10-19 实测）。
+   *
+   * 因此 provider 改成从 z0 起的金字塔，低层级用透明占位兜住：低层级交给下面
+   * 的天地图 / 战区底图显示，高倍段只在自己那一级叠上去。
+   */
+  let transparentTile = null;
+  function lowDetailPlaceholder() {
+    if (!transparentTile) {
+      const cv = document.createElement('canvas');
+      cv.width = TILE_PX;
+      cv.height = TILE_PX;
+      transparentTile = cv;
+    }
+    return transparentTile;
+  }
+
+  /**
+   * 挂**一层**高倍段。挂哪几层由 app.js 的 syncOfflineDetail() 决定。
+   *
+   * 层级语义（与原来不同，见上方 lowDetailPlaceholder 的原因）：
+   *   level === z         真实瓦片
+   *   z-2 <= level < z    取 z 级的祖先瓦片（4×/16× 面积，只在表面层级还没
+   *                       追平相机的过渡期出现，轻微拉伸可接受）
+   *   level < z-2         透明占位（这个高度本来就该由底图显示）
+   * max 仍是 z：surface 层级深于 z 时 Cesium 会把影像级钳到 z，请求上一级瓦片。
+   */
   function attachOfflineDetailBand(viewer, band) {
     const d = manifest().offline_detail_imagery || {};
     const url = d.url_template || IMAGERY_URL;
@@ -518,12 +551,23 @@
     const provider = attachCached(new Cesium.UrlTemplateImageryProvider({
       url: url,
       tilingScheme: new Cesium.WebMercatorTilingScheme(),
-      // 钉死在单层：矩形只保证"这一层有瓦片"，跨层共用一个矩形就会越界请求。
-      minimumLevel: z,
+      // 从 0 起：低层级不向 mbtiles 要任何瓦片（真实数据从 z 开始）。
+      minimumLevel: 0,
       maximumLevel: z,
       rectangle: aoiRectangle(band.bbox),
       credit: '离线高清底图 z' + z + '（' + (d.source || 'mbtiles') + '）',
     }), url);
+
+    const original = provider.requestImage.bind(provider);
+    provider.requestImage = function (x, y, level, request) {
+      if (level >= z) return original(x, y, level, request);
+      const up = z - level;
+      if (up <= 2) {
+        // 祖先瓦片：用 z 级坐标走原来的缓存/请求路径，缓存键也按 z 级算。
+        return original(x << up, y << up, z, request);
+      }
+      return Promise.resolve(lowDetailPlaceholder());
+    };
     return { zoom: z, layer: viewer.imageryLayers.addImageryProvider(provider) };
   }
 

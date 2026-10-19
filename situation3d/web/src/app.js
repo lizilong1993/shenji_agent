@@ -586,7 +586,16 @@ function initViewer() {
       // 同 urban：热点高清与离线高倍段都是**按需挂载**的，挂载判据要读它们，
       // 所以开关一变就记下来 —— 否则用户在面板里关掉，相机一动作又被挂回来。
       if (id === 'hotspot.imagery') state.hotspotImageryEnabled = !!want;
-      if (id === 'imagery.offline_detail') state.offlineDetailEnabled = !!want;
+      // 高倍段是**常挂、只切 show** 的（见 ensureOfflineDetailLayers）。这里不能走
+      // 下面的通用分支：那会把已挂载的**所有** band 一起显示出来，把"按相机只显示
+      // 相关层级"的闸门冲掉。开关从关到开时立即按相机重算一次（不等 1.5 s 周期）。
+      if (id === 'imagery.offline_detail') {
+        const was = state.offlineDetailEnabled;
+        state.offlineDetailEnabled = !!want;
+        if (!want) setOfflineDetailShown([]);
+        else if (!was) setOfflineDetailShown(offlineDetailWantedZooms());
+        return;
+      }
 
       // 这里本来还想把 `setTiandituLabel` / `setHotspotImagery` 里的提示文案接过来，
       // 查证后**没有必要**：`setSwitchNote()` 本身就是一个空函数
@@ -643,6 +652,9 @@ function initViewer() {
   // 决定，首次由 applySituationData 与 camera.changed 触发（见那两处的说明）。
   // 启动时挂上任何一层，Cesium 都会立刻为每个表面瓦片去要一遍深层瓦片 —— 那正是
   // "半个屏幕在加载"的来源。
+  // 高倍段（z14+）在这里**一次性挂好并隐藏**：之后只切 show，不再 add/remove
+  // （原因见 ensureOfflineDetailLayers）。启动时挂不会引起用户可见的重建。
+  ensureOfflineDetailLayers();
   registerImagerySlot('imagery.offline_detail', state.offlineDetailLayers);
   // 热点影像是**一层多实例**（每个热点框一个 provider），挂载时才登记。
   registerImagerySlot('hotspot.imagery', state.hotspotLayers);
@@ -1211,58 +1223,75 @@ function offlineDetailWantedZooms() {
 }
 
 /**
- * 按需挂载/卸载离线高倍段（z14+）。
+ * 把 manifest 声明的全部高倍段**挂一次、常驻**，初始全部隐藏。
  *
- * 只在**层级集合真的变了**时才动 imageryLayers —— 每帧增删会让 Cesium 反复重建
- * 表面瓦片顺序（applyLayers 的注释里有同样一条警告）。
+ * 为什么不再随相机 add/remove（2026-10-19 改）
+ * --------------------------------------------
+ * Cesium 对 imageryLayers 的 add/remove 会让表面瓦片**整体重建**：实测在 1.5 km
+ * 挂上 z14/15/16 三个 band 后，表面层级从 14 掉回 0/1/2，再花十几秒才重新细化，
+ * 期间画面持续卡顿。相机每跨一档就重建一次，就是"越低越卡"的直接来源。
+ *
+ * 改成常挂之后，层级切换只写 `ImageryLayer.show`（隐藏层在 Cesium 的
+ * `_createTileImagerySkeletons` 里直接跳过，不产生任何瓦片请求），既不重建表面，
+ * 也不会反复登记/注销槽位。
+ *
+ * 低层级爆炸的防护在 assets.js 的 attachOfflineDetailBand：provider 从 z0 起，
+ * 低层级用祖先瓦片/透明占位兜住，所以"挂上时表面层级还很低"不会再枚举整层瓦片。
  */
-function syncOfflineDetail() {
+function ensureOfflineDetailLayers() {
   if (!viewer || !window.OfflineAssets) return;
+  if (state.offlineDetailLayers && state.offlineDetailLayers.length) return;
+  const bands = OfflineAssets.offlineDetailBands();
+  if (!bands || !bands.length) return;
+  const recs = [];
+  bands.forEach(function (band) {
+    const rec = OfflineAssets.attachOfflineDetailBand(viewer, band);
+    if (!rec) return;
+    rec.layer.show = false;
+    recs.push(rec);
+  });
+  state.offlineDetailLayers = recs;
+  registerImagerySlot('imagery.offline_detail',
+    recs.map(function (r) { return r.layer; }));
+}
+
+/** 只写 show：`zooms` 是当前应该显示的高倍段层级集合。 */
+function setOfflineDetailShown(zooms) {
+  const keep = {};
+  (zooms || []).forEach(function (z) { keep[z] = true; });
+  (state.offlineDetailLayers || []).forEach(function (rec) {
+    rec.layer.show = !!keep[rec.zoom];
+  });
+  state.offlineDetailZooms = (zooms || []).slice();
+}
+
+/**
+ * 按相机层级切换高倍段显隐（不再增删图层）。
+ *
+ * 变更仍保留"连续两次算出同一结果才执行"的阻尼：`_tilesToRender` 在相机移动中
+ * 会短暂读不到，直接跟随会抖。代价是层级变化晚一拍生效（约 1.5~3 s）。
+ */
+function syncOfflineDetail(force) {
+  if (!viewer || !window.OfflineAssets) return;
+  ensureOfflineDetailLayers();
+  if (!state.offlineDetailEnabled) {
+    if ((state.offlineDetailZooms || []).length) setOfflineDetailShown([]);
+    return;
+  }
   const want = offlineDetailWantedZooms();
   const have = state.offlineDetailZooms || [];
   if (want.length === have.length && want.every(function (z, i) { return z === have[i]; })) {
     pendingDetailZooms = null;
     return;
   }
-
-  // **变更要连续两次算出同一结果才执行**。
-  //
-  // 为什么必须阻尼：挂/卸一层会让 Cesium 为每个表面瓦片重算影像槽位，而重算期间
-  // `surfaceRenderLevel()` 会抖（甚至短暂读不到）—— 抖动一次就切一次集合，
-  // 于是"挂→重建→卸→重建"自激，观感就是持续卡顿。实测 2026-10-17 8 km/台北：
-  // 采样里反复出现 `S=-1|挂载空` 与 `S=12|挂载 z14` 交替。
-  // 代价是层级变化晚一拍生效（相机停稳后约 1.5~3 s），换来的是不抖。
-  if (!pendingDetailZooms || pendingDetailZooms.join(',') !== want.join(',')) {
-    pendingDetailZooms = want;
-    return;
+  if (!force) {
+    if (!pendingDetailZooms || pendingDetailZooms.join(',') !== want.join(',')) {
+      pendingDetailZooms = want;
+      return;
+    }
   }
   pendingDetailZooms = null;
-
-  // 摘掉不再需要的（同 zoom 的层保留，避免"摘了又挂"）
-  const keep = {};
-  want.forEach(function (z) { keep[z] = true; });
-  state.offlineDetailLayers = (state.offlineDetailLayers || []).filter(function (rec) {
-    if (keep[rec.zoom]) return true;
-    try { viewer.imageryLayers.remove(rec.layer, true); } catch (e) { /* already gone */ }
-    return false;
-  });
-
-  // 挂上新增的
-  const haveZooms = {};
-  state.offlineDetailLayers.forEach(function (rec) { haveZooms[rec.zoom] = true; });
-  const bands = OfflineAssets.offlineDetailBands();
-  want.forEach(function (z) {
-    if (haveZooms[z]) return;
-    const band = bands.filter(function (b) { return b.zoom === z; })[0];
-    const rec = band && OfflineAssets.attachOfflineDetailBand(viewer, band);
-    if (rec) state.offlineDetailLayers.push(rec);
-  });
-
-  state.offlineDetailZooms = want;
-  LayerRegistry.dropImagery('imagery.offline_detail');
-  registerImagerySlot('imagery.offline_detail',
-    state.offlineDetailLayers.map(function (r) { return r.layer; }));
-  applyLayers();
+  setOfflineDetailShown(want);
 }
 
 /**
@@ -1984,9 +2013,39 @@ function applyTargetLod(force) {
     // 切到「模型」形态就把图标藏掉，那会让这些目标整个消失（实测：31 个目标
     // 里只有 12 个有模型，另 19 个是陆/空目标）。
     const showModel = useModel && hasModel;
-    if (rec.entity.billboard) rec.entity.billboard.show = !showModel;
+    // 图标**始终显示**：切到 3D 模型后图标不再隐藏，而是抬到模型头顶上方
+    // （见 applyTargetBillboardAnchor）。目标点本身仍由模型表达。
+    if (rec.entity.billboard) {
+      rec.entity.billboard.show = true;
+      applyTargetBillboardAnchor(rec.entity, showModel);
+    }
     if (hasModel && rec.entity.model) rec.entity.model.show = showModel;
   });
+}
+
+/**
+ * 2D 图标的锚定方式：图标形态沿用"居中贴目标点"（与历史行为一致）；模型形态
+ * 改为**底边锚定 + 抬高 52 px**，使图标稳定落在模型/标签的上方。
+ *
+ * 为什么用 pixelOffset 而不是 eyeOffset：图标是屏幕空间图元，pixelOffset 不受
+ * 相机距离/朝向影响，缩放时不会跳；eyeOffset 是视空间偏移，相机俯仰变化时会
+ * 让图标在模型两侧滑动。52 px 取"标签（底边 24 px + 约 18 px 高）之上再留
+ * 10 px"，模型再高也不会遮住图标。
+ */
+function applyTargetBillboardAnchor(entity, modelMode) {
+  const bb = entity && entity.billboard;
+  if (!bb) return;
+  // syncEntities 每个脏帧都会走这里；形态没变就不重复写属性，避免 Cesium
+  // 把实体反复标脏。
+  if (entity._iconAnchorModel === modelMode) return;
+  entity._iconAnchorModel = modelMode;
+  if (modelMode) {
+    bb.verticalOrigin = Cesium.VerticalOrigin.BOTTOM;
+    bb.pixelOffset = new Cesium.Cartesian2(0, -52);
+  } else {
+    bb.verticalOrigin = Cesium.VerticalOrigin.CENTER;
+    bb.pixelOffset = new Cesium.Cartesian2(0, 0);
+  }
 }
 
 function createTargetEntities() {
@@ -2005,7 +2064,10 @@ function createTargetEntities() {
         image: Symbology.symbolUri(def.icon, def.affiliation),
         width: 34,
         height: 34,
+        // 锚点/偏移由 applyTargetBillboardAnchor() 按形态切换：图标形态保持不变
+        // （居中、贴目标点），模型形态改到底边锚定并抬高，落在模型"头顶"之上。
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        pixelOffset: new Cesium.Cartesian2(0, 0),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         scaleByDistance: new Cesium.NearFarScalar(20000, 1.5, 2000000, 0.5),
       },
@@ -2024,6 +2086,13 @@ function createTargetEntities() {
           // 于是恒被 minimumPixelSize 夹住、「按高度切换」失去视觉意义。
           // 尺度表在 entityLod.js（按形态给真实长度 ÷ 资产单位长度）。
           scale: modelScaleForTarget(def),
+          // 阵营着色：按 affiliation 做**混合着色**（MIX, 0.35），保留模型自身的
+          // 材质/纹理层次，又让红方/蓝方在低空一眼可分。对 Kenney 那批依赖外部
+          // colormap.png 的资产，这层着色同时兜住"贴图缺失时整片白膜"的观感
+          // （贴图已补齐，见 web/assets/models/Textures/colormap.png）。
+          color: color,
+          colorBlendMode: Cesium.ColorBlendMode.MIX,
+          colorBlendAmount: 0.2,
           // 像素下限只作**极远处的可辨性兜底**，不能大到把距离语义抹平：
           // 原先 24 与 2D 图标的 34 同量级，会把 3D 恒定成 24 px。
           minimumPixelSize: 6,
@@ -2281,15 +2350,18 @@ function syncEntities() {
     const def = rec.def;
     const visible = isVisible(def);
     // 形态（2D 图标 / 3D 模型）必须在这里一起解算：syncEntities 会在每次脏标记
-    // 重跑时把 billboard.show 写回 visible，如果只让 applyTargetLod 管 billboard，
-    // 下一次 syncEntities 就会把已经切到 3D 的图标重新点亮 —— 实测低空下 31 个
-    // 目标全部"图标+模型同时显示"。所以两处用同一套判据。
+    // 重跑时重写 billboard.show。现在图标**在两种形态下都显示**（2026-10-19 按
+    // 用户要求），差别只在锚点：模型形态由 applyTargetBillboardAnchor 抬到头顶。
+    // 两处（这里与 applyTargetLod）必须用同一套判据，否则锚点会在一次重算后
+    // 退回"居中"，表现为低空时图标忽然落回模型身上。
     const useModel = !!(window.EntityLod && lastTargetForm === window.EntityLod.MODE_MODEL
       && targetHasModel[id]);
 
     rec.entity.show = visible;
     rec.entity.label.show = visible && state.layers.labels;
-    rec.entity.billboard.show = visible && !useModel;
+    // 图标始终显示（模型形态抬到头顶），原因见 applyTargetBillboardAnchor。
+    rec.entity.billboard.show = visible;
+    applyTargetBillboardAnchor(rec.entity, useModel);
     if (rec.entity.model) rec.entity.model.show = visible && useModel;
     rec.sensorEntity.show = visible && state.filters.sensors === true;
 
@@ -3057,7 +3129,7 @@ function relAddLine(from, to, dashed, color, text) {
     position: Cesium.Cartesian3.fromDegrees((from.lon + to.lon) / 2, (from.lat + to.lat) / 2, alt),
     label: {
       text: text, font: '12px sans-serif', fillColor: color, style: Cesium.LabelStyle.FILL,
-      showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('#000000a6'),
+      showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('#ffffffd9'),
       horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
       verticalOrigin: Cesium.VerticalOrigin.CENTER,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
