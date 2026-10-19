@@ -184,6 +184,9 @@
       // 低层 + 台海区域 z14，后者只在台湾区域有数据但精度是 20 m 网格。
       id: 'terrain.mesh', kind: 'globe', z: 11, label: '地形模型（台湾 20m 网格）',
       group: '底图', default: false, checkbox: 'modelTerrainMesh',
+      // 自动定位用的空间范围 [W,S,E,N]（度）。来源：tiles3d_db/tw_dem_20m.zip
+      // 的 layer.json available（z14: x 27308–27489, y 10184–10494，EPSG:4326 2× 根瓦片）。
+      bbox: [120.015, 21.885, 122.014, 25.302],
       exclusives: ['terrain.model'] },
     { id: 'weather.model', kind: 'globe', z: 20, label: '气象模型',
       group: '底图', default: false, checkbox: 'modelWeather' },
@@ -232,18 +235,25 @@
     {
       id: 'tiles3d.taipei', kind: 'primitive', z: 40, default: false,
       label: '台北 3D Tiles（实景）', group: '底图', checkbox: 'modelTaipei3d',
+      // 自动定位范围 [W,S,E,N]（度）：取自 tileset.json 根 boundingVolume.region
+      // （弧度 → 度）。图层打开时相机平滑飞到这一范围。
+      bbox: [121.4643, 24.9425, 121.6409, 25.0674],
     },
     {
       id: 'tiles3d.taichung', kind: 'primitive', z: 41, default: false,
       label: '台中 3D Tiles（实景）', group: '底图', checkbox: 'modelTaichung3d',
+      bbox: [120.5854, 24.0658, 120.6746, 24.2741],
     },
     {
       id: 'tiles3d.taoyuan', kind: 'primitive', z: 42, default: false,
       label: '桃园 3D Tiles（实景）', group: '底图', checkbox: 'modelTaoyuan3d',
+      bbox: [121.2008, 24.9437, 121.3777, 25.0663],
     },
     {
       id: 'tiles3d.tw2024', kind: 'primitive', z: 43, default: false,
       label: 'TW2024 三维样例', group: '底图', checkbox: 'modelTw2024',
+      // 该 tileset 用包围球声明（半径 36.8 km），按其中心 ±半径折算。
+      bbox: [119.166, 23.138, 119.8872, 23.7996],
     },
 
     // ---- 标签栈：不贴地，靠 disableDepthTestDistance 保证在几何之上 ----
