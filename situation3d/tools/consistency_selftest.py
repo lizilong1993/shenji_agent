@@ -163,7 +163,15 @@ PROBE = r"""
     // 返回 `{bound, visible:{layerId:bool}, count, items, resolution, …}`。
     var d = window.Plotting.debug();
     var v = (d && d.visible) || {};
-    return v[layerId] ? 1 : 0;
+    // 只看 sink 标志会漏掉 applyVisibility 写坏实体 show 的情况：该层至少要有一个
+    // 要素，且所有图元真的处于显示状态，才算"开了"。
+    var items = (d && d.items ? d.items : []).filter(function (it) {
+      return it.layer === layerId;
+    });
+    var shown = items.length > 0 && items.every(function (it) {
+      return it.shown !== false;
+    });
+    return (v[layerId] && shown) ? 1 : 0;
   }
 
   // 目标图层族的显隐读取口。
@@ -199,15 +207,9 @@ PROBE = r"""
     { id: "overlay.focusMask", what: "选中掩码（focusDebug().maskShow，必要时自动选中）", budget: 12000, read: focusMaskShown },
     { id: "situation.relations", what: "关联关系线（选中长机后的可见折线增量）", budget: 12000, read: relationsShown, snapshot: relationsSnapshot },
     { id: "situation.occupation", what: "占领区域（occupationEntities 可见数）", budget: 8000, read: occupationShown },
-    // —— 标绘栈（`kind:'plot'`）：此前**完全没有覆盖** ——
-    // 实测发现 `consistency_selftest.py` 的断言集合里只有 `situation.occupation`
-    // 属 plot 栈，故 6 个 `plot.*` 图层的显隐从未被校验；而任务五刚把它们的
-    // z 值从 10–50 上调到 80–93，更需要一条回归网兜住。
-    { id: "plot.mobility", what: "标绘·机动与集结（sink 是否收到意图）", read: function () { return plotFlagShown("plot.mobility"); } },
-    { id: "plot.offense",  what: "标绘·进攻（sink 是否收到意图）",     read: function () { return plotFlagShown("plot.offense"); } },
-    { id: "plot.defense",  what: "标绘·防御与障碍（sink 是否收到意图）", read: function () { return plotFlagShown("plot.defense"); } },
-    { id: "plot.fire",     what: "标绘·火力（sink 是否收到意图）",     read: function () { return plotFlagShown("plot.fire"); } },
-    { id: "plot.intel",    what: "标绘·侦察与空域（sink 是否收到意图）", read: function () { return plotFlagShown("plot.intel"); } },
+    // —— 标绘栈（`kind:'plot'`）：行由下方向**目录里实际存在的类别**生成 ——
+    // 不再写死五个类别：新增/改名类别时自检自动跟随，符合"图层由要素驱动、
+    // 不用固定分类限制扩展"的要求。
     // —— 目标图层族（此前 layerTargets 因读错对象而被标注「暂不纳入」，见上）——
     { id: "layerTargets", what: "可见目标（state.layers.targets，handler 同步产物）",
       read: function () { return targetLayerShown("targets"); } },
@@ -216,6 +218,45 @@ PROBE = r"""
     { id: "layerTracks",  what: "历史轨迹（state.layers.tracks）",
       read: function () { return targetLayerShown("tracks"); } },
   ];
+
+  // 标绘图层是**动态**的：没有要素就不会注册。先从目录里取"有手动类型"的类别，
+  // 每类补一行 SPECS 并各造一条要素；循环结束后全部删除，恢复现场。
+  // 类别列表**从目录推导**，不写死五个——新增类别时自检自动跟上。
+  function plotLayerIds() {
+    return LayerRegistry.list('plot').filter(function (l) { return l.group === '标绘'; })
+      .map(function (l) { return l.id; }).sort();
+  }
+  var catalogueNow = Plotting.catalogue();
+  var seedCats = Plotting.categories().filter(function (c) {
+    return catalogueNow.some(function (x) { return !x.system && x.defaultLayer === c.layer; });
+  });
+  out.seedLayers = seedCats.map(function (c) { return c.layer; });
+  seedCats.forEach(function (c) {
+    SPECS.push({
+      id: c.layer,
+      what: '标绘·' + c.zh + '（sink 是否收到意图）',
+      read: (function (lid) {
+        return function () { return plotFlagShown(lid); };
+      })(c.layer),
+    });
+  });
+  out.plotLayersBefore = plotLayerIds();
+  var PLOT_SEEDS = [];
+  seedCats.forEach(function (c) {
+    try {
+      var cat = catalogueNow.filter(function (x) {
+        return !x.system && x.defaultLayer === c.layer;
+      })[0];
+      if (!cat) return;
+      var pts = (cat.family === 'zone')
+        ? [[119.4, 24.2], [119.55, 24.2], [119.55, 24.35], [119.4, 24.35]]
+        : [[119.4, 24.2], [120.6, 25.0]];
+      PLOT_SEEDS.push(Plotting.add({ type: cat.type, layer: c.layer, points: pts }).id);
+    } catch (e) { /* 造不出来就让对应的 plot.* 行按失败报出 */ }
+  });
+  await frames(5);
+  out.plotSeeds = PLOT_SEEDS.length;
+  out.plotLayers = plotLayerIds();
 
   for (var i = 0; i < SPECS.length; i++) {
     var s = SPECS[i], row = { id: s.id, what: s.what };
@@ -307,6 +348,12 @@ PROBE = r"""
     }
     out.rows.push(row);
   }
+  // 清掉种子标绘：空类别图层应随之注销（before == after）
+  PLOT_SEEDS.forEach(function (id) {
+    try { Plotting.remove(id); } catch (e) { /* 已被图层翻转清掉 */ }
+  });
+  await frames(6);
+  out.plotLayersAfter = plotLayerIds();
   // —— 互斥争裁与**恢复**（`exclusives` 的运行时行为）——
   // 本会话修过互斥的对称性与默认值，但**从没验过运行时**。
   // `resetHiddenFeed()` 的注释恰好警告过失效模式：关掉上层后下层仍标着 `hidden`，
@@ -472,6 +519,17 @@ def _one(base, case, tmpdir, ci):
               b.get("caseId"))
 
     rows = ev.get("rows") or []
+    # 动态标绘图层：五个种子类别各有要素后必须出现；删除后回到初始集合。
+    seeded = ev.get("plotLayers") or []
+    before = ev.get("plotLayersBefore") or []
+    after = ev.get("plotLayersAfter") or []
+    want = ev.get("seedLayers") or []
+    check("标绘图层由实际要素动态创建（目录里每个手动类别都在册）",
+          bool(want) and all(x in seeded for x in want)
+          and (ev.get("plotSeeds") or 0) == len(want),
+          "seed=%s layers=%s n=%r" % (want, seeded, ev.get("plotSeeds")))
+    check("标绘要素删除后空类别图层注销（集合回到初始）",
+          after == before, "before=%s after=%s" % (before, after))
     if not rows:
         check("取到至少一行取证", False, "rows 为空")
     for row in rows:

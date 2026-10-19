@@ -28,15 +28,15 @@
 const params = new URLSearchParams(window.location.search);
 
 const LEVEL_CLASS = { 1: 'lv1', 2: 'lv2', 3: 'lv3', 4: 'lv4' };
-// ---- B（方向 1）：轨迹显示窗口 / 选中预测线 / 选中掩码 -------------------------
+// ---- B（方向 1）：轨迹显示窗口 / 选中目标轨迹标绘 / 选中掩码 -------------------
 // TRAIL_WINDOW_TICKS：历史轨迹**全量保留**，只在渲染时切片。窗口只影响"看多少"，
 // 不影响"清空后从第 0 帧重建"的回退逻辑（回退靠 rec.lastTick，不靠窗口）。
 const TRAIL_WINDOW_TICKS = 120;
-// 预测线来源：默认取"计划航路剩余段"（标注为 计划/预计，不冒充观测）；
-// 'kinematic' 才是航向外推备选。
-const PREDICT_MODE = 'planned';
-// 航向外推的视野（备选，默认不走 PREDICT_MODE=planned；切换前未在远程验证过）。TICK_SECONDS = 30。
-const PREDICT_HORIZON_TICKS = 60;
+// 目标轨迹来源：默认取"计划航路剩余段"，作为态势标绘的一条虚线要素（虚线=计划）；
+// 'kinematic' 才是航向外推备选。两种模式都走同一套标绘渲染，不再另建独立轨迹实体。
+const TRACK_MODE = 'planned';
+// 航向外推的视野（备选，默认不走 TRACK_MODE=planned；切换前未在远程验证过）。TICK_SECONDS = 30。
+const TRACK_HORIZON_TICKS = 60;
 const TICK_SECONDS = 30;
 // 掩码内环的最小挖空半径（度）：目标刚起步、轨迹只有几帧时也看得见那个点。
 const FOCUS_MASK_PAD_DEG = 0.05;
@@ -91,6 +91,9 @@ const state = {
             targetPanel: true, overview: true, focusMask: false, occupation: true },
   filters: { red: true, blue: true, sea: true, land: true, air: true },
   selected: null,
+  // 选中目标的态势标绘轨迹：记录 id + 最近一次写入的几何签名（避免每帧重建）
+  trackPlotId: null,
+  trackPlotKey: null,
   focusMaskEntity: null, // 选中掩码图元（懒建：没选中就先不建）
   focusMaskHole: null,   // 掩码内环经纬边界（focusDebug 报出去用）
   hotspotEntities: [],
@@ -638,6 +641,19 @@ function initViewer() {
   // 漏了这一步的表现是"add() 成功、但场景里没有任何东西"（实测 0 个实体），
   // 而且不报错：drawOne 里的 `if (!viewer) return 0` 是静默返回。
   if (window.Plotting) Plotting.bind(viewer);
+  // 标绘图层由**实际存在的标绘要素**动态驱动：Plotting 每次增删改后通知这里，
+  // 由 syncPlotLayers() 增删对应的 kind:'plot' 图层（见该函数的说明）。
+  if (window.Plotting && Plotting.onChange) {
+    Plotting.onChange(function (evt) {
+      // 当前目标轨迹被外部移除（例如 `Plotting.clearLayer()`）时，让下一帧重建；
+      // 暂停且无其它交互时，仅靠"几何没变"的短路会让它再也回不来。
+      if (state.trackPlotId && evt && (evt.type === 'remove' || evt.type === 'batch')) {
+        markScene('plotChange');
+      }
+      syncPlotLayers();
+    });
+    syncPlotLayers();
+  }
 
   // 常驻 imagery 槽位登记（动态层在挂载时登记，见 registerImagerySlot）。
   registerImagerySlot('tianditu.base', state.tiandituLayer);
@@ -1449,11 +1465,35 @@ function resetElementState() {
   });
 }
 
+/**
+ * 场景清空后恢复标绘。
+ *
+ * `viewer.entities.removeAll()` 只清图元，不清 `Plotting.byId` 里的记录；不重画的话，
+ * 「标绘图层由实际要素驱动」会自相矛盾——面板显示 N 条、场景里 0 条。
+ * 目标轨迹是选中目标的派生数据（此时选中已清空），先移除；用户标绘按控制点重画。
+ */
+function redrawPlotsAfterClear() {
+  // `updateFocusMask` 只在引用为空时才新建实体；removeAll 已经删掉了实体，
+  // 这里必须把引用清掉，否则下一次选中目标会去改一个已不在场景里的对象，
+  // 掩码整场会话再也不出现（而 focusDebug 还报 maskExists=true）。
+  state.focusMaskEntity = null;
+  state.focusMaskHole = null;
+  if (!window.Plotting) return 0;
+  if (state.trackPlotId) {
+    const old = state.trackPlotId;
+    state.trackPlotId = null;
+    state.trackPlotKey = null;
+    try { Plotting.remove(old); } catch (err) { /* 已不存在 */ }
+  }
+  return Plotting.redrawAll();
+}
+
 function teardownScene() {
   if (!viewer) return;
   detachFollow('TS已切换');
   clearTargetSelection();
   viewer.entities.removeAll();
+  redrawPlotsAfterClear();
   state.targets = {};
   state.hotspotEntities = [];
   state.occupationEntities = [];
@@ -2149,44 +2189,12 @@ function createTargetEntities() {
       },
     });
 
-      // 选中态的预测虚线：与历史实线是**两条独立 polyline** —— 计划/外推永远不和观测
-      // 叠在同一条线上，否则"哪段是观测、哪段是计划"肉眼分不出来。
-      const predicted = viewer.entities.add({
-        id: 'predict-' + def.id,
-        show: false,
-        polyline: {
-          positions: new Cesium.CallbackProperty(function () {
-            return predictedPointsOf(def);
-          }, false),
-          width: 2,
-          material: new Cesium.PolylineDashMaterialProperty({
-            color: color.withAlpha(0.9),
-            dashLength: 12,
-          }),
-          clampToGround: false,
-        },
-        // 预测线末端标"计划/预计"：这是已声明的计划，不是观测，也不是"预测"。
-        position: new Cesium.CallbackProperty(function () {
-          const pts = predictedPointsOf(def);
-          return pts.length ? pts[pts.length - 1] : undefined;
-        }, false),
-        label: {
-          text: '计划/预计',
-          font: '12px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
-          fillColor: Cesium.Color.fromCssColorString('#dce9ff'),
-          outlineColor: Cesium.Color.fromCssColorString('#10233c'),
-          outlineWidth: 2,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          pixelOffset: new Cesium.Cartesian2(0, -14),
-          showBackground: true,
-          backgroundColor: Cesium.Color.fromCssColorString('rgba(18,38,64,0.72)'),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        },
-      });
+    // 目标轨迹**不在这里建图元**：它统一走态势标绘（Plotting 的 `target_track`
+    // 类型，虚线=计划的语义），由 syncTrackPlot() 按选中目标维护一条标绘记录。
+    // 历史轨迹（已发生的航迹，实线）仍由上面的 polyline 承担。
     state.targets[def.id] = {
       def: def,
       entity: entity,
-      predicted: predicted,
       sensorEntity: sensorEntity,
       trail: [],
       lastTick: -1,
@@ -2381,9 +2389,9 @@ function syncEntities() {
 
     if (!state.layers.tracks) rec.trail.length = 0;
     rec.entity.polyline.show = visible && state.layers.tracks && rec.trail.length > 1;
-    // B3 预测虚线只跟选中目标走；与历史实线是两条独立图元。
-    setEntityShow(rec.predicted, visible && state.selected === id && state.layers.tracks);
   });
+  // 目标轨迹：只维护"当前选中目标"的一条态势标绘记录（见 syncTrackPlot）。
+  syncTrackPlot();
   // 掩码遮的是"整图减去选中目标与轨迹"：选中、时间、图层任一变化都要重画。
   updateFocusMask();
 
@@ -2419,45 +2427,135 @@ function trailWindowOf(rec, id) {
 }
 
 /**
- * 计划航路剩余段：当前位置 → 最近的航路点及其后续点。
- * 不碰引擎、不做运动学外推 —— 这条线永远是"已声明的计划"，所以只能标注为 计划/预计。
+ * 计划航路剩余段：当前位置 → 当前航段的终点及其后续航路点。
+ * 不碰引擎、不做运动学外推 —— 这条线永远是"已声明的计划"，按虚线（计划）语义
+ * 作为一条态势标绘呈现。返回 `[lon, lat, alt]`，高度用于空中目标。
  * waypoints 是 [lat, lon]（见 createRouteEntities 的 fromDegreesArrayHeights 调用）。
  */
-function plannedRemainder(def) {
+function trackPlotPoints(def) {
   const s = positionFor(def.id, state.tick);
-  if (!s || !def.waypoints || def.waypoints.length < 2) return [];
-  let near = 0;
+  if (!s) return [];
+  if (TRACK_MODE === 'kinematic') return kinematicTrackPoints(def, s);
+  if (!def.waypoints || def.waypoints.length < 2) return [];
+  const alt = def.altitude_m || 0;
+  // 找当前位置最近的**航段**，从该航段的终点继续画。
+  //
+  // 为什么不是"最近航路点"：两点航路（起点→终点）时，目标走过中点之前离起点更近，
+  // 从起点继续画会先往回折一段——轨迹上出现一条明显倒车的线。按航段投影取
+  // "下一段", 已经走过的点不会再被画回来。
+  const cosLat = Math.cos(s.lat * Math.PI / 180) || 1;
+  let near = 1;
   let best = Infinity;
-  for (let i = 0; i < def.waypoints.length; i++) {
-    const w = def.waypoints[i];
-    const d = (w[0] - s.lat) * (w[0] - s.lat) + (w[1] - s.lon) * (w[1] - s.lon);
+  for (let i = 1; i < def.waypoints.length; i++) {
+    const a = def.waypoints[i - 1];
+    const b = def.waypoints[i];
+    // 以当前位置为原点的局部平面（经度按 cos(lat) 缩放，避免高纬度横向压扁）
+    const ax = (a[1] - s.lon) * cosLat, ay = a[0] - s.lat;
+    const bx = (b[1] - s.lon) * cosLat, by = b[0] - s.lat;
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 > 1e-12 ? -(ax * dx + ay * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const d = Math.hypot(ax + dx * t, ay + dy * t);
     if (d < best) { best = d; near = i; }
   }
-  const alt = def.altitude_m || 0;
-  const out = [Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt)];
+  const out = [[s.lon, s.lat, s.alt]];
   for (let j = near; j < def.waypoints.length; j++) {
     const w = def.waypoints[j];
-    out.push(Cesium.Cartesian3.fromDegrees(w[1], w[0], alt));
+    out.push([w[1], w[0], alt]);
   }
   return out;
 }
 
-/** 航向外推（PREDICT_MODE 为 'kinematic' 的备选）：heading + speed_kn 直线外推。 */
-function kinematicPrediction(def) {
-  const s = positionFor(def.id, state.tick);
+/** 航向外推（TRACK_MODE 为 'kinematic' 的备选）：heading + speed_kn 直线外推。 */
+function kinematicTrackPoints(def, s) {
   if (!s || !(s.speed_kn > 0.01)) return [];
-  const dM = s.speed_kn * 1852 / 3600 * TICK_SECONDS * PREDICT_HORIZON_TICKS;
+  const dM = s.speed_kn * 1852 / 3600 * TICK_SECONDS * TRACK_HORIZON_TICKS;
   const rad = Cesium.Math.toRadians(s.heading || 0);
   const dLat = dM * Math.cos(rad) / 110540;
   const dLon = dM * Math.sin(rad) / (111320 * Math.cos(Cesium.Math.toRadians(s.lat)) || 1);
   return [
-    Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt),
-    Cesium.Cartesian3.fromDegrees(s.lon + dLon, s.lat + dLat, s.alt),
+    [s.lon, s.lat, s.alt],
+    [s.lon + dLon, s.lat + dLat, s.alt],
   ];
 }
 
-function predictedPointsOf(def) {
-  return PREDICT_MODE === 'kinematic' ? kinematicPrediction(def) : plannedRemainder(def);
+/**
+ * 目标轨迹：作为**一条态势标绘要素**维护（type:'target_track'，line 族，虚线）。
+ *
+ * 与历史航迹（实线）是两条独立图元 —— 一条是已经发生的观测，一条是计划/外推，
+ * 叠在同一条线上就分不清哪段是观测。这里不再创建独立的轨迹实体，
+ * 也不再为它单独命名：它就是标绘层 `plot.track` 里的一条要素。
+ */
+const TRACK_PLOT_TYPE = 'target_track';
+const TRACK_PLOT_LAYER = 'plot.track';
+
+function syncTrackPlot() {
+  if (!window.Plotting) return;
+  const id = state.selected;
+  const rec = id ? state.targets[id] : null;
+  // 目标被图层/阵营/域过滤或单要素隐藏时，它的轨迹也应一起消失（同一套可见性）。
+  const shown = !!rec && isVisible(rec.def);
+  const pts = shown ? trackPlotPoints(rec.def) : [];
+  if (!rec || pts.length < 2) {
+    if (state.trackPlotId) {
+      const old = state.trackPlotId;
+      state.trackPlotId = null;
+      state.trackPlotKey = null;
+      try { Plotting.remove(old); } catch (err) { /* 已被外部清掉 */ }
+    }
+    return;
+  }
+  const lonlat = pts.map(function (p) { return [p[0], p[1]]; });
+  const heights = pts.map(function (p) { return p[2]; });
+  // 只有空中目标（或确实带高度）才走 3D 折线；地面/水面目标保持贴地，
+  // 否则开了地形模型后 0 高度的虚线会被地形埋掉（clampToGround=false）。
+  const use3d = rec.def.domain === 'air' ||
+    heights.some(function (h) { return Math.abs(h) > 0.5; });
+  // 只在控制点/归属/贴地模式真的变了时重建：syncEntities 会随每帧/每次选中变化
+  // 走到这里，无条件 update 会把标绘实体每帧拆建一次。`3d|ground` 必须进 key：
+  // 目标从空中切到地面时坐标可能不变，但渲染模式必须跟着变。
+  const key = rec.def.affiliation + '|' + (use3d ? '3d' : 'ground') + '|' + lonlat.map(function (p) {
+    return p[0].toFixed(6) + ',' + p[1].toFixed(6) + ',' + Number(p[2]).toFixed(1);
+  }).join(';');
+  // 记录可能被外部移除（例如控制台调用 `Plotting.clearLayer()`）：先确认它还在，
+  // 否则"几何没变就跳过"会让轨迹在暂停状态下再也回不来。
+  const exists = !!(state.trackPlotId && Plotting.debug().items.some(function (it) {
+    return it.id === state.trackPlotId;
+  }));
+  if (exists && key === state.trackPlotKey) return;
+  if (!exists) {
+    state.trackPlotId = null;
+    state.trackPlotKey = null;
+  }
+  const spec = {
+    type: TRACK_PLOT_TYPE, layer: TRACK_PLOT_LAYER,
+    points: lonlat,
+    hostility: rec.def.affiliation === 'blue' ? 'enemy' : 'friendly',
+    // 地图上只说明"这是态势标绘"（不另外起名）
+    label: '态势标绘',
+  };
+  // 只有空中目标（或确实带高度）才走 3D 折线；地面/水面目标保持贴地，
+  // 否则开了地形模型后 0 高度的虚线会被地形埋掉（clampToGround=false）。
+  // **必须显式传 null**：update 时"省略 heights"会保留上一帧的高程，目标从空中
+  // 切到地面（或高度归零）后仍会悬空。
+  spec.heights = use3d ? heights : null;
+  try {
+    if (state.trackPlotId) {
+      Plotting.update(state.trackPlotId, spec);
+    } else {
+      state.trackPlotId = Plotting.add(spec).id;
+    }
+  } catch (err) {
+    // update 在 clearRec() 之后失败时，旧记录仍留在 Plotting 里（几何已空）。
+    // 必须先删掉它，否则 plot.track 会出现两条记录、其中一条永远删不掉。
+    const old = state.trackPlotId;
+    state.trackPlotId = null;
+    state.trackPlotKey = null;
+    if (old) { try { Plotting.remove(old); } catch (e) { /* 已不存在 */ } }
+    try { state.trackPlotId = Plotting.add(spec).id; } catch (err2) { return; }
+  }
+  state.trackPlotKey = key;
 }
 
 /**
@@ -2532,7 +2630,7 @@ function updateFocusMask() {
 }
 
 /**
- * 轨迹窗口 / 预测线 / 掩码的取证读数：外部（自检、验收）只认这些数字 ——
+ * 轨迹窗口 / 目标轨迹标绘 / 掩码的取证读数：外部（自检、验收）只认这些数字 ——
  * 少了这个出口，"画得对不对"就只能靠肉眼，窗口与掩码是否生效也无从断言。
  */
 function focusDebug() {
@@ -2546,19 +2644,29 @@ function focusDebug() {
     sum += n;
   });
   const mat = rec ? rec.entity.polyline.material : null;
+  // 目标轨迹现在是一条态势标绘要素（plot.track），取证读数直接读它的状态，
+  // 不再读旧的独立轨迹实体。
+  const trackDbg = (window.Plotting && state.trackPlotId)
+    ? Plotting.debug().items.filter(function (it) { return it.id === state.trackPlotId; })[0]
+    : null;
   return {
     focusMask: !!state.layers.focusMask,
     selected: id || null,
     tick: state.tick,
-    predictMode: PREDICT_MODE,
+    trackMode: TRACK_MODE,
     trailWindowTicks: TRAIL_WINDOW_TICKS,
     trailFull: rec ? rec.trail.length : 0,
     trailDrawn: rec ? trailWindowOf(rec, id).length : 0,
     maxTrailVertices: maxV,
     trailVertexSum: sum,
     historySolid: !!mat && !(mat instanceof Cesium.PolylineDashMaterialProperty),
-    predictedPolylines: rec && rec.predicted && rec.predicted.show ? 1 : 0,
-    predictedPoints: rec ? predictedPointsOf(rec.def).length : 0,
+    trackPlotId: state.trackPlotId,
+    trackPlotExists: !!trackDbg,
+    trackPlotLayer: TRACK_PLOT_LAYER,
+    // 与 syncTrackPlot 的 shown 判据一致：目标被过滤/隐藏时轨迹不存在，点数也报 0。
+    trackPlotPoints: (rec && state.trackPlotId && isVisible(rec.def))
+      ? trackPlotPoints(rec.def).length : 0,
+    trackPlotEntities: trackDbg ? trackDbg.entities : 0,
     maskExists: !!state.focusMaskEntity,
     maskShow: !!(state.focusMaskEntity && state.focusMaskEntity.show),
     maskHole: state.focusMaskHole,
@@ -4622,6 +4730,7 @@ function reloadSituation() {
   detachFollow('TS已更新');
   clearTargetSelection();
   viewer.entities.removeAll();
+  redrawPlotsAfterClear();
   state.targets = {};
   state.hotspotEntities = [];
   state.occupationEntities = [];
@@ -4739,6 +4848,27 @@ window.SituationHost = {
   // 图层顺序取证：imagery 的真实 index 顺序 + 每个图层的意图/事实。
   // 「哪个层压在哪个层上面」光看画面猜不出来，必须能读到 index。
   debugLayers: debugLayers,
+  // 动态标绘图层取证：注册表里实际存在的标绘类别图层 vs 要素所属图层。
+  // "图层由实际要素驱动"不能靠肉眼判断，必须能读出两侧的集合。
+  debugPlotLayers: function () {
+    var items = (window.Plotting ? Plotting.debug().items : []);
+    var used = {};
+    items.forEach(function (it) { used[it.layer] = (used[it.layer] || 0) + 1; });
+    return {
+      categories: (window.Plotting && Plotting.categories) ? Plotting.categories() : [],
+      registered: LayerRegistry.list('plot').filter(function (l) { return l.group === '标绘'; })
+        .map(function (l) {
+          return { id: l.id, label: l.label, z: l.z,
+                   count: LayerRegistry.elements(l.id).length,
+                   desired: !!LayerRegistry.runtime[l.id].desired };
+        }),
+      used: used,
+      items: items.map(function (it) {
+        return { id: it.id, type: it.type, layer: it.layer, system: it.system };
+      }),
+      trackPlotId: state.trackPlotId,
+    };
+  },
   // 图层自动定位：取证/测试入口（面板开关是唯一会触发飞行的用户路径）。
   focusLayer: focusLayer,
   layerExtent: layerExtent,
@@ -4869,7 +4999,7 @@ window.SituationHost = {
     selectTarget(id || null, false);
     return state.selected;
   },
-  // 轨迹窗口 / 预测线 / 掩码的取证读数：外部（自检、验收）只认这些数字，
+  // 轨迹窗口 / 目标轨迹标绘 / 掩码的取证读数：外部（自检、验收）只认这些数字，
   // "画得对不对"不能靠肉眼。
   focusDebug: focusDebug,
   occupationDebug: occupationDebug,
@@ -4931,6 +5061,171 @@ function exportData() {
 // 事件绑定
 // --------------------------------------------------------------------------
 
+// --------------------------------------------------------------------------
+// 动态标绘图层：由**实际存在的标绘要素**驱动
+// --------------------------------------------------------------------------
+//
+// 注册表里不再预置固定的标绘类别（原先写死 plot.mobility/offense/defense/fire/intel）。
+// 现在：
+//   · Plotting 每次 add/remove/update/import/clear 后通过 onChange 通知这里；
+//   · 这里按 `Plotting.debug().items` 里出现的 layer 集合，补注册缺失的类别图层、
+//     注销已经没有要素的类别图层；
+//   · 图层名称/顺序来自 `Plotting.categories()`（CATEGORIES 元数据），新增类别
+//     不需要改注册表。
+//
+// 只有"图层的集合"变化时才动注册表；同一图层内要素增删只让面板按数量徽标自然
+// 刷新（layerPanel.tick 的签名里带了 count），避免每次描点都重建图层。
+
+// 图层会因"最后一个要素被删"而注销；用户对某个类别的显隐意图要跨注销保留，
+// 否则重画一条同类标绘时，用户关掉的层会自己弹回来。
+var _plotLayerDesired = {};
+
+/** 标绘类型的中文名（catalogue 是静态目录，现取即可，不依赖初始化顺序）。 */
+function plotTypeZh(type) {
+  var zh = type;
+  if (window.Plotting) {
+    Plotting.catalogue().forEach(function (c) { if (c.type === type) zh = c.zh; });
+  }
+  return zh;
+}
+
+/** 标绘类别下拉项：`[['plot.offense','标绘·进攻'], …]`（创建/改归属共用）。 */
+function plotLayerOptions() {
+  var out = [];
+  if (!window.Plotting || !Plotting.categories) return out;
+  // 只由系统类型组成的类别（目标轨迹）不是手动标绘的归属选项
+  var anyManual = {};
+  Plotting.catalogue().forEach(function (c) {
+    if (!c.system) anyManual[c.category] = true;
+  });
+  Plotting.categories().forEach(function (c) {
+    if (!anyManual[c.id]) return;
+    out.push([c.layer, '标绘·' + c.zh]);
+  });
+  return out;
+}
+
+/**
+ * 给某个标绘类别图层注册要素提供者。
+ *
+ * 标绘可**删除、可更改**。更改允许动控制点/标注/归属/归属图层；控制点在表单里按
+ * "每行 经度, 纬度"编辑 —— `update()` 存的是控制点本身，不是派生出来的环/线。
+ * 系统生成的目标轨迹（`it.system`）是只读要素：只给「定位」，
+ * 不给删除/改属性/单要素开关（否则改完下一个 tick 就被系统覆盖）。
+ */
+function registerPlotLayerProvider(layerId) {
+  if (!window.LayerRegistry || !window.Plotting) return;
+  var touch = function () { if (window.LayerPanel) LayerPanel.invalidate(); };
+  LayerRegistry.setProvider(layerId, function () {
+    return Plotting.debug().items.filter(function (it) { return it.layer === layerId; })
+      .map(function (it) {
+        var zh = plotTypeZh(it.type);
+        if (it.system) {
+          return {
+            key: it.id,
+            label: it.label || zh,
+            sub: zh + ' · 系统生成',
+            visible: it.visible !== false,
+            actions: ['locate'],
+            onLocate: function () { Plotting.focus(it.id); },
+          };
+        }
+        return {
+          key: it.id,
+          label: it.label || zh,
+          sub: zh + ' · ' + it.points + ' 点',
+          visible: it.visible !== false,
+          actions: ['toggle', 'locate', 'edit', 'delete'],
+          onToggle: function (on) { Plotting.setVisible(it.id, on); touch(); },
+          onLocate: function () { Plotting.focus(it.id); },
+          onDelete: function () { Plotting.remove(it.id); touch(); },
+          editFields: [
+            { key: 'label', label: '标注', value: it.label || '' },
+            { key: 'hostility', label: '归属', value: it.hostility || 'friendly',
+              options: [['friendly', '红方（我军）'], ['enemy', '蓝方（敌军）']] },
+            { key: 'layer', label: '归属图层', value: it.layer,
+              options: plotLayerOptions() },
+            { key: 'points', label: '控制点', value: '', type: 'text' },
+          ],
+          onSave: function (v) {
+            var patch = { label: v.label, hostility: v.hostility, layer: v.layer };
+            if (v.points && v.points.trim()) {
+              var pts = v.points.split(/[;\n]+/).map(function (s) {
+                var a = s.split(/[,\s]+/).filter(Boolean).map(Number);
+                return (a.length === 2 && a.every(isFinite)) ? a : null;
+              }).filter(Boolean);
+              if (!pts.length) throw new Error('控制点格式应为「每行 经度, 纬度」');
+              patch.points = pts;
+            }
+            Plotting.update(it.id, patch);
+            touch();
+          },
+        };
+      });
+  });
+}
+
+/** 确保某个标绘类别图层已注册（按首次出现自动成层）。 */
+function ensurePlotLayer(layerId) {
+  if (!window.LayerRegistry || !window.Plotting) return;
+  var def = LayerRegistry.def(layerId);
+  if (def) {
+    if (def.group !== '标绘') {
+      // 程序化调用把标绘写进 relations/occupation 这类同 kind 但不同用途的图层：
+      // 不接管，显式说出来（导入路径已被 situation.js 的校验挡住）。
+      if (window.console && console.warn) {
+        console.warn('[plot] 标绘要素的归属图层不是标绘类别层：' + layerId);
+      }
+      return;
+    }
+    // 已存在：只补可能缺失的 provider（外部注销过 provider 时也能自愈）。
+    if (!LayerRegistry.hasProvider(layerId)) registerPlotLayerProvider(layerId);
+    return;
+  }
+  var cat = Plotting.categoryOfLayer(layerId);
+  LayerRegistry.register({
+    id: layerId, kind: 'plot', z: cat.z,
+    label: '标绘·' + cat.zh, group: '标绘', default: true,
+  });
+  // register() 的 runtime 初始 desired=false。新类别默认可见，但**用户之前关掉过的
+  // 类别要恢复为关**（图层会因清空而注销，显隐意图不能跟着丢）。
+  LayerRegistry.setDesired(layerId, _plotLayerDesired[layerId] !== false);
+  registerPlotLayerProvider(layerId);
+}
+
+/**
+ * 把"实际存在哪些标绘图层"同步到注册表。
+ *
+ * 每次都比较**两个集合**（要素所属图层 vs 已注册的标绘类别图层），而不是靠一个
+ * 提前写入的签名短路：外部 `LayerRegistry.unregister()` 或中途异常之后，下一次
+ * 同步仍能把缺失的图层补回来。集合没变时只补 provider，不做重排。
+ */
+function syncPlotLayers() {
+  if (!window.LayerRegistry || !window.Plotting) return null;
+  var used = {};
+  Plotting.debug().items.forEach(function (it) { used[it.layer] = true; });
+  var usedIds = Object.keys(used).sort();
+  var registered = LayerRegistry.list('plot').filter(function (l) { return l.group === '标绘'; })
+    .map(function (l) { return l.id; }).sort();
+  var missing = usedIds.filter(function (id) { return registered.indexOf(id) < 0; });
+  var extra = registered.filter(function (id) { return usedIds.indexOf(id) < 0; });
+
+  if (!missing.length && !extra.length) {
+    // 集合一致：只补可能丢失的 provider，不重排 imagery / 不重建面板
+    usedIds.forEach(function (id) {
+      if (!LayerRegistry.hasProvider(id)) registerPlotLayerProvider(id);
+    });
+    return null;
+  }
+
+  usedIds.forEach(ensurePlotLayer);
+  extra.forEach(function (id) { LayerRegistry.unregister(id); });
+  refreshPlotLayerSelect();
+  applyLayers();
+  if (window.LayerPanel) LayerPanel.invalidate();
+  return { layers: usedIds };
+}
+
 /**
  * 注册各图层的**要素提供者** —— 动态图层管理的数据源。
  *
@@ -4944,58 +5239,19 @@ function exportData() {
 function registerLayerProviders() {
   if (!window.LayerRegistry) return;
 
-  var plotZh = {};
-  if (window.Plotting) {
-    Plotting.catalogue().forEach(function (c) { plotZh[c.type] = c.zh; });
-  }
   var AFF_ZH = { red: '红方', blue: '蓝方' };
   var DOM_ZH = { sea: '水面', land: '陆上', air: '空中' };
 
   function touch() { if (window.LayerPanel) LayerPanel.invalidate(); }
 
-  // ---- 标绘：每个类别图层一个提供者 --------------------------------------
+  // ---- 标绘：提供者按**实际存在的类别图层**注册 --------------------------
   //
-  // 标绘可**删除、可更改**。更改允许动控制点/标注/归属/归属图层；控制点在表单里按
-  // "每行 经度, 纬度"编辑 —— `update()` 存的是控制点本身，不是派生出来的环/线。
+  // 标绘图层不是启动时写死的五行，而是由实际要素动态成层（见 syncPlotLayers）。
+  // 这里只给当前已经存在的标绘图层补齐提供者；新图层创建时由
+  // registerPlotLayerProvider() 补上。
   if (window.Plotting) {
     LayerRegistry.list('plot').forEach(function (d) {
-      LayerRegistry.setProvider(d.id, function () {
-        return Plotting.debug().items.filter(function (it) { return it.layer === d.id; })
-          .map(function (it) {
-            var zh = plotZh[it.type] || it.type;
-            return {
-              key: it.id,
-              label: it.label || zh,
-              sub: zh + ' · ' + it.points + ' 点',
-              visible: it.visible !== false,
-              actions: ['toggle', 'locate', 'edit', 'delete'],
-              onToggle: function (on) { Plotting.setVisible(it.id, on); touch(); },
-              onLocate: function () { Plotting.focus(it.id); },
-              onDelete: function () { Plotting.remove(it.id); touch(); },
-              editFields: [
-                { key: 'label', label: '标注', value: it.label || '' },
-                { key: 'hostility', label: '归属', value: it.hostility || 'friendly',
-                  options: [['friendly', '红方（我军）'], ['enemy', '蓝方（敌军）']] },
-                { key: 'layer', label: '归属图层', value: it.layer,
-                  options: LayerRegistry.list('plot').map(function (l) { return [l.id, l.label]; }) },
-                { key: 'points', label: '控制点', value: '', type: 'text' },
-              ],
-              onSave: function (v) {
-                var patch = { label: v.label, hostility: v.hostility, layer: v.layer };
-                if (v.points && v.points.trim()) {
-                  var pts = v.points.split(/[;\n]+/).map(function (s) {
-                    var a = s.split(/[,\s]+/).filter(Boolean).map(Number);
-                    return (a.length === 2 && a.every(isFinite)) ? a : null;
-                  }).filter(Boolean);
-                  if (!pts.length) throw new Error('控制点格式应为「每行 经度, 纬度」');
-                  patch.points = pts;
-                }
-                Plotting.update(it.id, patch);
-                touch();
-              },
-            };
-          });
-      });
+      if (d.group === '标绘') registerPlotLayerProvider(d.id);
     });
   }
 
@@ -5219,6 +5475,9 @@ function bindUI() {
   if (window.LayerPanel) {
     LayerPanel.bind(document.getElementById('layerPanel'), {
       onChange: function (id, want) {
+        // 动态标绘图层会因清空而注销；把用户意图记在 app 侧，重建时恢复。
+        var d = LayerRegistry.def(id);
+        if (d && d.group === '标绘') _plotLayerDesired[id] = !!want;
         LayerRegistry.setDesired(id, want);
         applyLayers();
         if (want) {
@@ -5672,11 +5931,26 @@ function syncPlotPreview() {
   if (!plotDraw || !window.Plotting) return;
   const def = plotDef(plotDraw.type);
   const ctrl = (def && def.ctrl) || { min: 2, max: null };
-  if (plotDraw.previewId) {
-    try { Plotting.remove(plotDraw.previewId); } catch (err) { /* 已移除 */ }
-    plotDraw.previewId = null;
+  if (plotDraw.points.length < ctrl.min) {
+    if (plotDraw.previewId) {
+      try { Plotting.remove(plotDraw.previewId); } catch (err) { /* 已移除 */ }
+      plotDraw.previewId = null;
+    }
+    return;
   }
-  if (plotDraw.points.length < ctrl.min) return;
+  // 续画时**更新**同一条预览，而不是 remove + add：后者会让动态标绘图层在
+  // "有要素/没要素"之间反复注册与注销，面板行跟着闪。
+  if (plotDraw.previewId) {
+    try {
+      Plotting.update(plotDraw.previewId, {
+        layer: plotDraw.layer, points: plotDraw.points,
+        hostility: plotDraw.side, label: plotDraw.label || null,
+      });
+      return;
+    } catch (err) {
+      plotDraw.previewId = null;   // 预览被外部清掉：下面重建一次
+    }
+  }
   try {
     const rec = Plotting.add({
       type: plotDraw.type, layer: plotDraw.layer, points: plotDraw.points,
@@ -5768,6 +6042,32 @@ function parsePlotPoints(text) {
 }
 
 
+/**
+ * 刷新标绘工具的「归属图层」下拉。
+ *
+ * 选项来自 `Plotting.categories()`，**不是**注册表里的图层清单：图层面板只列
+ * 当前有要素的类别，而创建入口要允许往任意类别里画（包括暂时为空的类别）。
+ * 注册动态图层后由 syncPlotLayers 调它，保证下拉随类别扩展自动更新。
+ */
+function refreshPlotLayerSelect() {
+  const layerSel = document.getElementById('plotLayer');
+  if (!layerSel || !window.Plotting) return;
+  const cur = layerSel.value;
+  const opts = plotLayerOptions();
+  layerSel.innerHTML = '';
+  opts.forEach(function (o) {
+    const n = document.createElement('option');
+    n.value = o[0];
+    n.textContent = o[1].replace('标绘·', '');
+    layerSel.appendChild(n);
+  });
+  if (cur && opts.some(function (o) { return o[0] === cur; })) {
+    layerSel.value = cur;
+  } else if (opts.length) {
+    layerSel.value = opts[0][0];
+  }
+}
+
 function bindPlotPanel() {
   const typeSel = document.getElementById('plotType');
   const layerSel = document.getElementById('plotLayer');
@@ -5782,18 +6082,15 @@ function bindPlotPanel() {
   const cat = plotCatalogue();
   typeSel.innerHTML = '';
   cat.forEach(function (c) {
+    // 系统生成的类型（目标轨迹）由选中目标自动维护，不进入手动标绘入口
+    if (c.system) return;
     const o = document.createElement('option');
     o.value = c.type;
     // 标准来源直接写在选项里 —— 每个类型是中式还是美式补齐，选的时候就该看见
     o.textContent = c.zh + '（' + (c.sourceStandard || '?') + '）';
     typeSel.appendChild(o);
   });
-  layerSel.innerHTML = '';
-  LayerRegistry.list('plot').forEach(function (l) {
-    const o = document.createElement('option');
-    o.value = l.id; o.textContent = l.label.replace('标绘·', '');
-    layerSel.appendChild(o);
-  });
+  refreshPlotLayerSelect();
   const syncLayerDefault = function () {
     const d = plotDef(typeSel.value);
     if (d && d.defaultLayer) layerSel.value = d.defaultLayer;

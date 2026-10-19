@@ -247,30 +247,13 @@
     // 显隐靠 setDesired + plot sink、增删靠 register/list。几何与标准来源在
     // `web/src/plotting.js`（`kind` 的 sink 只是把它接到场景）。
     //
-    // 按类别分层（对应中式军队标号的类别体系）：机动/集结 → 进攻 → 防御/障碍 →
-    // 火力 → 侦察/空域。`z` 只在这个栈内部排序；不同栈之间不可比（见文件头）。
-    //
-    // 默认**开**：标绘是"开了就该看到"的东西，没有数据时自然什么都没有，不会误导。
-    {
-      id: 'plot.mobility', kind: 'plot', z: 80, default: true,
-      label: '标绘·机动与集结', group: '标绘', checkbox: 'plotMobility',
-    },
-    {
-      id: 'plot.offense', kind: 'plot', z: 83, default: true,
-      label: '标绘·进攻', group: '标绘', checkbox: 'plotOffense',
-    },
-    {
-      id: 'plot.defense', kind: 'plot', z: 87, default: true,
-      label: '标绘·防御与障碍', group: '标绘', checkbox: 'plotDefense',
-    },
-    {
-      id: 'plot.fire', kind: 'plot', z: 90, default: true,
-      label: '标绘·火力', group: '标绘', checkbox: 'plotFire',
-    },
-    {
-      id: 'plot.intel', kind: 'plot', z: 93, default: true,
-      label: '标绘·侦察与空域', group: '标绘', checkbox: 'plotIntel',
-    },
+    // ⚠ 这里**不再预置固定的标绘类别图层**。图层由实际存在的标绘要素动态驱动：
+    // `app.js` 的 syncPlotLayers() 在 Plotting 增删要素后，按要素的 layer 字段
+    // `register` 缺失的类别、`unregister` 已经没有要素的类别。这样：
+    //   · 没有要素的类别不会在图层面板里显示成一行"0"；
+    //   · 新增标绘类型/类别时不需要回来改注册表；
+    //   · 用户手动标绘与系统自动生成的标绘（如目标轨迹）走同一条驱动逻辑。
+    // 类别名称与栈内顺序来自 `Plotting.categories()`（CATEGORIES 元数据）。
     // ---- TS图层 / 目标图层：原先只存在于 index.html，注册表里没有 ----
     //
     // 它们用**逐层 `handler`**（在 app.js 里挂上）而不是 kind sink：各自是一次性动作

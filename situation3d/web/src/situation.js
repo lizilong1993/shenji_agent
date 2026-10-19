@@ -183,7 +183,10 @@
         speed_unit: '节',
         altitude_m: t.altitude || 0,
         attributes: { 起点: t.start.join(', '), 终点: t.end.join(', ') },
-        waypoints: [t.start, t.end],
+        // ⚠ `waypoints` 的约定是 **[纬度, 经度]**（与离线数据集、createRouteEntities
+        // 和 trackPlotPoints 一致），而 t.start/t.end 是 [经度, 纬度]。这里必须交换，
+        // 否则自建 TS 的航路与目标轨迹会把经度当纬度画到错误位置。
+        waypoints: [[t.start[1], t.start[0]], [t.end[1], t.end[0]]],
         _start: t.start,
         _end: t.end,
         _km: km,
@@ -612,10 +615,33 @@
     if (window.Plotting && Plotting.catalogue) {
       Plotting.catalogue().forEach(function (c) { plotCat[c.type] = c; });
     }
-    var plotLayers = null;
+    var plotLayers = [];
+    // 只由系统类型组成的类别（当前是 plot.track）：普通标绘不能写进去。
+    // 注意这段必须在注册表过滤**之前**算好——选中目标时 plot.track 已经被
+    // syncPlotLayers 动态注册，单看"是否在册"会把系统图层当成合法目标。
+    var manualLayerIds = {}, systemOnlyLayers = {};
+    Object.keys(plotCat).forEach(function (t) {
+      var c = plotCat[t];
+      if (c.system) {
+        if (!manualLayerIds[c.defaultLayer]) systemOnlyLayers[c.defaultLayer] = true;
+      } else {
+        manualLayerIds[c.defaultLayer] = true;
+        delete systemOnlyLayers[c.defaultLayer];
+      }
+    });
     if (window.LayerRegistry && LayerRegistry.list) {
-      plotLayers = LayerRegistry.list('plot').map(function (l) { return l.id; });
+      // 只认「标绘」组：situation.relations / situation.occupation 也是 kind:'plot'，
+      // 但它们走各自的 handler、没有要素提供者，普通标绘落进去会变成关不掉的孤儿。
+      plotLayers = LayerRegistry.list('plot').filter(function (l) {
+        return l.group === '标绘' && !systemOnlyLayers[l.id];
+      }).map(function (l) { return l.id; });
     }
+    // 标绘图层由**实际要素动态成层**：某个类别当前为空时并不在注册表里，
+    // 但导入指向它的标绘仍然合法（导入后 Plotting.onChange 会自动建层）。
+    // 因此"在册"集合 = 当前已注册的标绘图层 ∪ 目录里**手动类型**的默认类别。
+    Object.keys(manualLayerIds).forEach(function (lid) {
+      if (plotLayers.indexOf(lid) < 0) plotLayers.push(lid);
+    });
     if (raw.plots !== undefined && raw.plots !== null) {
       if (!Array.isArray(raw.plots)) {
         errors.push('plots 必须是数组');
@@ -625,6 +651,11 @@
           if (!pl || typeof pl !== 'object') { errors.push(where + '：不是对象'); return; }
           var cat = plotCat[pl.type];
           if (!cat) { errors.push(where + '：未知标绘类型「' + pl.type + '」'); return; }
+          // 系统生成的标绘（目标轨迹）是选中目标的派生数据，不能写进 TS 定义
+          if (cat.system) {
+            errors.push(where + '：' + cat.zh + ' 由系统生成，不可写入 TS 定义');
+            return;
+          }
           var ctrl = cat.ctrl || { min: 2, max: null };
           if (!Array.isArray(pl.points) || pl.points.length < ctrl.min) {
             errors.push(where + '（' + pl.type + '）：至少需要 ' + ctrl.min + ' 个控制点');
