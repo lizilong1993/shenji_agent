@@ -410,6 +410,10 @@ def main() -> int:
                     help="extra JS expression to evaluate; result lands in report['eval']")
     ap.add_argument("--eval-async", action="store_true",
                     help="await the --eval expression (wrap in async IIFE)")
+    ap.add_argument("--eval-timeout-ms", type=int, default=150000,
+                    help="CDP socket timeout while an async --eval is running "
+                         "(default 150000); the default 60 s is too short for "
+                         "probes that poll for tens of seconds under SwiftShader")
     ap.add_argument("--debug", action="store_true")
     args = ap.parse_args()
 
@@ -465,7 +469,8 @@ def main() -> int:
     try:
         wait_for_devtools(port, 40)
         target = first_page_target(port)
-        cdp = DevTools(target["webSocketDebuggerUrl"])
+        cdp = DevTools(target["webSocketDebuggerUrl"],
+                       timeout=(args.eval_timeout_ms / 1000.0) if args.eval else 60.0)
         cdp.call("Page.enable")
         cdp.call("Runtime.enable")
         cdp.call("Page.addScriptToEvaluateOnNewDocument", source=PROBE_SOURCE)

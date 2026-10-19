@@ -58,7 +58,14 @@ def main():
     W, H = src.RasterXSize, src.RasterYSize
     x0, y0 = tile_origin(args.zoom, gt)
     nx, ny = W // 256, H // 256
-    bands = [src.GetRasterBand(k) for k in (1, 2, 3)]
+    # 单波段（DEM/掩膜）没有 RGB：按实际波段数取，别去读不存在的 2/3 波段
+    # （原先硬编码 1,2,3，遇到 DEM GeoTIFF 会直接崩在 ReadRaster）。
+    n_tif = src.RasterCount or 1
+    band_idx = tuple(range(1, min(3, n_tif) + 1))
+    bands = [src.GetRasterBand(k) for k in band_idx]
+    if n_tif < 3:
+        print("提示：tif 只有 %d 个波段（单波段产品），只比对第 1 波段；"
+              "与彩色瓦片的结论仅供参考。" % n_tif)
     print("tif %s：%dx%d px → z%d 起点瓦片 (%d,%d)，网格 %dx%d"
           % (os.path.basename(args.tif), W, H, args.zoom, x0, y0, nx, ny))
 
@@ -87,7 +94,10 @@ def main():
             continue
         ds, path = open_tile_bytes(row[0])
         try:
-            tb = [ds.GetRasterBand(k).ReadRaster(buf_type=gdal.GDT_Byte) for k in (1, 2, 3)]
+            tb = []
+            for k in band_idx:
+                b = ds.GetRasterBand(k)
+                tb.append(b.ReadRaster(buf_type=gdal.GDT_Byte) if b is not None else None)
         finally:
             ds = None
             gdal.Unlink(path)
