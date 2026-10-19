@@ -159,7 +159,14 @@ PROBE = r"""
 # 于是像 `?terrain=1` 这种瓦片队列很长（要拉 DEM）的深链，
 # 会在 settle 还没结束时就被外层杀掉，报成"probe 无结果"。
 # 那是**测试自己的超时算错了**，与产品无关（单独跑、不设外层超时时它完全正常）。
-QUEUE_MS = 60000   # 传给 --timeout-ms：等瓦片队列排空的上限
+# 传给 --timeout-ms：等瓦片队列排空的上限。
+#
+# 2026-10-19 从 60 s 降到 20 s：案例改成 core/inference 分片后，首屏只下 0.75 MB，
+# 而 SwiftShader 下 Cesium 的瓦片队列**长时间都不会真正排空**，60 s 等于每条 URL
+# 固定白等一分钟（16 条 / 3 路并行实测仍要 ~18 min）。深链自检断言的是"案例加载 +
+# 注册表意图"，不依赖瓦片全部到齐，20 s 足够；真需要等瓦片的探针（perf 那套）
+# 有自己的参数，不受这里影响。
+QUEUE_MS = 20000
 
 
 def run_probe(base, query, wait_ms, tmpdir, idx):
@@ -235,7 +242,7 @@ def main(argv=None):
     # 18s 时实测它被判成"probe 无结果"，而单独给它 30s 就完全正常
     # （`hasData:true caseId:taiwan_landing targets:31 terrainOn:true pageErrors:[]`）。
     # 自检里的假失败比没有自检更糟 —— 会让人去修没坏的东西，或者干脆不再看它。
-    ap.add_argument("--wait-ms", type=int, default=12000)
+    ap.add_argument("--wait-ms", type=int, default=8000)
     args = ap.parse_args(argv)
 
     if not os.path.isfile(INSPECT):
