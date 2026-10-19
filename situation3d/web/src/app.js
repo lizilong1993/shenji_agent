@@ -5214,11 +5214,6 @@ function bindUI() {
     ['terrain.model', function (v) { setTerrain(v); }],
     ['terrain.mesh', function (v) { setTerrainMesh(v); }],
     ['weather.model', function (v) { setWeather(v); }],
-    // 本地 3D Tiles（台湾城市实景）。挂/卸逻辑在 src/tiles3d.js，这里只转发意图。
-    ['tiles3d.taipei', function (v) { if (window.Local3D) Local3D.setEnabled('tiles3d.taipei', v); }],
-    ['tiles3d.taichung', function (v) { if (window.Local3D) Local3D.setEnabled('tiles3d.taichung', v); }],
-    ['tiles3d.taoyuan', function (v) { if (window.Local3D) Local3D.setEnabled('tiles3d.taoyuan', v); }],
-    ['tiles3d.tw2024', function (v) { if (window.Local3D) Local3D.setEnabled('tiles3d.tw2024', v); }],
   // B4 选中掩码：开关只改 state.layers.focusMask，重画交给 updateFocusMask()。
   // 必须走注册表 + apply() 的 handler：绕过注册表直接调 setter，会被 apply() 改回去。
   ['overlay.focusMask', function (v) { state.layers.focusMask = v; updateFocusMask(); }],

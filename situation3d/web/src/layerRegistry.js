@@ -224,37 +224,6 @@
       exclusives: ['tiles.google3d'],
     },
 
-    // ---- 本地 3D Tiles（2026-10-19 上传的台湾城市实景）----
-    //
-    // 与在线 Google 实景（`tiles.google3d`）**不互斥**：两者可以同时开，但
-    // 同时开时 Google 那条会把地球关掉（它自己的约束），本机 3D Tiles 不依赖
-    // globe，因此仍会显示——这是设计允许的状态，不是 bug。
-    // 默认全关：四套 tileset 加起来 80 万+ 瓦片，只有用户明确要看某座城市时才挂。
-    // 实际上 Cesium 只请求视野内的瓦片，但 tileset.json 的解析与根瓦片加载
-    // 仍要花时间，默认关能保证首屏不受影响。
-    {
-      id: 'tiles3d.taipei', kind: 'primitive', z: 40, default: false,
-      label: '台北 3D Tiles（实景）', group: '底图', checkbox: 'modelTaipei3d',
-      // 自动定位范围 [W,S,E,N]（度）：取自 tileset.json 根 boundingVolume.region
-      // （弧度 → 度）。图层打开时相机平滑飞到这一范围。
-      bbox: [121.4643, 24.9425, 121.6409, 25.0674],
-    },
-    {
-      id: 'tiles3d.taichung', kind: 'primitive', z: 41, default: false,
-      label: '台中 3D Tiles（实景）', group: '底图', checkbox: 'modelTaichung3d',
-      bbox: [120.5854, 24.0658, 120.6746, 24.2741],
-    },
-    {
-      id: 'tiles3d.taoyuan', kind: 'primitive', z: 42, default: false,
-      label: '桃园 3D Tiles（实景）', group: '底图', checkbox: 'modelTaoyuan3d',
-      bbox: [121.2008, 24.9437, 121.3777, 25.0663],
-    },
-    {
-      id: 'tiles3d.tw2024', kind: 'primitive', z: 43, default: false,
-      label: 'TW2024 三维样例', group: '底图', checkbox: 'modelTw2024',
-      // 该 tileset 用包围球声明（半径 36.8 km），按其中心 ±半径折算。
-      bbox: [119.166, 23.138, 119.8872, 23.7996],
-    },
 
     // ---- 标签栈：不贴地，靠 disableDepthTestDistance 保证在几何之上 ----
     {
