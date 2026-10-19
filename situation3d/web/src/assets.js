@@ -578,12 +578,29 @@
    * Tiles outside the downloaded zoom range resolve to null so the caller can
    * fall back to an ancestor tile instead of failing the whole terrain.
    */
+  /**
+   * 本地地形文件树只铺到 z14（`web/tiles/terrain/z15` 是空目录），而瓦片库
+   * `tiles_db/dem_terrarium` 有 z0–z15。z15 直接走 mbtiles 直发（与影像高倍段
+   * 同一机制），不再摊 3 万多个 PNG 文件。z15 缺失时 heightmapFor 会自动上溯
+   * 到 z14，不会出洞。
+   */
+  const TERRAIN_TREE_MAX_LEVEL = 14;
+  const TERRAIN_DB_MAX_LEVEL = 15;
+
+  /** 地形瓦片 URL：z≤14 读静态树，z15 读 mbtiles 直发路由。 */
+  function terrainTileUrl(z, x, y) {
+    if (z > TERRAIN_TREE_MAX_LEVEL) {
+      return './tiles_db/dem_terrarium/' + z + '/' + x + '/' + y;
+    }
+    return './tiles/terrain/' + z + '/' + x + '/' + y + '.png';
+  }
+
   function loadTerrainTile(z, x, y) {
     const key = z + '/' + x + '/' + y;
     const hit = lruGet(terrainCache, key);
     if (hit !== undefined) return hit;
 
-    const promise = imageFromUrl('./tiles/terrain/' + key + '.png')
+    const promise = imageFromUrl(terrainTileUrl(z, x, y))
       .then(function (im) {
         decodeCtx.clearRect(0, 0, TILE_PX, TILE_PX);
         decodeCtx.drawImage(im, 0, 0, TILE_PX, TILE_PX);
@@ -619,7 +636,10 @@
       (m.terrain && m.terrain.max_zoom) || 10,
       (m.theatre_terrain && m.theatre_terrain.max_zoom) || 0,
       (m.hotspot_terrain && m.hotspot_terrain.max_zoom) || 0,
-      (m.urban_terrain && m.urban_terrain.max_zoom) || 0);
+      (m.urban_terrain && m.urban_terrain.max_zoom) || 0,
+      // z15 来自 mbtiles（见 TERRAIN_DB_MAX_LEVEL）：manifest 的覆盖统计只到
+      // z14，但瓦片库确实有 z15；不把上限抬到 15，Cesium 永远不会请求它。
+      TERRAIN_DB_MAX_LEVEL);
   }
 
   /**
@@ -641,7 +661,13 @@
     const m = manifest();
     const cov = m.coverage && m.coverage.terrain;
     if (!cov) return true;
-    const perZoom = cov.per_zoom && cov.per_zoom[String(level)];
+    const perZoomTable = cov.per_zoom || {};
+    // z15 不在 manifest 的覆盖统计里（统计只做到 z14）。地形覆盖是按 AOI 固定的，
+    // 逐级向下找最近的已知矩形即可——直接判 false 会让 z15 永远不参与渲染。
+    let perZoom = perZoomTable[String(level)];
+    for (let lv = level - 1; !perZoom && lv >= 0; lv--) {
+      perZoom = perZoomTable[String(lv)];
+    }
     if (!perZoom) return false;            // 这一级一张都没有 → 直接给平地，别发请求
     const r = perZoom.regional_rectangle || perZoom.full_rectangle;
     if (!Array.isArray(r) || r.length !== 4) return true;
