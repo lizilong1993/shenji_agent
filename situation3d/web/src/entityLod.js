@@ -1,9 +1,9 @@
 /**
- * 车/船的 2D 图标 ⇄ 3D 模型切换（按视点高度）。
+ * 目标（车/船/飞机）的 2D 图标 ⇄ 3D 模型切换（按视点高度）。
  *
- * 需求（用户 2026-10-10）：
- *   - 2D 图标只在鸟瞰图与主视图中、**视点高度超过阈值**时显示；
- *   - 主视图高度低于阈值后，把 2D 图标换成 3D 模型。
+ * 需求（用户 2026-10-10，2026-10-19 修订阈值）：
+ *   - 2D 图标只在视点高度**高于**阈值时显示；
+ *   - 高度低于约 **3000 m** 后，把 2D 图标换成 3D 模型。
  *
  * 为什么单独一个模块、而不写进 app.js
  * ----------------------------------
@@ -13,15 +13,13 @@
  *
  * 阈值与滞回
  * ----------
- *   - **下降**跨过 20 km -> 转 3D；
- *   - **上升**须超过 24 km -> 才转回 2D。
+ *   - **下降**到 3000 m 及以下 -> 转 3D；
+ *   - **上升**须超过 3600 m -> 才转回 2D（20% 迟滞）。
  * 两个阈值（而非一个）是为了**滞回**：单阈值时相机在阈值附近抖动会让形态反复
- * 切换，而 headless 软渲染下 rAF 只有约 2.7 fps（见 tools/consistency_selftest.py），
- * 每次切换都要装卸模型，代价尤其高。
+ * 切换，而 headless 软渲染下 rAF 只有约 2.7 fps，每次切换都要装卸模型，代价尤其高。
  *
- * 这两个数是**设计初值，不是实测结论**——依据是 places.js 最近档为 60 km、
- * 建筑体块在 <=60 km 进入 close 档；实现后须用探针截图核对「20 km 时模型的屏幕
- * 占比是否足以辨识」再定稿。所以要改就改这里的常量，别散落到调用点。
+ * 3000 m 是用户给出的初值（"低于约 3000 米"），仍属**可调参数**：改就改这里的
+ * 常量，别散落到调用点；entity_lod_test.js 用 DEFAULTS 本身做边界断言。
  *
  * 跨栈提醒：本模块只管「形态」，不管图层顺序。标绘/目标的 z 序在
  * layerRegistry.js（见那里的文件头：Cesium 没有跨栈的统一 z）。
@@ -34,8 +32,8 @@
   'use strict';
 
   var DEFAULTS = {
-    enter3dHeight: 20000,
-    exit3dHeight: 24000,
+    enter3dHeight: 3000,
+    exit3dHeight: 3600,
   };
 
   var MODE_ICON = 'icon';
@@ -74,19 +72,35 @@
   /**
    * 目标类型 -> 3D 模型 URL。**找不到就返回 null**，调用点据此保留 2D 图标。
    *
-   * 目前接入的是任务三落地的 8 个 CC0 船模型（Kenney Watercraft Kit，见
-   * web/assets/models/Kenney_WatercraftKit_License.txt）。**车辆尚无资产**——
-   * 这是有意留白：资产路线（补 CC0 军用模型 / 程序化低模）未定，先不做假映射。
+   * 2026-10-19 起覆盖海/陆/空全部 15 类目标中的 13 个形态：
+   *   · 海面：Kenney Watercraft Kit（CC0，既有 5 个模型 + 巡逻舰复用快艇）
+   *   · 坦克：Quaternius Animated Tanks（CC0，含行进/转向动画）
+   *   · 战斗机：OpenGameArt "Mig"（CC0，由 .blend 转 glb）
+   *   · 预警机/直升机/装甲车/自行火炮/防空发射车/岸舰导弹车：由
+   *     `tools/modelgen/build_models.py` 程序化生成（Blender 无头，米制建模，
+   *     旋翼/雷达带 glTF 动画）。许可证见 web/assets/models/LICENSE-*。
    *
-   * 映射只按「形态类别」而非具体型号：我们的实体带真实型号参数（052D、054A…），
-   * 但这批 CC0 资产是民用 low-poly，**不足以表达具体型号**。等资产路线定了再细化。
+   * 映射只按「形态类别」而非具体型号：实体带真实型号参数（052D、054A…），但这些
+   * CC0/低模资产不足以表达具体型号；型号级替换是后续「重点细化」的范畴。
    */
   var MODEL_MAP = {
+    // 海面（Kenney CC0 水运套件，既有）
     ship_large: './assets/models/ship-large.glb',
     ship_medium: './assets/models/ship-small.glb',
     ship_cargo: './assets/models/ship-cargo-a.glb',
     boat_speed: './assets/models/boat-speed-a.glb',
     boat_tug: './assets/models/boat-tug-a.glb',
+    patrol: './assets/models/boat-speed-a.glb',
+    // 地面/空中（2026-10-19 新增：Quaternius CC0 坦克 + OGA CC0 MiG-15 +
+    // tools/modelgen 程序化生成的同风格低模。许可证见 web/assets/models/LICENSE-*）
+    fighter: './assets/models/fighter.glb',
+    aew: './assets/models/awacs.glb',
+    helicopter: './assets/models/helicopter.glb',
+    armor: './assets/models/armor.glb',
+    apc: './assets/models/apc.glb',
+    artillery: './assets/models/artillery.glb',
+    sam: './assets/models/sam_launcher.glb',
+    coastal_missile: './assets/models/coastal_missile.glb',
   };
 
   function modelUrlFor(formClass) {
@@ -109,9 +123,19 @@
   var REAL_LENGTH_M = {
     ship_large: 155,    // 驱逐舰量级（052D 约 157 m）
     ship_medium: 135,   // 护卫舰量级（054A 约 134 m）
-    ship_cargo: 130,    // 补给/运输舰量级
+    ship_cargo: 130,    // 补给/运输舰量级（登陆舰同量级）
     boat_speed: 35,     // 导弹艇量级（沱江级约 65 m，快艇更短，取 35）
     boat_tug: 30,       // 拖船
+    patrol: 65,         // 巡逻舰/轻护（沱江级约 65 m）
+    // 地面/空中：程序化模型按米建模，导入资产按公开量级取整
+    fighter: 10.1,      // MiG-15 全长 10.1 m
+    aew: 46.6,          // E-3 量级全长
+    helicopter: 17.7,   // AH-64 量级全长（含旋翼）
+    armor: 9.5,         // 主战坦克含炮管量级
+    apc: 7.7,           // 轮式装甲车
+    artillery: 11.0,    // 自行火炮含炮管
+    sam: 12.0,          // 防空导弹发射车
+    coastal_missile: 10.4, // 岸舰导弹发射车
   };
 
   // 资产最长轴（单位）。**实测值**，来自解 GLB accessor 的 min/max。
@@ -123,6 +147,16 @@
     ship_cargo: 10.5,
     boat_speed: 3.9,
     boat_tug: 3.5,
+    patrol: 3.9,          // 与 boat_speed 同一资产
+    // 2026-10-19 实测（Blender 导出的世界包围盒最长轴，单位）
+    fighter: 3.75,
+    aew: 40.7,
+    helicopter: 16.78,
+    armor: 17.216,
+    apc: 7.7,
+    artillery: 11.007,
+    sam: 10.575,
+    coastal_missile: 10.4,
   };
 
   /** 该形态模型应设的 scale；缺任一侧数据时返回 null（调用点不加 scale）。 */
@@ -142,16 +176,34 @@
     if (!def) return null;
     if (def.form && MODEL_MAP[def.form]) return def.form;
     var d = String(def.domain || '').toLowerCase();
-    if (d !== 'sea' && d !== 'naval' && d !== 'maritime') return null;
     var p = String(def.platform_class || '') + String(def.icon || '');
-    if (/货|补给|cargo|transport/i.test(p)) return 'ship_cargo';
-    if (/快艇|导弹艇|patrol|missile/i.test(p)) return 'boat_speed';
+
+    // 空中（2026-10-19 起有资产）。判序：预警机（圆盘）→ 直升机（旋翼）→ 战斗机。
+    if (d === 'air') {
+      if (/预警|aew|awacs/i.test(p)) return 'aew';
+      if (/直升机|helicopter|rotor|武装直升机/i.test(p)) return 'helicopter';
+      if (/战斗机|歼击机|fighter|air.?superiority|多用途/i.test(p)) return 'fighter';
+      return null;
+    }
+    // 地面：岸舰导弹必须排在"导弹/防空"之前判，否则会被 SAM 的规则截走。
+    if (d === 'land') {
+      if (/岸舰|岸防|coastal|anti.?ship/i.test(p)) return 'coastal_missile';
+      if (/防空|地空|sam|surface.?to.?air/i.test(p)) return 'sam';
+      if (/炮兵|火炮|artillery|howitzer/i.test(p)) return 'artillery';
+      if (/两栖战车|步战|步兵战车|apc|ifv|amphibious/i.test(p)) return 'apc';
+      if (/装甲|坦克|armor|tank|机步/i.test(p)) return 'armor';
+      return null;
+    }
+    if (d !== 'sea' && d !== 'naval' && d !== 'maritime') return null;
+    if (/货|补给|cargo|transport|登陆|两栖舰|landing/i.test(p)) return 'ship_cargo';
+    if (/快艇|导弹艇|patrol.?boat|missile.?boat/i.test(p)) return 'boat_speed';
     if (/拖|tug/i.test(p)) return 'boat_tug';
     // 实测（??case=taiwan_landing，31 个目标）拿到的 platform_class 只有「驱逐舰/护卫舰/
     // 补给舰」这类**类别词**，没有「052D」这种型号串——所以按类别词给形态：驱逐舰取大舰，
     // 护卫舰取中舰。判具体型号要等资产能表达型号（见 MODEL_MAP 注释）。
     if (/驱逐舰|destroyer/i.test(p)) return 'ship_large';
     if (/护卫舰|巡防舰|frigate|corvette/i.test(p)) return 'ship_medium';
+    if (/巡逻舰|patrol|轻护/i.test(p)) return 'patrol';
     if (/舰|ship/i.test(p)) return /大|large|基隆/i.test(p) ? 'ship_large' : 'ship_medium';
     return null;
   }

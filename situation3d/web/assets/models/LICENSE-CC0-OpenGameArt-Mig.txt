@@ -1,0 +1,4 @@
+fighter.glb — "Mig" (MiG-15) by Sketlux, based on the Freeciv fighter by yd
+Source: https://opengameart.org/content/mig
+License: CC0 1.0 (public domain)
+Converted from Mig-15.blend to glTF with tools/modelgen/build_models.py.
