@@ -240,6 +240,149 @@ SITUATIONS_DIR = env("SITUATION_DIR") or os.path.join(WEB_ROOT, "data", "situati
 
 # 默认案例：环境变量 SITUATION_DEFAULT 指定；不在扫描结果里时退回按 id 排序的第一个。
 SITUATION_DEFAULT = env("SITUATION_DEFAULT") or None
+
+# `_api_situations` 的索引缓存：键 = 目录里各 .json 的 (名字, 大小, mtime_ns)，值 = 响应体。
+# 见该方法的注释：不缓存的话，每次进系统都要白白解析 53.6 MB 的案例数据（10.5 s）。
+_SITUATIONS_CACHE = {"key": None, "body": None}
+# 持久化的那一份：让**重启服务后的第一个请求**也是毫秒级（内存缓存随进程消失）。
+# 放 /tmp 而不是 web/data：这是服务端的派生数据，不该被当作项目数据文件。
+_SITUATIONS_INDEX_PATH = "/tmp/situation3d_situations_index.json"
+
+
+def _situations_key():
+    """
+    目录里每个 `.json` 的 `(名字, 大小, mtime_ns)`，外加原始名字列表与 listdir 是否成功。
+
+    为什么用 stat 而不是内容哈希：40 MB 文件哈希一次也要 ~0.1 s，而 stat 是常数代价，
+    且这里的失效判据只需覆盖"文件被重新生成"这一种实际情况。
+    """
+    try:
+        names = sorted(os.listdir(SITUATIONS_DIR))
+        listed = True
+    except OSError:
+        names = []
+        listed = False
+    key = []
+    for name in names:
+        if not name.endswith(".json"):
+            continue
+        full = os.path.join(SITUATIONS_DIR, name)
+        try:
+            st = os.stat(full)
+        except OSError:
+            continue
+        if os.path.isfile(full):
+            key.append((name, st.st_size, st.st_mtime_ns))
+    return tuple(key), names, listed
+
+
+def _build_situations_index(names, listed):
+    """
+    真正去解析案例文件，产出索引响应体。
+
+    这一步就是那 10.5 s 的来源（`inference_frames`/`frames` 占了 46 MB，而索引只用到
+    6 个字段），所以它只在缓存与持久化索引都未命中时才被调用。
+    """
+    cases, errors = [], []
+    if not listed:
+        errors.append({"file": os.path.relpath(SITUATIONS_DIR, WEB_ROOT),
+                       "error": "目录不存在或不可读"})
+    seen = {}
+    for name in names:
+        if not name.endswith(".json"):
+            continue
+        full = os.path.join(SITUATIONS_DIR, name)
+        if not os.path.isfile(full):
+            continue
+        try:
+            with open(full, "r") as fh:
+                doc = json.load(fh)
+        except (OSError, ValueError) as exc:
+            errors.append({"file": name, "error": str(exc)})
+            continue
+        if not isinstance(doc, dict):
+            errors.append({"file": name, "error": "顶层不是对象"})
+            continue
+        cid = doc.get("case_id") or os.path.splitext(name)[0]
+        if cid in seen:
+            # 冲突时按文件名排序取第一个（确定性），另一个如实报出来
+            errors.append({"file": name,
+                           "error": "case_id 与 %s 冲突" % seen[cid]})
+            continue
+        seen[cid] = name
+        targets = doc.get("targets") or []
+        hotspots = doc.get("hotspots") or []
+        cases.append({
+            "id": cid,
+            "name": doc.get("case_name") or cid,
+            "description": doc.get("case_description") or "",
+            "target_count": len(targets) if isinstance(targets, list) else 0,
+            "hotspot_count": len(hotspots) if isinstance(hotspots, list) else 0,
+            "file": "data/situations/" + name,
+            "region": doc.get("region"),
+            "theatre": doc.get("theatre"),
+        })
+    cases.sort(key=lambda c: c["id"])
+    ids = {c["id"] for c in cases}
+    default = SITUATION_DEFAULT if SITUATION_DEFAULT in ids else (
+        cases[0]["id"] if cases else None)
+    return {
+        "default": default,
+        "cases": cases,
+        "errors": errors,
+        "dir": os.path.relpath(SITUATIONS_DIR, WEB_ROOT),
+    }
+
+
+def _read_persisted_situations(key):
+    """读 /tmp 的持久化索引；键不匹配就返回 None（当作没命中）。"""
+    try:
+        with open(_SITUATIONS_INDEX_PATH, "r") as fh:
+            doc = json.load(fh)
+        if not isinstance(doc, dict):
+            return None
+        saved = tuple(tuple(x) for x in (doc.get("key") or []))
+        if saved == key and isinstance(doc.get("body"), dict):
+            return doc["body"]
+    except (OSError, ValueError, TypeError):
+        pass
+    return None
+
+
+def _write_persisted_situations(key, body):
+    """原子写回持久化索引；失败只当没写成（不影响本次响应）。"""
+    try:
+        tmp = _SITUATIONS_INDEX_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump({"key": [list(k) for k in key], "body": body},
+                      fh, ensure_ascii=False)
+        os.replace(tmp, _SITUATIONS_INDEX_PATH)
+    except OSError:
+        pass
+
+
+def warm_situations_index():
+    """
+    启动时在后台把案例索引准备好。
+
+    没有这一步，"重启服务后的第一个请求"仍要现场付那 10.5 s —— 而那正是用户
+    "进系统要十几秒"的场景。预热失败只打印一行，绝不影响服务启动。
+    """
+    try:
+        key, names, listed = _situations_key()
+        if _SITUATIONS_CACHE["key"] == key and _SITUATIONS_CACHE["body"] is not None:
+            return
+        body = _read_persisted_situations(key)
+        if body is None:
+            t0 = time.time()
+            body = _build_situations_index(names, listed)
+            print("[situations] 索引已构建（%.1f s，%d 个案例）"
+                  % (time.time() - t0, len(body.get("cases") or [])), flush=True)
+            _write_persisted_situations(key, body)
+        _SITUATIONS_CACHE["key"] = key
+        _SITUATIONS_CACHE["body"] = body
+    except Exception as exc:            # noqa: BLE001 —— 预热不该让服务起不来
+        print("[situations] 预热失败：%s" % exc, flush=True)
 TDT_TIMEOUT = 12.0
 TDT_MAX_LEVEL = 18
 # 探测到的 UA 组合（'server' = 非浏览器 UA）。默认按服务器端 key 起步，因为
@@ -721,59 +864,31 @@ class Handler(SimpleHTTPRequestHandler):
 
         字段名与旧的 `web/data/cases.json` **保持一致**（含 `file`），这样前端的
         `state.caseIndex.cases[]`、菜单渲染与 `?case=` 深链都不用改。
+
+        ⚠ 2026-10-17：加**按 stat 的索引缓存**。理由是实测的启动成本 ——
+        两个案例文件合计 53.6 MB（`taiwan_landing.json` 39.6 MB，其中
+        `inference_frames` 占 35 MB / 1441 帧），而本接口只用到 6 个字段。
+        把它们整个 `json.load` 一次实测 **10.5 s**（14 MB→2.30 s、39.6 MB→8.18 s），
+        HTTP 侧 TTFB 19.9~25.9 s；启动时前端卡在
+        `Promise.all([loadBase(), loadCaseIndex()])` 上，用户看到的就是"进系统十几秒"。
+        现在文件没变（名字/大小/mtime 都没动）就直接复用上次的响应体，
+        只有案例文件真的变了才重算一次。命中路径分三级：
+        **进程内存（~10 ms）→ /tmp 的持久化索引（省掉解析）→ 真去解析（10.5 s）**。
+        第三级只在"索引文件缺失/不匹配"时才走到；启动时还有一个后台预热线程
+        （见 warm_situations_index）把这一级也基本消掉 —— 否则**每次重启服务后的
+        第一个请求**仍要等 20 多秒。
         """
-        cases, errors = [], []
-        try:
-            names = sorted(os.listdir(SITUATIONS_DIR))
-        except OSError:
-            names = []
-            errors.append({"file": os.path.relpath(SITUATIONS_DIR, WEB_ROOT),
-                           "error": "目录不存在或不可读"})
-        seen = {}
-        for name in names:
-            if not name.endswith(".json"):
-                continue
-            full = os.path.join(SITUATIONS_DIR, name)
-            if not os.path.isfile(full):
-                continue
-            try:
-                with open(full, "r") as fh:
-                    doc = json.load(fh)
-            except (OSError, ValueError) as exc:
-                errors.append({"file": name, "error": str(exc)})
-                continue
-            if not isinstance(doc, dict):
-                errors.append({"file": name, "error": "顶层不是对象"})
-                continue
-            cid = doc.get("case_id") or os.path.splitext(name)[0]
-            if cid in seen:
-                # 冲突时按文件名排序取第一个（确定性），另一个如实报出来
-                errors.append({"file": name,
-                               "error": "case_id 与 %s 冲突" % seen[cid]})
-                continue
-            seen[cid] = name
-            targets = doc.get("targets") or []
-            hotspots = doc.get("hotspots") or []
-            cases.append({
-                "id": cid,
-                "name": doc.get("case_name") or cid,
-                "description": doc.get("case_description") or "",
-                "target_count": len(targets) if isinstance(targets, list) else 0,
-                "hotspot_count": len(hotspots) if isinstance(hotspots, list) else 0,
-                "file": "data/situations/" + name,
-                "region": doc.get("region"),
-                "theatre": doc.get("theatre"),
-            })
-        cases.sort(key=lambda c: c["id"])
-        ids = {c["id"] for c in cases}
-        default = SITUATION_DEFAULT if SITUATION_DEFAULT in ids else (
-            cases[0]["id"] if cases else None)
-        self._send_json({
-            "default": default,
-            "cases": cases,
-            "errors": errors,
-            "dir": os.path.relpath(SITUATIONS_DIR, WEB_ROOT),
-        })
+        key, names, listed = _situations_key()
+        if _SITUATIONS_CACHE["key"] == key and _SITUATIONS_CACHE["body"] is not None:
+            self._send_json(_SITUATIONS_CACHE["body"])
+            return
+        body = _read_persisted_situations(key)
+        if body is None:
+            body = _build_situations_index(names, listed)
+        _SITUATIONS_CACHE["key"] = key
+        _SITUATIONS_CACHE["body"] = body
+        _write_persisted_situations(key, body)
+        self._send_json(body)
 
     def _api_health(self):
         """Liveness/config probe.
@@ -1168,6 +1283,16 @@ def main() -> int:
     env("_WARM_")
 
     httpd = Server((args.host, args.port), Handler)
+
+    # 启动即预热案例索引（后台线程）。没有它，"重启服务后的第一个请求"仍要现场解析
+    # 53.6 MB 的案例数据（10.5 s），用户看到的就是"进系统卡十几秒"。
+    # 放后台线程：预热要几秒到十几秒，不该拖住服务开始监听。
+    try:
+        import threading
+        threading.Thread(target=warm_situations_index, daemon=True).start()
+    except Exception as exc:            # noqa: BLE001
+        print("[situations] 预热线程未启动：%s" % exc, flush=True)
+
     sys.stderr.write("serving %s on http://%s:%d/  (started %s)\n"
                      % (WEB_ROOT, args.host, args.port,
                         time.strftime("%Y-%m-%d %H:%M:%S")))

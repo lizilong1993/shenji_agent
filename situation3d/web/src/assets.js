@@ -1238,6 +1238,10 @@
     terrainMaxLevel: terrainMaxLevel,
     createOverviewImageryProvider: createOverviewImageryProvider,
     attachUrbanImagery: attachUrbanImagery,
+    // 城区层实际生效的最高层级（= min(manifest.urban_imagery_detail.max_zoom, 13)）。
+    // 导出它是为了让 app.js 能判断"这一层在当前相机层级下还有没有用"
+    // —— 见 app.js 的 layerTooCoarseForCamera()。
+    urbanTreeMaxZoom: URBAN_TREE_MAX_ZOOM,
     offlineDetailBands: offlineDetailBands,
     attachOfflineDetailBand: attachOfflineDetailBand,
     createTerrainProvider: createTerrainProvider,

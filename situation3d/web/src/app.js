@@ -171,7 +171,6 @@ const dom = {};
  'menuCase', 'menuCaseList',
  'tickLabel', 'timeline', 'clockLabel',
  'countRed', 'countBlue', 'countSea', 'countLand', 'countAir',
- 'loadingBadge', 'loadingText',
  'mapCompass', 'compRose', 'mapViewpoint', 'mvAll', 'modelPlaces',
  'modelTianditu', 'modelImagery', 'modelTerrain', 'modelBuildings',
  'mapScalebar', 'sbBar', 'sbLabel', 'followTarget',
@@ -198,29 +197,26 @@ const dom = {};
 // 瓦片加载进度
 // --------------------------------------------------------------------------
 
-let loadingSettleTimer = null;
-
 /**
- * 显示/隐藏底图加载提示。
+ * 瓦片加载进度回调。
  *
- * Cesium 的瓦片细化是渐进的，底图会从粗到细逐级出现。没有提示时，这段
- * 时间看起来就像"卡住了"。这里用 tileLoadProgressEvent 的排队数驱动徽标，
- * 归零后再等一小段时间确认稳定，避免在两次细化之间反复闪烁。
+ * 顶部的"正在加载瓦片… 剩余 N"徽标已按需求**删除**（2026-10-17）；这个回调留下
+ * 来是因为它还担着两件与提示无关的事：
+ *   1. 告诉 TileCache"底图是否空闲" —— 这是**预加载与渲染之间的调度闸门**，
+ *      删掉它预加载就失去唯一的启动时机；
+ *   2. 空闲后创建鸟瞰图 —— 启动期两个 WebGL 上下文会互抢连接与 CPU。
+ *
+ * 队列计数的"过期纠正"也留着：`tileLoadProgressEvent` 只在队列**变化**时触发，
+ * 而实测存在"最后几块是被移除/取消而不是加载完成"的路径 —— 事件停在"剩余 2"，
+ * 同一时刻 `globe.tilesLoaded === true`、三条队列全空、零在途请求（2026-10-15 用
+ * CDP 摊开核对过）。空闲判定若照它的字面值走，就永远判不出空闲、预热永不启动。
  */
-function setLoadingTiles(queued) {
-  // **先压掉过期计数**：`tileLoadProgressEvent` 只在队列**变化**时触发，而实测存在
-  // "最后几块是被移除/取消而不是加载完成"的路径 —— 事件停在"剩余 2"，
-  // 而同一时刻 `globe.tilesLoaded === true`、三条加载队列全空、零在途请求
-  // （2026-10-15 用 CDP 把队列摊开核对过）。那条路径下徽标会一直挂着
-  // "正在加载瓦片… 剩余 2"，看起来就像卡了半小时 —— 实际上什么都没在加载。
-  // 所以这里以 `tilesLoaded` 为准做一次纠正：它说加载完了，就当 0。
+function onTileLoadProgress(queued) {
   if (queued > 0 && viewer && viewer.scene && viewer.scene.globe
       && viewer.scene.globe.tilesLoaded) {
     queued = 0;
   }
 
-  // 底图空闲时才让缓存开始预热：预热与当前视野的渲染共用同一批连接和 CPU，
-  // 同时进行会把 Cesium 的影像请求挤掉，表现为底图一直画不出来。
   if (window.TileCache && TileCache.setIdle) TileCache.setIdle(queued === 0);
 
   // 底图空闲后再创建鸟瞰图：启动期两个 WebGL 上下文会互抢连接与 CPU。
@@ -228,21 +224,6 @@ function setLoadingTiles(queued) {
   if (queued === 0 && state.layers.overview && window.Overview) {
     try { Overview.show(); } catch (e) { console.warn('[overview]', e.message); }
   }
-
-  if (!dom.loadingBadge) return;
-  if (loadingSettleTimer) {
-    clearTimeout(loadingSettleTimer);
-    loadingSettleTimer = null;
-  }
-  if (queued > 0) {
-    dom.loadingText.textContent = '正在加载瓦片… 剩余 ' + queued;
-    dom.loadingBadge.classList.remove('hidden');
-    return;
-  }
-  loadingSettleTimer = setTimeout(function () {
-    dom.loadingBadge.classList.add('hidden');
-    loadingSettleTimer = null;
-  }, 600);
 }
 
 function humanBytes(n) {
@@ -881,7 +862,21 @@ function hotspotImageryWanted() {
   if (!viewer) return false;
   // 地球不可见时这张影像也画不出来 —— 别为不可见的东西取瓦片（与高倍段同一条规则）。
   if (viewer.scene && viewer.scene.globe && !viewer.scene.globe.show) return false;
+  // 相机需要的层级已经明显超过这一层的最高层级时不挂：它在这个高度只能提供
+  // **用不上的粗瓦片**。实测 8 km（需要 z14）时热点层（z≤12）仍全量拉取，
+  // 15 秒内 /tiles/imagery/ 138 次请求、9 个长帧、p99 150 ms —— 这就是 8 km 的卡顿源。
+  if (layerTooCoarseForCamera(hotspotLayerMaxZoom())) return false;
   return viewer.camera.positionCartographic.height <= HOTSPOT_IMAGERY_TRIGGER_M;
+}
+
+/** 热点层的最高层级（manifest 里声明，默认 12）。 */
+function hotspotLayerMaxZoom() {
+  try {
+    const m = window.OfflineAssets ? OfflineAssets.manifest() : null;
+    return ((m && m.hotspot_imagery) || {}).max_zoom || 12;
+  } catch (e) {
+    return 12;
+  }
 }
 
 /** 摘掉全部热点高清层并注销槽位（幂等）。 */
@@ -920,6 +915,24 @@ function syncHotspotImagery() {
  *       层级 = log2(156543.033928 / 地面分辨率)（156543.033928 是 z0 在赤道上的米/像素）。
  * 它给的是量级正确的层级；调用方再留 ±2/±3 的层带余量，所以不必追求逐帧精确。
  */
+/**
+ * 这一层在**当前相机层级**下是否已经无力贡献。
+ *
+ * 判据只用相机，不用 `surfaceRenderLevel()` —— 理由与高倍段选层完全一样
+ * （见 offlineDetailWantedZooms 的长注释）：挂/卸会让表面重建，用渲染读数当判据
+ * 就会自激。这里取 `cam >= maxZoom + 1`：相机已经需要比这一层更细的细节时，
+ * 它的瓦片只能被拉伸显示，却仍然要为每个表面瓦片算一遍（台海热点层有 9 个 provider）。
+ * 让位不会留空洞 —— 天地图 img/cia 是**全球底图**，这些框内同样有瓦片。
+ * 实测（8 km/台北，cam=13）：热点层（z≤12）在此闸门下落位，城区层（z≤13）保留
+ * （13 正是这一屏需要的层级）。
+ */
+function layerTooCoarseForCamera(maxZoom) {
+  if (!(maxZoom > 0)) return false;
+  const cam = cameraImageryLevel();
+  if (cam < 0) return false;          // 拿不到层级不闸（保守）
+  return cam >= maxZoom + 1;
+}
+
 function cameraImageryLevel() {
   try {
     if (!viewer) return -1;
@@ -957,25 +970,47 @@ function surfaceRenderLevel() {
   }
 }
 
-// 围绕"**实际渲染层级**"取多宽的层带：向下 1 级、向上 1 级。
+// 高倍段层带：围绕**正在渲染的层级 S** 取 [S-1, S+1]。
 //
-// 2026-10-17 收紧（原为向下 2 / 向上 3，且锚点取 `max(相机估算, 渲染层级)`）。
-// 实测 20 km 机位：相机几何算出 z13，而**表面实际只渲染到 z11**，于是挂上 z14/15/16
-// 三个钉死层级的 provider —— 一个 z11 表面瓦片要 64 个 z14 瓦片才能盖满，
-// 结果是 **969 次瓦片请求 / tilesLoaded 144.4 s / fps 2 / p95 帧时 617 ms**。
-// 现在的规则：**只按正在渲染的层级下单，绝不预订"还不存在的细节"**。
-const DETAIL_BAND_BELOW = 1;
-const DETAIL_BAND_ABOVE = 1;
+// 2026-10-17 第三次订正（前两版都被实测否掉了）：
+//   · 第一版 `max(相机, 渲染) ± (2,3)`：20 km 时挂 z14/15/16 → 一个 z11 表面瓦片要
+//     64 张 z14 才盖满 → **969 次请求 / 144 s / fps 2**。
+//   · 第二版以 S 为锚但**只在 camera.changed 时重算**：S 是相机停稳后才追上来的，
+//     之后没有事件 → 窗口永远差一档 → 4 km 下 mounted 恒为空（高倍段等于不存在）。
+//   · 第三版改成相机口径 + S 做刹车：8 km 时表面只渲染 z12 却挂了 z14
+//     （一个 z12 瓦片要 16 张 z14）→ 87 次 /tiles_db 请求 + 反复重建 → fps 7.6。
+// 现在的组合（第四版，前三版都被实测否掉，过程见 offlineDetailWantedZooms 的注释）：
+//   · 相机口径 [cam-2, cam+1] 决定层带在哪一段（稳定、不受渲染快慢影响）；
+//   · 表面**峰值** `S_peak + 1` 决定能不能真的挂（不预订表面还画不到的细节）；
+//   · 已挂的层粘滞（除非相机走远或比表面峰值深超过 2 级）—— 打破挂/卸自激；
+//   · 加上"读不到 S 就保持现状"与 1.5 s 周期重算两条护栏。
+const DETAIL_BAND_CAM_BELOW = 2;
+const DETAIL_BAND_CAM_ABOVE = 1;
+const DETAIL_BAND_S_ABOVE = 1;
+
+// 高倍段集合变更的阻尼：上一次算出的候选集合。连着两次算出同一结果才真正切换，
+// 避免表面层级抖动导致的"挂→重建→卸"自激（见 syncOfflineDetail 的说明）。
+let pendingDetailZooms = null;
 
 /**
  * 当前应挂的高倍段层级（从 manifest 的 bands 里挑）。
  *
- * 锚点是 `surfaceRenderLevel()` —— **渲染器此刻真正在画的层级**，它才是"视野正在用的
- * 细节等级"。相机几何只用来**封顶**（视野不需要比它更深），不再用来抬高下限：
- * `max()` 那条会把层带整体推到远超实际渲染的深度，正是上面那组实测数字的来源。
+ * **判据只看相机层级**，不看 `surfaceRenderLevel()`。这是被实测逼出来的最终形态：
  *
- * 拿不到渲染层级（还没画第一帧）或地球不可见时一律返回空：**不下单**比下错单便宜，
- * 下一帧相机变化时会再同步一次。
+ *   挂/卸一层影像会让 Cesium 重建表面影像，重建期间 `_tilesToRender` 掉到极小值
+ *   （本环境实测掉到 0 并要 ~10 s 才重新精化回来）。于是任何"以渲染层级为判据"的规则
+ *   都会用自己的副作用当输入，形成自激：挂 z14 → 表面重建 → S 掉 → 判为"不该挂"→ 卸 →
+ *   又重建 → S 掉 → 再挂… 实测 4 km 下 applyLayers 11 次、p95 帧时 300 ms、
+ *   挂上又消失反复出现；而按相机判时同一个机位**一次决策、之后不动**。
+ *
+ * 规则（含 1 级迟滞，避免在阈值上抖动）：
+ *   · 挂载：`cam - 2 <= z <= cam`（视野确实需要这一档，且不比它粗太多）
+ *   · 保持：`cam - 2 <= z <= cam + 1`（比需要细 1 级也留着，别在阈值上来回切）
+ *   · 于是 20 km（cam 13）**一层都不挂** —— 原版"预订 z14/15/16"造成的 969 次请求
+ *     在这里从规则上就不可能发生；8 km（cam 14）挂 z14；4 km（cam 15）挂 z14,15。
+ *
+ * 代价（明说）：相机层级比表面实际渲染层级深时，会为"表面还没画到的细节"下单 ——
+ * 但那是**相机（人的意图）说要看那么细**，而不是渲染器的一时快慢决定的。
  */
 function offlineDetailWantedZooms() {
   if (!state.offlineDetailEnabled || !window.OfflineAssets) return [];
@@ -984,13 +1019,20 @@ function offlineDetailWantedZooms() {
   if (!viewer || !viewer.scene || !viewer.scene.globe || !viewer.scene.globe.show) return [];
   const all = OfflineAssets.offlineDetailBands();
   if (!all || !all.length) return [];
-  const S = surfaceRenderLevel();
-  if (S < 0) return [];
-  const lo = S - DETAIL_BAND_BELOW;
-  const hi = Math.min(cameraImageryLevel(), S + DETAIL_BAND_ABOVE);
-  if (hi < lo) return [];   // 相机已经拉远到比表面还粗：这一档不要了
+  const cam = cameraImageryLevel();
+  if (cam < 0) return (state.offlineDetailZooms || []).slice();
+  const mountLo = cam - DETAIL_BAND_CAM_BELOW;
+  const keepLo = cam - DETAIL_BAND_CAM_BELOW;
+  const keepHi = cam + DETAIL_BAND_CAM_ABOVE;
+
+  // ① 已挂且仍在容许带内 → 原样保持（迟滞区：比需要细 1 级也不急着卸）。
+  const mounted = (state.offlineDetailZooms || []).slice();
+  if (mounted.length && mounted.every(function (z) { return z >= keepLo && z <= keepHi; })) {
+    return mounted;
+  }
+  // ② 重算：只挂"相机需要的档"。
   return all
-    .filter(function (b) { return b.zoom >= lo && b.zoom <= hi; })
+    .filter(function (b) { return b.zoom >= mountLo && b.zoom <= cam; })
     .map(function (b) { return b.zoom; })
     .sort(function (a, b) { return a - b; });
 }
@@ -1006,8 +1048,22 @@ function syncOfflineDetail() {
   const want = offlineDetailWantedZooms();
   const have = state.offlineDetailZooms || [];
   if (want.length === have.length && want.every(function (z, i) { return z === have[i]; })) {
+    pendingDetailZooms = null;
     return;
   }
+
+  // **变更要连续两次算出同一结果才执行**。
+  //
+  // 为什么必须阻尼：挂/卸一层会让 Cesium 为每个表面瓦片重算影像槽位，而重算期间
+  // `surfaceRenderLevel()` 会抖（甚至短暂读不到）—— 抖动一次就切一次集合，
+  // 于是"挂→重建→卸→重建"自激，观感就是持续卡顿。实测 2026-10-17 8 km/台北：
+  // 采样里反复出现 `S=-1|挂载空` 与 `S=12|挂载 z14` 交替。
+  // 代价是层级变化晚一拍生效（相机停稳后约 1.5~3 s），换来的是不抖。
+  if (!pendingDetailZooms || pendingDetailZooms.join(',') !== want.join(',')) {
+    pendingDetailZooms = want;
+    return;
+  }
+  pendingDetailZooms = null;
 
   // 摘掉不再需要的（同 zoom 的层保留，避免"摘了又挂"）
   const keep = {};
@@ -3592,7 +3648,15 @@ function syncUrbanImagery() {
   const height = viewer.camera.positionCartographic.height;
   // 地球不可见时城区层同样画不出来，不挂（见 hotspotImageryWanted 的同类守卫）。
   const globeOn = !(viewer.scene && viewer.scene.globe) || viewer.scene.globe.show;
-  const want = state.urbanEnabled && globeOn && height <= URBAN_IMAGERY_TRIGGER_M;
+  // 相机需要的层级已明显超过城区的最高层级时也不挂：这一层是城市尺度的粗层
+  // （z≤13），在 8 km 这类"需要 z14"的高度给不出细节却仍会全量拉取 —— 那是
+  // 实测到的 8 km 卡顿源之一（与热点层同因，见 layerTooCoarseForCamera）。
+  const urbanTop = (window.OfflineAssets && OfflineAssets.urbanTreeMaxZoom)
+    ? Math.min(((OfflineAssets.manifest().urban_imagery_detail || {}).max_zoom || 99),
+               OfflineAssets.urbanTreeMaxZoom)
+    : 13;
+  const want = state.urbanEnabled && globeOn && !layerTooCoarseForCamera(urbanTop)
+    && height <= URBAN_IMAGERY_TRIGGER_M;
 
   if (want && !state.urbanLayers) {
     state.urbanLayers = OfflineAssets.attachUrbanImagery(viewer, state.urbanAoi);
@@ -5117,20 +5181,25 @@ function bindUI() {
   // 相机移动时也刷新一次读数（节流到 4 Hz），否则刚打开页面时面板全是"—"。
   let lastGeoUpdate = 0;
   // 底图加载进度。queued 为 0 表示当前视野的瓦片已经全部就位。
-  viewer.scene.globe.tileLoadProgressEvent.addEventListener(setLoadingTiles);
-
-  // 兜底看门狗：事件不来的话，上面那条"以 tilesLoaded 为准"的纠正就没有触发时机。
-  // 每 3 秒看一眼，若渲染器说加载完了而徽标还挂着，就按 0 收掉。代价是一次布尔读。
-  setInterval(function () {
-    if (!viewer || !viewer.scene || !viewer.scene.globe) return;
-    if (!viewer.scene.globe.tilesLoaded) return;
-    if (!dom.loadingBadge || dom.loadingBadge.classList.contains('hidden')) return;
-    setLoadingTiles(0);
-  }, 3000);
+  viewer.scene.globe.tileLoadProgressEvent.addEventListener(onTileLoadProgress);
 
   // 预加载循环：空闲且相机停稳时，把"视口内、另一档层级"的瓦片提前取回来。
   // 默认开启，`?prefetch=off` 可关（见 applyPrefetchParams）。
   startPrefetchLoop();
+
+  // 按需层的周期性复核。两件事都需要它：
+  //   1. `surfaceRenderLevel()`（正在渲染的层级）**必然晚于相机停稳**，而重算原先只挂在
+  //      camera.changed 上 —— 相机一停就没有事件，最后一次重算用的是滞后一档的层级，
+  //      实测 4 km 下高倍段恒为空（离线高清影像等于不存在）。
+  //   2. 热点/城区的"还有没有用"闸门同样以 S 为判据。
+  // 1.5 秒一次即可：三个同步在集合没变时立刻返回，代价是一次比较。
+  setInterval(function () {
+    if (!viewer || !viewer.scene || !viewer.scene.globe) return;
+    if (!viewer.scene.globe.show) return;
+    syncOfflineDetail();
+    syncHotspotImagery();
+    syncUrbanImagery();
+  }, 1500);
 
   // 地球可见性看门狗：`globe.show` 只被在线三维实景层（buildings3d.js）改，改完没有
   // 事件通知到这里；而"不可见就不该取瓦片"与"恢复可见要把按需层挂回来"两条都依赖它。
