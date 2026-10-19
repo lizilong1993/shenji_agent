@@ -123,8 +123,12 @@ class WargameEngine(object):
                 continue
             order = by_uid.get(u.uid)
             if order and order.action == "move" and order.path:
-                entered = movement.advance(u, order.path, state.tick_seconds,
-                                           state.map, _move_mode(u))
+                entered = movement.advance(
+                    u, order.path, state.tick_seconds, state.map, _move_mode(u),
+                    can_enter=lambda p, _u=u: (
+                        len([x for x in state.unit_at(p, _u.color)
+                             if x.domain == "land"]) < 4
+                        if _u.domain == "land" else True))
                 u.moving = bool(entered)
                 u.concealed = False
                 if entered:

@@ -64,8 +64,13 @@ def hex_budget(unit, tick_seconds: float, hmap: hexmap.HexMap) -> float:
 
 
 def advance(unit, path: Sequence[int], tick_seconds: float,
-            hmap: hexmap.HexMap, mode: str = "vehicle") -> List[int]:
-    """Move ``unit`` along ``path`` for one tick.  Returns the hexes entered."""
+            hmap: hexmap.HexMap, mode: str = "vehicle",
+            can_enter=None) -> List[int]:
+    """Move ``unit`` along ``path`` for one tick.  Returns the hexes entered.
+
+    ``can_enter(pos)`` is an optional stacking/passability callback; returning
+    ``False`` stops the unit before that hex.
+    """
     if not path:
         return []
     if (not getattr(unit, "path", None)
@@ -81,6 +86,8 @@ def advance(unit, path: Sequence[int], tick_seconds: float,
         nxt = int(unit.path[idx + 1])
         if hexmap.distance(cur, nxt) != 1:
             # Path is stale or malformed; stop rather than teleport.
+            break
+        if can_enter is not None and not can_enter(nxt):
             break
         cost = hmap.move_cost(cur, nxt, mode)
         if cost == float("inf") or cost > budget:

@@ -56,7 +56,7 @@ class Unit:
             "max_blood": self.max_blood,
             "armor": self.armor,
             "alive": self.alive,
-            "suppressed": self.suppressed,
+            "suppressed": self.suppressed and self.alive,
             "concealed": self.concealed,
             "moving": self.moving,
             "marching": self.marching,

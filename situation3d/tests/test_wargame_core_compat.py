@@ -47,6 +47,22 @@ class PublicFixtureTests(unittest.TestCase):
                          [e["type"] for e in r2["events"]])
         self.assertGreaterEqual(len(r1["events"]), 1)
 
+    def test_other_public_fixtures_load(self):
+        pairs = [
+            ("1930331196.json", "map_96"),
+            ("2120131194.json", "map_212"),
+        ]
+        for name, map_dir in pairs:
+            sp = os.path.join(DATA, "scenarios", name)
+            mp = os.path.join(DATA, "maps", map_dir, "basic.json")
+            if not (os.path.isfile(sp) and os.path.isfile(mp)):
+                continue
+            state = scenario.load_scenario(sp, mp, seed=3)
+            self.assertGreater(len(state.units), 0, name)
+            self.assertGreater(len(state.objectives), 0, name)
+            result = engine.run_demo(state, max_ticks=3)
+            self.assertLessEqual(result["tick"], 3, name)
+
 
 if __name__ == "__main__":
     unittest.main()
