@@ -67,6 +67,26 @@
   var CONV_US = 'FM 1-02.2 / APP-06 有完整公开规范';
   var CN_DOC = '《中国人民解放军作战标图规定》(2013-05-27 总参谋部发布、中央军委批准)';
 
+  // ---------------------------------------------------------------------
+  // 标绘类别：**只是分组元数据，不是注册表里的固定图层**
+  // ---------------------------------------------------------------------
+  //
+  // 图层面板里出现哪些「标绘·××」，由**实际存在的标绘要素**决定：
+  // `app.js` 的 syncPlotLayers() 按 `debug().items` 里的 layer 字段按需
+  // register / unregister（见那里的说明）。所以这里不预先声明"系统有固定的
+  // 五种标绘"——新增一个类别只要：
+  //   1. 在 CATEGORIES 补一行（名称 + z）；
+  //   2. 在 CATALOGUE 里给新类型标注 defaultLayer（LAYER_BY_TYPE）。
+  // 即使忘了第 1 步也不会坏：类别名回落到图层 id 后缀，图层照常出现。
+  var CATEGORIES = {
+    mobility: { zh: '机动与集结', z: 80 },
+    offense: { zh: '进攻', z: 83 },
+    defense: { zh: '防御与障碍', z: 87 },
+    fire: { zh: '火力', z: 90 },
+    intel: { zh: '侦察与空域', z: 93 },
+    track: { zh: '目标轨迹', z: 96 },
+  };
+
   var CATALOGUE = {
     // ---- 进攻类 · 折线箭头族（族 A：2 控制点） ----
     assault_direction: {
@@ -139,7 +159,7 @@
     // ---- 集结/地域类（族 F：闭合区域） ----
     assembly_area: {
       zh: '集结地域', family: 'zone', sourceStandard: 'CN',
-      sourceDoc: CN_DOC, sourceConfidence: CONV_CN,
+      sourceDoc: CN_DOC,
       // ⚠ FIX-1：这里原先写 `closed-spline-area`，但 `ringsFor` 的 zone 分支只做
       // `p.slice()` —— **裸多边形，没有样条**。元数据声称了没实现的算法，
       // 属于"文档比实现好看"，已改为如实描述。
@@ -152,7 +172,7 @@
     },
     waiting_area: {
       zh: '待机地域', family: 'zone', sourceStandard: 'CN',
-      sourceDoc: CN_DOC, sourceConfidence: CONV_CN,
+      sourceDoc: CN_DOC,
       algorithmFamily: 'area',
       sourceConfidence: CONV_CN + '；**当前实现为裸多边形，未做闭合样条平滑**',
       cnImplRef: '复用集结地域算法（未移植）',
@@ -314,6 +334,23 @@
       custom: true,
       params: {},
     },
+    // ---- 系统生成的态势标绘：目标轨迹（计划航段） ----
+    //
+    // 目标轨迹**不再作为独立的轨迹图层存在**：它按《军事标图技法》
+    // 第二章第五节「实线=现行、虚线=计划（预定）」的约定，作为一条 line 族
+    // 标绘要素进入态势标绘体系；由 app.js 按选中目标与当前帧自动 add/update，
+    // 归属动态图层 `plot.track`。`system:true` 表示该类型由系统维护：
+    // 不出现在手动标绘类型列表里，也不随 TS 定义导出/导入。
+    target_track: {
+      zh: '目标轨迹', family: 'line', sourceStandard: 'CN',
+      sourceDoc: CN_DOC + '（线型语义）；《军事标图技法》第二章第五节（虚线=计划/预定）',
+      sourceConfidence: '由目标计划航路自动生成；虚线语义可溯源，轨迹本身是本系统派生数据',
+      algorithmFamily: 'line',
+      cnImplRef: '无（复用 line 族）',
+      usEquivalent: null,
+      system: true,
+      params: { dash: true },
+    },
   };
   // ---------------------------------------------------------------------
   // 配色：**中式约定与北约相反，这是最容易搞错的一点**
@@ -369,7 +406,7 @@
   // ---------------------------------------------------------------------
   //
   // 为什么放在这里而不是逐条写进 CATALOGUE：族已经唯一决定了点数语义
-  // （见各族的构造函数），逐条写 24 遍既啰嗦又容易写错。UI 通过
+  // （见各族的构造函数），逐条写一遍既啰嗦又容易写错。UI 通过
   // `Plotting.catalogue()` 拿到这两项，用来提示"还需点几个点"和默认勾选图层。
 
   /** 每族需要几个控制点。`max: null` 表示不设上限（折线骨架可任意长）。 */
@@ -409,7 +446,37 @@
     // 侦察与空域
     recon_area: 'plot.intel', no_fly_zone: 'plot.intel',
     maritime_blockade: 'plot.intel',
+    // 系统生成的态势标绘（目标轨迹）：独立类别，按实际要素动态成层
+    target_track: 'plot.track',
   };
+
+  /** `plot.<category>` → 类别元数据。类别未在 CATEGORIES 声明时回落到 id 后缀。 */
+  function categoryOfLayer(layerId) {
+    var cid = String(layerId || '').replace(/^plot\./, '');
+    var meta = CATEGORIES[cid] || null;
+    return {
+      id: cid,
+      layer: 'plot.' + cid,
+      zh: (meta && meta.zh) || cid,
+      z: (meta && meta.z) || 90,
+    };
+  }
+
+  /**
+   * 可用的标绘类别（创建入口用）。
+   *
+   * **这不是图层清单**：图层面板只显示当前真有要素的类别（见 app.js
+   * syncPlotLayers）。这里返回的是"能往哪一类里画"，供标绘工具的下拉框使用；
+   * 所以即使某一类当前为空，也仍然可选。
+   */
+  function categories() {
+    var ids = Object.keys(CATEGORIES);
+    Object.keys(LAYER_BY_TYPE).forEach(function (t) {
+      var cid = LAYER_BY_TYPE[t].replace(/^plot\./, '');
+      if (ids.indexOf(cid) < 0) ids.push(cid);
+    });
+    return ids.map(categoryOfLayer).sort(function (a, b) { return a.z - b.z; });
+  }
 
   var COLOR = {
     get red() { return NATO_COLOR.enemy; },
@@ -421,6 +488,37 @@
   var byId = {};              // 标绘实例 id -> 记录
   var seq = 0;
   var layerVisible = {};      // 标绘类别图层 id -> 是否可见（由 LayerRegistry 的 sink 驱动）
+
+  // ---------------------------------------------------------------------
+  // 变更通知：图层由**实际标绘要素动态驱动**
+  // ---------------------------------------------------------------------
+  //
+  // add/remove/update/import/clear 之后通知外部（app.js 的 syncPlotLayers），
+  // 由它按当前要素增删 `kind:'plot'` 图层。批量操作（import/clear）只在结束时
+  // 通知一次，避免中途反复 register/unregister 造成面板与场景抖动。
+  var changeListeners = [];
+  var _batchDepth = 0;
+
+  function onChange(fn) { if (typeof fn === 'function') changeListeners.push(fn); }
+
+  function notifyChange(evt) {
+    if (_batchDepth) return;
+    changeListeners.forEach(function (fn) {
+      // 通知失败不能反过来打断标绘本身的增删改 —— 记一条警告即可。
+      try { fn(evt); } catch (e) {
+        if (window.console && console.warn) console.warn('[Plotting] onChange 失败：', e);
+      }
+    });
+  }
+
+  function batch(fn) {
+    _batchDepth++;
+    try { return fn(); }
+    finally {
+      _batchDepth--;
+      if (!_batchDepth) notifyChange({ type: 'batch' });
+    }
+  }
 
   function bind(v) {
     viewer = v || null;
@@ -1336,22 +1434,39 @@
     var rings = ringsFor(rec.type, rec.points);
 
     rings.forEach(function (ring) {
-      var positions = ring.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); });
       if (isLine) {
+        // 逐点高度（可选）：目标轨迹这类由系统生成的标绘需要保住空中目标的真实
+        // 高度，不能用贴地的 2D 折线。`rec.heights` 与 `rec.points` 一一对应；
+        // 顶点被降采样时长度会对不上，此时退回贴地渲染（宁可贴地，也不错位）。
+        var useHeights = !!(rec.heights && rec.heights.length === rec.points.length
+          && ring.length === rec.points.length);
+        var linePositions;
+        if (useHeights) {
+          var flat = [];
+          for (var hi = 0; hi < ring.length; hi++) {
+            flat.push(ring[hi][0], ring[hi][1], Number(rec.heights[hi]) || 0);
+          }
+          linePositions = Cesium.Cartesian3.fromDegreesArrayHeights(flat);
+        } else {
+          linePositions = ring.map(function (c) {
+            return Cesium.Cartesian3.fromDegrees(c[0], c[1]);
+          });
+        }
         // ⚠ FIX-2：这里原先**无条件**用虚线材质，于是 `params.dash` 从来没被读过，
         // 所有线型都是虚线。教范是"实线=现行、虚线=计划/待命"，写死虚线会让每一个
         // 新增的实线型图形默认表达**错误的状态**。
         rec.entities.push(viewer.entities.add({
           polyline: {
-            positions: positions,
+            positions: linePositions,
             width: 3,
-            clampToGround: true,
+            clampToGround: !useHeights,
             material: (def.params && def.params.dash)
               ? new Cesium.PolylineDashMaterialProperty({ color: color, dashLength: 16 })
               : color,
           },
         }));
       } else {
+        var positions = ring.map(function (c) { return Cesium.Cartesian3.fromDegrees(c[0], c[1]); });
         // OPT-2：声明了 `altLayer` 的图形走**高度夹层**。
         // `height` + `extrudedHeight` + `perPositionHeight:false` 就是"从下限定到上限"的
         // 体积，对任意环都成立（含扇面）。注意这条路是 Geometry/Primitive 管线，
@@ -1422,9 +1537,15 @@
   /** 控制点中点处放一个标注。抽出来是因为符号化边界分支也要用同一份样式。 */
   function addLabel(rec) {
     if (!viewer || !rec.label) return 0;
-    var mid = rec.points[Math.floor(rec.points.length / 2)];
+    var idx = Math.floor(rec.points.length / 2);
+    var mid = rec.points[idx];
+    // 带逐点高度的图形（目标轨迹）标签也要跟着到空中，否则虚线在空中、
+    // 标签却挂在地面 0 米处，近景明显脱节。
+    var useHeight = rec.heights && rec.heights.length === rec.points.length;
     rec.entities.push(viewer.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(mid[0], mid[1]),
+      position: useHeight
+        ? Cesium.Cartesian3.fromDegrees(mid[0], mid[1], rec.heights[idx])
+        : Cesium.Cartesian3.fromDegrees(mid[0], mid[1]),
       label: {
         text: rec.label,
         font: 'bold 14px "Microsoft YaHei", sans-serif',
@@ -1495,6 +1616,13 @@
       ref: def.sourceDoc,
       confidence: def.sourceConfidence,
       points: spec.points.map(function (c) { return [c[0], c[1]]; }),
+      // 逐点高度（可选，米）。只用于 `family:'line'` 的系统标绘（目标轨迹）：
+      // 与 `points` 一一对应；长度不符时丢弃，退回贴地渲染。
+      heights: (function () {
+        var h = spec.heights;
+        if (!Array.isArray(h) || h.length !== spec.points.length) return null;
+        return h.map(function (v) { var n = Number(v); return isFinite(n) ? n : 0; });
+      })(),
       // 颜色**不在这里定**：存归属，取色留给渲染时按当前配色标准解析，
       // 否则 setColorStandard('NATO') 之后已有标绘不会跟着变。
       color: spec.color || null,
@@ -1510,6 +1638,7 @@
     byId[id] = rec;
     drawOne(rec);
     applyVisibility();
+    notifyChange({ type: 'add', id: id, layer: rec.layer });
     return rec;
   }
 
@@ -1518,13 +1647,34 @@
     if (!rec) return false;
     clearRec(rec);
     delete byId[id];
+    notifyChange({ type: 'remove', id: id, layer: rec.layer });
     return true;
   }
 
   function clearLayer(layerId) {
-    Object.keys(byId).forEach(function (id) {
-      if (!layerId || byId[id].layer === layerId) remove(id);
+    return batch(function () {
+      Object.keys(byId).forEach(function (id) {
+        if (!layerId || byId[id].layer === layerId) remove(id);
+      });
     });
+  }
+
+  /**
+   * 场景被整体清空（`viewer.entities.removeAll()`）后重画已有标绘。
+   *
+   * 标绘记录独立于 viewer 实体：换案例时实体被一次性移除，但 `byId` 里的记录还在。
+   * 不重画的话，"标绘图层由实际要素驱动"会变成自相矛盾——面板上显示 N 条，
+   * 场景里一条都没有。记录存的是控制点，重画是幂等的。
+   */
+  function redrawAll() {
+    if (!viewer) return 0;
+    Object.keys(byId).forEach(function (id) {
+      var rec = byId[id];
+      clearRec(rec);
+      drawOne(rec);
+    });
+    applyVisibility();
+    return Object.keys(byId).length;
   }
 
   /** 由 LayerRegistry 的 plot sink 调用：切换某个标绘类别图层的显隐。 */
@@ -1583,10 +1733,21 @@
     if (patch.points) {
       rec.points = patch.points.map(function (c) { return [c[0], c[1]]; });
     }
+    if (patch.heights !== undefined) {
+      rec.heights = (function () {
+        var h = patch.heights;
+        if (!Array.isArray(h) || h.length !== rec.points.length) return null;
+        return h.map(function (v) { var n = Number(v); return isFinite(n) ? n : 0; });
+      })();
+    } else if (rec.heights && rec.heights.length !== rec.points.length) {
+      // 只改控制点、没给新高程：长度对不上就丢弃高程，避免逐点错位。
+      rec.heights = null;
+    }
     if (rec.visible === false) rec.visible = true;   // 重建出来的默认可见，由调用方再关
     drawOne(rec);
     applyVisibility();
     if (host) host.scene.requestRender();
+    notifyChange({ type: 'update', id: id, layer: rec.layer });
     return rec;
   }
 
@@ -1598,7 +1759,12 @@
    * `points` 做**深拷贝** —— 直接把内部数组交出去，调用方一改就把记录改了。
    */
   function exportAll() {
-    return Object.keys(byId).map(function (id) {
+    return Object.keys(byId).filter(function (id) {
+      // 系统生成的标绘（目标轨迹）是**当前选中目标的派生数据**，不属于用户
+      // 画出来的态势图；写进 TS 定义会让它变成"某时某刻的残影"。
+      var def = CATALOGUE[byId[id].type];
+      return !(def && def.system);
+    }).map(function (id) {
       var rec = byId[id];
       return {
         type: rec.type,
@@ -1617,18 +1783,24 @@
    */
   function importAll(list, opts) {
     if (!Array.isArray(list)) return { added: 0, errors: ['plots 必须是数组'] };
-    if (opts && opts.replace) {
-      Object.keys(byId).forEach(function (id) { remove(id); });
-    }
     var errors = [], added = 0;
-    list.forEach(function (p, i) {
-      try {
-        add({ type: p && p.type, layer: p && p.layer, points: p && p.points,
-              hostility: p && p.hostility, label: (p && p.label) || null });
-        added++;
-      } catch (e) {
-        errors.push('plots[' + i + ']：' + e.message);
+    // 批量期间不逐条通知图层同步：一份定义几十条时，逐条 register/unregister
+    // 会让面板反复重建。结束时统一通知一次。
+    batch(function () {
+      if (opts && opts.replace) {
+        Object.keys(byId).forEach(function (id) { remove(id); });
       }
+      list.forEach(function (p, i) {
+        try {
+          var def = CATALOGUE[p && p.type];
+          if (def && def.system) throw new Error('系统生成的标绘类型不可导入');
+          add({ type: p && p.type, layer: p && p.layer, points: p && p.points,
+                hostility: p && p.hostility, label: (p && p.label) || null });
+          added++;
+        } catch (e) {
+          errors.push('plots[' + i + ']：' + e.message);
+        }
+      });
     });
     return { added: added, errors: errors };
   }
@@ -1674,17 +1846,22 @@
   function catalogue() {
     return Object.keys(CATALOGUE).map(function (k) {
       var d = CATALOGUE[k];
+      var cid = categoryOfLayer(LAYER_BY_TYPE[k] || 'plot.offense');
       return {
         type: k, zh: d.zh, family: d.family,
         sourceStandard: d.sourceStandard, sourceDoc: d.sourceDoc,
         sourceConfidence: d.sourceConfidence, algorithmFamily: d.algorithmFamily,
         cnImplRef: d.cnImplRef || null, usEquivalent: d.usEquivalent || null,
-        // 界面所需：需要几个控制点、默认落在哪个标绘图层
+        // 界面所需：需要几个控制点、默认落在哪个类别/图层
         ctrl: CTRL_BY_FAMILY[d.family] || { min: 2, max: null },
         defaultLayer: LAYER_BY_TYPE[k] || 'plot.offense',
+        category: cid.id, categoryZh: cid.zh,
         // `custom` 表示"本图形自建、不对应任何标准图形"。必须能被外部读到——
         // 放在 params 里没人读就等于没标（FIX-1c）。
         custom: !!d.custom,
+        // `system` 表示由系统自动维护（当前只有目标轨迹）：不进入手动类型列表，
+        // 不随 TS 定义导出/导入。
+        system: !!d.system,
       };
     });
   }
@@ -1692,10 +1869,16 @@
   window.Plotting = {
     CATALOGUE: CATALOGUE,
     catalogue: catalogue,
+    // 标绘类别（创建入口用）与"图层 → 类别"解析（动态图层命名用）
+    categories: categories,
+    categoryOfLayer: categoryOfLayer,
+    // 变更通知：外部据此同步"按要素动态存在"的标绘图层
+    onChange: onChange,
     bind: bind,
     add: add,
     remove: remove,
     clearLayer: clearLayer,
+    redrawAll: redrawAll,
     setLayerVisible: setLayerVisible,
     setVisible: setVisible,
     update: update,
@@ -1752,13 +1935,21 @@
                  label: byId[id].label || null,
                  hostility: byId[id].hostility || null,
                  visible: byId[id].visible !== false,
+                 // 图层 sink 写入的可见标志 vs 实体真实的 show：
+                 // 自检要能区分"意图传下去了"与"图元真显示了"。
+                 shown: (byId[id].entities.length + (byId[id].primitives || []).length > 0) &&
+                   byId[id].entities.every(function (e) { return !!e.show; }) &&
+                   (byId[id].primitives || []).every(function (pr) { return !!pr.show; }),
                  points: byId[id].points.length,
                  // 实际控制点：面板与持久化都要用（上面那个 `points` 是**数量**，
                  // 保留它是因为已有代码在读，不要改名）
                  controlPoints: byId[id].points.map(function (c) { return [c[0], c[1]]; }),
                  std: byId[id].std, entities: byId[id].entities.length,
                  primitives: (byId[id].primitives || []).length,
-                 marks: byId[id].markCount || 0 };
+                 marks: byId[id].markCount || 0,
+                 // 系统生成（目标轨迹）：面板据此只给"定位"，不给删改开关
+                 system: !!(CATALOGUE[byId[id].type] && CATALOGUE[byId[id].type].system),
+                 heights: byId[id].heights ? byId[id].heights.length : 0 };
       });
       return {
         bound: !!viewer, visible: layerVisible, count: list.length, items: list,

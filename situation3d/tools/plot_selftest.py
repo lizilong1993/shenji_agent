@@ -177,7 +177,8 @@ PROBE = r"""
       });
     } catch (e) { bad.push(c.type + ':' + e.message); }
   });
-  out.sweep = { total: entries.length, bad: bad };
+  out.sweep = { total: entries.length, bad: bad,
+                types: entries.map(function (c) { return c.type; }) };
 
   // 7. FIX 回归：修复项各自的可判定断言
   var cat = {};
@@ -451,10 +452,10 @@ PROBE = r"""
   // 12. FIX-5 回归：阵列图元合并为批量图元（数量与图元数无关）
   out.batch = await (async function () {
     function frames(n) {
+      // 无头 SwiftShader 的 rAF 可能低到 0.5 fps；按帧等待会把正确实现拖到
+      // CDP timeout。改为按时间等，足够让 Cesium 的异步几何与面板重建完成。
       return new Promise(function (res) {
-        var k = 0;
-        function step() { if (++k >= n) return res(); requestAnimationFrame(step); }
-        requestAnimationFrame(step);
+        setTimeout(res, Math.min(Math.max(n, 1) * 250, 6000));
       });
     }
     var scene = SituationHost.viewer().scene;
@@ -466,10 +467,24 @@ PROBE = r"""
     // 判成了失败——所以现在把这两种情形分开断言。
     var tiny = [A, [119.42, 24.215]];
     var long = [A, [120.6, 25.0]];
+    function waitReady(rec, ms) {
+      return new Promise(function (res) {
+        var t = Date.now();
+        (function step() {
+          var done = rec.primitives.length > 0 && rec.primitives.every(function (pr) {
+            return pr.ready === true;
+          });
+          if (done || Date.now() - t >= ms) return res(done);
+          setTimeout(step, 250);
+        })();
+      });
+    }
     function probe(pts, type) {
       var before = scene.primitives.length;
       var r = Plotting.add({ type: type, layer: 'plot.defense', points: pts });
-      return frames(25).then(function () {
+      // 没有批量图元（marks 低于可见下限）时不用等；有则轮询到 ready，
+      // 而不是按 rAF 帧数等 —— 无头环境帧率低时 25 帧可能只有几秒。
+      return waitReady(r, r.primitives.length ? 20000 : 500).then(function () {
         var d = Plotting.debug().items.filter(function (i) { return i.id === r.id; })[0] || {};
         var ready = r.primitives.map(function (pr) { return pr.ready === true; });
         Plotting.remove(r.id);
@@ -483,6 +498,69 @@ PROBE = r"""
     var l = await probe(long, 'wire_fence');
     var f = await probe(long, 'anti_tank_ditch');
     return { wire_tiny: s, wire_long: l, fill_long: f, min_px: 3 };
+  })();
+  // 13. 动态标绘图层：图层集合由**实际要素**决定，且类别可扩展
+  out.dynamicLayers = await (async function () {
+    function frames(n) {
+      // 无头 SwiftShader 的 rAF 可能低到 0.5 fps；按帧等待会把正确实现拖到
+      // CDP timeout。改为按时间等，足够让 Cesium 的异步几何与面板重建完成。
+      return new Promise(function (res) {
+        setTimeout(res, Math.min(Math.max(n, 1) * 250, 6000));
+      });
+    }
+    function usedLayers() {
+      var u = {};
+      Plotting.debug().items.forEach(function (it) { u[it.layer] = true; });
+      return Object.keys(u).sort();
+    }
+    function registeredLayers() {
+      return LayerRegistry.list('plot').filter(function (l) { return l.group === '标绘'; })
+        .map(function (l) { return l.id; }).sort();
+    }
+    function same(a, b) { return a.length === b.length && a.every(function (x, i) { return x === b[i]; }); }
+    var A = [119.4, 24.2], B = [120.6, 25.0];
+    var before = { used: usedLayers(), registered: registeredLayers() };
+    var r1 = Plotting.add({ type: 'phase_line', layer: 'plot.fire', points: [A, B] });
+    await frames(6);
+    // 面板按帧差分重建；无头环境 rAF 很慢。这里主动调生产用的 LayerPanel.tick()，
+    // 再轮询 DOM，避免把"帧还没到"误判成"图层没出现"。
+    var panelRow = false;
+    for (var pi = 0; pi < 50 && !panelRow; pi++) {
+      if (window.LayerPanel && LayerPanel.tick) LayerPanel.tick();
+      panelRow = !!document.getElementById('layerRow-plot.fire');
+      if (!panelRow) await new Promise(function (r) { setTimeout(r, 100); });
+    }
+    var afterAdd = { used: usedLayers(), registered: registeredLayers(),
+                     panelRow: panelRow };
+    var r2 = Plotting.add({ type: 'coordination_line', layer: 'plot.fire', points: [A, B] });
+    await frames(6);
+    var afterSecond = { used: usedLayers(), registered: registeredLayers(),
+                        count: LayerRegistry.elements('plot.fire').length };
+    // 目录里没有声明过的类别：只要要素带着这个 layer，图层就应该自动出现
+    var r3 = Plotting.add({ type: 'phase_line', layer: 'plot.custom_ext', points: [A, B] });
+    await frames(6);
+    var custom = {
+      registered: registeredLayers().indexOf('plot.custom_ext') >= 0,
+      label: (LayerRegistry.def('plot.custom_ext') || {}).label || null,
+    };
+    Plotting.remove(r3.id);
+    Plotting.remove(r1.id);
+    Plotting.remove(r2.id);
+    await frames(8);
+    var afterRemove = { used: usedLayers(), registered: registeredLayers() };
+    var sel = document.getElementById('plotLayer');
+    return {
+      before: before,
+      after_add: afterAdd,
+      after_second: afterSecond,
+      custom: custom,
+      after_remove: afterRemove,
+      restored: same(afterRemove.used, before.used) && same(afterRemove.registered, before.registered),
+      // 创建入口的类别下拉来自目录，不依赖"当前有没有要素"
+      category_option: !!(sel && Array.prototype.some.call(sel.options, function (o) {
+        return o.value === 'plot.fire';
+      })),
+    };
   })();
   return out;
 })()
@@ -573,7 +651,7 @@ EXPECT_FACILITIES = {
 
 
 
-# Third payload: the trajectory window / predicted leg / focus mask contract that
+# Third payload: the trajectory window / target-track plot / focus mask contract that
 # `app.js` exposes through `SituationHost.focusDebug()` and drives through
 # `SituationHost.selectTarget()`. Every number below is read from the page, and
 # the selection is toggled in-place, so "the thing really happened" is what the
@@ -590,9 +668,9 @@ PROBE_FOCUS = r"""
   if (!H) return { error: 'window.SituationHost missing' };
   if (typeof H.focusDebug !== 'function') return { error: 'focusDebug missing' };
   function frames(n) {
+    // 同上：按时间等待，不依赖无头环境的 rAF 帧率。
     return new Promise(function (res) {
-      var i = 0;
-      (function step() { if (++i >= n) return res(); requestAnimationFrame(step); })();
+      setTimeout(res, Math.min(Math.max(n, 1) * 250, 6000));
     });
   }
   function layer(id, on) {
@@ -602,10 +680,11 @@ PROBE_FOCUS = r"""
   var S = H.state, o = { mask_layer_ok: false, tracks_on: false };
   function snap(tag, d) {
     o[tag] = {
-      trailWindowTicks: d.trailWindowTicks, predictMode: d.predictMode, selected: d.selected,
+      trailWindowTicks: d.trailWindowTicks, trackMode: d.trackMode, selected: d.selected,
       maxTrailVertices: d.maxTrailVertices, trailVertexSum: d.trailVertexSum,
       trailFull: d.trailFull, trailDrawn: d.trailDrawn, tick: d.tick,
-      predictedPolylines: d.predictedPolylines, predictedPoints: d.predictedPoints,
+      trackPlotExists: d.trackPlotExists, trackPlotPoints: d.trackPlotPoints,
+      trackPlotLayer: d.trackPlotLayer, trackPlotEntities: d.trackPlotEntities,
       historySolid: d.historySolid, maskExists: d.maskExists, maskShow: d.maskShow
     };
   }
@@ -650,21 +729,27 @@ PROBE_FOCUS = r"""
   o.targets_n = tarr.length;
   o.target_id = t0x ? (t0x.id || t0x.target_id || null) : null;
   if (o.target_id && typeof H.selectTarget === 'function') H.selectTarget(o.target_id);
-  var p1 = await poll(function (d) { return d.predictedPolylines === 1; }, 3000);
+  var p1 = await poll(function (d) { return d.trackPlotExists === true; }, 3000);
   o.select_ok = p1.ok; o.select_polls = p1.n; o.select_ms = p1.ms;
   var p2 = await poll(function (d) { return d.maskShow === true; }, 12000);
   o.mask_ok = p2.ok; o.mask_polls = p2.n; o.mask_ms = p2.ms;
-  o.selected_last = { selected: p2.d.selected, predictedPolylines: p2.d.predictedPolylines,
-                      predictedPoints: p2.d.predictedPoints, historySolid: p2.d.historySolid,
+  o.selected_last = { selected: p2.d.selected, trackPlotExists: p2.d.trackPlotExists,
+                      trackPlotPoints: p2.d.trackPlotPoints, trackPlotLayer: p2.d.trackPlotLayer,
+                      historySolid: p2.d.historySolid,
                       maskExists: p2.d.maskExists, maskShow: p2.d.maskShow,
                       maxTrailVertices: p2.d.maxTrailVertices, trailFull: p2.d.trailFull,
                       trailDrawn: p2.d.trailDrawn, trailVertexSum: p2.d.trailVertexSum,
                       tick: p2.d.tick };
   snap('selected', p2.d);
   if (typeof H.selectTarget === 'function') H.selectTarget(null);
-  var p3 = await poll(function (d) { return d.maskShow === false; }, 12000);
+  // ⚠ 不能只等 `maskShow === false`：它在 selectTarget(null) 里是**同步**生效的，
+  // 第一次读值就会命中，而 `markScene → syncTrackPlot` 还没跑——轨迹仍会显示，
+  // 后面的"取消选中移除轨迹"断言会在正确实现上假失败。两个条件都必须满足。
+  var p3 = await poll(function (d) {
+    return d.maskShow === false && d.trackPlotExists === false;
+  }, 12000);
   o.mask_hide_ok = p3.ok; o.mask_hide_polls = p3.n; o.mask_hide_ms = p3.ms;
-  o.unselected_last = { selected: p3.d.selected, predictedPolylines: p3.d.predictedPolylines,
+  o.unselected_last = { selected: p3.d.selected, trackPlotExists: p3.d.trackPlotExists,
                         maskShow: p3.d.maskShow, tick: p3.d.tick };
   snap('unselected', p3.d);
   if (o.mask_desired0 !== null) layer('overlay.focusMask', o.mask_desired0);
@@ -907,8 +992,11 @@ def probe(url: str, js: str = PROBE) -> dict:
         # `inspect_remote.py` takes the expression as a **string** on --eval; it has no
         # --eval-file. Passing argv as a list avoids the shell entirely, which is what
         # makes a multi-line JS payload safe here: there is no quoting layer to escape.
+        # 无头 SwiftShader 的帧率可能低到 0.5 fps，主探针里的 rAF 等待会随之变长；
+        # 150 s 的默认 CDP 超时会把**正确实现**误判成 timeout。放宽到 10 min。
         cmd = [sys.executable, INSPECT, "--url", url, "--out", out,
-               "--wait-ms", "20000", "--eval-async", "--eval", js]
+               "--wait-ms", "20000", "--eval-timeout-ms", "600000",
+               "--eval-async", "--eval", js]
         try:
             subprocess.run(cmd, cwd=ROOT, check=True,
                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -992,7 +1080,11 @@ def main() -> int:
 
     print("6. catalogue sweep -- every type generates finite geometry")
     sw = d["sweep"]
-    check("24 types present", sw["total"] == 24, "got %s" % sw["total"])
+    # 不断言精确总数：新增类型/类别时自检不应假失败；但必须覆盖 24 个手动类型
+    # 且包含系统生成的 target_track，否则目录加载不完整会被漏掉。
+    check("catalogue covers every manual type plus target_track",
+          sw["total"] >= 25 and "target_track" in (sw.get("types") or []),
+          "total=%s types=%s" % (sw.get("total"), sw.get("types")))
     check("no NaN / missing ring", not sw["bad"], "bad=%s" % ", ".join(sw["bad"][:6]))
 
     print("7. FIX regression -- metadata honesty, line style, tooth side, instance labels")
@@ -1131,6 +1223,40 @@ def main() -> int:
           "tiny=%r long=%r fill=%r" % (wt.get("leaked"), wl.get("leaked"), fl.get("leaked")))
     check("FIX-5: marks no longer created as one entity each",
           (wl.get("entities") or 0) <= 2, "entities=%r marks=%r" % (wl.get("entities"), wl.get("marks")))
+
+    print("13. dynamic plot layers -- driven by actual elements")
+    dl = d.get("dynamicLayers") or {}
+    before = dl.get("before") or {}
+    add1 = dl.get("after_add") or {}
+    add2 = dl.get("after_second") or {}
+    custom = dl.get("custom") or {}
+    if before.get("used"):
+        check("registered plot layers match the baseline elements",
+              before.get("used") == before.get("registered"),
+              "used=%r registered=%r" % (before.get("used"), before.get("registered")))
+    else:
+        # 空集合下 both==[] 的等式是恒真的（假断言），所以显式断言"空集不建层"。
+        check("no plot elements -> no plot category layers registered",
+              before.get("registered") == [],
+              "registered=%r" % (before.get("registered"),))
+    check("adding an element registers its category layer",
+          "plot.fire" in (add1.get("registered") or []),
+          "registered=%r" % (add1.get("registered"),))
+    check("the new layer appears in the layer panel",
+          add1.get("panelRow") is True, "panelRow=%r" % (add1.get("panelRow"),))
+    check("a second element does not create a second layer",
+          (add2.get("registered") or []).count("plot.fire") == 1
+          and add2.get("count") == 2,
+          "registered=%r count=%r" % (add2.get("registered"), add2.get("count")))
+    check("an undeclared category still gets a layer (no fixed taxonomy)",
+          custom.get("registered") is True and custom.get("label") == "标绘·custom_ext",
+          "registered=%r label=%r" % (custom.get("registered"), custom.get("label")))
+    check("removing the last element unregisters the layer (set restored)",
+          dl.get("restored") is True,
+          "after_remove=%s" % json.dumps(dl.get("after_remove"), sort_keys=True))
+    check("plot tool offers catalogue categories even when empty",
+          dl.get("category_option") is True, "category_option=%r" % (dl.get("category_option"),))
+
     # 7. Theatre filtering: how many port/airport hotspots the case produced.
     print()
     print("7. theatre facilities -- hotspot port/airport counts")
@@ -1192,9 +1318,9 @@ def main() -> int:
               % (sorted(exempt), sorted(seen), missing))
         check("facility bboxes inside theatre box (or exempt)", not bad, "; ".join(bad[:3]))
 
-    # 8. trajectory window / predicted leg / focus mask.
+    # 8. trajectory window / target-track plot / focus mask.
     print()
-    print("8. trajectory window, predicted leg, focus mask")
+    print("8. trajectory window, target-track plot, focus mask")
     foc_raw = probe(args.url, PROBE_FOCUS)
     if foc_raw.get("evalError"):
         print("probe error: %s" % foc_raw["evalError"])
@@ -1226,14 +1352,18 @@ def main() -> int:
           and base["trailVertexSum"] <= foc["targets_n"] * (win or 0),
           "sum=%r targets=%r window=%r" % (
               base.get("trailVertexSum"), foc.get("targets_n"), win))
-    check("selection settles within the poll budget (predictedPolylines==1)",
+    check("selection settles within the poll budget (trackPlotExists==true)",
           foc.get("select_ok") is True,
           "polls=%r ms=%r last=%s" % (foc.get("select_polls"), foc.get("select_ms"),
                                       json.dumps(foc.get("selected_last"), sort_keys=True)))
-    check("selecting a target yields exactly one predicted polyline",
-          sel.get("predictedPolylines") == 1,
-          "selected=%r polylines=%r" % (sel.get("selected"), sel.get("predictedPolylines")))
-    check("history line stays solid while the predicted leg is separate",
+    check("selecting a target registers exactly one target-track plot element",
+          sel.get("trackPlotExists") is True,
+          "selected=%r exists=%r layer=%r" % (sel.get("selected"), sel.get("trackPlotExists"),
+                                              sel.get("trackPlotLayer")))
+    check("target track is a plot.track element (situation plotting, not a separate entity)",
+          sel.get("trackPlotLayer") == "plot.track" and sel.get("trackPlotPoints") >= 2,
+          "layer=%r points=%r" % (sel.get("trackPlotLayer"), sel.get("trackPlotPoints")))
+    check("history line stays solid while the target-track plot is separate",
           sel.get("historySolid") is True, "historySolid=%r" % (sel.get("historySolid"),))
     check("selected target shows its full trail (max == trailFull > window)",
           isinstance(sel.get("trailFull"), int) and sel.get("trailFull") > (win or 0)
@@ -1248,9 +1378,9 @@ def main() -> int:
     check("focus mask is visible while a target is selected",
           sel.get("maskExists") is True and sel.get("maskShow") is True,
           "maskExists=%r maskShow=%r" % (sel.get("maskExists"), sel.get("maskShow")))
-    check("deselecting removes the predicted polyline",
-          desel.get("predictedPolylines") == 0,
-          "selected=%r polylines=%r" % (desel.get("selected"), desel.get("predictedPolylines")))
+    check("deselecting removes the target-track plot element",
+          desel.get("trackPlotExists") is False,
+          "selected=%r exists=%r" % (desel.get("selected"), desel.get("trackPlotExists")))
     check("focus mask hides after deselect (polled)",
           foc.get("mask_hide_ok") is True,
           "polls=%r ms=%r last=%s" % (foc.get("mask_hide_polls"), foc.get("mask_hide_ms"),
