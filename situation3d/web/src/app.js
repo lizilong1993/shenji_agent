@@ -681,6 +681,8 @@ function initViewer() {
   // 在线三维实景只是登记 viewer，真正的联网在建 tileset 时才发生（见 bindUI），
   // 这样"没配置令牌"的部署不会在开页面时就发一次注定 401 的请求。
   if (window.Buildings3D) Buildings3D.init(viewer);
+  // 本地 3D Tiles 只登记 viewer；tileset 在用户勾选时才开始加载（见 tiles3d.js）。
+  if (window.Local3D) Local3D.init(viewer);
 }
 
 function flyTo(lon, lat, height, pitchDeg) {
@@ -3163,11 +3165,78 @@ function setTerrain(on) {
     if (provider.ready) waitReady(0);
     else waitReady(60);          // 最多等 15 s，等不到也保持可用状态
   } else {
-    viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
-    viewer.scene.globe.depthTestAgainstTerrain = false;
-    state.terrainOn = false;
+    // 互斥解算后另一个地形源可能正生效（网格地形赢、本层被判 false）——
+    // 这时不能把 provider 打回椭球，否则赢家的地形会被后执行的我们抹掉。
+    if (!terrainEffectiveExcept('terrain.model')) {
+      viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+      viewer.scene.globe.depthTestAgainstTerrain = false;
+      state.terrainOn = false;
+    }
     setSwitchNote('地形模型已关闭：使用椭球面，高程不参与渲染。');
   }
+}
+
+/** 除 `exceptId` 外，是否还有地形图层在互斥解算后生效。 */
+function terrainEffectiveExcept(exceptId) {
+  try {
+    const eff = LayerRegistry.resolve();
+    return ['terrain.model', 'terrain.mesh'].some(function (id) {
+      return id !== exceptId && !!eff[id];
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * 台湾 20m DEM（quantized-mesh）地形开关。
+ *
+ * 与 setTerrain() 并列而不是替换：`CesiumTerrainProvider` 只在有数据的区域
+ * （台湾，z0–z14）返回真实高程，区域外 Cesium 按 layer.json 的 available 直接
+ * 判为无数据、不再发请求；需要全球低层地形时切回「地形模型」即可。
+ *
+ * `fromUrl` 返回 Promise。老构建没有静态入口时退回构造器，两者行为一致。
+ * 代次 `terrainMeshToken` 保证"点了又关"时晚到的 provider 不会写进场景。
+ */
+var terrainMeshToken = 0;
+function setTerrainMesh(on) {
+  const token = ++terrainMeshToken;
+  if (!on) {
+    if (!terrainEffectiveExcept('terrain.mesh')) {
+      viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+      viewer.scene.globe.depthTestAgainstTerrain = false;
+      state.terrainOn = false;
+    }
+    setSwitchNote('网格地形已关闭。');
+    return;
+  }
+  setSwitchNote('正在加载台湾 20m 网格地形（quantized-mesh，z0–z14）…');
+  const url = './tiles3d/tw_dem_20m/';
+  let start;
+  try {
+    start = Cesium.CesiumTerrainProvider.fromUrl
+      ? Cesium.CesiumTerrainProvider.fromUrl(url, {
+        requestVertexNormals: true, requestWaterMask: false,
+      })
+      : Promise.resolve(new Cesium.CesiumTerrainProvider({
+        url: url, requestVertexNormals: true, requestWaterMask: false,
+      }));
+  } catch (e) {
+    start = Promise.reject(e);
+  }
+  start.then(function (provider) {
+    if (token !== terrainMeshToken) return;      // 已切走
+    viewer.terrainProvider = provider;
+    viewer.scene.globe.depthTestAgainstTerrain = true;
+    state.terrainOn = true;
+    LayerRegistry.setFeed('terrain.mesh', 'ok', null);
+    setSwitchNote('网格地形已启用：台湾 20m DEM（quantized-mesh，z0–z14）。');
+  }).catch(function (e) {
+    if (token !== terrainMeshToken) return;
+    LayerRegistry.setFeed('terrain.mesh', 'failed',
+      '网格地形加载失败：' + ((e && e.message) || e));
+    setSwitchNote('网格地形加载失败：' + ((e && e.message) || e) + '（保持原地形）。');
+  });
 }
 
 function setWsf3dOverlay(on) {
@@ -4400,6 +4469,8 @@ window.SituationHost = {
       // 在线实景那条链路（默认图层）的取证：断网/无令牌/令牌过期都只能从
       // phase 与 detail 分辨，光看画面是"没有建筑"还是"建筑没加载出来"分不清。
       online: window.Buildings3D ? Buildings3D.debug() : null,
+      // 本地 3D Tiles 的取证：每个数据集是否挂载、已加载瓦片数、失败原因。
+      local3d: window.Local3D ? Local3D.debug() : null,
     };
   },
   setStatus: setStatus,
@@ -4935,7 +5006,13 @@ function bindUI() {
     // 地形/气象：它们原先只是 HTML 复选框（DOM-only），迁移「底图」组时漏了，
     // 现在补进注册表并在这里接上原本 bindCheck 的回调体。
     ['terrain.model', function (v) { setTerrain(v); }],
+    ['terrain.mesh', function (v) { setTerrainMesh(v); }],
     ['weather.model', function (v) { setWeather(v); }],
+    // 本地 3D Tiles（台湾城市实景）。挂/卸逻辑在 src/tiles3d.js，这里只转发意图。
+    ['tiles3d.taipei', function (v) { if (window.Local3D) Local3D.setEnabled('tiles3d.taipei', v); }],
+    ['tiles3d.taichung', function (v) { if (window.Local3D) Local3D.setEnabled('tiles3d.taichung', v); }],
+    ['tiles3d.taoyuan', function (v) { if (window.Local3D) Local3D.setEnabled('tiles3d.taoyuan', v); }],
+    ['tiles3d.tw2024', function (v) { if (window.Local3D) Local3D.setEnabled('tiles3d.tw2024', v); }],
   // B4 选中掩码：开关只改 state.layers.focusMask，重画交给 updateFocusMask()。
   // 必须走注册表 + apply() 的 handler：绕过注册表直接调 setter，会被 apply() 改回去。
   ['overlay.focusMask', function (v) { state.layers.focusMask = v; updateFocusMask(); }],

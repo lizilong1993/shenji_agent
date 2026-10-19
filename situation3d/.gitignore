@@ -26,3 +26,6 @@ tools/shots/
 # 发布的瓦片库（mbtiles）。上传的原始瓦片按库直发，不再摊成文件树——
 # 本机文件系统建小文件只有 17-59 个/秒（见 server/serve.py 的注释）。
 tiles_db/
+
+# 3D Tiles / quantized-mesh 数据集（zip 直发，见 server/serve.py）
+tiles3d_db/
