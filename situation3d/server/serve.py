@@ -498,15 +498,29 @@ TILES3D_TYPES = {
 
 # path -> {"key": (size, mtime_ns), "zf": ZipFile, "root": 顶层前缀}
 _TILES3D_ZIPS = {}
-_TILES3D_LOCK = [None]
+# path -> threading.Lock。**每个 zip 一把锁**，不是全局一把：打开 taizhong
+# 要几十秒，全局锁会把"读已经就绪的 taibei"也一起堵住（实测 13-34 s）。
+_TILES3D_LOCKS = {}
+_TILES3D_META_LOCK = [None]
 
 
-def _tiles3d_lock():
-    global _TILES3D_LOCK
-    if _TILES3D_LOCK[0] is None:
+def _tiles3d_meta_lock():
+    global _TILES3D_META_LOCK
+    if _TILES3D_META_LOCK[0] is None:
         import threading
-        _TILES3D_LOCK[0] = threading.Lock()
-    return _TILES3D_LOCK[0]
+        _TILES3D_META_LOCK[0] = threading.Lock()
+    return _TILES3D_META_LOCK[0]
+
+
+def _tiles3d_lock_for(path):
+    """取（必要时建）该 zip 的专用锁。惰性建锁：导入期不建线程原语。"""
+    with _tiles3d_meta_lock():
+        lock = _TILES3D_LOCKS.get(path)
+        if lock is None:
+            import threading
+            lock = threading.Lock()
+            _TILES3D_LOCKS[path] = lock
+        return lock
 
 
 def tiles3d_dataset(name):
@@ -527,13 +541,11 @@ def tiles3d_sources():
         return []
 
 
-def _tiles3d_zip(path):
+def _tiles3d_zip_locked(path):
     """取（必要时重开）该数据集的 ZipFile，并探测导出包的顶层目录前缀。
 
-    导出工具普遍在 zip 里再套一层与压缩包同名的目录（如 `TAIBEI101/Data/...`）。
-    如果**所有条目都在同一个顶层目录下**，就把那个目录当作 URL 的根，于是
-    `/tiles3d/taibei101/tileset.json` 而不是 `.../TAIBEI101/tileset.json`。
-    调用方必须已持有 _tiles3d_lock()。
+    调用方必须已持有 _tiles3d_lock_for(path)，且**在持有锁期间**完成所有
+    对该 ZipFile 的读取（ZipFile 共用文件句柄，并发读会踩位置）。
     """
     import zipfile
     try:
@@ -572,24 +584,25 @@ def _tiles3d_zip(path):
 
 
 def tiles3d_get(path, rel):
-    """取一个条目，返回 (bytes, content_type, etag)；不存在返回 None。
-
-    ZipFile 的读路径共用同一个文件句柄（seek + read），多线程并发读会互相
-    踩位置，所以整段读取串行化。单个条目是几十 KB 的 glb/json，串行不构成
-    瓶颈；真要更快可以给每个 zip 建句柄池，但没必要先复杂化。
-    """
-    ent = _tiles3d_zip(path)
-    if not ent:
-        return None
-    name = ent["root"] + rel
-    try:
-        with _tiles3d_lock():
+    """取一个条目，返回 (bytes, content_type, etag)；不存在返回 None。"""
+    lock = _tiles3d_lock_for(path)
+    with lock:
+        ent = _tiles3d_zip_locked(path)
+        if not ent:
+            return None
+        name = ent["root"] + rel
+        try:
             info = ent["zf"].getinfo(name)
             data = ent["zf"].read(info)
-    except KeyError:
-        return None
-    except Exception:  # noqa: BLE001 - 坏条目/坏 zip 都回 404，不 500
-        return None
+        except KeyError:
+            # 顶层文件（tileset.json / layer.json）缺失只可能是前缀探测或数据本身
+            # 的问题，值得留一条日志；瓦片级缺失是常态（域外请求），不打。
+            if "/" not in rel:
+                print("[tiles3d] 缺少顶层条目 %s（root=%r）" % (name, ent["root"]),
+                      flush=True)
+            return None
+        except Exception:  # noqa: BLE001 - 坏条目/坏 zip 都回 404，不 500
+            return None
     ext = os.path.splitext(name)[1].lower()
     ctype = TILES3D_TYPES.get(ext) or "application/octet-stream"
     etag = '"%x-%x"' % (info.CRC, info.file_size)
@@ -597,31 +610,34 @@ def tiles3d_get(path, rel):
 
 
 def warm_tiles3d():
-    """启动时后台打开所有 zip，把**中央目录解析**的代价从第一个请求里挪走。
+    """启动时在后台打开所有 zip，把**中央目录解析**的代价从第一个请求里挪走。
 
-    实测（2026-10-19，load ≈ 90）：`ZipFile('taibei101.zip')` 打开要 **19.2 s**
+    实测（2026-10-19，load ≈ 90）：`ZipFile('taibei101.zip')` 打开要 **19-50 s**
     （3.5 GB / 36.4 万条目的中央目录，在慢盘上读+解析），而打开之后单条目读取
     只要 0.01 s。Cesium 打开图层时先取 tileset.json —— 不预热的话用户点开关
-    要干等近 20 s 且没有任何提示。放到启动后台线程里，这段时间就与"等用户点开关"
-    重叠了。
+    要干等几十秒且没有任何提示。
+
+    每个数据集**一个线程**（各自持自己的锁）：顺序预热的话最后一个数据集要等到
+    前四个都开完；并行之后全部就绪的时间约等于最慢的那一个。
     """
     import threading
 
-    def run():
-        for name in tiles3d_sources():
-            path = tiles3d_dataset(name)
-            if not path:
-                continue
-            t0 = time.time()
-            try:
-                with _tiles3d_lock():
-                    _tiles3d_zip(path)
-                print("[tiles3d] 预热 %s 完成（%.1f s）"
-                      % (name, time.time() - t0), flush=True)
-            except Exception as exc:  # noqa: BLE001 - 预热失败不影响其它数据集
-                print("[tiles3d] 预热 %s 失败：%s" % (name, exc), flush=True)
+    def one(name, path):
+        t0 = time.time()
+        try:
+            with _tiles3d_lock_for(path):
+                _tiles3d_zip_locked(path)
+            print("[tiles3d] 预热 %s 完成（%.1f s）"
+                  % (name, time.time() - t0), flush=True)
+        except Exception as exc:  # noqa: BLE001 - 预热失败不影响其它数据集
+            print("[tiles3d] 预热 %s 失败：%s" % (name, exc), flush=True)
 
-    threading.Thread(target=run, name="tiles3d-warm", daemon=True).start()
+    for name in tiles3d_sources():
+        path = tiles3d_dataset(name)
+        if not path:
+            continue
+        threading.Thread(target=one, args=(name, path),
+                         name="tiles3d-warm-" + name, daemon=True).start()
 
 
 def _tdt_slot():
