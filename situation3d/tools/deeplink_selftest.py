@@ -169,8 +169,11 @@ def run_probe(base, query, wait_ms, tmpdir, idx):
     cmd = [sys.executable, INSPECT, "--url", url, "--out", out,
            "--timeout-ms", str(QUEUE_MS),
            "--wait-ms", str(wait_ms), "--eval-async", "--eval", PROBE]
-    # 外层超时 = 队列上限 + 静置 + 浏览器启动/收尾的余量
-    budget = (QUEUE_MS + wait_ms) / 1000.0 + 45
+    # 外层超时 = 队列上限 + 静置 + 浏览器启动/收尾 + **异步 eval 自身的时长**。
+    # 原先只留 45 s，`?overview=1` 的探针要等 26 个 rAF（SwiftShader 下约 10 s）
+    # 再加建第二个 Cesium 视图，实测会顶着 117 s 被外层杀掉；eval 侧 CDP 超时已
+    # 放宽到 150 s，外层必须同步放宽，否则修了里面还是被外面掐。
+    budget = (QUEUE_MS + wait_ms) / 1000.0 + 120
     try:
         subprocess.run(cmd, cwd=ROOT, stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL, timeout=budget)
