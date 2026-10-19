@@ -159,6 +159,62 @@
     coastal_missile: 10.4,
   };
 
+  // ---- 运动姿态 / 车轮节点（2026-10-19，CZML 运动改造） ------------------
+  //
+  // **模型机头在 Cesium 局部系里的轴向**。Cesium 把 glTF 的 Y-up 转成 Z-up：
+  // glTF -Z → 局部 +Y，glTF +X → +X，glTF +Z → -Y。三批资产的建模/导出习惯
+  // 不同，不能套同一个"前方"：
+  //   · 程序化 Blender 资产（build_models.py）：机身/炮管沿 Blender +Y → glTF -Z
+  //     → 局部 **+Y**；
+  //   · Kenney Watercraft（UnityGLTF）：船头沿 glTF +Z → 局部 **-Y**；
+  //   · OGA MiG-15：机身沿 glTF +X → 局部 **+X**；
+  //   · Quaternius 坦克（FBX2glTF）：车身长轴沿局部 **+X**。
+  // 这个轴只影响"姿态四元数如何把机头对上航向"，不影响缩放表。
+  var FORWARD_AXIS = {
+    // 2026-10-19 逐资产标定（俯视、heading=90°，东=屏幕右）：
+    //   · Kenney 船：船头在局部 +X；
+    //   · OGA MiG：机头在局部 -X；
+    //   · Quaternius 坦克：炮管/车头在局部 -Y；
+    //   · Blender 程序化资产（build_models.py：APC/火炮/防空车/岸舰车/预警机/直升机）：
+    //     车头/机头在局部 -X。
+    // 这张表由 tools 下的轴向标定页逐项截图确认；换资产必须重新标定。
+    ship_large: '+X', ship_medium: '+X', ship_cargo: '+X',
+    boat_speed: '+X', boat_tug: '+X', patrol: '+X',
+    fighter: '-X', aew: '-X', helicopter: '-X',
+    armor: '-Y', apc: '-X', artillery: '-X',
+    sam: '-X', coastal_missile: '-X',
+  };
+
+  /** 轮式车辆的轮节点（GLB 节点名与局部旋转轴/半径）。履带式没有轮节点。 */
+  var WHEEL_NODES = {
+    apc: { prefix: 'wheel', count: 8, axis: 'Y', radius: 0.72 },
+    sam: { prefix: 'wheel', count: 6, axis: 'Y', radius: 0.75 },
+    coastal_missile: { prefix: 'wheel', count: 6, axis: 'Y', radius: 0.75 },
+    artillery: { prefix: 'roadwheel', count: 8, axis: 'Y', radius: 0.42 },
+  };
+
+  function forwardAxis(formClass) {
+    return FORWARD_AXIS[formClass] || '+Y';
+  }
+
+  /**
+   * 轮节点列表（GLB 里轮子的实际节点名）。程序化导出把第一个命名为
+   * `wheel`，后续是 `wheel.001` … `wheel.007`，沿用这个命名规则生成。
+   */
+  function wheelNodes(formClass) {
+    var spec = WHEEL_NODES[formClass];
+    if (!spec) return [];
+    var out = [];
+    for (var i = 0; i < spec.count; i++) {
+      out.push({
+        name: i === 0 ? spec.prefix : spec.prefix + '.' + ('00' + i).slice(-3),
+        axis: spec.axis,
+        radius: spec.radius,
+      });
+    }
+    return out;
+  }
+
   /** 该形态模型应设的 scale；缺任一侧数据时返回 null（调用点不加 scale）。 */
   function scaleFor(formClass) {
     var real = REAL_LENGTH_M[formClass];
@@ -218,6 +274,10 @@
     REAL_LENGTH_M: REAL_LENGTH_M,
     MODEL_UNITS: MODEL_UNITS,
     formClassOf: formClassOf,
+    forwardAxis: forwardAxis,
+    wheelNodes: wheelNodes,
+    FORWARD_AXIS: FORWARD_AXIS,
+    WHEEL_NODES: WHEEL_NODES,
     MODEL_MAP: MODEL_MAP,
   };
 }));

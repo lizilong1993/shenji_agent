@@ -100,6 +100,22 @@ for (const k of Object.keys(L.MODEL_MAP)) {
   else { pass++; }
 }
 
+// --- 9. 运动姿态轴 / 车轮节点（2026-10-19 CZML 运动改造新增） ---
+for (const k of Object.keys(L.MODEL_MAP)) {
+  const ax = L.forwardAxis(k);
+  if (['+X', '-X', '+Y', '-Y'].indexOf(ax) >= 0) pass++;
+  else failures.push(k + ' 的 forwardAxis 非法: ' + ax);
+}
+eq(L.forwardAxis('nope'), '+Y', '未知形态 forwardAxis 兜底 +Y');
+eq(L.wheelNodes('apc').length, 8, 'apc 8 个轮节点');
+eq(L.wheelNodes('sam').length, 6, 'sam 6 个轮节点');
+eq(L.wheelNodes('artillery')[0].name, 'roadwheel', 'artillery 轮节点名 roadwheel');
+eq(L.wheelNodes('apc')[7].name, 'wheel.007', 'apc 末轮名 wheel.007');
+eq(L.wheelNodes('ship_large').length, 0, '船没有轮节点');
+eq(L.wheelNodes('armor').length, 0, '履带车没有轮节点');
+eq(L.wheelNodes('apc')[0].axis, 'Y', '轮子绕局部 Y 轴旋转');
+eq(L.wheelNodes('apc')[0].radius > 0, true, '轮半径为正');
+
 console.log(`entityLod 判据：${pass} 通过, ${failures.length} 失败`);
 if (failures.length) {
   failures.forEach(f => console.log('  FAIL ' + f));

@@ -1411,6 +1411,7 @@ function applySituationData(data, caseId) {
       createHotspots();
       createRouteEntities();
       createTargetEntities();
+      attachMotionAndFx(data);
   if (typeof applyTargetLod === "function") applyTargetLod(true);
       applyCamera(data.camera);
 
@@ -1492,6 +1493,8 @@ function teardownScene() {
   if (!viewer) return;
   detachFollow('TS已切换');
   clearTargetSelection();
+  if (window.TargetFx) TargetFx.dispose();
+  if (window.TargetMotion) TargetMotion.dispose(viewer);
   viewer.entities.removeAll();
   redrawPlotsAfterClear();
   state.targets = {};
@@ -2137,6 +2140,9 @@ function createTargetEntities() {
           // 原先 24 与 2D 图标的 34 同量级，会把 3D 恒定成 24 px。
           minimumPixelSize: 6,
           maximumScale: 20000,
+          // 车轮节点旋转（targetFx.js）：只给轮式车辆，节点名/轴/半径来自
+          // EntityLod.WHEEL_NODES；船/飞机/履带车返回 undefined，不改变模型。
+          nodeTransformations: window.TargetFx ? TargetFx.modelNodeTransformations(def) : undefined,
           show: false,
         };
       })(),
@@ -2200,6 +2206,42 @@ function createTargetEntities() {
       lastTick: -1,
     };
   });
+}
+
+/** targetFx.js 需要的只读环境（不在特效模块里直接摸 app.js 的闭包）。 */
+function targetFxApi() {
+  return {
+    isVisible: function (def) { return isVisible(def); },
+    sample: function (id) { return positionFor(id, state.tick); },
+    entity: function (id) { const rec = state.targets[id]; return rec ? rec.entity : null; },
+    clockTime: function () { return viewer ? viewer.clock.currentTime : null; },
+    playing: function () { return !!state.playing; },
+    cameraHeight: cameraHeightMeters,
+  };
+}
+
+/**
+ * 装载 CZML 运动源并初始化特效。
+ *
+ * 实体先由 createTargetEntities() 建好，CZML 采样属性在异步 load 完成后挂上去
+ * （见 targetMotion.js）。特效与运动都从 viewer.clock 取时间，而 viewer.clock
+ * 由 loop() 里的 tickFloat 每帧同步，三条链路共用同一个时间源。
+ */
+function attachMotionAndFx(data) {
+  if (window.TargetFx) {
+    try { TargetFx.init(viewer, data, targetFxApi()); }
+    catch (e) { console.warn('[fx] 初始化失败：', e); }
+  }
+  if (window.TargetMotion) {
+    TargetMotion.load(viewer, data).then(function (st) {
+      if (!st || state.data !== data) return;
+      markScene('czml-ready');
+    }).catch(function (e) {
+      // CZML 装载失败时保留 createTargetEntities 里的 CallbackProperty 兜底位置，
+      // 功能退化但场景不空。
+      console.warn('[czml] 装载失败，保留逐帧位置：', e);
+    });
+  }
 }
 
 function createRouteEntities() {
@@ -4532,7 +4574,15 @@ function applyFollowFrame(force) {
     setStatus('目标 ' + f.id + ' 已到达航路终点，跟随保持', 'ok');
   }
 
-  const pos = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
+  // 跟随用 CZML 在**当前时钟**的位置，而不是整数帧坐标：否则模型在帧间平滑
+  // 移动、相机却每 tick 跳一步，近景会出现模型在画面里轻微前后蹭。
+  let pos = null;
+  try {
+    if (rec.entity && rec.entity.position) {
+      pos = rec.entity.position.getValue(viewer.clock.currentTime);
+    }
+  } catch (e) { pos = null; }
+  if (!pos) pos = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
   if (!force && f.last && Cesium.Cartesian3.distance(pos, f.last) < 0.5) return;
   if (!f.last) f.last = new Cesium.Cartesian3();
   Cesium.Cartesian3.clone(pos, f.last);
@@ -4703,6 +4753,11 @@ function loop(nowMs) {
     }
   }
 
+  // 运动/特效与时间轴同源：先把连续帧号写进 Cesium 时钟，CZML 采样再按该
+  // 时刻插值；特效在同一帧读取同一个时钟。
+  if (window.TargetMotion) TargetMotion.syncClock(state.tickFloat);
+  if (window.TargetFx) TargetFx.frame(dt);
+
   if (RenderGovernor.take()) syncEntities();
 
   // 相机静止时 camera.changed 不会再触发，而它第一次触发时场景可能尚未渲染
@@ -4741,6 +4796,7 @@ function reloadSituation() {
   createHotspots();
   createRouteEntities();
   createTargetEntities();
+  attachMotionAndFx(state.data);
   if (typeof applyTargetLod === "function") applyTargetLod(true);
   updateOccupationAreas();
   renderHotspotTable();
@@ -4799,6 +4855,9 @@ window.SituationHost = {
   relationsDebug: relationsDebug,
   selectTarget: function (id, fly) { selectTarget(id || null, !!fly); },
   viewer: function () { return viewer; },
+  // 运动/特效取证：CZML 采样数、时钟、尾流/尾气/轮角状态。
+  motionDebug: function () { return window.TargetMotion ? TargetMotion.stats() : null; },
+  fxDebug: function () { return window.TargetFx ? TargetFx.debug() : null; },
   // 取证用：建筑体块的短路条件逐条报出来。`?buildings=1` 不生效时，
   // "到底卡在哪个 return"光看结果猜不出来。
   // 注意这里**从 DOM 现取**复选框，不用 dom 缓存：实测两者会不一致
