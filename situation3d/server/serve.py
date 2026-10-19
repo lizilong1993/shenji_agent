@@ -246,7 +246,104 @@ SITUATION_DEFAULT = env("SITUATION_DEFAULT") or None
 _SITUATIONS_CACHE = {"key": None, "body": None}
 # 持久化的那一份：让**重启服务后的第一个请求**也是毫秒级（内存缓存随进程消失）。
 # 放 /tmp 而不是 web/data：这是服务端的派生数据，不该被当作项目数据文件。
-_SITUATIONS_INDEX_PATH = "/tmp/situation3d_situations_index.json"
+_SITUATION_INDEX_PATH = "/tmp/situation3d_situations_index.json"
+
+# 案例分片缓存（core / inference）。理由见 _case_parts()：39.6 MB 的案例里
+# inference_frames 占 35 MB，首屏不需要它；但**不能让每次请求都重新解析**，
+# 所以首次解析后把两个分片写到 /tmp，重启后直接读字节。
+CASE_PARTS_DIR = "/tmp/situation3d_case_parts"
+_CASE_PARTS = {}
+_CASE_PARTS_LOCK = [None]
+
+
+def _case_parts_lock():
+    global _CASE_PARTS_LOCK
+    if _CASE_PARTS_LOCK[0] is None:
+        import threading
+        _CASE_PARTS_LOCK[0] = threading.Lock()
+    return _CASE_PARTS_LOCK[0]
+
+
+def _write_case_part(path, data):
+    """原子写；失败只当没写成（内存缓存仍然有效）。"""
+    try:
+        os.makedirs(CASE_PARTS_DIR, exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _case_parts(path):
+    """把案例拆成 (core, inference) 两份 JSON 字节。
+
+    core = 原文档去掉 `inference_frames`；inference = 那一帧数组本身。
+    前端先拿 core 立即渲染场景，再后台取 inference 补右侧 TS 面板 ——
+    首屏不必等 35 MB 的推理帧。
+    """
+    lock = _case_parts_lock()
+    with lock:
+        try:
+            st = os.stat(path)
+        except OSError:
+            raise IOError("案例文件不可读")
+        key = "%x-%x" % (st.st_size, st.st_mtime_ns)
+        ent = _CASE_PARTS.get(path)
+        if ent and ent["key"] == key:
+            return ent
+
+        import hashlib
+        stem = hashlib.sha1(path.encode("utf-8")).hexdigest()[:12] + "-" + key
+        core_p = os.path.join(CASE_PARTS_DIR, stem + ".core.json")
+        inf_p = os.path.join(CASE_PARTS_DIR, stem + ".inference.json")
+        if os.path.isfile(core_p) and os.path.isfile(inf_p):
+            with open(core_p, "rb") as fh:
+                core = fh.read()
+            with open(inf_p, "rb") as fh:
+                inf = fh.read()
+        else:
+            with open(path, "r") as fh:
+                doc = json.load(fh)
+            frames = None
+            if isinstance(doc, dict):
+                frames = doc.pop("inference_frames", None)
+            core = json.dumps(doc, ensure_ascii=False).encode("utf-8")
+            inf = json.dumps(frames if frames is not None else [],
+                             ensure_ascii=False).encode("utf-8")
+            _write_case_part(core_p, core)
+            _write_case_part(inf_p, inf)
+
+        ent = {"key": key, "core": core, "inference": inf}
+        _CASE_PARTS[path] = ent
+        return ent
+
+
+def warm_case_parts():
+    """启动后台把每个案例的 core/inference 分片准备好（每个 ~8 s，解析一次）。"""
+    import threading
+
+    def run():
+        try:
+            names = sorted(os.listdir(SITUATIONS_DIR))
+        except OSError:
+            return
+        for name in names:
+            if not name.endswith(".json"):
+                continue
+            full = os.path.join(SITUATIONS_DIR, name)
+            if not os.path.isfile(full):
+                continue
+            t0 = time.time()
+            try:
+                _case_parts(full)
+                print("[situations] 分片预热 %s 完成（%.1f s）"
+                      % (name, time.time() - t0), flush=True)
+            except Exception as exc:      # noqa: BLE001 - 预热失败不影响其它案例
+                print("[situations] 分片预热 %s 失败：%s" % (name, exc), flush=True)
+
+    threading.Thread(target=run, name="case-parts-warm", daemon=True).start()
 
 
 def _situations_key():
@@ -332,6 +429,30 @@ def _build_situations_index(names, listed):
         "errors": errors,
         "dir": os.path.relpath(SITUATIONS_DIR, WEB_ROOT),
     }
+
+
+def _case_file_for_id(cid):
+    """案例 id → 文件绝对路径。**不重新解析案例**：复用索引缓存/持久化索引。"""
+    if not cid or "/" in cid or "\\" in cid:
+        return None
+    body = _SITUATIONS_CACHE["body"]
+    if body is None:
+        key, names, listed = _situations_key()
+        body = _read_persisted_situations(key)
+        if body is None:
+            body = _build_situations_index(names, listed)
+            _write_persisted_situations(key, body)
+        _SITUATIONS_CACHE["key"] = key
+        _SITUATIONS_CACHE["body"] = body
+    for c in body.get("cases") or []:
+        if c.get("id") != cid:
+            continue
+        rel = c.get("file") or ""
+        if not rel.startswith("data/situations/"):
+            return None
+        full = os.path.join(SITUATIONS_DIR, os.path.basename(rel))
+        return full if os.path.isfile(full) else None
+    return None
 
 
 def _read_persisted_situations(key):
@@ -815,13 +936,31 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _send_json(self, obj, status=200):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self._send_json_bytes(body, status)
+
+    def _send_json_bytes(self, body, status=200):
+        """发 JSON 字节；≥1 KB 且客户端支持时 gzip（案例 core 从 4.6 MB 降到几百 KB）。"""
+        enc = None
+        wants = "gzip" in (self.headers.get("Accept-Encoding") or "")
+        if wants and status == 200 and len(body) >= 1024:
+            buf = io.BytesIO()
+            with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=6, mtime=0) as gz:
+                gz.write(body)
+            body = buf.getvalue()
+            enc = "gzip"
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        if enc:
+            self.send_header("Content-Encoding", enc)
+            self.send_header("Vary", "Accept-Encoding")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         # HTTP/1.1 keep-alive: the body must be written to keep the socket
         # framing valid, exactly like _send_head does for files.
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def _read_json_body(self):
         try:
@@ -904,6 +1043,25 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if path == "/api/situations":
             self._api_situations()
+            return
+        if path == "/api/situation":
+            # 案例分片：?id=<case_id>&part=core|inference。前端先 core 后 inference，
+            # 首屏不再等整包 39.6 MB（inference_frames 占 35 MB）。
+            cid = (query or {}).get("id") or ""
+            part = (query or {}).get("part") or "core"
+            if part not in ("core", "inference"):
+                self._send_json({"error": "part 只能是 core 或 inference"}, 400)
+                return
+            full = _case_file_for_id(cid)
+            if not full:
+                self._send_json({"error": "未知案例：%s" % cid}, 404)
+                return
+            try:
+                parts = _case_parts(full)
+            except Exception as exc:      # noqa: BLE001
+                self._send_json({"error": "案例解析失败：%s" % exc}, 500)
+                return
+            self._send_json_bytes(parts[part])
             return
         if path == "/api/health":
             self._api_health()
@@ -1525,6 +1683,13 @@ def main() -> int:
         threading.Thread(target=warm_situations_index, daemon=True).start()
     except Exception as exc:            # noqa: BLE001
         print("[situations] 预热线程未启动：%s" % exc, flush=True)
+
+    # 案例分片（core/inference）同样后台预热：每个案例解析一次 ~8 s，放在首请求里
+    # 就会变成"打开案例等 8 秒"。
+    try:
+        warm_case_parts()
+    except Exception as exc:            # noqa: BLE001
+        print("[situations] 分片预热线程未启动：%s" % exc, flush=True)
 
     # 3D Tiles 的 zip 中央目录解析要 ~20 s/个（见 warm_tiles3d 的注释），同样放后台。
     try:

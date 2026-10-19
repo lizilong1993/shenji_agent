@@ -748,12 +748,63 @@ function loadCase(caseId) {
   if (!entry) throw new Error('未知案例: ' + caseId);
 
   setStatus('加载TS数据…');
-  return fetch('./' + entry.file, { cache: 'no-store' })
+  // 2026-10-19：案例拆成 core / inference 两个分片（见 serve.py 的 _case_parts）。
+  // taiwan_landing.json 39.6 MB 里 inference_frames 占 35 MB / 1441 帧，而首屏
+  // 渲染只需要 targets/frames。先拿 core 立即出场景，inference 在后台补进右栏；
+  // 接口不可用时（旧服务、直接开静态文件）回退整包，行为与以前一致。
+  return fetch('/api/situation?id=' + encodeURIComponent(caseId) + '&part=core',
+               { cache: 'no-store' })
     .then(function (r) {
-      if (!r.ok) throw new Error('TS数据加载失败: HTTP ' + r.status);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     })
-    .then(function (data) { return applySituationData(data, caseId); });
+    .then(function (data) {
+      applySituationData(data, caseId);
+      state.inference = null;
+      if (dom.rlNote) dom.rlNote.textContent = '推理结果加载中…';
+      // 不 return：推理帧后台加载，loadCase 在 core 应用完就 resolve（首屏不等它）。
+      loadCaseInference(caseId);
+      return data;
+    })
+    .catch(function (splitErr) {
+      console.warn('[situations] 分片接口不可用，回退整包：', splitErr);
+      return fetch('./' + entry.file, { cache: 'no-store' })
+        .then(function (r) {
+          if (!r.ok) throw new Error('TS数据加载失败: HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (data) { return applySituationData(data, caseId); });
+    });
+}
+
+/**
+ * 后台取推理帧并补进场景状态。
+ *
+ * 只做"补数据"：场景、实体、时间轴已经由 core 建好；这里完成后刷新右栏与
+ * 目标状态面板。切走案例时（state.caseId 变了）丢弃晚到的结果。
+ */
+function loadCaseInference(caseId) {
+  return fetch('/api/situation?id=' + encodeURIComponent(caseId) + '&part=inference',
+               { cache: 'no-store' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function (arr) {
+      if (state.caseId !== caseId) return;          // 已切换案例
+      state.inference = Array.isArray(arr) ? arr : (arr && arr.inference_frames) || null;
+      if (state.data && !state.data.inference_frames) {
+        state.data.inference_frames = state.inference;
+      }
+      updateInferenceUi();
+      markScene('inference');
+      setStatus('TS已更新（推理帧已载入）', 'ok');
+    })
+    .catch(function (e) {
+      if (state.caseId !== caseId) return;
+      if (dom.rlNote) dom.rlNote.textContent = '推理结果加载失败：' + e.message;
+      if (window.console && console.warn) console.warn('[inference] 加载失败', e);
+    });
 }
 
 /**
