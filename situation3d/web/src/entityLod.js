@@ -1,28 +1,25 @@
 /**
- * 目标（车/船/飞机）的 2D 图标 ⇄ 3D 模型切换（按视点高度）。
+ * 目标 2D 图标 ⇄ 3D 模型切换（按视点高度）与**型号 → 资产**解析。
  *
- * 需求（用户 2026-10-10，2026-10-19 修订阈值）：
- *   - 2D 图标只在视点高度**高于**阈值时显示；
- *   - 高度低于约 **3000 m** 后，把 2D 图标换成 3D 模型。
+ * 2026-10-20 重构：资产从"按平台大类的低模"升级为"按具体型号的高模"，
+ * 并保留大类回退。资产来源见 web/assets/models/CREDITS.md：
+ *   - Sketchfab CC-BY / Free Standard 实机模型（054A/071/Perry/99A/M1A2/
+ *     F-16C/歼-16/阵风/E-2D/直-10/MQ-9/PL-03 等），经 Blender 减面、贴图压缩、
+ *     按公开全长缩放到 **1 单位 = 1 米**；
+ *   - 无公开资产的型号（056A/903/磐石/沱江/基隆/红旗-16/鹰击-62）由
+ *     tools/modelgen/build_custom.py 按公开尺寸自建。
  *
- * 为什么单独一个模块、而不写进 app.js
- * ----------------------------------
- * 切换判据是**纯函数**（高度 + 当前形态 -> 目标形态），把它与 Cesium 场景隔离后
- * 就能用 Node 直接跑用例（本机无前端测试框架）。tools/entity_lod_test.js 就是
- * 这套用例；decide() 里不允许出现任何 Cesium 依赖。
+ * 因此：**所有模型 scale 都是 1、机头/舰艏一律 +Y**（Blender +Y → glTF -Z →
+ * Cesium 局部 +Y）。旧版的"真实长度 ÷ 资产单位长度"缩放表与逐资产 FORWARD_AXIS
+ * 已删除——资产在生成阶段就归一，运行时不再做尺度/朝向补偿。
  *
- * 阈值与滞回
- * ----------
- *   - **下降**到 3000 m 及以下 -> 转 3D；
- *   - **上升**须超过 3600 m -> 才转回 2D（20% 迟滞）。
- * 两个阈值（而非一个）是为了**滞回**：单阈值时相机在阈值附近抖动会让形态反复
- * 切换，而 headless 软渲染下 rAF 只有约 2.7 fps，每次切换都要装卸模型，代价尤其高。
+ * 选型规则（用户 2026-10-20）：
+ *   1. 先用 def.model（如"052D 型驱逐舰"）匹配精确型号；
+ *   2. 没有精确资产就回退到 formClassOf() 得到的**大类模型**；
+ *   3. 连大类也判不出 -> null，保留 2D 图标。
  *
- * 3000 m 是用户给出的初值（"低于约 3000 米"），仍属**可调参数**：改就改这里的
- * 常量，别散落到调用点；entity_lod_test.js 用 DEFAULTS 本身做边界断言。
- *
- * 跨栈提醒：本模块只管「形态」，不管图层顺序。标绘/目标的 z 序在
- * layerRegistry.js（见那里的文件头：Cesium 没有跨栈的统一 z）。
+ * 判据 decide() 仍是纯函数，tools/entity_lod_test.js 直接跑 Node 用例。
+ * 阈值与滞回见 DEFAULTS：低于 3000 m 进 3D，高于 3600 m 回 2D（20% 迟滞）。
  */
 (function (root, factory) {
   var api = factory();
@@ -42,11 +39,8 @@
   /**
    * 纯判据：给定高度与当前形态，返回**应该**处于的形态。
    *
-   * 设计要点：
-   *   - 高度非法（NaN/undefined/负数）时**保持当前形态**，不抛异常也不乱切——
-   *     相机尚未初始化时 height 可能是 undefined，那时切到 3D 是错的。
-   *   - 滞回：已在 3D 时要**高于** exit3d 才回 2D；已在 2D 时要**低于** enter3d
-   *     才去 3D。两个条件都严格，避免等高时反复。
+   * - 高度非法（NaN/undefined/负数）时保持当前形态；
+   * - 滞回：已在 3D 时要高于 exit3d 才回 2D；已在 2D 时要低于 enter3d 才去 3D。
    */
   function decide(heightMeters, currentMode, cfg) {
     var c = cfg || DEFAULTS;
@@ -69,200 +63,177 @@
     return { mode: MODE_ICON, changed: false, reason: 'above-enter3d' };
   }
 
-  /**
-   * 目标类型 -> 3D 模型 URL。**找不到就返回 null**，调用点据此保留 2D 图标。
-   *
-   * 2026-10-19 起覆盖海/陆/空全部 15 类目标中的 13 个形态：
-   *   · 海面：Kenney Watercraft Kit（CC0，既有 5 个模型 + 巡逻舰复用快艇）
-   *   · 坦克：Quaternius Animated Tanks（CC0，含行进/转向动画）
-   *   · 战斗机：OpenGameArt "Mig"（CC0，由 .blend 转 glb）
-   *   · 预警机/直升机/装甲车/自行火炮/防空发射车/岸舰导弹车：由
-   *     `tools/modelgen/build_models.py` 程序化生成（Blender 无头，米制建模，
-   *     旋翼/雷达带 glTF 动画）。许可证见 web/assets/models/LICENSE-*。
-   *
-   * 映射只按「形态类别」而非具体型号：实体带真实型号参数（052D、054A…），但这些
-   * CC0/低模资产不足以表达具体型号；型号级替换是后续「重点细化」的范畴。
-   */
+  /** 大类 -> 资产。**每个大类都必须有回退**，新类别进来时靠它兜底。 */
   var MODEL_MAP = {
-    // 海面（Kenney CC0 水运套件，既有）
-    ship_large: './assets/models/ship-large.glb',
-    ship_medium: './assets/models/ship-small.glb',
-    ship_cargo: './assets/models/ship-cargo-a.glb',
-    boat_speed: './assets/models/boat-speed-a.glb',
-    boat_tug: './assets/models/boat-tug-a.glb',
-    patrol: './assets/models/boat-speed-a.glb',
-    // 地面/空中（2026-10-19 新增：Quaternius CC0 坦克 + OGA CC0 MiG-15 +
-    // tools/modelgen 程序化生成的同风格低模。许可证见 web/assets/models/LICENSE-*）
-    fighter: './assets/models/fighter.glb',
-    aew: './assets/models/awacs.glb',
-    helicopter: './assets/models/helicopter.glb',
-    armor: './assets/models/armor.glb',
-    apc: './assets/models/apc.glb',
-    artillery: './assets/models/artillery.glb',
-    sam: './assets/models/sam_launcher.glb',
-    coastal_missile: './assets/models/coastal_missile.glb',
+    // 水面
+    destroyer: './assets/models/type_052c.glb',
+    frigate: './assets/models/type_054a.glb',
+    corvette: './assets/models/type_056a.glb',
+    patrol: './assets/models/type_056a.glb',
+    amphibious: './assets/models/type_071.glb',
+    replenishment: './assets/models/type_903.glb',
+    boat_speed: './assets/models/type_056a.glb',
+    // 地面
+    tank: './assets/models/type_ztz99a.glb',
+    light_tank: './assets/models/type_ztz99a.glb',
+    amphibious_vehicle: './assets/models/type_ztd05.glb',
+    spg: './assets/models/type_plz05.glb',
+    howitzer: './assets/models/type_m777.glb',
+    mlrs: './assets/models/type_phl03.glb',
+    sam: './assets/models/type_hq9.glb',
+    anti_ship: './assets/models/type_yj62.glb',
+    truck: './assets/models/type_eq240.glb',
+    // 空中
+    fighter: './assets/models/type_j16.glb',
+    aew: './assets/models/type_kj2000.glb',
+    helicopter: './assets/models/type_z10.glb',
+    uav: './assets/models/type_mq9.glb',
   };
-
-  function modelUrlFor(formClass) {
-    return MODEL_MAP[formClass] || null;
-  }
 
   /**
-   * 各形态的**真实长度（米）**，以及资产的最长轴（**单位**，实测自 GLB 包围盒）。
-   *
-   * 为什么需要这张表：Kenney 这类 low-poly 包**不按米制建模**——`ship-large.glb`
-   * 的最长轴只有 **13.1 单位**。Cesium 的 `Entity.model` 默认 **1 单位 = 1 米**，
-   * 所以不设 `scale` 时，一艘驱逐舰会被当成 **13.1 m** 的船（真实约 155 m，差一个
-   * 数量级）。这会让模型小到 24 px 以下，于是被 `minimumPixelSize` **恒定夹在 24 px**，
-   * 「按高度切换 2D/3D」在视觉上就失去意义——阈值也就无从定稿。
-   *
-   * 所以：**按形态给出真实长度，除以资产单位长度得到 scale**。数值来源是公开的
-   * 舰艇全长量级（取整到 5 m），**是量级而非精确型别尺寸**——本批资产是民用
-   * low-poly，本来也表达不了具体型号（见 MODEL_MAP 注释）。
+   * 精确型号 -> 资产。匹配对象是 def.model（缺失时再看 platform_class + name）。
+   * 顺序敏感：更具体的写在前面。注释里的"近似"是公开资产缺失时的同族替代，
+   * 不是同型号——换资产时请同步改这里。
    */
-  var REAL_LENGTH_M = {
-    ship_large: 155,    // 驱逐舰量级（052D 约 157 m）
-    ship_medium: 135,   // 护卫舰量级（054A 约 134 m）
-    ship_cargo: 130,    // 补给/运输舰量级（登陆舰同量级）
-    boat_speed: 35,     // 导弹艇量级（沱江级约 65 m，快艇更短，取 35）
-    boat_tug: 30,       // 拖船
-    patrol: 65,         // 巡逻舰/轻护（沱江级约 65 m）
-    // 地面/空中：程序化模型按米建模，导入资产按公开量级取整
-    fighter: 10.1,      // MiG-15 全长 10.1 m
-    aew: 46.6,          // E-3 量级全长
-    helicopter: 17.7,   // AH-64 量级全长（含旋翼）
-    armor: 9.5,         // 主战坦克含炮管量级
-    apc: 7.7,           // 轮式装甲车
-    artillery: 11.0,    // 自行火炮含炮管
-    sam: 12.0,          // 防空导弹发射车
-    coastal_missile: 10.4, // 岸舰导弹发射车
-  };
+  var TYPE_RULES = [
+    // 水面舰
+    [/054a/i, 'type_054a'],
+    [/903|综合补给/i, 'type_903'],
+    [/071|船坞登陆/i, 'type_071'],
+    [/056a|轻型护卫|江岛/i, 'type_056a'],
+    [/成功级|perry|佩里/i, 'type_perry'],
+    [/沱江|tuo.?chiang|ta.?chiang/i, 'type_tuochiang'],
+    [/基隆|kidd/i, 'type_kidd'],
+    [/磐石|panshi/i, 'type_panshi'],
+    // 052D 无公开可下载资产，用同族 052C 近似（文中注释、README 同步说明）
+    [/052d|luyang.?iii/i, 'type_052c'],
+    // 地面
+    [/99a|ztz-?99/i, 'type_ztz99a'],
+    [/m1a2/i, 'type_m1a2'],
+    [/cm-?11|m48/i, 'type_m48a5'],
+    [/15\s*式|type.?15|ztq-?15/i, 'type_ztz99a'],
+    [/05\s*式|ztd-?05|zbd-?05/i, 'type_ztd05'],
+    [/plz-?05/i, 'type_plz05'],
+    [/m109/i, 'type_m109a6'],
+    [/m777/i, 'type_m777'],
+    [/phl-?03/i, 'type_phl03'],
+    [/红旗-?9|hq-?9/i, 'type_hq9'],
+    [/红旗-?16|hq-?16|ly-?80/i, 'type_hq16'],
+    [/爱国者|patriot|pac-?3/i, 'type_pac3'],
+    [/鹰击-?62|yj-?62/i, 'type_yj62'],
+    [/运输|车队|ural|卡车|truck|eq240|东风/i, 'type_eq240'],
+    // 空中
+    [/歼-?16|j-?16|su-?30/i, 'type_j16'],
+    [/f-?16/i, 'type_f16c'],
+    [/idf|经国|f-?ck-?1/i, 'type_idf'],
+    [/阵风|rafale/i, 'type_rafale'],
+    // 空警-500 无公开资产，用 KJ-2000（同为中方预警机）近似
+    [/空警-?500|kj-?500/i, 'type_kj2000'],
+    [/e-?2|鹰眼|hawkeye/i, 'type_e2d'],
+    [/直-?10|z-?10/i, 'type_z10'],
+    [/无人机|uav|drone|mq-?9|翼龙|彩虹/i, 'type_mq9'],
+    [/直-?9|z-?9|米-?17|mi-?17|黑鹰|uh-?60/i, 'type_z10'],
+  ];
 
-  // 资产最长轴（单位）。**实测值**，来自解 GLB accessor 的 min/max。
-  // 换了资产必须同步更新，否则尺度会错——entity_lod_test.js 会校验这张表与
-  // MODEL_MAP 的键集合一致。
-  var MODEL_UNITS = {
-    ship_large: 13.1,
-    ship_medium: 10.6,
-    ship_cargo: 10.5,
-    boat_speed: 3.9,
-    boat_tug: 3.5,
-    patrol: 3.9,          // 与 boat_speed 同一资产
-    // 2026-10-19 实测（Blender 导出的世界包围盒最长轴，单位）
-    fighter: 3.75,
-    aew: 40.7,
-    helicopter: 16.78,
-    armor: 17.216,
-    apc: 7.7,
-    artillery: 11.007,
-    sam: 10.575,
-    coastal_missile: 10.4,
-  };
-
-  // ---- 运动姿态 / 车轮节点（2026-10-19，CZML 运动改造） ------------------
-  //
-  // **模型机头在 Cesium 局部系里的轴向**。Cesium 把 glTF 的 Y-up 转成 Z-up：
-  // glTF -Z → 局部 +Y，glTF +X → +X，glTF +Z → -Y。三批资产的建模/导出习惯
-  // 不同，不能套同一个"前方"：
-  //   · 程序化 Blender 资产（build_models.py）：机身/炮管沿 Blender +Y → glTF -Z
-  //     → 局部 **+Y**；
-  //   · Kenney Watercraft（UnityGLTF）：船头沿 glTF +Z → 局部 **-Y**；
-  //   · OGA MiG-15：机身沿 glTF +X → 局部 **+X**；
-  //   · Quaternius 坦克（FBX2glTF）：车身长轴沿局部 **+X**。
-  // 这个轴只影响"姿态四元数如何把机头对上航向"，不影响缩放表。
-  var FORWARD_AXIS = {
-    // 2026-10-19 逐资产标定（俯视、heading=90°，东=屏幕右）：
-    //   · Kenney 船：船头在局部 +X；
-    //   · OGA MiG：机头在局部 -X；
-    //   · Quaternius 坦克：炮管/车头在局部 -Y；
-    //   · Blender 程序化资产（build_models.py：APC/火炮/防空车/岸舰车/预警机/直升机）：
-    //     车头/机头在局部 -X。
-    // 这张表由 tools 下的轴向标定页逐项截图确认；换资产必须重新标定。
-    ship_large: '+X', ship_medium: '+X', ship_cargo: '+X',
-    boat_speed: '+X', boat_tug: '+X', patrol: '+X',
-    fighter: '-X', aew: '-X', helicopter: '-X',
-    armor: '-Y', apc: '-X', artillery: '-X',
-    sam: '-X', coastal_missile: '-X',
-  };
-
-  /** 轮式车辆的轮节点（GLB 节点名与局部旋转轴/半径）。履带式没有轮节点。 */
-  var WHEEL_NODES = {
-    apc: { prefix: 'wheel', count: 8, axis: 'Y', radius: 0.72 },
-    sam: { prefix: 'wheel', count: 6, axis: 'Y', radius: 0.75 },
-    coastal_missile: { prefix: 'wheel', count: 6, axis: 'Y', radius: 0.75 },
-    artillery: { prefix: 'roadwheel', count: 8, axis: 'Y', radius: 0.42 },
-  };
-
-  function forwardAxis(formClass) {
-    return FORWARD_AXIS[formClass] || '+Y';
+  function normText(s) {
+    return String(s || '').toLowerCase();
   }
 
-  /**
-   * 轮节点列表（GLB 里轮子的实际节点名）。程序化导出把第一个命名为
-   * `wheel`，后续是 `wheel.001` … `wheel.007`，沿用这个命名规则生成。
-   */
-  function wheelNodes(formClass) {
-    var spec = WHEEL_NODES[formClass];
-    if (!spec) return [];
-    var out = [];
-    for (var i = 0; i < spec.count; i++) {
-      out.push({
-        name: i === 0 ? spec.prefix : spec.prefix + '.' + ('00' + i).slice(-3),
-        axis: spec.axis,
-        radius: spec.radius,
-      });
+  /** 精确型号资产；无匹配返回 null。 */
+  function exactModelUrl(def) {
+    if (!def || typeof def !== 'object') return null;
+    var text = normText(def.model) + ' ' + normText(def.platform_class) + ' ' +
+      normText(def.name) + ' ' + normText(def.icon);
+    for (var i = 0; i < TYPE_RULES.length; i++) {
+      if (TYPE_RULES[i][0].test(text)) return './assets/models/' + TYPE_RULES[i][1] + '.glb';
     }
-    return out;
-  }
-
-  /** 该形态模型应设的 scale；缺任一侧数据时返回 null（调用点不加 scale）。 */
-  function scaleFor(formClass) {
-    var real = REAL_LENGTH_M[formClass];
-    var units = MODEL_UNITS[formClass];
-    if (!real || !units) return null;
-    return real / units;
+    return null;
   }
 
   /**
-   * 由实体定义推断形态类别。**只做保守映射**：拿不准就返回 null（保留 2D）。
-   *
-   * def.form 若由数据显式给出则优先用它；否则按 domain + 平台类别粗判。
+   * 解析资产 URL。参数可以是：
+   *   - def 对象：精确型号 -> 大类 -> null；
+   *   - 大类字符串（旧调用/测试）：直接查 MODEL_MAP。
+   */
+  function modelUrlFor(arg) {
+    if (typeof arg === 'string') return MODEL_MAP[arg] || null;
+    var exact = exactModelUrl(arg);
+    if (exact) return exact;
+    return MODEL_MAP[formClassOf(arg)] || null;
+  }
+
+  /**
+   * 运行时缩放：资产都按米归一，所以恒为 1。保留函数是为了 app.js 的调用契约
+   * （返回 undefined 时不写 scale 属性）。
+   */
+  function scaleFor(arg) {
+    if (typeof arg === 'string') return MODEL_MAP[arg] ? 1 : null;
+    if (!arg) return null;
+    return modelUrlFor(arg) ? 1 : null;
+  }
+
+  /**
+   * 由实体定义推断**大类**（资产回退用）。只做保守映射：拿不准返回 null。
    */
   function formClassOf(def) {
     if (!def) return null;
     if (def.form && MODEL_MAP[def.form]) return def.form;
     var d = String(def.domain || '').toLowerCase();
-    var p = String(def.platform_class || '') + String(def.icon || '');
+    var p = String(def.platform_class || '') + ' ' + String(def.icon || '') + ' ' +
+      String(def.model || '');
 
-    // 空中（2026-10-19 起有资产）。判序：预警机（圆盘）→ 直升机（旋翼）→ 战斗机。
     if (d === 'air') {
       if (/预警|aew|awacs/i.test(p)) return 'aew';
-      if (/直升机|helicopter|rotor|武装直升机/i.test(p)) return 'helicopter';
-      if (/战斗机|歼击机|fighter|air.?superiority|多用途/i.test(p)) return 'fighter';
+      if (/直升机|helicopter|rotor|旋翼/i.test(p)) return 'helicopter';
+      if (/无人机|uav|drone|侦察机/i.test(p)) return 'uav';
+      if (/战斗机|歼击机|fighter|air.?superiority|多用途|阵风|rafale/i.test(p)) return 'fighter';
       return null;
     }
-    // 地面：岸舰导弹必须排在"导弹/防空"之前判，否则会被 SAM 的规则截走。
     if (d === 'land') {
-      if (/岸舰|岸防|coastal|anti.?ship/i.test(p)) return 'coastal_missile';
-      if (/防空|地空|sam|surface.?to.?air/i.test(p)) return 'sam';
-      if (/炮兵|火炮|artillery|howitzer/i.test(p)) return 'artillery';
-      if (/两栖战车|步战|步兵战车|apc|ifv|amphibious/i.test(p)) return 'apc';
-      if (/装甲|坦克|armor|tank|机步/i.test(p)) return 'armor';
+      // 岸舰导弹必须在"防空"之前判，否则"导弹"会把它截走。
+      if (/岸舰|岸防|coastal|anti.?ship/i.test(p)) return 'anti_ship';
+      if (/防空|地空|sam|surface.?to.?air|爱国者|红旗/i.test(p)) return 'sam';
+      if (/火箭炮|mlrs|phl/i.test(p)) return 'mlrs';
+      if (/榴弹炮|howitzer|m777/i.test(p)) return 'howitzer';
+      if (/炮兵|火炮|artillery|自行炮|plz/i.test(p)) return 'spg';
+      if (/两栖战车|两栖突击|步战|步兵战车|apc|ifv|aav|zbd|ztd/i.test(p)) return 'amphibious_vehicle';
+      if (/运输|车队|卡车|truck|logistic/i.test(p)) return 'truck';
+      if (/15\s*式|轻型坦克|light.?tank|ztq/i.test(p)) return 'light_tank';
+      if (/装甲|坦克|armor|tank|机步/i.test(p)) return 'tank';
       return null;
     }
     if (d !== 'sea' && d !== 'naval' && d !== 'maritime') return null;
-    if (/货|补给|cargo|transport|登陆|两栖舰|landing/i.test(p)) return 'ship_cargo';
-    if (/快艇|导弹艇|patrol.?boat|missile.?boat/i.test(p)) return 'boat_speed';
-    if (/拖|tug/i.test(p)) return 'boat_tug';
-    // 实测（??case=taiwan_landing，31 个目标）拿到的 platform_class 只有「驱逐舰/护卫舰/
-    // 补给舰」这类**类别词**，没有「052D」这种型号串——所以按类别词给形态：驱逐舰取大舰，
-    // 护卫舰取中舰。判具体型号要等资产能表达型号（见 MODEL_MAP 注释）。
-    if (/驱逐舰|destroyer/i.test(p)) return 'ship_large';
-    if (/护卫舰|巡防舰|frigate|corvette/i.test(p)) return 'ship_medium';
-    if (/巡逻舰|patrol|轻护/i.test(p)) return 'patrol';
-    if (/舰|ship/i.test(p)) return /大|large|基隆/i.test(p) ? 'ship_large' : 'ship_medium';
+    // 登陆/两栖必须先于补给判：实测数据里 071 的 icon 是 "replenishment"。
+    if (/登陆|两栖|landing|amphibious|071/i.test(p)) return 'amphibious';
+    if (/补给|replenish|oiler|903/i.test(p)) return 'replenishment';
+    if (/巡逻|轻护|导弹艇|corvette|patrol|056|沱江/i.test(p)) return 'corvette';
+    if (/驱逐|destroyer/i.test(p)) return 'destroyer';
+    if (/护卫|frigate/i.test(p)) return 'frigate';
+    if (/舰|ship|艇|boat/i.test(p)) return 'frigate';
     return null;
   }
+
+  /**
+   * 资产生成时艏/头朝 Blender +Y。实测 Cesium 1.145 的模型局部轴映射是
+   * glTF +Z -> 局部 +X（东）、glTF +X -> 局部 +Y（北），而 Blender +Y 导出为
+   * glTF -Z，所以**模型艏/头落在 Cesium 局部 -X**。
+   * targetFx/targetMotion 用这张表把"局部前向"对到航向；必须返回 '-X'，
+   * 否则所有目标会横着走（2026-10-20 用轴向测试 GLB 在 8848 上实测）。
+   */
+  function forwardAxis() {
+    return '-X';
+  }
+
+  /** 新资产没有可命名的轮节点（轮子烘焙在车身网格里），返回空表。 */
+  function wheelNodes() {
+    return [];
+  }
+
+  // 兼容旧引用：这两张表已不再参与计算（资产是米制、scale=1）。
+  var REAL_LENGTH_M = {};
+  var MODEL_UNITS = {};
+  var FORWARD_AXIS = {};
+  var WHEEL_NODES = {};
 
   return {
     MODE_ICON: MODE_ICON,
@@ -270,14 +241,16 @@
     DEFAULTS: DEFAULTS,
     decide: decide,
     modelUrlFor: modelUrlFor,
+    exactModelUrl: exactModelUrl,
     scaleFor: scaleFor,
-    REAL_LENGTH_M: REAL_LENGTH_M,
-    MODEL_UNITS: MODEL_UNITS,
     formClassOf: formClassOf,
     forwardAxis: forwardAxis,
     wheelNodes: wheelNodes,
+    MODEL_MAP: MODEL_MAP,
+    TYPE_RULES: TYPE_RULES,
+    REAL_LENGTH_M: REAL_LENGTH_M,
+    MODEL_UNITS: MODEL_UNITS,
     FORWARD_AXIS: FORWARD_AXIS,
     WHEEL_NODES: WHEEL_NODES,
-    MODEL_MAP: MODEL_MAP,
   };
 }));

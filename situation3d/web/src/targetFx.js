@@ -51,7 +51,7 @@
   }
 
   function hasModel(def) {
-    return !!(window.EntityLod && window.EntityLod.modelUrlFor(formClassOf(def)));
+    return !!(window.EntityLod && window.EntityLod.modelUrlFor(def));
   }
 
   function isSea(def) {

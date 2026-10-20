@@ -2020,17 +2020,17 @@ function isVisible(def) {
 // 「关了目标图层」和「离得远」变成同一件事，无法分别推理。所以这里只写
 // billboard.show / model.show，**不碰 isVisible**，避免与既有通路打架。
 
-/** 该目标模型应设的 scale（真实长度 ÷ 资产单位长度）；拿不准返回 undefined。 */
+/** 模型 scale：资产已按米归一，恒为 1；判不出模型时返回 undefined。 */
 function modelScaleForTarget(def) {
   if (!window.EntityLod || !window.EntityLod.scaleFor) return undefined;
-  const s = window.EntityLod.scaleFor(window.EntityLod.formClassOf(def));
+  const s = window.EntityLod.scaleFor(def);
   return (s && isFinite(s) && s > 0) ? s : undefined;
 }
 
 /** 该目标要用的 3D 模型 URL；拿不准返回 null（保留 2D）。 */
 function modelUrlForTarget(def) {
   if (!window.EntityLod) return null;
-  return window.EntityLod.modelUrlFor(window.EntityLod.formClassOf(def));
+  return window.EntityLod.modelUrlFor(def);
 }
 
 /** 当前相机高度（米）。取不到时返回 undefined —— decide() 会保持现状。 */
@@ -2138,15 +2138,12 @@ function createTargetEntities() {
         targetHasModel[def.id] = true;   // 供 applyTargetLod 判断，不读 Property
         return {
           uri: url,
-          // **必须给 scale**：Kenney 资产不按米制建模（ship-large 最长轴仅 13.1
-          // 单位），Cesium 默认 1 单位 = 1 米，不缩放时驱逐舰被当成 13 m 的船，
-          // 于是恒被 minimumPixelSize 夹住、「按高度切换」失去视觉意义。
-          // 尺度表在 entityLod.js（按形态给真实长度 ÷ 资产单位长度）。
+          // 新资产在 tools/modelgen 管线里已按公开全长归一为 **1 单位 = 1 米**
+          // （舰长/机长/车长含炮管），所以 scale 恒为 1；保留调用是为了兼容
+          // scaleFor() 的契约（拿不准时返回 undefined，不写 scale）。
           scale: modelScaleForTarget(def),
-          // 阵营着色：按 affiliation 做**混合着色**（MIX, 0.35），保留模型自身的
-          // 材质/纹理层次，又让红方/蓝方在低空一眼可分。对 Kenney 那批依赖外部
-          // colormap.png 的资产，这层着色同时兜住"贴图缺失时整片白膜"的观感
-          // （贴图已补齐，见 web/assets/models/Textures/colormap.png）。
+          // 阵营着色：按 affiliation 做**混合着色**（MIX, 0.2），保留模型自身的
+          // 材质/纹理层次，又让红方/蓝方在低空一眼可分。
           color: color,
           colorBlendMode: Cesium.ColorBlendMode.MIX,
           colorBlendAmount: 0.2,
