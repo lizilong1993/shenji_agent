@@ -215,13 +215,23 @@
       // 而 `globeHidden` 是**场景副作用**，还带保存/恢复语义 —— 放进去反而更绕。
       // 之所以要删掉那行：**一条不生效的声明比没有声明更危险** —— 将来有人以为注册表
       // 管着它，把 `buildings3d.js` 里的两行删了，冲突就会悄悄回来。
-      exclusives: ['buildings.blocks'],
+      exclusives: ['buildings.blocks', 'tiles3d.tw_coastal'],
     },
     {
       id: 'buildings.blocks', kind: 'primitive', z: 30, default: false,
       label: '建筑体块（三维，本机离线）', group: '底图',
       checkbox: 'modelBuildings',
-      exclusives: ['tiles.google3d'],
+      exclusives: ['tiles.google3d', 'tiles3d.tw_coastal'],
+    },
+    {
+      // 2026-10-20 新增：台湾沿海 15 个 AOI 的 LOD1 白膜（OSM 轮廓 + GBA 高度，
+      // 114,785 栋，b3dm 瓦片）。数据为 tiles3d_db/tw_coastal.zip，由 serve.py 直发。
+      // 默认关：15 套子 tileset 的解析与根瓦片加载不应拖慢首屏。
+      // bbox 取 15 AOI 外包范围（含澎湖）；打开时相机飞到台湾全岛概览。
+      id: 'tiles3d.tw_coastal', kind: 'primitive', z: 40, default: false,
+      label: '台湾沿海白膜（LOD1）', group: '底图', checkbox: 'modelTwCoastal',
+      bbox: [119.520, 22.320, 121.910, 25.200],
+      exclusives: ['tiles.google3d', 'buildings.blocks'],
     },
 
 

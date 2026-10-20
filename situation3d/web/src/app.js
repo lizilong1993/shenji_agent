@@ -625,6 +625,9 @@ function initViewer() {
         applyBuildingsVisibility(want);
       } else if (id === 'tiles.google3d') {
         setOnlineTilesetVisible(want);
+      } else if (id === 'tiles3d.tw_coastal') {
+        // 本地白膜瓦片：挂/卸交给 tiles3d.js，意图与顺序仍归注册表。
+        if (window.Local3D) Local3D.setEnabled('tiles3d.tw_coastal', want);
       }
     },
     label: function (id, want) {
@@ -1948,6 +1951,14 @@ function setSwitch(id, on) {
   const lid = layerIdForCheckbox(id);
   if (lid) {
     LayerRegistry.setDesired(lid, on);
+    applyLayers();
+    return;
+  }
+  // 兜底：调用方（applyLayerCommand）传的是**图层 id**（面板生成的图层没有
+  // DOM 节点、checkbox 字段也可能是惰性的）。不兜底时「全部显示/恢复默认」
+  // 对这些图层静默无效。
+  if (LayerRegistry.def && LayerRegistry.def(id)) {
+    LayerRegistry.setDesired(id, on);
     applyLayers();
   }
 }

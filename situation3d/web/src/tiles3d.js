@@ -46,6 +46,11 @@
       label: 'TW2024 三维样例',
       url: './tiles3d/tw2024/tileset.json',
     },
+    // 2026-10-20：OSM 轮廓 + GBA 高度生成的 15 个沿海 AOI LOD1 白膜（tw_coastal.zip）。
+    'tiles3d.tw_coastal': {
+      label: '台湾沿海白膜（LOD1）',
+      url: './tiles3d/tw_coastal/tileset.json',
+    },
   };
 
   /**
