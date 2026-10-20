@@ -269,10 +269,12 @@
       group: 'TS图层', default: true },
     { id: 'layerOverview', kind: 'situation', z: 30, label: '鸟瞰图',
       group: 'TS图层', default: false },
-    // 方向 2：占领区域。引擎逐帧下发 frames[i]["occupation"]，主视图面图元
-    // 与小地图掩码都由 app.js 的 handler 驱动（不经过 plotting.js）。
-    { id: 'situation.occupation', kind: 'plot', z: 85, label: '占领区域',
-      group: 'TS图层', default: true },
+    // 方向 2：占领区域 —— **已下线**（2026-10-20 用户要求，显示与功能一并停用）。
+    // 原实现：引擎逐帧下发 frames[i]["occupation"]，主视图面图元与小地图掩码由
+    // app.js 的 handler 驱动。恢复时取消下面这行的注释，并恢复 app.js 里的
+    // occupation handler / updateOccupationAreas 实现。
+    // { id: 'situation.occupation', kind: 'plot', z: 85, label: '占领区域',
+    //   group: 'TS图层', default: true },
 
     // 可见目标按阵营拆成两行（需求：红方目标 / 蓝方目标）；两行是对同一个
     // `state.layers.targets` 的**分面视图**，总开关语义由 app.js 的 handler

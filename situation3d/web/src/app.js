@@ -641,6 +641,10 @@ function initViewer() {
   // 漏了这一步的表现是"add() 成功、但场景里没有任何东西"（实测 0 个实体），
   // 而且不报错：drawOne 里的 `if (!viewer) return 0` 是静默返回。
   if (window.Plotting) Plotting.bind(viewer);
+  // 热点/占领由帧号驱动重建，但**初始的图层意图在下面才写入**：先把开关置开，
+  // 否则首帧的 createHotspots() 会因 layers.hotspots=false 建出空集合，
+  // 而后的 key（帧号+开关+数量）不再变化，热点就永远不出现（实测）。
+  state.layers.hotspots = true;
   // 标绘图层由**实际存在的标绘要素**动态驱动：Plotting 每次增删改后通知这里，
   // 由 syncPlotLayers() 增删对应的 kind:'plot' 图层（见该函数的说明）。
   if (window.Plotting && Plotting.onChange) {
@@ -2447,15 +2451,16 @@ function computeHotspots() {
     const c = cells[key];
     const lat = c.pts.reduce(function (s, p) { return s + p.lat; }, 0) / c.pts.length;
     const lon = c.pts.reduce(function (s, p) { return s + p.lon; }, 0) / c.pts.length;
-    // 半径 = 簇内接触点最大偏离 + 双方影响半径的折中，限制在 20–120 km
+    // 半径 = 簇内接触点的空间散度 + 余量；上限收到 80 km——之前 120 km 的圆
+    // 在战区级视图上几乎盖住半个海峡，反而看不出"热点在哪里"。
     let maxD = 0;
     c.pts.forEach(function (p) {
       maxD = Math.max(maxD, relKm({ lat: lat, lon: lon }, p));
     });
-    const radiusKm = Math.max(20, Math.min(120, maxD * 1.6 + 20));
+    const radiusKm = Math.max(15, Math.min(80, maxD * 1.3 + 12));
     const engageN = c.contacts.filter(function (x) { return x === 'engage'; }).length;
-    const name = (engageN > 0 ? '交火区' : '对峙区') + ' ' + Math.round(lat * 10) / 10 + '°N '
-      + Math.round(lon * 10) / 10 + '°E';
+    // 名称只写性质：坐标就写在图上，写进标签只是噪声。
+    const name = engageN > 0 ? '交火区' : '对峙区';
     const ring = circleRing(lat, lon, radiusKm, 28);
     return { id: key, name: name, center: [lat, lon], radiusKm: radiusKm,
              score: c.score, contacts: c.pts.length, engaging: engageN,
@@ -2466,7 +2471,41 @@ function computeHotspots() {
              }) };
   });
   out.sort(function (a, b) { return b.score - a.score; });
-  return out.slice(0, HOTSPOT_MAX);
+  // ---- 合并重叠簇 ----
+  // 网格聚合按 0.35° 切分，同一片交战区常被切成两三个相邻格，各自画一个
+  // 30–60 km 的圆互相大面积重叠，读起来像"两个不同的交火区"，其实是同一处。
+  // 这里做一次贪心吸收：后者的圆心落进前者的圆内（或反之）就并入前者——
+  // 圆心按强度加权、半径取能同时包住两者的最小半径（距离 + 对方半径）。
+  const merged = [];
+  out.forEach(function (h) {
+    for (let i = 0; i < merged.length; i++) {
+      const m = merged[i];
+      const d = relKm({ lat: m.center[0], lon: m.center[1] },
+                       { lat: h.center[0], lon: h.center[1] });
+      if (d <= m.radiusKm || d + h.radiusKm <= m.radiusKm) {
+        const wSum = m.score + h.score;
+        const lat = (m.center[0] * m.score + h.center[0] * h.score) / wSum;
+        const lon = (m.center[1] * m.score + h.center[1] * h.score) / wSum;
+        m.center = [lat, lon];
+        m.radiusKm = Math.min(100, Math.max(m.radiusKm, d + h.radiusKm) * 0.85);
+        m.score += h.score;
+        m.contacts += h.contacts;
+        m.engaging += h.engaging;
+        m.merged = (m.merged || 1) + 1;
+        return;
+      }
+    }
+    merged.push(h);
+  });
+  merged.forEach(function (m) {
+    m.feature = ringToFeature(circleRing(m.center[0], m.center[1], m.radiusKm, 28), {
+      kind: 'hotspot', level: m.engaging > 0 ? 'engage' : 'proximity',
+      score: Math.round(m.score * 10) / 10, radiusKm: m.radiusKm,
+      merged: m.merged || 1,
+    });
+  });
+  merged.sort(function (a, b) { return b.score - a.score; });
+  return merged.slice(0, HOTSPOT_MAX);
 }
 
 /**
@@ -2513,12 +2552,14 @@ function rebuildDynamicAreas(force) {
   // 结果集本身就进 key：开局时 inference 往往还没就绪，强度全 0 → 热点为空；
   // 只在帧号/开关上判断会让"数据到了但没重建"永久空着（实测）。
   const spots = computeHotspots();
-  const areas = computeOccupationArea();
-  const setKey = key + '#' + spots.length + ':' + areas.length;
+  const setKey = key + '#' + spots.length;
   if (!force && setKey === _dynAreasKey) return;
   _dynAreasKey = setKey;
   rebuildHotspotEntities(spots);
-  rebuildOccupationEntities(areas);
+  // ⚠ 「占领区域」已按用户要求**整块下线**（2026-10-20）：图层、渲染、小地图掩码
+  // 与要素列表都不再创建。`computeOccupationArea` / `rebuildOccupationEntities`
+  // 保留未删，确认不再需要时可整段删除；恢复方式：去掉此注释并恢复图层行。
+  // rebuildOccupationEntities(areas);
 }
 
 /** 圆 → 贴地多边形（经纬度近似）。 */
@@ -2561,26 +2602,16 @@ function rebuildHotspotEntities(spots) {
           return a.concat([p[0], p[1]]); }, [])),
         width: 2, clampToGround: true, material: color,
       },
+      // 热点**不写文字**：面本身已经说明了位置和范围，名称只在图层要素列表里
+      // 用于定位；图上再写一遍只会和密集的目标标牌抢空间。
       position: Cesium.Cartesian3.fromDegrees(hs.center[1], hs.center[0]),
-      label: {
-        text: hs.name,
-        font: '13px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
-        fillColor: color,
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 1.5,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString('rgba(255,255,255,0.82)'),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        scaleByDistance: new Cesium.NearFarScalar(50000, 1.0, 1500000, 0.0),
-      },
     });
     entity.hsData = hs;
     state.hotspotEntities.push(entity);
   });
   state.hotspotRows = spots.map(function (hs, i) {
     return { key: 'hotspot-' + i, name: hs.name, level_label: hs.engaging > 0 ? '交火' : '对峙',
-             score: hs.score, radiusKm: hs.radiusKm };
+             score: hs.score, radiusKm: hs.radiusKm, center: hs.center };
   });
   if (window.LayerPanel) LayerPanel.invalidate();
 }
@@ -2633,7 +2664,7 @@ function createHotspots() {
   // 之后 updateOccupationAreas 又因 key 未变而跳过。
   _dynAreasKey = null;
   rebuildHotspotEntities();
-  rebuildOccupationEntities();
+  // 占领区域已下线（原 rebuildOccupationEntities 调用）
 }
 
 /** 方向 4 取证出口：动态热点数量（旧数据字段已不适用，保留结构）。 */
@@ -2678,13 +2709,15 @@ function markScene(reason) {
 //   规则    被更高优先级的矩形压住就隐藏这一帧（**不删除实体**，只置 show）
 //   代价    每帧约 N 次 worldToWindowCoordinates（N≈60），按 200 ms 节流
 //
-// 被隐藏的标签记在 `_declutterHid` 里，下一轮先全部恢复再重新判定——
-// 否则相机一停，被隐藏的标签永远不会回来。
+// 被隐藏的标签：label 对象 -> 连续"仍然不重叠"的轮数。
+// 规则是**一重叠就藏、连续两轮不重叠才恢复**——既满足"隐藏直到不重叠"，
+// 也避免两个标签在边界附近互相顶掉造成闪烁。
 
-var _declutterHid = [];
+var _declutterHidden = new WeakMap();
 var _declutterLastMs = 0;
-var DECLUTTER_THROTTLE_MS = 180;
+var DECLUTTER_THROTTLE_MS = 150;
 var DECLUTTER_PAD = 2;
+var DECLUTTER_CLEAR_PASSES = 2;
 
 /**
  * 估一个标签的屏幕矩形（Cesium 没给 label 的包围盒，按字号与字数近似）。
@@ -2717,19 +2750,14 @@ function declutterLabels(force) {
   if (!force && now - _declutterLastMs < DECLUTTER_THROTTLE_MS) return null;
   _declutterLastMs = now;
 
-  // 先恢复上一轮被我们隐藏的标签。
-  for (var k = 0; k < _declutterHid.length; k++) {
-    try { _declutterHid[k].show = true; } catch (e) { /* 实体已移除 */ }
-  }
-  _declutterHid.length = 0;
-
   var time = viewer.clock.currentTime;
   var items = [];
 
   Object.keys(state.targets).forEach(function (id) {
     var rec = state.targets[id];
     var ent = rec && rec.entity;
-    if (!ent || !ent.show || !ent.label || !ent.label.show) return;
+    if (!ent || !ent.show || !ent.label) return;
+    // ⚠ 这里**不看 label.show**：它可能正是上一轮被我们关掉的。
     var text = ent.label.text;
     text = (text && text.getValue) ? text.getValue() : text;
     if (!text) return;
@@ -2753,29 +2781,42 @@ function declutterLabels(force) {
     items.push({ label: e.label, text: text, size: 12, pri: 2, w: w, offY: 0, vc: true });
   });
 
-  // 优先级高者先占位；同优先级按屏幕纵向排序，让靠上的先留。
   items.sort(function (a, b) { return (b.pri - a.pri) || (a.w.y - b.w.y); });
 
   var placed = [];
-  var hidden = 0;
+  var hidden = 0, shown = 0;
   items.forEach(function (it) {
     var r = labelRect(it.w, it.text, it.size, it.offY, it.vc);
-    // 视窗外的标签直接隐藏（省 GPU 也避免边缘重叠）。
+    var fits = true;
     if (it.w.x < -r.w || it.w.y < -r.h ||
         it.w.x > viewer.canvas.clientWidth + r.w || it.w.y > viewer.canvas.clientHeight + r.h) {
-      it.label.show = false; _declutterHid.push(it.label); hidden++; return;
-    }
-    for (var i = 0; i < placed.length; i++) {
-      if (rectsOverlap(r, placed[i])) {
-        it.label.show = false;
-        _declutterHid.push(it.label);
-        hidden++;
-        return;
+      fits = false;                          // 视窗外同样按"不可见"处理
+    } else {
+      for (var i = 0; i < placed.length; i++) {
+        if (rectsOverlap(r, placed[i])) { fits = false; break; }
       }
     }
-    placed.push(r);
+
+    if (fits) {
+      var n = (_declutterHidden.get(it.label) || 0) + 1;
+      if (_declutterHidden.has(it.label) && n < DECLUTTER_CLEAR_PASSES) {
+        // 刚空出来一轮还不够：继续藏，防抖。
+        _declutterHidden.set(it.label, n);
+        it.label.show = false; hidden++;
+        return;
+      }
+      _declutterHidden.delete(it.label);
+      it.label.show = true; shown++;
+      placed.push(r);
+    } else {
+      _declutterHidden.set(it.label, 0);
+      it.label.show = false; hidden++;
+    }
   });
-  return { total: items.length, shown: placed.length, hidden: hidden };
+
+  return { total: items.length, shown: shown, hidden: hidden,
+           relHidden: relView.ents.filter(function (e) {
+             return e.label && _declutterHidden.has(e.label); }).length };
 }
 
 function refreshPredictEntity(id) {
@@ -2800,7 +2841,10 @@ function syncEntities() {
       && targetHasModel[id]);
 
     rec.entity.show = visible;
-    rec.entity.label.show = visible && state.layers.labels;
+    // 标签避让的隐藏是**另一层状态**：syncEntities 每次脏帧都会重写 show，
+    // 不乘上它就会把隐藏的标签重新点亮（实测表现为标牌闪烁）。
+    rec.entity.label.show = visible && state.layers.labels
+      && !_declutterHidden.has(rec.entity.label);
     // 图标始终显示（模型形态抬到头顶），原因见 applyTargetBillboardAnchor。
     rec.entity.billboard.show = visible;
     applyTargetBillboardAnchor(rec.entity, useModel);
@@ -3029,27 +3073,14 @@ function occupationFrame() {
 }
 
 /**
- * Direction 2: paint one face per hotspot from the frame's compact occupation
- * map. Called from syncEntities() on every markScene (tick advance, data load,
- * layer toggle), and the same map is pushed to the minimap mask.
+ * 占领区域：**已下线**（2026-10-20 用户要求，显示与功能一并停用）。
+ *
+ * 原实现按目标影响圆逐帧重建贴地面，并把阵营状态推给鸟瞰图掩码。现在整块功能
+ * 不再调用；保留空函数是为了让 syncEntities、图层 handler 等旧调用点无需全部改动，
+ * 恢复时把 `rebuildOccupationEntities/computeOccupationArea` 的调用放回即可。
  */
 function updateOccupationAreas() {
-  // 占领区现在由 rebuildOccupationEntities() 按目标影响圆动态重建，
-  // 每帧只做一次"是否需要重建"的判断（帧号/过滤/图层开关）。
-  rebuildDynamicAreas(false);
-  // 小地图掩码：把**动态占领区**（按阵营）推给 Overview。原来喂的是数据集
-  // 预设热点名 → 状态映射，与新的动态占领区已经不是一套东西。
-  if (window.Overview && Overview.updateOccupation) {
-    const areas = computeOccupationArea();
-    const byId = {};
-    areas.forEach(function (a) { byId[a.id] = a.side; });
-    const hotspots = (state.occupationEntities || []).map(function (e) {
-      const a = areas.filter(function (x) { return x.id === e.occTarget; })[0];
-      return { name: e.occTarget, side: a ? a.side : 'neutral',
-               bbox: a ? [a.lon - 0.01, a.lat - 0.01, a.lon + 0.01, a.lat + 0.01] : null };
-    }).filter(function (h) { return !!h.bbox; });
-    Overview.updateOccupation(state.tick, byId, hotspots, !!state.layers.occupation);
-  }
+  // no-op（占领区域已下线）
 }
 
 /**
@@ -3057,35 +3088,8 @@ function updateOccupationAreas() {
  * current frame, its histogram, and the minimap mask readings.
  */
 function occupationDebug() {
-  // 占领区改为按目标影响圆动态重建后，取证读数直接数**场景里的图元**：
-  // 每侧可见数、半径统计、掩码读数。
-  const list = state.occupationEntities || [];
-  const counts = { red: 0, blue: 0, contested: 0, neutral: 0 };
-  const sides = {};
-  list.forEach(function (e) {
-    const a = e.occTarget;
-    let side = null;
-    Object.keys(state.targets).some(function (id) {
-      if (id !== a) return false;
-      side = state.targets[id].def.affiliation;
-      return true;
-    });
-    if (side === 'red') counts.red++;
-    else if (side === 'blue') counts.blue++;
-  });
-  const ov = (window.Overview && Overview.occupationMaskDebug)
-    ? Overview.occupationMaskDebug() : null;
-  for (const k of ['red', 'blue', 'contested', 'neutral']) counts[k] = counts[k] || 0;
-  return {
-    tick: state.tick,
-    dynamic: true,
-    statuses: {},
-    counts: counts,
-    entities: list.length,
-    visible: list.filter(function (e) { return !!e.show; }).length,
-    maskVertices: ov ? ov.vertices : 0,
-    maskTick: ov ? ov.tick : null,
-  };
+  // 占领区域已下线：只报"未启用"，不再读图元。
+  return { tick: state.tick, enabled: false, entities: 0, visible: 0 };
 }
 
 function syncSelection() {
@@ -3380,7 +3384,21 @@ function renderHotspotIntents() {
  * "位置信息"按钮回到光标跟随模式。
  */
 function selectHotspot(index, fly) {
-  const hs = state.data.hotspots[index];
+  // 热点现在是**动态生成**的：先取当前帧的热点行，找不到再退回数据集预设
+  // （旧数据集/旧链接仍可能带 index）。
+  const row = (state.hotspotRows || [])[index];
+  if (row && row.center) {
+    detachFollow('热点区域跳转');
+    state.activeHotspot = index;
+    state.geoPinned = true;
+    if (dom.geoRegion) dom.geoRegion.textContent = row.name;
+    if (fly) flyTo(row.center[1], row.center[0], (row.radiusKm || 40) * 3000);
+    state.hotspotRows.forEach(function (rec, i) {
+      if (rec.row) rec.row.classList.toggle('active', i === index);
+    });
+    return;
+  }
+  const hs = state.data && state.data.hotspots && state.data.hotspots[index];
   if (!hs) return;
   detachFollow('热点区域跳转');
 
@@ -3565,6 +3583,8 @@ function relAddLine(from, to, dashed, color, text) {
   var alt = Math.max(0, (Number(from.alt) || 0) + (Number(to.alt) || 0)) / 2;
   // 过远的关联只画线不写字（见 REL_LABEL_MAX_KM）。
   if (relKm(from, to) > REL_LABEL_MAX_KM) text = '';
+  // **没有文字就不建 label 实体**：空字符串的标签在 Cesium 里仍占一个图元，
+  // 也会让"每个实体都有标签"的统计变得没有意义。
   var ent = viewer.entities.add({
     polyline: {
       positions: Cesium.Cartesian3.fromDegreesArrayHeights(
@@ -3574,8 +3594,10 @@ function relAddLine(from, to, dashed, color, text) {
         ? new Cesium.PolylineDashMaterialProperty({ color: color, dashLength: 16 })
         : new Cesium.ColorMaterialProperty(color),
     },
-    position: Cesium.Cartesian3.fromDegrees((from.lon + to.lon) / 2, (from.lat + to.lat) / 2, alt),
-    label: {
+    position: text
+      ? Cesium.Cartesian3.fromDegrees((from.lon + to.lon) / 2, (from.lat + to.lat) / 2, alt)
+      : undefined,
+    label: text ? {
       text: text, font: '12px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
       fillColor: color, style: Cesium.LabelStyle.FILL,
       showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('#ffffffd9'),
@@ -3586,7 +3608,7 @@ function relAddLine(from, to, dashed, color, text) {
       // 拉远后标签自然淡出，避免战区级视图上标签挤成一片（线仍然可见）。
       translucencyByDistance: new Cesium.NearFarScalar(300000, 1.0, 900000, 0.0),
       scaleByDistance: new Cesium.NearFarScalar(150000, 1.0, 700000, 0.75),
-    },
+    } : undefined,
   });
   ent.show = !!relView.show;
   relView.ents.push(ent);
@@ -3622,7 +3644,7 @@ var PAIR_ZH = { lead: '长机', wingman: '僚机' };
 /**
  * 关系文案。
  *
- * 友方（同一编队）：`协同 · 长机→僚机`；同阵营不同编队：`友邻 · 同属红方`。
+ * 友方：编队内写 `协同 · 长机→僚机`；同阵营其余目标**不写字**（绿线已表达本方）。
  * 敌方：不再只写"敌对 XX km"，而是把**系统实际具备的**证据说清楚：
  *   · 进入交战射程（双方 engage 半径之和）→ `交战威胁 · 距离 X km`
  *   · 仅进入影响/探测范围 → `探测跟踪 · 距离 X km`
@@ -3630,21 +3652,41 @@ var PAIR_ZH = { lead: '长机', wingman: '僚机' };
  * 队伍代号（air-red-1 等）只用于内部，不再直接展示。
  */
 function relText(kind, evidence, fromDef, toDef, km) {
-  var f = fromDef && fromDef.affiliation === 'red' ? '红方' : '蓝方';
   if (kind === 'own') {
     var fr = relAttr(fromDef, 'pair_role'), tr = relAttr(toDef, 'pair_role');
     if (fr && tr) {
+      // 只有**编队内**的协同关系值得写出来（长机/僚机是数据里真实存在的字段）。
       return '协同 · ' + (PAIR_ZH[fr] || fr) + '→' + (PAIR_ZH[tr] || tr);
     }
-    return '友邻 · 同属' + f;
+    // 同阵营但没有编队字段：绿线已经表达了"本方"，不再写字。
+    return '';
   }
   var d = Math.round(km);
   var verb = evidence === 'measured' ? '交战威胁' : '探测跟踪';
   return verb + ' · 距离 ' + d + ' km';
 }
 
-function refreshRelations() {
+var _relKey = null;
+
+/**
+ * 关系线只在**相关内容变化**时重建：选中目标、帧号、过滤开关。
+ *
+ * 原先它挂在每次 syncEntities 后面，而 syncEntities 每个脏帧都会跑（播放时
+ * 每帧一次）。整组线被清掉重建，标签也随之销毁重建——正好和标签避让的隐藏
+ * 状态打架，表现为标牌闪烁、关系文字一闪一闪。
+ */
+function relationsKey() {
+  return [state.selected || '', state.tick,
+          state.filters.red ? 1 : 0, state.filters.blue ? 1 : 0,
+          state.filters.sea ? 1 : 0, state.filters.land ? 1 : 0,
+          state.filters.air ? 1 : 0].join('|');
+}
+
+function refreshRelations(force) {
   if (!window.Cesium || !viewer || !state || !state.targets) return;
+  var key = relationsKey();
+  if (!force && key === _relKey) return;
+  _relKey = key;
   relClear();
   var sid = state.selected;
   if (!sid || !state.targets[sid]) return;
@@ -3693,7 +3735,7 @@ function refreshRelations() {
 function setRelationsVisible(on) {
   relView.show = !!on;
   relView.ents.forEach(function (e) { e.show = !!on; });
-  if (on) refreshRelations();
+  if (on) refreshRelations(true);
 }
 
 // Activity state: the code(s) the UI is actually showing right now, taken from
@@ -3839,7 +3881,7 @@ function selectTarget(id, fly, height) {
   syncSelection();
   renderTargetCounts();
   renderTargetStatus(id);
-  refreshRelations();
+  refreshRelations(true);
   // The banner shows the operation's phase plus the selected unit's own phase when
   // the two differ, so it has to be refreshed on selection - otherwise picking a
   // unit that lags leaves the previous unit's comparison on screen.
@@ -3855,7 +3897,7 @@ function clearTargetSelection() {
   setPlottingHidden(false);
   syncSelection();
   renderTargetStatus(null);
-  refreshRelations();
+  refreshRelations(true);
   markScene('clearTargetSelection');
 }
 
@@ -5288,9 +5330,7 @@ window.SituationHost = {
       })[0];
       if (e && e.hsData.feature) fc.features.push(e.hsData.feature);
     });
-    computeOccupationArea().forEach(function (a) {
-      if (a.feature) fc.features.push(a.feature);
-    });
+    // 占领区域已下线，不再进入导出。
     return fc;
   },
   /** GeoJSON 导入（用户标绘）。返回 {added, errors}。 */
@@ -5304,14 +5344,15 @@ window.SituationHost = {
   /** 动态热点/占领区的取证出口：计算值 vs 场景图元数（数据集可能有/无威胁数据）。 */
   dynamicAreasDebug: function () {
     const spots = computeHotspots();
-    const areas = computeOccupationArea();
     return {
       hotspots: spots.length,
       hotspotEntities: (state.hotspotEntities || []).length,
       hotspotRows: (state.hotspotRows || []).length,
-      occupation: areas.length,
-      occupationEntities: (state.occupationEntities || []).length,
-      occupationVisible: (state.occupationEntities || []).filter(function (e) { return !!e.show; }).length,
+      // 占领区域已下线（保留字段，恒为 0/enabled:false，避免旧自检报错）。
+      occupation: 0,
+      occupationEnabled: false,
+      occupationEntities: 0,
+      occupationVisible: 0,
       threatAvailable: Object.keys(state.targets).some(function (id) {
         return threatOf(id).threat > 0;
       }),
@@ -5745,7 +5786,8 @@ function registerLayerProviders() {
       key: t.id,
       // 展示名 = 型号；编号放在副标题里（仍然能找到唯一目标）。
       label: model,
-      sub: t.id + ' · ' + side + ' · ' + (DOM_ZH[def.domain] || def.domain),
+      // 阵营已是图层名（红方目标/蓝方目标），副标题不再重复它。
+      sub: t.id + ' · ' + (DOM_ZH[def.domain] || def.domain),
       visible: isVisible(t),
       actions: ['toggle', 'locate', 'edit', 'delete'],
       onToggle: function (on) {
@@ -5832,7 +5874,8 @@ function registerLayerProviders() {
       return {
         key: 'hotspot-' + i,
         label: h.name || ('热点 ' + (i + 1)),
-        sub: (h.level_label || '') + (h.radiusKm ? ' · 半径 ' + Math.round(h.radiusKm) + ' km' : ''),
+        // 名称本身就是「交火区/对峙区」，副标题只补范围，不再重复等级。
+        sub: h.radiusKm ? '半径 ' + Math.round(h.radiusKm) + ' km' : '',
         visible: !!state.layers.hotspots && !state.hiddenHotspots[i],
         actions: ['toggle', 'locate'],
         onToggle: function (on) {
@@ -6053,7 +6096,8 @@ function bindUI() {
   ['overlay.focusMask', function (v) { state.layers.focusMask = v; updateFocusMask(); }],
   // D (direction 2): occupation faces + minimap mask. The handler writes the
   // state flag and repaints immediately; apply() alone would leave stale shows.
-  [OCCUPATION_LAYER_ID, function (v) { state.layers.occupation = v; updateOccupationAreas(); }],
+  // 占领区域已下线：图层行与 handler 一并停用（恢复时恢复这两处）。
+  // [OCCUPATION_LAYER_ID, function (v) { state.layers.occupation = v; updateOccupationAreas(); }],
   ].forEach(function (pair) {
     var d = LayerRegistry.def(pair[0]);
     if (d) d.handler = function (id, want) { pair[1](want); };

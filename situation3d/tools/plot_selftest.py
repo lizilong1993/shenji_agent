@@ -1611,11 +1611,10 @@ def main() -> int:
               json.dumps(ar.get("hotspotRows"), ensure_ascii=False))
     else:
         print("  no hotspots at this tick (no hostile pair inside engage/influence)")
-    # 占领圆按目标生成，但**阵营/域过滤会隐藏其中一部分**（与目标可见性同一套规则），
-    # 所以只要求"有可见圆，且不超过目标总数"。
-    check("occupation is per-target (visible circles <= live targets, > 0)",
-          0 < (ar.get("occVisible") or 0) <= (ar.get("liveTargets") or 0),
-          "occ=%r targets=%r" % (ar.get("occVisible"), ar.get("liveTargets")))
+    # 占领区域已下线：不再生成任何占领图元（恢复时把这条断言改回"按目标生成"）。
+    check("occupation layer is disabled (no occupation entities)",
+          (ar.get("occVisible") or 0) == 0,
+          "occ=%r" % (ar.get("occVisible"),))
     check("visible targets split into red/blue layers with model names",
           (ar.get("redN") or 0) > 0 and (ar.get("blueN") or 0) > 0
           and (ar.get("redFirstLabel") or "").find("R") != 0,
@@ -1627,13 +1626,15 @@ def main() -> int:
           "%r" % (ar.get("plotLabels"),))
     rt = ar.get("relTexts") or []
     # 文字只描述关系本身；证据性质（实测/推理）由实线/虚线表达，不再写进文案。
-    check("relation labels are Chinese and semantic (no raw ids / 敌对 N km)",
-          bool(rt) and all(("协同" in t or "友邻" in t or "交战" in t or "探测" in t
-                           or "警戒" in t) for t in rt)
+    # 文案只保留"绿/红线和线型都表达不了"的信息：编队内协同、敌方威胁性质与距离。
+    # 不允许出现：原始 ID、英文角色、敌对 N km、"实测/推理"后缀、同阵营重复声明。
+    check("relation labels carry only non-redundant information",
+          all(("协同" in t or "交战" in t or "探测" in t) for t in rt)
           and not any("敌对" in t for t in rt)
           and not any(("实测" in t or "推理" in t) for t in rt)
+          and not any(("同属" in t or "友邻" in t) for t in rt)
           and all("wingman" not in t and "lead" not in t for t in rt),
-          json.dumps(rt, ensure_ascii=False))
+          json.dumps(rt[:8], ensure_ascii=False))
     cp = ar.get("centerPx") or {}
     if cp.get("dx") is None:
         print("  locate: target B01 not present in this dataset -- check skipped")

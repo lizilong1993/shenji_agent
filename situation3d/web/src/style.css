@@ -537,7 +537,7 @@ select {
 .swatch.red { background: var(--red); }
 .swatch.blue { background: var(--blue); }
 .swatch.line { width: 14px; height: 2px; border-radius: 0; background: #f0a020; }
-.swatch.hotspot { background: #f0a020; opacity: .35; border: 1px solid #f0a020; }
+.swatch.hotspot { background: rgba(216, 74, 58, .30); border: 1px solid #d84a3a; }
 
 /* 瓦片加载进度徽标（"正在加载瓦片… 剩余 N"）已按需求删除（2026-10-17）。
    进度回调仍保留在 app.js 的 onTileLoadProgress()：它还负责底图空闲判定
