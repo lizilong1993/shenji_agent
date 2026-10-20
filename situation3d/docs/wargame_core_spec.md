@@ -1,9 +1,83 @@
-# `wargame_core` 规格说明（P0/P1 草案）
+# `wargame_core` 规格说明（P1/P2 草案）
 
-> 状态：P0 规格提取 + P1 陆战最小闭环
-> 代码：`situation3d/wargame_core/`
+> 状态：P0 规格提取 + P1 陆战最小闭环 + P2 海空/战役编排
+> 代码：`situation3d/wargame_core/`、`situation3d/campaign.py`、`situation3d/campaigns/`
 > 性质：clean-room 实现；只依据公开规则文档、公开想定/地图数据与可观察行为；不反编译、不复制闭源代码。
-> 适用范围：两个虚构演示案例的陆战裁决；海空扩展见后续版本。
+> 适用范围：两个虚构演示案例的陆海空裁决。
+
+## 0. P2 增补（2026-10-20）
+
+### 0.1 海空模块
+
+| 模块 | 内容 |
+|---|---|
+| `sensors.py` | 雷达/红外/声呐/ESM；特征系数随域/尺寸/高度层变化；雷达地平线；被动不暴露 |
+| `engagement.py` | 显式交战矩阵 + 合成海空武器参数（导出 `approximated: true`） |
+| `naval.py` | 海面/水下机动、反舰/反潜、海军寻路 |
+| `air.py` | 固定翼/直升机/无人机、高度层、空战/对地/对海、燃油 |
+| `logistics.py` | 港口/机场/海上补给、运输拦截 |
+| `beach.py` | 舰→艇→滩头换乘、两栖转陆战 |
+
+交战矩阵（节选）：
+
+| 攻击方 | 目标 | 允许武器 |
+|---|---|---|
+| 陆上 | 陆上 | `direct`（公开陆战表） |
+| 陆上 | 水面 | `coastal_asm` |
+| 陆上 | 空中 | `sam` / `aaa` |
+| 水面 | 水面 | `asm` / `naval_gun` |
+| 水面 | 空中 | `sam` / `ciws` |
+| 水面 | 水下 | `torpedo` / `depth_charge` / `asroc` |
+| 空中 | 空中 | `bvr` / `wvr` |
+| 空中 | 地面/水面 | `air_ground` / `asm_light` |
+
+未列出的组合一律不可交战（例如坦克不能打军舰）。
+
+### 0.2 战役编排
+
+`situation3d/campaign.py` 提供：
+
+- `Stage`：起止 tick、模式（scripted/mixed/adjudicated/engine）、退出条件、镜头。
+- `ScriptEvent`：tick、前置条件、效果、兜底、动作（`spawn_beach` / `set_jam` / `convert_land`）。
+- `CampaignRunner`：逐阶段推进；脚本事件在 due tick 触发；阶段快照；帧记录；结局并列。
+- 输出 `campaign.v3` 数据集，含 `stages/events/frames/outcome/final`，并附带兼容字段（`targets/hotspots/symbology/inference_frames`）。
+
+### 0.3 地图生成
+
+`scripts/build_campaign_map.py`：
+
+- Natural Earth 1:10m land 多边形（扫描线 + 奇偶规则）→ 陆/海；
+- OSM Overpass 道路（motorway…tertiary）与居民地中心 → 道路等级/居民地；
+- 本地 Terrarium 高程瓦片（纯 Python PNG 解码）→ `elev`；
+- 输出 100×100 odd-r 六角地图：`basic.json`、`cost.pickle`、可选 `see.npz`；
+- `grid` 元数据写入 `basic.json`，供 `hexmap.pos_to_lonlat/lonlat_to_pos` 反算经纬度。
+
+台海 profile：中心 119.55E/23.55N、3000 m/hex、100×100（约 300×260 km），覆盖厦门—金门—澎湖—台南—高雄。
+
+### 0.4 台海案例
+
+`campaigns/taiwan_landing.py`：
+
+- 33 个单位（红 18 / 蓝 15），覆盖两栖、水面、空中、岸防、防空、地面、保障；
+- 7 阶段（集结—航渡—换乘—抢滩—巩固/反突击—内陆—结局），960 tick × 30 s = 8 h；
+- 5 个目标点（登陆场/台南/高雄/澎湖/海峡中段）；
+- 6 个脚本事件（ISR、电子干扰、两次换乘、预备队反击）；
+- 结局：脚本设为红方胜；引擎独立计算并在 `outcome.match` 中对比。
+
+### 0.5 验收
+
+- `test_wargame_core_sea_air.py`：传感器/交战矩阵/海军寻路/空中/后勤/换乘。
+- `test_campaign.py`：阶段连续、帧连续、脚本事件顺序、结局字段、同 seed 一致、无“无事件消失”。
+- 全量：`PYTHONPATH=situation3d python3 -m unittest discover -s situation3d/tests -p 'test_*.py'`。
+
+### 0.6 已知限制（P2）
+
+- 海空武器参数是合成值；交战矩阵只覆盖两案例实际用到的组合。
+- 雷达/声呐/红外是抽象模型，没有真实传播、海杂波、水声多途。
+- 尚未实现：指挥链/通信、间瞄校射、空中加油、潜艇浮出/下潜转换、两栖卸载时间。
+- 前端仍需接入 `campaign.v3` 的阶段/事件/结局 UI（P3）。
+
+---
 
 ## 1. 目标与非目标
 

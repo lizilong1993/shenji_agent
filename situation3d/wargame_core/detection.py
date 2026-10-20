@@ -56,6 +56,9 @@ def can_observe(observer, target, hmap: hexmap.HexMap,
         return False
     if getattr(observer, "alive", True) is False or getattr(target, "alive", True) is False:
         return False
+    if not hmap.valid(int(getattr(observer, "pos", -1))) or \
+            not hmap.valid(int(getattr(target, "pos", -1))):
+        return False
     rng = observe_range(observer, target, hmap)
     if rng <= 0:
         return False

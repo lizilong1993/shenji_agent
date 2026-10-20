@@ -24,7 +24,7 @@ class Unit:
     speed_kmh: float = 30.0
     value: int = 0
     unit_type: str = "vehicle"  # infantry | vehicle | artillery | aa | helicopter | uav | fort
-    domain: str = "land"        # land | air
+    domain: str = "land"        # land | air | sea | sub
     weapons: List[weapons.WeaponProfile] = field(default_factory=list)
     ammo: Dict[str, int] = field(default_factory=dict)
     observe_distance: Dict[str, int] = field(default_factory=dict)
@@ -39,6 +39,18 @@ class Unit:
     path_index: int = 0
     move_state: int = 0
     raw: dict = field(default_factory=dict)
+
+    # -- joint-domain extensions -------------------------------------------
+    altitude_band: str = "ground"   # ground | 水面 | 超低空 | 低空 | 中空 | 高空
+    depth: str = "surface"          # surface | periscope | deep (submarines)
+    heading: float = 0.0
+    size_class: str = "medium"      # small | medium | large
+    readiness: float = 0.85
+    fuel: float = 1.0
+    emitting: bool = True
+    sensors: List[object] = field(default_factory=list)
+    sea_air_weapons: List[object] = field(default_factory=list)
+    strength: float = 100.0
 
     def to_dict(self) -> dict:
         return {
@@ -60,6 +72,13 @@ class Unit:
             "concealed": self.concealed,
             "moving": self.moving,
             "marching": self.marching,
+            "domain": self.domain,
+            "altitude_band": self.altitude_band,
+            "depth": self.depth,
+            "readiness": round(self.readiness, 2),
+            "fuel": round(self.fuel, 2),
+            "strength": round(self.strength, 1),
+            "ammo": dict(self.ammo),
         }
 
 
@@ -100,6 +119,19 @@ class GameState(object):
         self.los = LineOfSight(hmap)
         self.winner: Optional[str] = None
         self.reason: str = ""
+        self.jam: float = 0.0
+        self.stage_id: str = ""
+        self.control: Dict[str, dict] = {}
+        self.supply_points: List[dict] = []
+        # (uid, goal) -> path or None.  Re-planning A* every tick is the
+        # dominant cost once ships and aircraft are in the loop.
+        self.path_cache: Dict[tuple, Optional[List[int]]] = {}
+
+    def allocate_uid(self) -> int:
+        # Keep new IDs clear of public scenario IDs.
+        self._uid_seq = max(getattr(self, "_uid_seq", 900000),
+                            max(self.units.keys() or [900000])) + 1
+        return self._uid_seq
 
     def next_event_id(self) -> int:
         self._event_seq += 1

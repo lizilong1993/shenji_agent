@@ -66,3 +66,34 @@ class LineOfSight(object):
 
     def clear_cache(self) -> None:
         self._cache.clear()
+
+    def radar_horizon_km(self, observer_elev_m: float, target_alt_m: float) -> float:
+        """Approximate radar/visual horizon (4/3 earth radius)."""
+        import math
+        k = 4.0 / 3.0
+        r_earth = 6371000.0 * k
+        h1 = max(0.0, float(observer_elev_m))
+        h2 = max(0.0, float(target_alt_m))
+        return (math.sqrt(2.0 * r_earth * h1) + math.sqrt(2.0 * r_earth * h2)) / 1000.0
+
+    def tactical_visible(self, a: int, b: int,
+                         target_altitude_band: str = "ground") -> bool:
+        """LOS for sensors: terrain LOS plus the radar horizon.
+
+        Ground targets use the normal hex LOS.  Air targets are additionally
+        limited by the horizon; a very low target may be hidden behind terrain
+        or below the horizon even when the hex line is clear.
+        """
+        if not self.visible(a, b):
+            return False
+        band = target_altitude_band or "ground"
+        if band == "地面":
+            band = "ground"
+        if band in ("ground", "水面", "surface"):
+            return True
+        observer_elev = self.map.elev(a)
+        alt = {"超低空": 100.0, "低空": 1000.0, "中空": 5000.0,
+               "高空": 10000.0}.get(band, 1000.0)
+        horizon = self.radar_horizon_km(observer_elev, alt)
+        d_km = hexmap.distance(a, b) * self.map.scale_m / 1000.0
+        return d_km <= horizon

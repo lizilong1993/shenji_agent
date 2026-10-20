@@ -11,9 +11,8 @@ import json
 import os
 from typing import Dict, List, Optional, Tuple
 
-from . import hexmap, weapons
+from . import engagement, hexmap, sensors, weapons
 from .state import GameState, Objective, Unit
-
 
 def load_json(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as fh:
@@ -44,8 +43,74 @@ def _unit_type(name: str, op_type: int) -> str:
     return "vehicle"
 
 
+def _domain_from_name(name: str, op_type: int) -> str:
+    """Infer the theatre domain from the platform name.
+
+    The public scenario format has no ``domain`` field, so the demo campaign
+    scenarios declare it explicitly; this fallback keeps the public fixtures
+    working.
+    """
+    if op_type == 3:
+        return "air"
+    if "潜艇" in name:
+        return "sub"
+    if any(k in name for k in ("驱逐舰", "护卫舰", "巡逻舰", "补给舰",
+                               "登陆舰", "两栖", "航母", "舰")):
+        return "sea"
+    return "land"
+
+
 def _domain(op_type: int) -> str:
     return "air" if op_type == 3 else "land"
+
+
+def _rich_unit(op: dict, hmap: Optional[hexmap.HexMap] = None) -> Unit:
+    """Build a unit and attach sea/air sensors and weapons when relevant.
+
+    The public ``scenario.json`` schema has no ``domain`` field; campaign
+    scenarios can add ``domain`` and ``altitude_band`` per operator, and this
+    loader honours them.  Without those fields the platform name is used.
+    """
+    u = unit_from_operator(op)
+    domain = str(op.get("domain") or "").strip()
+    if domain in ("sea", "sub", "air", "land"):
+        u.domain = domain
+    else:
+        u.domain = _domain_from_name(u.name, u.op_type)
+    u.altitude_band = str(op.get("altitude_band") or
+                          ("水面" if u.domain in ("sea", "sub")
+                           else "中空" if u.domain == "air" else "ground"))
+    u.depth = str(op.get("depth") or "surface")
+    u.size_class = str(op.get("size_class") or
+                       ("large" if u.domain == "sea" and "驱逐" in u.name
+                        else "small" if u.domain == "air" else "medium"))
+    u.heading = float(op.get("heading") or 0.0)
+    u.readiness = float(op.get("readiness") or 0.85)
+    u.fuel = float(op.get("fuel") or 1.0)
+    u.emitting = bool(op.get("emitting", True))
+    u.sensors = sensors.sensors_for(u.name, u.domain)
+    # Public ``observe_distance`` (by target sub_type) is authoritative for
+    # land observation; merge it into the visual sensor range so the public
+    # fixtures behave as documented.
+    if u.domain == "land" and u.observe_distance:
+        seen = []
+        for key, val in u.observe_distance.items():
+            try:
+                v = float(val)
+            except (TypeError, ValueError):
+                continue
+            if v > 0:
+                seen.append(v)
+        if seen:
+            hex_range = max(seen)
+            km = hex_range * hmap.scale_m / 1000.0 if hmap else hex_range
+            u.sensors = [sensors.Sensor("visual", km, 1.0)] + u.sensors
+    if u.domain in ("sea", "sub", "air"):
+        prof = engagement.sea_air_weapons_for(u.name, u.domain)
+        u.sea_air_weapons = prof
+        for w in prof:
+            u.ammo.setdefault(w.key, int(w.ammo))
+    return u
 
 
 def unit_from_operator(op: dict) -> Unit:
@@ -88,7 +153,7 @@ def build_state(scenario: dict, hmap: hexmap.HexMap,
                 tick_seconds: float = 30.0) -> GameState:
     units: Dict[int, Unit] = {}
     for op in scenario.get("operators") or []:
-        u = unit_from_operator(op)
+        u = _rich_unit(op, hmap)
         units[u.uid] = u
     objectives: List[Objective] = []
     for c in scenario.get("cities") or []:
@@ -103,6 +168,7 @@ def build_state(scenario: dict, hmap: hexmap.HexMap,
     state = GameState(hmap, units, objectives, seed=seed,
                       tick_seconds=tick_seconds, max_time=max_time,
                       scenario_id=scenario.get("scenario_id"))
+    state.supply_points = list(scenario.get("supply_points") or [])
     _mark_stacking(state)
     return state
 
@@ -120,6 +186,13 @@ def load_scenario(scenario_path: str, map_path: str,
                   seed: int = 20261019,
                   tick_seconds: float = 30.0) -> GameState:
     scenario = load_json(scenario_path)
+    hmap = load_map(map_path)
+    return build_state(scenario, hmap, seed=seed, tick_seconds=tick_seconds)
+
+
+def load_scenario_dict(scenario: dict, map_path: str,
+                       seed: int = 20261019,
+                       tick_seconds: float = 30.0) -> GameState:
     hmap = load_map(map_path)
     return build_state(scenario, hmap, seed=seed, tick_seconds=tick_seconds)
 

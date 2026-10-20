@@ -96,6 +96,8 @@ def can_fire(attacker, target, state) -> bool:
         return False
     if attacker.color == target.color:
         return False
+    if getattr(target, "domain", "land") != "land":
+        return False
     if getattr(attacker, "suppressed", False):
         return False
     if getattr(attacker, "moving", False) and getattr(attacker, "unit_type", "") not in ("vehicle",):
@@ -168,12 +170,18 @@ def best_target(attacker, state) -> Optional[object]:
     for u in state.units.values():
         if not getattr(u, "alive", True) or u.color == attacker.color:
             continue
+        if not state.map.valid(u.pos) or not state.map.valid(attacker.pos):
+            continue
+        if getattr(u, "domain", "land") != "land":
+            # Land direct-fire tables only cover land targets; sea/air targets
+            # go through the engagement matrix instead.
+            continue
+        d = hexmap.distance(attacker.pos, u.pos)
         w = select_weapon(attacker, u, state.map)
-        if w is None:
+        if w is None or d > w.max_range:
             continue
         if not detection.can_observe(attacker, u, state.map, state.los):
             continue
-        d = hexmap.distance(attacker.pos, u.pos)
         score = (d, -int(getattr(u, "value", 0) or 0))
         if best_score is None or score < best_score:
             best_score = score

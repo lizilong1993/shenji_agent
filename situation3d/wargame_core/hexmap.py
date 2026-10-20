@@ -202,6 +202,18 @@ class HexMap(object):
         except ValueError:
             return -1
 
+    def bearing_deg(self, a: int, b: int) -> float:
+        """Approximate bearing from hex a to hex b in degrees (north = 0)."""
+        ar, ac = decode(a)
+        br, bc = decode(b)
+        # Odd-r offset to cube, then to pixel (flat-top approximation).
+        ax, ay, az = offset_to_cube(ar, ac)
+        bx, by, bz = offset_to_cube(br, bc)
+        px = (bx - ax) + (bz - az) / 2.0
+        py = (bz - az) * 0.8660254
+        import math
+        return (math.degrees(math.atan2(px, py)) + 360.0) % 360.0
+
     # -- movement ----------------------------------------------------------
     def passable(self, pos: int, mode: str = "vehicle") -> bool:
         cond = self.cond(pos)
@@ -269,3 +281,44 @@ class HexMap(object):
         if cond in (URBAN, FOREST):
             return self.ele_grade
         return 0.0
+
+    # -- geographic conversion --------------------------------------------
+    def pos_to_lonlat(self, pos: int) -> Tuple[float, float]:
+        """Centre of a hex in WGS84, using the ``grid`` block if present."""
+        g = self.doc.get("grid")
+        if not g:
+            raise KeyError("map has no grid metadata")
+        r, c = decode(pos)
+        import math
+        width = float(g["width_m"])
+        height = float(g.get("height_m") or width * math.sqrt(3.0) / 2.0)
+        # Odd-r pixel layout: x grows east, y grows south.
+        px = (c + 0.5 * (r & 1)) * width
+        py = r * height
+        lon0 = float(g["center_lon"])
+        lat0 = float(g["center_lat"])
+        # Grid centre in the same pixel space used by the map builder.
+        cx = ((float(g["cols"]) - 1) * width + width * 0.5) / 2.0
+        cy = (float(g["rows"]) - 1) * height / 2.0
+        lon = lon0 + (px - cx) / (111320.0 * math.cos(math.radians(lat0)))
+        lat = lat0 - (py - cy) / 110540.0
+        return lon, lat
+
+    def lonlat_to_pos(self, lon: float, lat: float) -> int:
+        g = self.doc.get("grid")
+        if not g:
+            raise KeyError("map has no grid metadata")
+        import math
+        width = float(g["width_m"])
+        height = float(g.get("height_m") or width * math.sqrt(3.0) / 2.0)
+        cx = ((float(g["cols"]) - 1) * width + width * 0.5) / 2.0
+        cy = (float(g["rows"]) - 1) * height / 2.0
+        lon0 = float(g["center_lon"])
+        lat0 = float(g["center_lat"])
+        px = cx + (lon - lon0) * 111320.0 * math.cos(math.radians(lat0))
+        py = cy - (lat - lat0) * 110540.0
+        r = int(round(py / height))
+        c = int(round(px / width - 0.5 * (r & 1)))
+        r = max(0, min(self.rows - 1, r))
+        c = max(0, min(self.cols - 1, c))
+        return encode(r, c)

@@ -29,3 +29,6 @@ tiles_db/
 
 # 3D Tiles / quantized-mesh 数据集（zip 直发，见 server/serve.py）
 tiles3d_db/
+
+# 战役地图由 scripts/build_campaign_map.py 生成（OSM/DEM 派生，体积大）
+web/data/campaign_maps/

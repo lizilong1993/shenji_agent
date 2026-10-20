@@ -1,4 +1,4 @@
-"""Turn loop for the clean-room land wargame core."""
+"""Turn loop for the clean-room joint wargame core (land + sea + air)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,8 @@ import json
 from dataclasses import dataclass
 from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
-from . import combat, detection, hexmap, movement
+from . import (air, combat, detection, engagement, hexmap, logistics,
+               movement, naval)
 from .state import GameState, Unit
 
 
@@ -21,6 +22,10 @@ class Order:
 def _move_mode(unit: Unit) -> str:
     if unit.domain == "air":
         return "air"
+    if unit.domain == "sea":
+        return "sea"
+    if unit.domain == "sub":
+        return "sub"
     if unit.unit_type == "infantry":
         return "infantry"
     return "vehicle"
@@ -43,37 +48,95 @@ def _objective_goal(unit: Unit, state: GameState) -> Optional[int]:
     return min(candidates, key=lambda o: hexmap.distance(unit.pos, o.coord)).coord
 
 
-def auto_orders(state: GameState) -> List[Order]:
-    """A small deterministic staff officer for the demo.
+def _target_for(unit: Unit, state: GameState):
+    if unit.domain == "land":
+        t = combat.best_target(unit, state)
+        if t is not None:
+            return t
+        t = engagement.best_sea_air_target(unit, state)
+        return t
+    return engagement.best_sea_air_target(unit, state)
 
-    It fires when a target is visible and in range; otherwise it moves toward
-    the nearest enemy or objective.  This is not a competitive AI; it exists to
-    exercise the engine loop end-to-end.
-    """
+
+def _enemy_goal_sea(unit: Unit, state: GameState) -> Optional[int]:
+    enemies = [u for u in state.living()
+               if u.color != unit.color and u.domain in ("sea", "sub")]
+    if not enemies:
+        return None
+    return min(enemies, key=lambda u: hexmap.distance(unit.pos, u.pos)).pos
+
+
+def _cached_path(state: GameState, key: tuple, fn):
+    """Plan at most once per (unit, goal); A* dominates the tick cost."""
+    if key in state.path_cache:
+        path = state.path_cache[key]
+        return list(path) if path else None
+    path = fn()
+    state.path_cache[key] = list(path) if path else None
+    # Keep the cache small; stale entries are rare in a short campaign.
+    if len(state.path_cache) > 512:
+        state.path_cache.clear()
+    return path
+
+
+def auto_orders(state: GameState) -> List[Order]:
+    """A small deterministic staff officer for the demo."""
     orders: List[Order] = []
     for u in state.living():
         if u.suppressed:
             orders.append(Order(u.uid, "hold"))
             continue
-        target = combat.best_target(u, state)
+        if not state.map.valid(u.pos):
+            # Public fixtures can contain an out-of-map operator; leave it
+            # parked instead of letting A*/LOS raise.
+            orders.append(Order(u.uid, "hold"))
+            continue
+        target = _target_for(u, state)
         if target is not None:
             orders.append(Order(u.uid, "fire", target=target.uid))
             continue
-        if u.unit_type in ("artillery", "aa", "fort"):
+        if u.unit_type == "fort":
             orders.append(Order(u.uid, "hold"))
+            continue
+        if u.unit_type in ("artillery", "aa") and u.domain == "land":
+            orders.append(Order(u.uid, "hold"))
+            continue
+        if u.domain in ("sea", "sub"):
+            # Ships only pursue water objectives or enemy ships.
+            goal = None
+            for o in state.objectives:
+                if o.flag != u.color and state.map.cond(o.coord) == hexmap.RIVER:
+                    if goal is None or hexmap.distance(u.pos, o.coord) < hexmap.distance(u.pos, goal):
+                        goal = o.coord
+            if goal is None:
+                goal = _enemy_goal_sea(u, state)
+            if goal is None:
+                orders.append(Order(u.uid, "hold"))
+                continue
+            path = _cached_path(
+                state, (u.uid, u.pos, goal),
+                lambda: naval.naval_path(state.map, u.pos, goal, u))
+            orders.append(Order(u.uid, "move", path=path) if path
+                          else Order(u.uid, "hold"))
             continue
         goal = _objective_goal(u, state) or _enemy_goal(u, state)
-        if goal is None:
+        if goal is None or u.pos == goal:
             orders.append(Order(u.uid, "hold"))
             continue
-        if u.pos == goal:
-            orders.append(Order(u.uid, "hold"))
-            continue
-        mode = _move_mode(u)
-        path = movement.find_path(state.map, u.pos, goal, mode)
-        if not path:
-            goal = _enemy_goal(u, state)
-            path = movement.find_path(state.map, u.pos, goal, mode) if goal is not None else []
+        if u.domain == "air":
+            path = _cached_path(
+                state, (u.uid, u.pos, goal),
+                lambda: air.air_path(state.map, u.pos, goal))
+        else:
+            mode = _move_mode(u)
+            path = _cached_path(
+                state, (u.uid, u.pos, goal),
+                lambda: movement.find_path(state.map, u.pos, goal, mode))
+            if not path:
+                goal = _enemy_goal(u, state)
+                path = _cached_path(
+                    state, (u.uid, u.pos, goal),
+                    lambda: movement.find_path(state.map, u.pos, goal, mode)) if goal is not None else None
         if path:
             orders.append(Order(u.uid, "move", path=path))
         else:
@@ -103,9 +166,23 @@ class WargameEngine(object):
         self.tick_events.append(ev)
         return ev
 
+    def _can_enter(self, unit: Unit, pos: int) -> bool:
+        state = self.state
+        if unit.domain == "land":
+            return len([x for x in state.unit_at(pos, unit.color)
+                        if x.domain == "land"]) < 4
+        if unit.domain == "air":
+            return True
+        # Ships and submarines: one surface vessel per hex keeps the display
+        # readable; submarines are separate.
+        same = [x for x in state.unit_at(pos, unit.color)
+                if x.domain == unit.domain and x.uid != unit.uid]
+        return len(same) < 2
+
     def step(self, orders: Iterable[Order]) -> List[dict]:
         self.tick_events = []
         state = self.state
+        event_start = len(state.events)
         by_uid = {o.uid: o for o in orders}
         # Reset per-tick transient flags.
         for u in state.living():
@@ -123,35 +200,68 @@ class WargameEngine(object):
                 continue
             order = by_uid.get(u.uid)
             if order and order.action == "move" and order.path:
-                entered = movement.advance(
-                    u, order.path, state.tick_seconds, state.map, _move_mode(u),
-                    can_enter=lambda p, _u=u: (
-                        len([x for x in state.unit_at(p, _u.color)
-                             if x.domain == "land"]) < 4
-                        if _u.domain == "land" else True))
+                if u.domain == "sea" or u.domain == "sub":
+                    entered = naval.advance_naval(
+                        u, order.path, state.tick_seconds, state.map)
+                elif u.domain == "air":
+                    entered = air.advance_air(
+                        u, order.path, state.tick_seconds, state.map)
+                else:
+                    entered = movement.advance(
+                        u, order.path, state.tick_seconds, state.map,
+                        _move_mode(u),
+                        can_enter=lambda p, _u=u: self._can_enter(_u, p))
                 u.moving = bool(entered)
                 u.concealed = False
                 if entered:
                     u.marching = False
+                    if u.domain in ("sea", "sub") and u.path_index > 0:
+                        u.heading = state.map.bearing_deg(
+                            u.path[u.path_index - 1], u.pos)
 
         for u in state.living():
-            if not u.alive:
-                continue
-            if u.suppressed:
+            if not u.alive or u.suppressed:
                 continue
             order = by_uid.get(u.uid)
             target = None
             if order and order.action == "fire" and order.target is not None:
                 target = state.units.get(order.target)
             if target is None:
-                target = combat.best_target(u, state)
-            if target is not None and combat.can_fire(u, target, state):
-                combat.resolve_direct_fire(u, target, state)
-                if not target.alive:
-                    self._event(
-                        "destroyed", level="warn", actors=[target.uid],
-                        location=list(hexmap.decode(target.pos)),
-                        description="%s 被摧毁" % target.name)
+                target = _target_for(u, state)
+            if target is None:
+                continue
+            if u.domain in ("sea", "sub"):
+                ev = naval.resolve_naval_fire(u, target, state)
+            elif u.domain == "air":
+                ev = air.resolve_air_fire(u, target, state)
+            elif engagement.can_engage(u, target):
+                ev = engagement.resolve_sea_air(u, target, state)
+            else:
+                ev = combat.resolve_direct_fire(u, target, state)
+            if ev is not None and not target.alive:
+                self._event(
+                    "destroyed", level="warn", actors=[target.uid],
+                    location=list(hexmap.decode(target.pos)),
+                    description="%s 被摧毁" % target.name)
+
+        # Fuel burn + resupply (supply points are optional).
+        for u in state.living():
+            air.update_fuel(u, state.tick_seconds)
+        resupply_marks = getattr(state, "resupply_marks", None)
+        if resupply_marks is None:
+            resupply_marks = {}
+            state.resupply_marks = resupply_marks
+        for ev in logistics.resupply(state, state.tick_seconds):
+            # One event per unit per 20 ticks; otherwise a unit parked on a
+            # supply point floods the timeline.
+            uid = (ev.get("actors") or [None])[0]
+            if uid is not None and state.tick - resupply_marks.get(uid, -999) < 20:
+                continue
+            if uid is not None:
+                resupply_marks[uid] = state.tick
+            self._event("resupply", level="info", actors=ev.get("actors", []),
+                        location=ev.get("location", []),
+                        description=ev.get("description", ""), raw=ev.get("raw", {}))
 
         changes = state.control_objectives()
         for c in changes:
@@ -170,7 +280,15 @@ class WargameEngine(object):
                 "outcome", level="warn",
                 description="推演结束：%s（%s）" % (winner, state.reason),
                 raw=state.score())
-        return list(self.tick_events)
+        # Combat modules append straight to state.events; merge everything
+        # emitted this tick so the campaign's per-stage events are complete.
+        seen = {id(e) for e in self.tick_events}
+        merged = list(self.tick_events)
+        for e in state.events[event_start:]:
+            if id(e) not in seen:
+                merged.append(e)
+        merged.sort(key=lambda e: e.get("id", ""))
+        return merged
 
 
 def run_demo(state: GameState, max_ticks: int = 60,
@@ -183,7 +301,8 @@ def run_demo(state: GameState, max_ticks: int = 60,
         evs = engine.step(orders_fn(state))
         if verbose and evs:
             for e in evs:
-                if e["type"] in ("direct_fire", "destroyed", "objective", "outcome"):
+                if e["type"] in ("direct_fire", "sea_air_fire", "destroyed",
+                                 "objective", "outcome", "beaching"):
                     print("[%4d] %s" % (e["tick"], e["description"]))
     return {
         "scenario_id": state.scenario_id,
