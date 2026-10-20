@@ -289,19 +289,48 @@ ICONS = {
 }
 
 
+def _engage_km(u) -> float:
+    """Weapon reach in km, used by the front end to draw contact hotspots."""
+    rng = 0.0
+    for w in getattr(u, "sea_air_weapons", []) or []:
+        rng = max(rng, float(getattr(w, "max_range_km", 0.0)))
+    for w in getattr(u, "weapons", []) or []:
+        rng = max(rng, float(getattr(w, "range_km", 0.0)))
+    return round(rng, 1)
+
+
+def _influence_km(u) -> float:
+    """Sensor reach in km, used for the influence/occupation overlay."""
+    rng = 0.0
+    for s in getattr(u, "sensors", []) or []:
+        rng = max(rng, float(getattr(s, "range_km", 0.0)))
+    return round(rng, 1)
+
+
+UNIT_CLASS_ZH = {
+    "ship": "水面舰艇", "submarine": "潜艇", "aircraft": "作战飞机",
+    "helicopter": "直升机", "uav": "无人机", "infantry": "步兵",
+    "vehicle": "地面车辆", "artillery": "炮兵", "aa": "防空兵力",
+    "recon": "侦察分队", "fort": "工事",
+}
+
+
 def target_defs(state) -> list:
     out = []
     for u in state.units.values():
         out.append({
-            "id": u.uid, "name": u.name,
+            "id": str(u.uid), "name": u.name,
             "affiliation": "red" if u.color == 0 else "blue",
             "domain": {"land": "land", "sea": "sea", "sub": "sea",
                        "air": "air"}.get(u.domain, u.domain),
             "unit_type": u.unit_type,
-            "platform_class": u.unit_type,
+            "platform_class": UNIT_CLASS_ZH.get(u.unit_type, u.unit_type),
             "icon": ICONS.get(u.name, "armor" if u.domain == "land" else "destroyer"),
             "blood": u.blood, "max_blood": u.max_blood,
             "speed_kn": round(u.speed_kmh / 1.852, 1),
+            # 前端按这两个字段算“交火区/对峙区”热点与控制区覆盖。
+            "engage_km": _engage_km(u),
+            "influence_km": _influence_km(u),
         })
     return out
 

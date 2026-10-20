@@ -233,6 +233,7 @@
       h.flyTo(geo[0], geo[1], 90000, -55);
     }
     if (e.actors && e.actors.length && h && h.selectTarget) {
+      // Frame/target ids are strings in campaign.v3.
       var first = String(e.actors[0]);
       // 只有当前案例里存在的目标才可选
       var exists = (data.targets || []).some(function (t) { return String(t.id) === first; });

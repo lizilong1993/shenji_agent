@@ -187,7 +187,7 @@ class CampaignRunner(object):
             except KeyError:
                 lon, lat = 0.0, 0.0
             targets.append({
-                "id": u.uid,
+                "id": str(u.uid),
                 "lon": round(lon, 6),
                 "lat": round(lat, 6),
                 "alt": 0.0,

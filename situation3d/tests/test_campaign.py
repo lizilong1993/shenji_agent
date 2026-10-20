@@ -98,6 +98,30 @@ class CampaignTests(unittest.TestCase):
         self.assertTrue(dead.issubset(destroyed),
                         "dead without destroyed event: %s" % (dead - destroyed))
 
+    def test_target_ids_match_frames(self):
+        """The front end joins defs to frames with ===; types must agree."""
+        import importlib.util
+        mod_path = os.path.join(SITUATION3D, "scripts", "run_campaign.py")
+        spec = importlib.util.spec_from_file_location("run_campaign_mod", mod_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        state = scenario.load_scenario_dict(self.T.scenario_dict(), self.T.map_path(),
+                                            seed=1, tick_seconds=30.0)
+        runner = C.CampaignRunner(self.T.build_spec(), state)
+        result = runner.run(max_ticks_per_stage=2)
+        defs = self.T.target_defs(state)
+        def_types = {type(d["id"]).__name__ for d in defs}
+        frame_types = set()
+        for f in result["frames"]:
+            for t in f["targets"]:
+                frame_types.add(type(t["id"]).__name__)
+        self.assertEqual(def_types, frame_types,
+                         "target defs %s vs frames %s" % (def_types, frame_types))
+        def_ids = {str(d["id"]) for d in defs}
+        for f in result["frames"][:3]:
+            for t in f["targets"]:
+                self.assertIn(str(t["id"]), def_ids)
+
 
 if __name__ == "__main__":
     unittest.main()

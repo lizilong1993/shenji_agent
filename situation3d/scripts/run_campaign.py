@@ -148,8 +148,8 @@ def main(argv=None) -> int:
         "plots": mod.plots() if hasattr(mod, "plots") else [],
         "camera": mod.camera(),
         # The front end matches frames[].targets[].id against targets[].id with
-        # ===, so both must use the same type.
-        "target_id_type": "int",
+        # ===; object keys are always strings, so both sides use strings.
+        "target_id_type": "str",
         "urban_aoi": base.get("urban_aoi") or [],
         "symbology": base.get("symbology"),
         "inference_frames": None,
