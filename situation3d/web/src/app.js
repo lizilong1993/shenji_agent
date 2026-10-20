@@ -2476,27 +2476,37 @@ function computeHotspots() {
   // 30–60 km 的圆互相大面积重叠，读起来像"两个不同的交火区"，其实是同一处。
   // 这里做一次贪心吸收：后者的圆心落进前者的圆内（或反之）就并入前者——
   // 圆心按强度加权、半径取能同时包住两者的最小半径（距离 + 对方半径）。
-  const merged = [];
-  out.forEach(function (h) {
-    for (let i = 0; i < merged.length; i++) {
-      const m = merged[i];
-      const d = relKm({ lat: m.center[0], lon: m.center[1] },
-                       { lat: h.center[0], lon: h.center[1] });
-      if (d <= m.radiusKm || d + h.radiusKm <= m.radiusKm) {
-        const wSum = m.score + h.score;
-        const lat = (m.center[0] * m.score + h.center[0] * h.score) / wSum;
-        const lon = (m.center[1] * m.score + h.center[1] * h.score) / wSum;
-        m.center = [lat, lon];
-        m.radiusKm = Math.min(100, Math.max(m.radiusKm, d + h.radiusKm) * 0.85);
-        m.score += h.score;
-        m.contacts += h.contacts;
-        m.engaging += h.engaging;
-        m.merged = (m.merged || 1) + 1;
-        return;
+  let merged = out.slice();
+  // 反复吸收直到稳定：一次遍历只能合并相邻簇，合并后的新圆心会重新覆盖第三个簇，
+  // 必须迭代到"任意两个圆心都不落在对方半径内"为止（实测 11 个热点里仍有两两重叠）。
+  for (let pass = 0; pass < 12; pass++) {
+    let changed = false;
+    const next = [];
+    merged.forEach(function (h) {
+      for (let i = 0; i < next.length; i++) {
+        const m = next[i];
+        const d = relKm({ lat: m.center[0], lon: m.center[1] },
+                         { lat: h.center[0], lon: h.center[1] });
+        // 任一方圆内包含对方圆心 → 同一处战场，合并。
+        if (d < Math.max(m.radiusKm, h.radiusKm)) {
+          const wSum = m.score + h.score;
+          const lat = (m.center[0] * m.score + h.center[0] * h.score) / wSum;
+          const lon = (m.center[1] * m.score + h.center[1] * h.score) / wSum;
+          m.center = [lat, lon];
+          m.radiusKm = Math.min(100, Math.max(m.radiusKm, d + h.radiusKm));
+          m.score += h.score;
+          m.contacts += h.contacts;
+          m.engaging += h.engaging;
+          m.merged = (m.merged || 1) + 1;
+          changed = true;
+          return;
+        }
       }
-    }
-    merged.push(h);
-  });
+      next.push(h);
+    });
+    merged = next;
+    if (!changed) break;
+  }
   merged.forEach(function (m) {
     m.feature = ringToFeature(circleRing(m.center[0], m.center[1], m.radiusKm, 28), {
       kind: 'hotspot', level: m.engaging > 0 ? 'engage' : 'proximity',
@@ -2547,6 +2557,13 @@ var _dynAreasKey = null;
 
 function rebuildDynamicAreas(force) {
   if (!viewer) return;
+  // ⚠ 实测：本函数在 `createHotspots()` 里被调用时，`state.tick` 与 `layers` 已就绪；
+  // 但**不能**只在 key 相同时短路——开局会把"0 个热点"写进 key，之后数据补齐
+  // 也不会重算。因此 force=true 是唯一的确定性入口（案例加载、图层开关、手工刷新）。
+  if (force) _dynAreasKey = null;
+  // 局部 import 一次就能全部重建，开销很小；只有**播放推进**（每秒几十次）才需要
+  // 用 key 短路。之前只在"帧号+开关+数量"变化时重建，而开局时数量恰好都是 0
+  // （数据集未就绪），key 不再变化，热点就永远不出现（实测）。
   const key = dynamicAreasKey();
   if (!force && key === _dynAreasKey) return;
   // 结果集本身就进 key：开局时 inference 往往还没就绪，强度全 0 → 热点为空；
@@ -2658,13 +2675,10 @@ function rebuildOccupationEntities(areas) {
 // 兼容旧调用点：原先 createHotspots() 同时建热点与占领面。
 // 现在统一走重建入口（force=true 时忽略帧号缓存）。
 function createHotspots() {
-  // 只重建热点/占领图元。**不要**在这里跑 rebuildDynamicAreas(true)：
-  // 应用启动时图层意图还没按 LAYERS 的 default 写入（applyLayers 在后面），
-  // 那时 state.layers.hotspots / occupation 仍是初始值，会建出空集合，
-  // 之后 updateOccupationAreas 又因 key 未变而跳过。
+  // 启动时立即建一次（`state.layers.hotspots` 已在 initViewer 里预置为 true，
+  // 见那里的说明）；帧号变化后再由 updateOccupationAreas 按 key 增量重建。
   _dynAreasKey = null;
-  rebuildHotspotEntities();
-  // 占领区域已下线（原 rebuildOccupationEntities 调用）
+  rebuildDynamicAreas(true);
 }
 
 /** 方向 4 取证出口：动态热点数量（旧数据字段已不适用，保留结构）。 */
@@ -3080,7 +3094,11 @@ function occupationFrame() {
  * 恢复时把 `rebuildOccupationEntities/computeOccupationArea` 的调用放回即可。
  */
 function updateOccupationAreas() {
-  // no-op（占领区域已下线）
+  // ⚠ 必须 force：调用点在 syncEntities 末尾，`state.tick` 要到下一帧同步才更新；
+  // 若按 key 短路，首帧会用"第 0 帧的空热点"锁死 key，之后播放/拖时间轴都不再重建
+  // （实测 tick=720 时热点仍为 0）。重建只在脏帧发生一次，不是逐帧开销。
+  // 占领区域已下线（原 rebuildOccupationEntities 调用保留注释）。
+  rebuildDynamicAreas(true);
 }
 
 /**
@@ -6042,7 +6060,12 @@ function bindUI() {
   // 这样它们与底图/标绘走**同一条 apply 通路**，面板才能把它们当普通图层行渲染并
   // 统计要素数量。回调体是从这里原样搬过去的，行为不变。
   [
-    ['layerHotspots', function (v) { state.layers.hotspots = v; markScene('layerHotspots'); }],
+    // 开关立即重建/清除热点（不等下一帧 syncEntities；无头/低帧率下会滞后）。
+    ['layerHotspots', function (v) {
+      state.layers.hotspots = v;
+      rebuildDynamicAreas(true);
+      markScene('layerHotspots');
+    }],
     ['layerRoutes', function (v) { state.layers.routes = v; markScene('layerRoutes'); }],
     ['layerTargetsRed', function (v) {
       state.layers.targetsRed = v;

@@ -594,8 +594,20 @@ PROBE_AREAS = r"""
   await wait(1800);
   var on = S.hotspotEntities.length;
   var rows = (S.hotspotRows || []).slice(0, 4).map(function (h) {
-    return { name: h.name, level: h.level_label, radius: h.radiusKm };
+    return { name: h.name, level: h.level_label, radius: h.radiusKm, center: h.center };
   });
+    // 合并校验：任意两个热点圆都不应相交（以米制圆心距与各自半径比较）。
+    var overlapPairs = 0;
+    var allSpots = S.hotspotRows || [];
+    for (var a = 0; a < allSpots.length; a++) {
+      for (var b = a + 1; b < allSpots.length; b++) {
+        var ca = allSpots[a].center || [0, 0], cb = allSpots[b].center || [0, 0];
+        var dd = Math.hypot((ca[0] - cb[0]) * 110540,
+                            (ca[1] - cb[1]) * 111320 * Math.cos(ca[0] * Math.PI / 180));
+        if (dd < (allSpots[a].radiusKm || 0) * 1000 ||
+            dd < (allSpots[b].radiusKm || 0) * 1000) overlapPairs++;
+      }
+    }
 
   // 动态占领：图元数应等于当前可见目标数（每目标一个影响圆）
   var liveN = Object.keys(S.targets).length;
@@ -647,7 +659,7 @@ PROBE_AREAS = r"""
     .map(function (l) { return l.label; });
 
   return {
-    hotspotOff: off, hotspotOn: on, hotspotRows: rows,
+    hotspotOff: off, hotspotOn: on, hotspotRows: rows, hotspotOverlapPairs: overlapPairs,
     liveTargets: liveN, occVisible: occN,
     redN: red.length, blueN: blue.length,
     redFirstLabel: firstRed && firstRed.label,
@@ -1605,6 +1617,11 @@ def main() -> int:
         check("dynamic hotspots: turning the layer off clears them, on rebuilds them",
               (ar.get("hotspotOff") or 0) == 0 and (ar.get("hotspotOn") or 0) > 0,
               "off=%r on=%r" % (ar.get("hotspotOff"), ar.get("hotspotOn")))
+        # 断言合并后**所有**热点两两不重叠（探针已按米制半径计算并返回 mergedPairs）。
+        check("hotspots are merged (no two circles overlap)",
+              ar.get("hotspotOverlapPairs") == 0,
+              "overlapPairs=%r rows=%r" % (
+                  ar.get("hotspotOverlapPairs"), ar.get("hotspotRows")))
         check("hotspots are generated with a level label and radius",
               bool(ar.get("hotspotRows")) and all(
                   r.get("radius") and r.get("level") for r in ar.get("hotspotRows") or []),
