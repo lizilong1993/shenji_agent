@@ -35,6 +35,8 @@ const TRAIL_WINDOW_TICKS = 120;
 // 目标轨迹来源：默认取"计划航路剩余段"，是一段**计划轨迹**（虚线）；
 // 'kinematic' 才是航向外推备选。两种模式都走同一套标绘渲染，不再另建独立轨迹实体。
 const TRACK_MODE = 'planned';
+// 计划轨迹的前推窗口（帧）。无航路点的数据集用它从帧序列里取未来位置。
+const PREDICT_HORIZON_TICKS = 60;
 // 航向外推的视野（备选，默认不走 TRACK_MODE=planned；切换前未在远程验证过）。TICK_SECONDS = 30。
 const TRACK_HORIZON_TICKS = 60;
 const TICK_SECONDS = 30;
@@ -2424,9 +2426,13 @@ function computeHotspots() {
       const km = relKm(A.pos, B.pos);
       const engR = (Number(A.def.engage_km) || 0) + (Number(B.def.engage_km) || 0);
       const infR = influenceRadiusKm(A.def) + influenceRadiusKm(B.def);
+      // 强度基础：有推理威胁就用它；数据集没有推理帧（如 CZML 驱动的新案例）时
+      // 退回**纯几何**判据——至少"进入交战射程"本身就是一个战场信号。
+      const tA = A.threat > 0 ? A.threat : 40;
+      const tB = B.threat > 0 ? B.threat : 40;
       let score = 0;
-      if (engR > 0 && km <= engR) score = ((A.threat + B.threat) / 2) * 1.2;
-      else if (km <= infR) score = ((A.threat + B.threat) / 2) * 0.5;
+      if (engR > 0 && km <= engR) score = ((tA + tB) / 2) * 1.2;
+      else if (km <= infR) score = ((tA + tB) / 2) * 0.5;
       if (score < HOTSPOT_MIN_SCORE) continue;
       // 热点落在两点中点；相近的交战对并入同一格
       const lat = (A.pos.lat + B.pos.lat) / 2, lon = (A.pos.lon + B.pos.lon) / 2;
@@ -2748,7 +2754,22 @@ function predictedTrackPoints(def) {
   const s = positionFor(def.id, state.tick);
   if (!s) return [];
   const out = [[s.lon, s.lat, s.alt]];
-  if (!def.waypoints || def.waypoints.length < 2) return out;
+  if (!def.waypoints || def.waypoints.length < 2) {
+    // 没有航路点（例如 CZML 驱动的新案例）：用**后续帧的计划位置**作为计划轨迹。
+    // 数据集本身就有完整的逐帧计划航迹，比"航向外推"更可靠。
+    const frames = (state.data && state.data.frames) || [];
+    if (frames.length > state.tick + 1) {
+      const end = Math.min(frames.length - 1, state.tick + PREDICT_HORIZON_TICKS);
+      const step = Math.max(1, Math.floor((end - state.tick) / 8));
+      for (let t = state.tick + step; t <= end; t += step) {
+        const p = positionFor(def.id, t);
+        if (p) out.push([p.lon, p.lat, p.alt]);
+      }
+      const last = positionFor(def.id, end);
+      if (last && out[out.length - 1][0] !== last.lon) out.push([last.lon, last.lat, last.alt]);
+    }
+    return out;
+  }
   const alt = def.altitude_m || 0;
   // 取**当前所在航段**的下一段：两点航路时，用"最近航路点"会在中点前先往回折。
   const cosLat = Math.cos(s.lat * Math.PI / 180) || 1;
@@ -5169,6 +5190,23 @@ window.SituationHost = {
     return (window.Plotting && Plotting.fromFeatureCollection)
       ? Plotting.fromFeatureCollection(fc)
       : { added: 0, errors: ['Plotting 未加载'] };
+  },
+  /** 动态热点/占领区的取证出口：计算值 vs 场景图元数（数据集可能有/无威胁数据）。 */
+  dynamicAreasDebug: function () {
+    const spots = computeHotspots();
+    const areas = computeOccupationArea();
+    return {
+      hotspots: spots.length,
+      hotspotEntities: (state.hotspotEntities || []).length,
+      hotspotRows: (state.hotspotRows || []).length,
+      occupation: areas.length,
+      occupationEntities: (state.occupationEntities || []).length,
+      occupationVisible: (state.occupationEntities || []).filter(function (e) { return !!e.show; }).length,
+      threatAvailable: Object.keys(state.targets).some(function (id) {
+        return threatOf(id).threat > 0;
+      }),
+      errors: window.__pageErrors || [],
+    };
   },
   // 动态标绘图层取证：注册表里实际存在的标绘类别图层 vs 要素所属图层。
   // "图层由实际要素驱动"不能靠肉眼判断，必须能读出两侧的集合。
