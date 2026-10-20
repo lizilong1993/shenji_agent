@@ -16,7 +16,7 @@
 | `type_kj2000.glb` | KJ-2000 (DCS World) | KojfDiscord | CC Attribution | KJ-2000（空警-500 / 预警机大类近似） |
 | `type_z10.glb` | Changhe Z-10W | 42manako | CC Attribution | 直-10 |
 | `type_mq9.glb` | MQ-9 Reaper Drone – Game Ready Military Asset | racingrevved | CC Attribution | MQ-9（无人机大类） |
-| `type_ztz99a.glb` | ZTZ-99A2 | 42manako | CC Attribution | 99A 主战坦克 |
+| `type_ztz99a.glb` | Type 99 MBT | philano | CC Attribution | 99A 主战坦克 |
 | `type_m1a2.glb` | M1a2 | muhammadvscode | CC Attribution | M1A2（M1A2T） |
 | `type_m48a5.glb` | M48A5 Patton Medium Tank | MirzaArrafiERV_45 | CC Attribution | M48A5（CM-11 近似） |
 | `type_ztd05.glb` | [OD]ZTD-05AG AAV 05式改型两栖突击车 | EXcalibur117 | Free Standard | 05 式两栖突击车 |
