@@ -1529,8 +1529,11 @@ def main() -> int:
     check("page criterion matches the independently computed criterion",
           sel.get("criterion") == criterion,
           "page=%r computed=%r engage=%r influence=%r" % (sel.get("criterion"), criterion, engage_n, influence_n))
-    check("line labels are drawn for every relation line",
-          sel.get("lineLabelOk") is True and sel.get("lineLabelCount") == sel.get("total"),
+    # 标签只为**近距**关系绘制（远线只画线），所以断言改为"带字数量不超过线数、
+    # 且至少有一条带字"，而不是"每线必有字"。
+    check("relation labels are drawn for the near relations only (<= lines, > 0)",
+          sel.get("lineLabelOk") is True
+          and 0 < (sel.get("lineLabelCount") or 0) <= (sel.get("total") or 0),
           "lineLabelOk=%r lineLabelCount=%r total=%r" % (
               sel.get("lineLabelOk"), sel.get("lineLabelCount"), sel.get("total")))
     check("relation lines are really visible in the scene",
