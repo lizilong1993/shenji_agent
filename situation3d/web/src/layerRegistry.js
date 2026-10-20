@@ -241,7 +241,7 @@
       label: '地名', group: '底图', checkbox: 'modelPlaces',
     },
 
-    // ---- 标绘栈：态势标绘（军队标号）作为一类图层纳管 ----
+    // ---- 标绘栈：军队标号标绘作为一类图层纳管 ----
     //
     // 标绘**不新起独立的图层通路**：它就是 kind:'plot' 的普通图层，顺序靠这里的 z、
     // 显隐靠 setDesired + plot sink、增删靠 register/list。几何与标准来源在
@@ -274,11 +274,17 @@
     { id: 'situation.occupation', kind: 'plot', z: 85, label: '占领区域',
       group: 'TS图层', default: true },
 
-    { id: 'layerTargets', kind: 'target', z: 10, label: '可见目标',
+    // 可见目标按阵营拆成两行（需求：红方目标 / 蓝方目标）；两行是对同一个
+    // `state.layers.targets` 的**分面视图**，总开关语义由 app.js 的 handler
+    // 取"任一行开 = 显示该类目标"实现。
+    { id: 'layerTargetsRed', kind: 'target', z: 9, label: '红方目标',
+      group: '目标图层', default: true },
+    { id: 'layerTargetsBlue', kind: 'target', z: 11, label: '蓝方目标',
       group: '目标图层', default: true },
     { id: 'layerLabels', kind: 'target', z: 20, label: '目标标牌',
       group: '目标图层', default: true },
-    { id: 'layerTracks', kind: 'target', z: 30, label: '历史轨迹',
+    // 「历史轨迹」图层同时管理历史实线与计划虚线（虚线 + 终点箭头）。
+    { id: 'layerTracks', kind: 'target', z: 30, label: '历史轨迹（含计划）',
       group: '目标图层', default: true },
   // B4 选中掩码：外环全图 + 内环挖空「选中目标 + 它的轨迹范围」。
   // handler 在 app.js 的映射表里（state.layers.focusMask → updateFocusMask）。

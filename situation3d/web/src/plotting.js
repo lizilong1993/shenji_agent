@@ -1,5 +1,5 @@
 /**
- * 态势标绘：把「中式军队标号为主、美军标补齐」的标绘图形做成**图层管理模块里的一类图层**。
+ * 标绘：把「中式军队标号为主、美军标补齐」的标绘图形做成**图层管理模块里的一类图层**。
  *
  * 三条设计约束（来自项目负责人）
  * ------------------------------
@@ -71,7 +71,7 @@
   // 标绘类别：**只是分组元数据，不是注册表里的固定图层**
   // ---------------------------------------------------------------------
   //
-  // 图层面板里出现哪些「标绘·××」，由**实际存在的标绘要素**决定：
+  // 图层面板里出现哪些标绘类别（进攻 / 火力 …），由**实际存在的标绘要素**决定：
   // `app.js` 的 syncPlotLayers() 按 `debug().items` 里的 layer 字段按需
   // register / unregister（见那里的说明）。所以这里不预先声明"系统有固定的
   // 五种标绘"——新增一个类别只要：
@@ -84,7 +84,6 @@
     defense: { zh: '防御与障碍', z: 87 },
     fire: { zh: '火力', z: 90 },
     intel: { zh: '侦察与空域', z: 93 },
-    track: { zh: '目标轨迹', z: 96 },
   };
 
   var CATALOGUE = {
@@ -133,9 +132,11 @@
       algorithmFamily: 'polyline-arrow-npt',
       cnImplRef: 'c-lei-en/cesiumPlot:arrowDraw/algorithm.ts#getTailedAttackArrow',
       usEquivalent: { name: 'Main Axis of Advance', code: '151403', spec: 'FM 1-02.2 + APP-06' },
+      // 燕尾参数：`swallowWidthFactor` 翼尖超出尾沿的比例、`swallowNotchFactor`
+      // 叉口深度（相对翼展）。取值是观感约定，不是规范数值（见 sourceConfidence）。
       params: { headHeightFactor: 0.18, headWidthFactor: 0.30, neckHeightFactor: 0.85,
                 neckWidthFactor: 0.15, headTailFactor: 0.8, tailWidthFactor: 0.1,
-                swallowTailFactor: 1 },
+                swallowWidthFactor: 0.5, swallowNotchFactor: 0.35 },
     },
     squad_combat: {
       zh: '分队战斗行动箭头', family: 'arrowN', sourceStandard: 'CN',
@@ -334,23 +335,6 @@
       custom: true,
       params: {},
     },
-    // ---- 系统生成的态势标绘：目标轨迹（计划航段） ----
-    //
-    // 目标轨迹**不再作为独立的轨迹图层存在**：它按《军事标图技法》
-    // 第二章第五节「实线=现行、虚线=计划（预定）」的约定，作为一条 line 族
-    // 标绘要素进入态势标绘体系；由 app.js 按选中目标与当前帧自动 add/update，
-    // 归属动态图层 `plot.track`。`system:true` 表示该类型由系统维护：
-    // 不出现在手动标绘类型列表里，也不随 TS 定义导出/导入。
-    target_track: {
-      zh: '目标轨迹', family: 'line', sourceStandard: 'CN',
-      sourceDoc: CN_DOC + '（线型语义）；《军事标图技法》第二章第五节（虚线=计划/预定）',
-      sourceConfidence: '由目标计划航路自动生成；虚线语义可溯源，轨迹本身是本系统派生数据',
-      algorithmFamily: 'line',
-      cnImplRef: '无（复用 line 族）',
-      usEquivalent: null,
-      system: true,
-      params: { dash: true },
-    },
   };
   // ---------------------------------------------------------------------
   // 配色：**中式约定与北约相反，这是最容易搞错的一点**
@@ -446,8 +430,6 @@
     // 侦察与空域
     recon_area: 'plot.intel', no_fly_zone: 'plot.intel',
     maritime_blockade: 'plot.intel',
-    // 系统生成的态势标绘（目标轨迹）：独立类别，按实际要素动态成层
-    target_track: 'plot.track',
   };
 
   /** `plot.<category>` → 类别元数据。类别未在 CATEGORIES 声明时回落到 id 后缀。 */
@@ -760,6 +742,25 @@
     return out;
   }
 
+  /**
+   * 燕尾（叉形）尾巴的角点。
+   *
+   * 标准燕尾箭头：左右两条边在尾部各向后掠出一个尖，尾端中间是**空的**（开口
+   * 朝后），像一个叉子。原来的实现只往环里塞了一个"燕尾点"，且落点方向按
+   * `getThirdPoint(bone[1], bone[0], 0, …)` 计算——那会得到一个规则的三角形
+   * 尾巴，根本不是燕尾。
+   *
+   * 这里显式构造：从左尾点沿"朝后的方向"掠出 `h`，再沿"朝内的方向"收回 `w/2`，
+   * 最终两翼尖落在骨架中线侧后方，形成叉口。`notch` 是叉口的深度占箭头总长的比例。
+   */
+  function swallowCorner(tailLeft, tailRight, params) {
+    var allW = distance(tailLeft, tailRight);
+    var n = params.swallowNotchFactor === undefined ? 0.35 : params.swallowNotchFactor;
+    var w = allW * (params.swallowWidthFactor === undefined ? 0.5 : params.swallowWidthFactor);
+    var h = w * (1 + n * 2);
+    return { w: w, h: h };
+  }
+
   function arrowNRing(p, params, tailed) {
     var tailLeft, tailRight;
     if (p.length >= 3 && isClockWise(p[0], p[1], p[2])) {
@@ -787,10 +788,24 @@
     var right = qbSpline([tailRight].concat(body.right).concat([head[4]]));
     var ring = left.concat(head).concat(right.reverse());
     if (tailed) {
-      var allLen = wholeDistance(bone);
-      var swallow = getThirdPoint(bone[1], bone[0], 0,
-        allLen * params.tailWidthFactor * (params.swallowTailFactor || 1), true);
-      ring = ring.concat([swallow, left[0]]);
+      // 燕尾：左翼尖 → 叉口内收点 → 右翼尖，三点接在两侧尾点之间。
+      var sc = swallowCorner(tailLeft, tailRight, params);
+      // 沿尾沿朝向（左→右）取外法向；翼尖朝"骨架后方"偏出，叉口内收。
+      var dx = tailRight.x - tailLeft.x, dy = tailRight.y - tailLeft.y;
+      var wl = Math.hypot(dx, dy) || 1e-9;
+      var ux = dx / wl, uy = dy / wl;            // 尾沿方向
+      var bx = bone[1].x - bone[0].x, by = bone[1].y - bone[0].y;
+      var bl = Math.hypot(bx, by) || 1e-9;
+      var bxu = bx / bl, byu = by / bl;          // 骨架前进方向
+      // 两侧翼尖：沿尾沿向外超出半个尾宽，再向骨架后方掠出 h
+      var wingL = { x: tailLeft.x - ux * sc.w / 2 - bxu * sc.h,
+                    y: tailLeft.y - uy * sc.w / 2 - byu * sc.h };
+      var wingR = { x: tailRight.x + ux * sc.w / 2 - bxu * sc.h,
+                    y: tailRight.y + uy * sc.w / 2 - byu * sc.h };
+      var notch = { x: (tailLeft.x + tailRight.x) / 2 - bxu * sc.h * 0.18,
+                    y: (tailLeft.y + tailRight.y) / 2 - byu * sc.h * 0.18 };
+      // 环顺序：…右尾点 → 右翼尖 → 叉口 → 左翼尖 → 左尾点…
+      ring = ring.concat([wingR, notch, wingL]);
     }
     return ring;
   }
@@ -1435,23 +1450,12 @@
 
     rings.forEach(function (ring) {
       if (isLine) {
-        // 逐点高度（可选）：目标轨迹这类由系统生成的标绘需要保住空中目标的真实
-        // 高度，不能用贴地的 2D 折线。`rec.heights` 与 `rec.points` 一一对应；
-        // 顶点被降采样时长度会对不上，此时退回贴地渲染（宁可贴地，也不错位）。
-        var useHeights = !!(rec.heights && rec.heights.length === rec.points.length
-          && ring.length === rec.points.length);
-        var linePositions;
-        if (useHeights) {
-          var flat = [];
-          for (var hi = 0; hi < ring.length; hi++) {
-            flat.push(ring[hi][0], ring[hi][1], Number(rec.heights[hi]) || 0);
-          }
-          linePositions = Cesium.Cartesian3.fromDegreesArrayHeights(flat);
-        } else {
-          linePositions = ring.map(function (c) {
-            return Cesium.Cartesian3.fromDegrees(c[0], c[1]);
-          });
-        }
+        // 标绘一律**贴地**：开了地形后，浮在椭球面高度的线会被山体遮住/穿插，
+        // 表现为"标绘画不全"。`clampToGround` 让线沿地形起伏走（Cesium 的
+        // GroundPolyline 管线）。
+        var linePositions = ring.map(function (c) {
+          return Cesium.Cartesian3.fromDegrees(c[0], c[1]);
+        });
         // ⚠ FIX-2：这里原先**无条件**用虚线材质，于是 `params.dash` 从来没被读过，
         // 所有线型都是虚线。教范是"实线=现行、虚线=计划/待命"，写死虚线会让每一个
         // 新增的实线型图形默认表达**错误的状态**。
@@ -1459,7 +1463,7 @@
           polyline: {
             positions: linePositions,
             width: 3,
-            clampToGround: !useHeights,
+            clampToGround: true,
             material: (def.params && def.params.dash)
               ? new Cesium.PolylineDashMaterialProperty({ color: color, dashLength: 16 })
               : color,
@@ -1516,14 +1520,23 @@
           n++;
           return n;
         }
+        // 面状标绘：**贴地分类多边形**（classificationType BOTH）+**贴地轮廓线**。
+        // 只靠 `outline` 在部分地形/AGL 下轮廓会被地形遮住（实测"图形被切掉
+        // 一半"），所以轮廓单独用一条 clampToGround 的闭合折线绘制。
         rec.entities.push(viewer.entities.add({
           polygon: {
             hierarchy: new Cesium.PolygonHierarchy(positions),
             material: color.withAlpha(def.params && def.params.hatch ? 0.30 : 0.38),
-            outline: true,
-            outlineColor: color,
-            outlineWidth: 2,
+            outline: false,
             classificationType: Cesium.ClassificationType.BOTH,
+          },
+        }));
+        rec.entities.push(viewer.entities.add({
+          polyline: {
+            positions: positions.concat([positions[0]]),
+            width: 2,
+            clampToGround: true,
+            material: color,
           },
         }));
       }
@@ -1539,13 +1552,10 @@
     if (!viewer || !rec.label) return 0;
     var idx = Math.floor(rec.points.length / 2);
     var mid = rec.points[idx];
-    // 带逐点高度的图形（目标轨迹）标签也要跟着到空中，否则虚线在空中、
-    // 标签却挂在地面 0 米处，近景明显脱节。
-    var useHeight = rec.heights && rec.heights.length === rec.points.length;
+    // 标签**贴地**（与标绘同一处理），且远处自动淡出：贴地标签若按绝对字号
+    // 始终显示，拉远后会挤成一团。
     rec.entities.push(viewer.entities.add({
-      position: useHeight
-        ? Cesium.Cartesian3.fromDegrees(mid[0], mid[1], rec.heights[idx])
-        : Cesium.Cartesian3.fromDegrees(mid[0], mid[1]),
+      position: Cesium.Cartesian3.fromDegrees(mid[0], mid[1]),
       label: {
         text: rec.label,
         font: 'bold 14px "Microsoft YaHei", sans-serif',
@@ -1555,6 +1565,7 @@
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        scaleByDistance: new Cesium.NearFarScalar(50000, 1.0, 1500000, 0.0),
       },
     }));
     return 1;
@@ -1777,6 +1788,88 @@
   }
 
   /**
+   * 导出为 GeoJSON `FeatureCollection`（面状要素存为 Polygon，其它存为
+   * LineString / MultiLineString）。用于与外部工具交换；也作为"面状要素
+   * 的统一存储格式"的对外出口。
+   *
+   * `catalogue()` 里的 family 决定几何类型：
+   *   zone  → Polygon（控制点环）
+   *   line/band/array → MultiLineString（各段折线）
+   *   arrow/arrowN/pincer/fan → Polygon（渲染用的环，箭头本身就是闭合面）
+   */
+  function toFeatureCollection() {
+    var features = Object.keys(byId).filter(function (id) {
+      var def = CATALOGUE[byId[id].type];
+      return !(def && def.system);
+    }).map(function (id) {
+      var rec = byId[id];
+      var def = CATALOGUE[rec.type] || {};
+      var fam = def.family;
+      var props = {
+        type: rec.type, zh: def.zh || rec.type, layer: rec.layer,
+        hostility: rec.hostility, label: rec.label || null,
+        category: def.category || null,
+      };
+      var geometry;
+      if (fam === 'line' || fam === 'band' || fam === 'array') {
+        geometry = { type: 'MultiLineString', coordinates: [rec.points] };
+      } else {
+        var ring = rec.points.slice();
+        if (ring.length && (ring[0][0] !== ring[ring.length - 1][0] ||
+                            ring[0][1] !== ring[ring.length - 1][1])) {
+          ring = ring.concat([ring[0]]);
+        }
+        geometry = { type: 'Polygon', coordinates: [ring] };
+      }
+      return { type: 'Feature', geometry: geometry, properties: props };
+    });
+    return { type: 'FeatureCollection', features: features };
+  }
+
+  /**
+   * 从 GeoJSON `FeatureCollection` 导入。逐条调用 `add()`，校验与手动创建一致。
+   *
+   * 接受 `properties.type`（标绘类型）与 `properties.layer`；
+   * 归属阵营读 `properties.hostility`。Polygon / MultiLineString 的首环/首线
+   * 作为控制点。缺 `type` 的 Feature 会用 `properties.zh` 反查目录。
+   */
+  function fromFeatureCollection(fc, opts) {
+    if (!fc || fc.type !== 'FeatureCollection' || !Array.isArray(fc.features)) {
+      return { added: 0, errors: ['不是合法的 FeatureCollection'] };
+    }
+    var zh2type = {};
+    Object.keys(CATALOGUE).forEach(function (k) { zh2type[CATALOGUE[k].zh] = k; });
+    var added = 0, errors = [];
+    var list = fc.features.filter(function (f) {
+      // 动态生成的面（热点 / 占领区）不属于用户标绘，导入时跳过而不是报错。
+      var k = f && f.properties && f.properties.kind;
+      return k !== 'hotspot' && k !== 'occupation';
+    }).map(function (f) {
+      var p = f && f.properties || {};
+      var type = p.type || zh2type[p.zh] || null;
+      var pts = [];
+      var g = f && f.geometry;
+      if (g && g.type === 'Polygon' && g.coordinates && g.coordinates[0]) {
+        pts = g.coordinates[0].map(function (c) { return [c[0], c[1]]; });
+        // 闭合环的末点与首点重复：去掉末点（标绘的控制点本身是开环）
+        if (pts.length > 1 && pts[0][0] === pts[pts.length - 1][0] &&
+            pts[0][1] === pts[pts.length - 1][1]) pts = pts.slice(0, -1);
+      } else if (g && g.type === 'MultiLineString' && g.coordinates && g.coordinates[0]) {
+        pts = g.coordinates[0].map(function (c) { return [c[0], c[1]]; });
+      } else if (g && g.type === 'LineString' && g.coordinates) {
+        pts = g.coordinates.map(function (c) { return [c[0], c[1]]; });
+      }
+      return { type: type, layer: p.layer, points: pts,
+               hostility: p.hostility, label: p.label || null };
+    });
+    list.forEach(function (spec, i) {
+      try { add(spec); added++; }
+      catch (e) { errors.push('features[' + i + ']：' + e.message); }
+    });
+    return { added: added, errors: errors };
+  }
+
+  /**
    * 批量导入。逐条走既有的 `add()`，所以类型校验、点数校验都沿用同一份实现。
    * **逐条收集错误**而不是遇到第一条就抛：一份定义里有两三条坏的，用户应该一次
    * 看全，而不是改一条试一次。
@@ -1885,6 +1978,9 @@
     focus: focus,
     exportAll: exportAll,
     importAll: importAll,
+    // GeoJSON 交换（面状要素的对外统一格式）
+    toFeatureCollection: toFeatureCollection,
+    fromFeatureCollection: fromFeatureCollection,
     // 屏幕空间装饰的缩放重建：`force` 供自检直接触发，避免依赖真实相机运动
     refreshScreenSpaceDecorations: refreshScreenSpaceDecorations,
     resolutionBucket: resolutionBucket,

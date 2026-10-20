@@ -211,8 +211,11 @@ PROBE = r"""
     // 不再写死五个类别：新增/改名类别时自检自动跟随，符合"图层由要素驱动、
     // 不用固定分类限制扩展"的要求。
     // —— 目标图层族（此前 layerTargets 因读错对象而被标注「暂不纳入」，见上）——
-    { id: "layerTargets", what: "可见目标（state.layers.targets，handler 同步产物）",
-      read: function () { return targetLayerShown("targets"); } },
+    // 可见目标按阵营拆成两行；两行各自翻转、各自生效（红方关闭不影响蓝方）。
+    { id: "layerTargetsRed", what: "红方目标（state.layers.targetsRed）",
+      read: function () { return targetLayerShown("targetsRed"); } },
+    { id: "layerTargetsBlue", what: "蓝方目标（state.layers.targetsBlue）",
+      read: function () { return targetLayerShown("targetsBlue"); } },
     { id: "layerLabels",  what: "目标标牌（state.layers.labels）",
       read: function () { return targetLayerShown("labels"); } },
     { id: "layerTracks",  what: "历史轨迹（state.layers.tracks）",

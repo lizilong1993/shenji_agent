@@ -86,6 +86,8 @@
         // "先画标绘、后打开TS面板"走的就是这一条，标绘会在导出里凭空消失 ——
         // 这正是本轮要消灭的那类静默丢失（见下面有TS分支的说明）。
         plots: (window.Plotting && Plotting.exportAll) ? Plotting.exportAll() : [],
+      plotFeatures: exportPlotFeatures(),
+        plotFeatures: exportPlotFeatures(),
       };
     }
     const frames = data.frames;
@@ -116,6 +118,7 @@
       // 草稿是"当前TS的副本"，那么**屏幕上已经画着的标绘也属于它**。不带上就会
       // 出现"重置草稿之后标绘全没了"——用户没删任何东西，却丢了。
       plots: (window.Plotting && Plotting.exportAll) ? Plotting.exportAll() : [],
+      plotFeatures: exportPlotFeatures(),
     };
   }
 
@@ -477,6 +480,42 @@
    * 把 JSON 或 XML 文本归一化成草稿对象。
    * 返回 `{draft, errors, warnings}`；`errors` 非空时不要应用。
    */
+  /**
+   * 标绘的 GeoJSON 形式（与 `plots` 并存，互为兼容）：
+   *   · 导出：在 TS 定义里额外写 `plotFeatures`（FeatureCollection）；
+   *   · 导入：若给了 `plotFeatures` 就优先用它，否则退回旧 `plots` 数组。
+   * 两条路都最终落到 `Plotting.add()`，所以类型/点数校验只有一份。
+   */
+  function exportPlotFeatures() {
+    return (window.Plotting && Plotting.toFeatureCollection)
+      ? Plotting.toFeatureCollection()
+      : { type: 'FeatureCollection', features: [] };
+  }
+
+  /** FeatureCollection → 与 `plots` 同构的数组（供 normalizeStructured 校验）。 */
+  function featuresToPlots(fc) {
+    if (!fc || fc.type !== 'FeatureCollection' || !Array.isArray(fc.features)) return null;
+    const out = [];
+    fc.features.forEach(function (f) {
+      const p = (f && f.properties) || {};
+      if (p.kind === 'hotspot' || p.kind === 'occupation') return; // 动态生成，不入 TS
+      const g = f && f.geometry;
+      let pts = [];
+      if (g && g.type === 'Polygon' && g.coordinates && g.coordinates[0]) {
+        pts = g.coordinates[0].slice();
+        if (pts.length > 1 && pts[0][0] === pts[pts.length - 1][0] &&
+            pts[0][1] === pts[pts.length - 1][1]) pts.pop();
+      } else if (g && g.type === 'MultiLineString' && g.coordinates && g.coordinates[0]) {
+        pts = g.coordinates[0].slice();
+      } else if (g && g.type === 'LineString') {
+        pts = g.coordinates.slice();
+      }
+      out.push({ type: p.type, layer: p.layer, hostility: p.hostility,
+                 label: p.label || null, points: pts });
+    });
+    return out;
+  }
+
   function normalizeStructured(text, format) {
     var errors = [], warnings = [], raw = null;
 
@@ -642,6 +681,16 @@
     Object.keys(manualLayerIds).forEach(function (lid) {
       if (plotLayers.indexOf(lid) < 0) plotLayers.push(lid);
     });
+    // GeoJSON 入口优先：给了 `plotFeatures` 就以它为准（并忽略旧 `plots`，
+    // 避免同一批标绘被两份数据导入两次）。
+    if (raw.plotFeatures !== undefined && raw.plotFeatures !== null) {
+      const asPlots = featuresToPlots(raw.plotFeatures);
+      if (!asPlots) {
+        errors.push('plotFeatures 必须是 GeoJSON FeatureCollection');
+      } else {
+        raw = Object.assign({}, raw, { plots: asPlots });
+      }
+    }
     if (raw.plots !== undefined && raw.plots !== null) {
       if (!Array.isArray(raw.plots)) {
         errors.push('plots 必须是数组');

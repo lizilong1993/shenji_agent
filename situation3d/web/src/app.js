@@ -32,7 +32,7 @@ const LEVEL_CLASS = { 1: 'lv1', 2: 'lv2', 3: 'lv3', 4: 'lv4' };
 // TRAIL_WINDOW_TICKS：历史轨迹**全量保留**，只在渲染时切片。窗口只影响"看多少"，
 // 不影响"清空后从第 0 帧重建"的回退逻辑（回退靠 rec.lastTick，不靠窗口）。
 const TRAIL_WINDOW_TICKS = 120;
-// 目标轨迹来源：默认取"计划航路剩余段"，作为态势标绘的一条虚线要素（虚线=计划）；
+// 目标轨迹来源：默认取"计划航路剩余段"，是一段**计划轨迹**（虚线）；
 // 'kinematic' 才是航向外推备选。两种模式都走同一套标绘渲染，不再另建独立轨迹实体。
 const TRACK_MODE = 'planned';
 // 航向外推的视野（备选，默认不走 TRACK_MODE=planned；切换前未在远程验证过）。TICK_SECONDS = 30。
@@ -87,13 +87,11 @@ const state = {
   playing: false,
   ticksPerSecond: 30,
   targets: {},              // id -> { def, entity, trail: [], lastTick, sensorEntity }
-  layers: { targets: true, tracks: true, routes: true, hotspots: true, labels: true,
+  layers: { targets: true, targetsRed: true, targetsBlue: true,
+            tracks: true, routes: true, hotspots: true, labels: true,
             targetPanel: true, overview: true, focusMask: false, occupation: true },
   filters: { red: true, blue: true, sea: true, land: true, air: true },
   selected: null,
-  // 选中目标的态势标绘轨迹：记录 id + 最近一次写入的几何签名（避免每帧重建）
-  trackPlotId: null,
-  trackPlotKey: null,
   focusMaskEntity: null, // 选中掩码图元（懒建：没选中就先不建）
   focusMaskHole: null,   // 掩码内环经纬边界（focusDebug 报出去用）
   hotspotEntities: [],
@@ -644,14 +642,7 @@ function initViewer() {
   // 标绘图层由**实际存在的标绘要素**动态驱动：Plotting 每次增删改后通知这里，
   // 由 syncPlotLayers() 增删对应的 kind:'plot' 图层（见该函数的说明）。
   if (window.Plotting && Plotting.onChange) {
-    Plotting.onChange(function (evt) {
-      // 当前目标轨迹被外部移除（例如 `Plotting.clearLayer()`）时，让下一帧重建；
-      // 暂停且无其它交互时，仅靠"几何没变"的短路会让它再也回不来。
-      if (state.trackPlotId && evt && (evt.type === 'remove' || evt.type === 'batch')) {
-        markScene('plotChange');
-      }
-      syncPlotLayers();
-    });
+    Plotting.onChange(function () { syncPlotLayers(); });
     syncPlotLayers();
   }
 
@@ -713,15 +704,34 @@ function initViewer() {
   if (window.Local3D) Local3D.init(viewer);
 }
 
+/**
+ * 飞到某个经纬点，并让该点**正处视窗中心**。
+ *
+ * 旧实现 `flyTo({destination: fromDegrees(lon, lat, h)})` 把**相机位置**当成了
+ * 目标位置：带俯仰角时视窗中心落在目标前方，目标跑到屏幕侧下方（实测 900 km
+ * 下偏 200 px）。这里保持同一套"相机在目标上方 h 米"的机位语义，但改为
+ * `headingPitchRange`（以目标为原点的球坐标）——目标点恒在视窗中心。
+ */
 function flyTo(lon, lat, height, pitchDeg) {
   // 先解除跟随：camera.lookAt 会把 camera.transform 锁在目标 ENU 上，而
   // setView / flyTo 不会自动解锁，orientation 会被按那个局部系解释。
   detachFollow('视角跳转');
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
-    orientation: { heading: 0, pitch: Cesium.Math.toRadians(pitchDeg === undefined ? -70 : pitchDeg), roll: 0 },
-    duration: 1.2,
-  });
+  const pitch = Cesium.Math.toRadians(pitchDeg === undefined ? -70 : pitchDeg);
+  const h = Math.max(1000, Number(height) || 180000);
+  const target = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+  // 斜距：目标点正上方 h、俯仰 pitch 时的视线距离 = h / sin(-pitch)。
+  const range = Math.abs(Math.cos(pitch)) < 1e-3 ? h : h / Math.sin(-pitch);
+  // ⚠ 用 `setView` 而不是 `flyTo` / `flyToBoundingSphere`：实测本页的
+  // `RequestAnimationFrame` 渲染循环在无头/低帧率下不会推进 Cesium 的飞行
+  // 动画（`flyTo` 立即完成但机位不变），定位会静默失效。setView 是同步的，
+  // 且 `lookAt` 自带"目标居视窗中心"的语义。
+  viewer.camera.lookAt(target, new Cesium.HeadingPitchRange(0, pitch, range));
+  // lookAt 会把相机锁在目标 ENU 上；这里必须**解除锁定**（transform 置单位阵），
+  // 否则后续旋转/缩放会被解释为绕目标公转。判定不能用 `Matrix4.IDENTITY` ——
+  // 那是同一个常量对象，clone 进去等于没改；用"取出来比较是否仍是上一次的锁"更稳。
+  if (!Cesium.Matrix4.equals(viewer.camera.transform, Cesium.Matrix4.IDENTITY)) {
+    viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -1480,12 +1490,6 @@ function redrawPlotsAfterClear() {
   state.focusMaskEntity = null;
   state.focusMaskHole = null;
   if (!window.Plotting) return 0;
-  if (state.trackPlotId) {
-    const old = state.trackPlotId;
-    state.trackPlotId = null;
-    state.trackPlotKey = null;
-    try { Plotting.remove(old); } catch (err) { /* 已不存在 */ }
-  }
   return Plotting.redrawAll();
 }
 
@@ -1879,7 +1883,7 @@ function closeCaseMenu() { closeAllMenus(); }
 
 const LAYER_GROUPS = [
   { name: 'TS图层', ids: ['layerHotspots', 'layerRoutes'] },
-  { name: '目标图层', ids: ['layerTargets', 'layerLabels', 'layerTracks', 'modelSensor',
+  { name: '目标图层', ids: ['layerTargetsRed', 'layerTargetsBlue', 'layerLabels', 'layerTracks', 'modelSensor',
                             'layerTargetPanel', 'filterRed', 'filterBlue', 'filterSea',
                             'filterLand', 'filterAir'] },
   { name: '底图', ids: ['modelTianditu', 'modelTiandituLabel', 'modelImagery',
@@ -1984,6 +1988,9 @@ function positionFor(id, tick) {
 
 function isVisible(def) {
   if (!state.layers.targets) return false;
+  // 可见目标按阵营拆成两行：红方 / 蓝方目标各自可单独关。
+  if (def.affiliation === 'red' && !state.layers.targetsRed) return false;
+  if (def.affiliation === 'blue' && !state.layers.targetsBlue) return false;
   // 单要素层面：图层开关 → 阵营/域过滤 → **单要素开关/移除**，三层取与。
   // 走同一条通路（实体 show）而不是另建一套隐藏机制：目标实体、标牌、航路都由
   // isVisible/syncEntities 统一驱动，另建一套就会出现"隐藏了但航路还在"。
@@ -2105,6 +2112,8 @@ function createTargetEntities() {
       }, false),
       billboard: {
         image: Symbology.symbolUri(def.icon, def.affiliation),
+        // **固定屏幕尺寸**：34 CSS px，不随相机缩放（去掉 scaleByDistance）。
+        // 之前近处 1.5×、远处 0.5×，拉远后目标牌小到读不出字。
         width: 34,
         height: 34,
         // 锚点/偏移由 applyTargetBillboardAnchor() 按形态切换：图标形态保持不变
@@ -2112,7 +2121,6 @@ function createTargetEntities() {
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         pixelOffset: new Cesium.Cartesian2(0, 0),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        scaleByDistance: new Cesium.NearFarScalar(20000, 1.5, 2000000, 0.5),
       },
       // 车/船的 3D 模型（低空显示，见 EntityLod）。**默认 show:false**：
       // 高空由 billboard 表达，跨过阈值后由 applyTargetLod() 切过来。
@@ -2160,7 +2168,7 @@ function createTargetEntities() {
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         showBackground: true,
         backgroundColor: Cesium.Color.fromCssColorString('rgba(255,255,255,0.86)'),
-        scaleByDistance: new Cesium.NearFarScalar(20000, 1.0, 2000000, 0.0),
+        // 标牌固定字号：不随距离缩放（去掉 scaleByDistance）。
       },
     });
 
@@ -2168,12 +2176,48 @@ function createTargetEntities() {
     entity.polyline = {
       positions: new Cesium.CallbackProperty(function () {
         const rec = state.targets[def.id];
-        return rec ? trailWindowOf(rec, def.id) : [];
+        // 完整历史（第 0 帧 → 当前帧）。窗口只影响掩码/取证读数，不影响绘制。
+        return rec ? rec.trail : [];
       }, false),
       width: 2,
       material: color.withAlpha(0.85),
       clampToGround: false,
     };
+
+    // 计划轨迹：虚线 + 终点箭头，由「历史轨迹」图层统一管理（不再单独成标绘层）。
+    // 与历史实线是两个独立图元，视觉上区分"已发生"与"计划"。
+    const predict = viewer.entities.add({
+      id: 'predict-' + def.id,
+      show: false,
+      polyline: {
+        positions: new Cesium.CallbackProperty(function () {
+          const pts = predictedTrackPoints(def);
+          return pts.map(function (p) { return Cesium.Cartesian3.fromDegrees(p[0], p[1], p[2] || 0); });
+        }, false),
+        width: 2,
+        material: new Cesium.PolylineDashMaterialProperty({
+          color: color.withAlpha(0.9),
+          dashLength: 14,
+        }),
+        clampToGround: false,
+      },
+      // 终点箭头：billboard 转成屏幕像素，指向计划的终点（不随缩放变形）。
+      position: new Cesium.CallbackProperty(function () {
+        const pts = predictedTrackPoints(def);
+        return pts.length >= 2
+          ? Cesium.Cartesian3.fromDegrees(pts[pts.length - 1][0], pts[pts.length - 1][1],
+                                          pts[pts.length - 1][2] || 0)
+          : undefined;
+      }, false),
+      billboard: {
+        image: PREDICT_ARROW_URI,
+        width: 16,
+        height: 16,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        // 用 polylines 的 material 颜色没法复用到 billboard，直接用阵营色近似
+        color: color,
+      },
+    });
 
     // 传感器覆盖范围，默认隐藏。
     const sensorEntity = viewer.entities.add({
@@ -2195,12 +2239,12 @@ function createTargetEntities() {
       },
     });
 
-    // 目标轨迹**不在这里建图元**：它统一走态势标绘（Plotting 的 `target_track`
-    // 类型，虚线=计划的语义），由 syncTrackPlot() 按选中目标维护一条标绘记录。
-    // 历史轨迹（已发生的航迹，实线）仍由上面的 polyline 承担。
+    // 历史轨迹 = 上面的实线 polyline（全程）；计划轨迹 = 上面的 predict 实体
+    // （虚线 + 终点箭头）。两者都由「历史轨迹」图层统一管理。
     state.targets[def.id] = {
       def: def,
       entity: entity,
+      predict: predict,
       sensorEntity: sensorEntity,
       trail: [],
       lastTick: -1,
@@ -2265,118 +2309,326 @@ function createRouteEntities() {
   });
 }
 
-/**
- * 热点区域面的**固定高度**（米）：10000。
- *
- * 演进过程值得留着，因为两个版本的取舍不同：
- *   ① 最早是 `height: 0` 的一张**平面**贴在椭球面上 —— 开了 DEM 地形后会被地形
- *      盖住（陆上区域尤其明显），而且没有"高度"可言；
- *   ② 后来改成从地面拔起的**立体框**（`height` 作底、`extrudedHeight` 作顶），
- *      解决了遮挡，但在战区级视图下多个框的侧面互相穿插，把区域本身糊住了；
- *   ③ 现在（2026-10-15，按用户要求）改为**悬在 10 km 的平面矩形**：
- *      只保留"范围"这一条信息，不与地形打架，也不互相遮挡。
- *
- * 10 km 仍远高于地形（全球陆地最高约 4 km），所以②里"必须高过地形"的那条理由
- * 依然成立 —— 这一步不是退回①，而是把"高度"从一个立体维度改成一个**抬升量**。
- *
- * **低于该视点不可见**：由 `refreshEntityVisibility()` 按相机高度置 `show`
- * （与图层开关、单条隐藏都是"与"的关系，见那一段）。
- */
-const HOTSPOT_SURFACE_ALT_M = 10000;
-// 方向 4：热点按 kind 区分呈现。port / airport 是「设施」——加一个锚点图元，并把文字收进
-// 显式层级门槛（默认取 places.js LOD 的 rank-5 档 700 km：相机高于门槛时只留锚点、不显示文字）；
-// 其余 kind 保持既有的矩形面 + 名称不变。符号集里没有港口/机场图标，先用颜色区分，不引入新资源。
-const FACILITY_KINDS = {
-  port: Cesium.Color.fromCssColorString('#1f6feb'),
-  airport: Cesium.Color.fromCssColorString('#7b3fa0'),
-};
-const FACILITY_TEXT_MAX_HEIGHT_M = 700000;
+// --------------------------------------------------------------------------
+// 动态热点 / 动态占领区（按推演数据判定，不依赖预设矩形）
+// --------------------------------------------------------------------------
+//
+// 判定依据（数据里实际具备的字段，见 data/situations/*.json）：
+//   · 位置        frames[i].targets[*].lon/lat/alt
+//   · 敌对关系    inference_frames[i].targets[*].threat / alert / threat_terms
+//                 （threat_terms 给 proximity / coverage / base，能区分"为什么高"）
+//   · 交战判定    双方 engage_km 之和（与关系线用同一口径）
+// 热点 = **双方兵力都存在的交战/对峙聚集区**：
+//   对每个敌对目标对，若距离 ≤ engage 半径和 → 强度 = 双方 threat 均值 × 1.2
+//                                        否则若距离 ≤ 双方影响半径和 → 强度 = 均值 × 0.5
+//   再把强度按网格聚合成"簇"（相邻格点合并），簇中心即热点位置；
+//   半径由簇内目标的空间散度决定（覆盖实际接触面，而不是固定框）。
+// 占领区 = 每个目标按其类型给出**影响半径**（舰/防空/炮兵/地面），
+//   半径按该目标当前 threat 缩放（0.5x~1x）；同阵营叠加，交集处判为争夺。
 
-// 方向 4 取证出口：数据集条数 vs 真建出的锚点/文字，供自检断言「图元数 == 数据条数」。
-function hotspotFacilities() {
-  var out = { data: {}, anchors: {}, labels: {} };
-  var list = (state.data && state.data.hotspots) || [];
-  list.forEach(function (hs, i) {
-    var kind = hs.kind || 'other';
-    out.data[kind] = (out.data[kind] || 0) + 1;
-    var e = state.hotspotEntities[i];
-    if (e && e.point) out.anchors[kind] = (out.anchors[kind] || 0) + 1;
-    if (e && e.label && e.label.show) out.labels[kind] = (out.labels[kind] || 0) + 1;
+const HOTSPOT_GRID_DEG = 0.35;      // 聚合网格（约 35 km）
+const HOTSPOT_MIN_SCORE = 0.6;      // 低于此强度不入热点
+const HOTSPOT_MAX = 12;             // 上限，防止战区级铺满
+
+// 每类目标的影响半径（km）——取"能覆盖到的战场范围"，不是射程本身。
+function influenceRadiusKm(def) {
+  const ic = Number(def.influence_km) || 0;
+  if (ic > 0) return ic;
+  if (def.domain === 'air') return 160;
+  if (def.domain === 'sea') return 100;
+  return 80;
+}
+
+/** 当前帧的 threat 表（0 表示没有推理数据）。 */
+function threatOf(id) {
+  const inf = inferenceAt(state.tick);
+  const t = inf && inf.targets && inf.targets[id];
+  return { threat: t ? (Number(t.threat) || 0) : 0,
+           alert: t ? (Number(t.alert) || 0) : 0 };
+}
+
+/** 当前帧全部目标的 {id, def, pos, side, threat}。 */
+function liveTargets() {
+  const out = [];
+  Object.keys(state.targets).forEach(function (id) {
+    const rec = state.targets[id];
+    const pos = positionFor(id, state.tick);
+    if (!rec || !pos) return;
+    const th = threatOf(id);
+    out.push({ id: id, def: rec.def, pos: pos, threat: th.threat });
   });
   return out;
 }
 
+/** km → 经/纬度跨度（局部近似，足够画覆盖区）。 */
+function kmToLonLat(km, lat) {
+  const mLon = 111.32 * Math.max(0.2, Math.cos(lat * Math.PI / 180));
+  return { lon: km / mLon, lat: km / 110.54 };
+}
 
-function createHotspots() {
-  // Direction 2 faces are rebuilt together with the hotspot prisms: every
-  // caller that rebuilds hotspots also tears the scene down first.
-  state.occupationEntities = [];
-  state.data.hotspots.forEach(function (hs, i) {
-    const w = hs.bbox[0], s = hs.bbox[1], e = hs.bbox[2], n = hs.bbox[3];
-    const centerLat = hs.center[0], centerLon = hs.center[1];
-    const facility = FACILITY_KINDS[hs.kind] || null;
-    const tint = facility || Cesium.Color.fromCssColorString('#f0a020');
+/**
+ * 动态热点。
+ * 返回 `[{ id, name, center:[lat,lon], radiusKm, score, contacts }]`。
+ */
+// --------------------------------------------------------------------------
+// 面状要素的存储格式：GeoJSON
+// --------------------------------------------------------------------------
+//
+// 圆、交火区这类面状要素在**内部存储与对外交换**时统一用 GeoJSON：
+//   · 存储：每个热点/占领区带上 `feature`（Polygon，WGS84 经纬度），
+//     不再只有"圆心 + 半径"这种私有形式；
+//   · 交换：SituationHost.plotFeatureCollection() 把标绘/热点/占领导出为
+//     FeatureCollection，QGIS、其它系统可直接读；
+//   · 渲染仍走 Entity（贴地面 + 贴地边界），不用 GeoJsonDataSource：
+//     后者每次更新整体重建，逐帧 31 个目标会明显掉帧。
+// 只支持 WGS84，不做其它 CRS 转换。
 
-    // 热点区域按真实经纬范围绘制成**悬在固定高度的面状矩形**，而不是一个点 ——
-    // 面板展示的是"范围"，一个点无法表示一条海峡或一个群岛。
+/** 经纬度环 → GeoJSON Polygon Feature（环自动闭合）。 */
+function ringToFeature(ring, props) {
+  const r = ring.slice();
+  if (r.length < 3) return null;
+  if (r[0][0] !== r[r.length - 1][0] || r[0][1] !== r[r.length - 1][1]) r.push(r[0]);
+  return {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [r] },
+    properties: props || {},
+  };
+}
+
+/** 读取 Feature 的外环（MultiPolygon 取第一片）。非法输入返回空数组。 */
+function featureRing(feature) {
+  if (!feature || feature.type !== 'Feature' || !feature.geometry) return [];
+  const g = feature.geometry;
+  if (g.type === 'Polygon' && g.coordinates && g.coordinates[0]) return g.coordinates[0];
+  if (g.type === 'MultiPolygon' && g.coordinates && g.coordinates[0] && g.coordinates[0][0]) {
+    return g.coordinates[0][0];
+  }
+  return [];
+}
+
+/** Feature 的属性/几何是否可用于贴地面。 */
+function featureValid(feature) {
+  const r = featureRing(feature);
+  return r.length >= 4 && r.every(function (c) {
+    return c && isFinite(c[0]) && isFinite(c[1]);
+  });
+}
+
+function computeHotspots() {
+  const list = liveTargets();
+  const cells = {};        // "gi|gj" -> { score, pts:[], contacts }
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      const A = list[i], B = list[j];
+      if (A.def.affiliation === B.def.affiliation) continue;
+      const km = relKm(A.pos, B.pos);
+      const engR = (Number(A.def.engage_km) || 0) + (Number(B.def.engage_km) || 0);
+      const infR = influenceRadiusKm(A.def) + influenceRadiusKm(B.def);
+      let score = 0;
+      if (engR > 0 && km <= engR) score = ((A.threat + B.threat) / 2) * 1.2;
+      else if (km <= infR) score = ((A.threat + B.threat) / 2) * 0.5;
+      if (score < HOTSPOT_MIN_SCORE) continue;
+      // 热点落在两点中点；相近的交战对并入同一格
+      const lat = (A.pos.lat + B.pos.lat) / 2, lon = (A.pos.lon + B.pos.lon) / 2;
+      const key = Math.round(lat / HOTSPOT_GRID_DEG) + '|' + Math.round(lon / HOTSPOT_GRID_DEG);
+      if (!cells[key]) cells[key] = { score: 0, pts: [], contacts: [] };
+      cells[key].score += score;
+      cells[key].pts.push({ lat: lat, lon: lon, a: A, b: B });
+      cells[key].contacts.push(km <= engR ? 'engage' : 'proximity');
+    }
+  }
+  const out = Object.keys(cells).map(function (key) {
+    const c = cells[key];
+    const lat = c.pts.reduce(function (s, p) { return s + p.lat; }, 0) / c.pts.length;
+    const lon = c.pts.reduce(function (s, p) { return s + p.lon; }, 0) / c.pts.length;
+    // 半径 = 簇内接触点最大偏离 + 双方影响半径的折中，限制在 20–120 km
+    let maxD = 0;
+    c.pts.forEach(function (p) {
+      maxD = Math.max(maxD, relKm({ lat: lat, lon: lon }, p));
+    });
+    const radiusKm = Math.max(20, Math.min(120, maxD * 1.6 + 20));
+    const engageN = c.contacts.filter(function (x) { return x === 'engage'; }).length;
+    const name = (engageN > 0 ? '交火区' : '对峙区') + ' ' + Math.round(lat * 10) / 10 + '°N '
+      + Math.round(lon * 10) / 10 + '°E';
+    const ring = circleRing(lat, lon, radiusKm, 28);
+    return { id: key, name: name, center: [lat, lon], radiusKm: radiusKm,
+             score: c.score, contacts: c.pts.length, engaging: engageN,
+             // 存储格式：GeoJSON Polygon（与渲染同源，导出即可交换）
+             feature: ringToFeature(ring, {
+               kind: 'hotspot', level: engageN > 0 ? 'engage' : 'proximity',
+               score: Math.round(c.score * 10) / 10, radiusKm: radiusKm,
+             }) };
+  });
+  out.sort(function (a, b) { return b.score - a.score; });
+  return out.slice(0, HOTSPOT_MAX);
+}
+
+/**
+ * 动态占领区：每个目标输出一个圆形影响区（贴地），同阵营叠加。
+ * 返回 `[{ side, lat, lon, radiusKm, id }]`；渲染时按阵营着色。
+ */
+function computeOccupationArea() {
+  const list = liveTargets();
+  return list.map(function (t) {
+    const r = influenceRadiusKm(t.def);
+    // threat 越高覆盖越实：0 威胁也保留 55% 的"存在范围"
+    const k = 0.55 + 0.45 * Math.min(1, Math.max(0, t.threat) / 70);
+    const ring = circleRing(t.pos.lat, t.pos.lon, r * k, 20);
+    return { id: t.id, side: t.def.affiliation, lat: t.pos.lat, lon: t.pos.lon,
+             radiusKm: r * k,
+             feature: ringToFeature(ring, {
+               kind: 'occupation', side: t.def.affiliation, target: t.id,
+             }) };
+  });
+}
+
+/**
+ * 重建热点 / 占领区域图元。
+ *
+ * 旧实现是"数据集预设的 18 个固定矩形"，既不是按战况生成，也无法反映变化。
+ * 现在两者都按当前帧动态计算：
+ *   热点 —— 交战/对峙聚集区（computeHotspots），用标绘体系里的 `recon_area`
+ *          多边形贴地绘制（圆按 24 段近似），同一图层由 Plotting 管理；
+ *   占领 —— 每个目标的影响圆（computeOccupationArea），归「占领区域」图层。
+ * 只在**帧号或选中/过滤变化**时重建，避免每帧反复建实体。
+ */
+function dynamicAreasKey() {
+  return [state.tick, state.layers.hotspots ? 1 : 0, state.layers.occupation ? 1 : 0,
+          state.filters.red ? 1 : 0, state.filters.blue ? 1 : 0,
+          state.filters.sea ? 1 : 0, state.filters.land ? 1 : 0,
+          state.filters.air ? 1 : 0].join('|');
+}
+var _dynAreasKey = null;
+
+function rebuildDynamicAreas(force) {
+  if (!viewer) return;
+  const key = dynamicAreasKey();
+  if (!force && key === _dynAreasKey) return;
+  // 结果集本身就进 key：开局时 inference 往往还没就绪，强度全 0 → 热点为空；
+  // 只在帧号/开关上判断会让"数据到了但没重建"永久空着（实测）。
+  const spots = computeHotspots();
+  const areas = computeOccupationArea();
+  const setKey = key + '#' + spots.length + ':' + areas.length;
+  if (!force && setKey === _dynAreasKey) return;
+  _dynAreasKey = setKey;
+  rebuildHotspotEntities(spots);
+  rebuildOccupationEntities(areas);
+}
+
+/** 圆 → 贴地多边形（经纬度近似）。 */
+function circleRing(lat, lon, radiusKm, steps) {
+  const n = steps || 24;
+  const d = kmToLonLat(radiusKm, lat);
+  const ring = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    ring.push([lon + Math.cos(a) * d.lon, lat + Math.sin(a) * d.lat]);
+  }
+  return ring;
+}
+
+function rebuildHotspotEntities(spots) {
+  state.hotspotEntities.forEach(function (e) {
+    try { viewer.entities.remove(e); } catch (err) { /* 已移除 */ }
+  });
+  state.hotspotEntities = [];
+  if (!state.layers.hotspots) return;
+  spots = spots || computeHotspots();
+  spots.forEach(function (hs, i) {
+    const ring = hs.feature ? featureRing(hs.feature)
+                            : circleRing(hs.center[0], hs.center[1], hs.radiusKm, 28);
+    const color = hs.engaging > 0
+      ? Cesium.Color.fromCssColorString('#d84a3a')
+      : Cesium.Color.fromCssColorString('#f0a020');
     const entity = viewer.entities.add({
       id: 'hotspot-' + i,
       name: hs.name,
-      rectangle: {
-        coordinates: Cesium.Rectangle.fromDegrees(w, s, e, n),
-        material: tint.withAlpha(0.10),
-        outline: true,
-        outlineColor: tint.withAlpha(0.85),
-        outlineWidth: 1,
-        // **不再有 extrudedHeight**：高度就是一个抬升量，见 HOTSPOT_SURFACE_ALT_M 的说明。
-        height: HOTSPOT_SURFACE_ALT_M,
+      polygon: {
+        hierarchy: new Cesium.PolygonHierarchy(
+          Cesium.Cartesian3.fromDegreesArray(ring.reduce(function (a, p) {
+            return a.concat([p[0], p[1]]); }, []))),
+        material: color.withAlpha(0.18),
+        classificationType: Cesium.ClassificationType.BOTH,
       },
-      // 标签跟着面走：放在同一个抬升高度上，不再"挂在框顶"。
-      position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, HOTSPOT_SURFACE_ALT_M),
-      // 方向 4：设施类热点补一个锚点图元（符号集暂无港口/机场图标）。
-      point: facility ? {
-        pixelSize: 9,
-        color: facility,
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 1.5,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      } : undefined,
+      polyline: {
+        positions: Cesium.Cartesian3.fromDegreesArray(ring.concat([ring[0]]).reduce(function (a, p) {
+          return a.concat([p[0], p[1]]); }, [])),
+        width: 2, clampToGround: true, material: color,
+      },
+      position: Cesium.Cartesian3.fromDegrees(hs.center[1], hs.center[0]),
       label: {
         text: hs.name,
         font: '13px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
-        fillColor: Cesium.Color.fromCssColorString('#8a5a00'),
+        fillColor: color,
         outlineColor: Cesium.Color.WHITE,
-        // 同目标标牌：12px/3px 的描边会糊字，改 13px/1.5。
         outlineWidth: 1.5,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        pixelOffset: new Cesium.Cartesian2(0, 0),
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString('rgba(255,255,255,0.82)'),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        scaleByDistance: new Cesium.NearFarScalar(50000, 1.0, 1500000, 0.0),
       },
     });
-    entity.hsKind = facility ? hs.kind : null;
+    entity.hsData = hs;
     state.hotspotEntities.push(entity);
-    // Direction 2: one face for the same hotspot, recoloured from
-    // frames[i]["occupation"] on every markScene. Show/hide follows the
-    // situation.occupation layer through updateOccupationAreas().
-    const occFace = viewer.entities.add({
+  });
+  state.hotspotRows = spots.map(function (hs, i) {
+    return { key: 'hotspot-' + i, name: hs.name, level_label: hs.engaging > 0 ? '交火' : '对峙',
+             score: hs.score, radiusKm: hs.radiusKm };
+  });
+  if (window.LayerPanel) LayerPanel.invalidate();
+}
+
+function rebuildOccupationEntities(areas) {
+  state.occupationEntities.forEach(function (e) {
+    try { viewer.entities.remove(e); } catch (err) { /* 已移除 */ }
+  });
+  state.occupationEntities = [];
+  if (!state.layers.occupation) return;
+  areas = areas || computeOccupationArea();
+  areas.forEach(function (a, i) {
+    if (a.side === 'red' && !state.filters.red) return;
+    if (a.side === 'blue' && !state.filters.blue) return;
+    const color = a.side === 'blue' ? OCCUPATION_STATUS_COLORS.blue
+                                    : OCCUPATION_STATUS_COLORS.red;
+    const ring = a.feature ? featureRing(a.feature)
+                           : circleRing(a.lat, a.lon, a.radiusKm, 20);
+    const flat = ring.reduce(function (acc, p) { return acc.concat([p[0], p[1]]); }, []);
+    const ent = viewer.entities.add({
       id: 'occupation-' + i,
-      name: hs.name + ' 归属',
-      show: false,
+      name: a.id + ' 控制区',
       polygon: {
-        hierarchy: new Cesium.PolygonHierarchy(
-          Cesium.Cartesian3.fromDegreesArray([w, s, e, s, e, n, w, n])),
-        height: OCCUPATION_FACE_HEIGHT_M,
-        material: OCCUPATION_STATUS_COLORS.neutral.withAlpha(0.35),
-        outline: true,
-        outlineColor: OCCUPATION_STATUS_COLORS.neutral.withAlpha(0.95),
-        outlineWidth: 2,
+        hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
+        material: color.withAlpha(0.22),
+        classificationType: Cesium.ClassificationType.BOTH,
       },
     });
-    occFace.occIndex = i;
-    occFace.occName = hs.name;
-    occFace.occStatus = null;
-    state.occupationEntities.push(occFace);
+    ent.occTarget = a.id;
+    state.occupationEntities.push(ent);
   });
+}
+
+// 兼容旧调用点：原先 createHotspots() 同时建热点与占领面。
+// 现在统一走重建入口（force=true 时忽略帧号缓存）。
+function createHotspots() {
+  // 只重建热点/占领图元。**不要**在这里跑 rebuildDynamicAreas(true)：
+  // 应用启动时图层意图还没按 LAYERS 的 default 写入（applyLayers 在后面），
+  // 那时 state.layers.hotspots / occupation 仍是初始值，会建出空集合，
+  // 之后 updateOccupationAreas 又因 key 未变而跳过。
+  _dynAreasKey = null;
+  rebuildHotspotEntities();
+  rebuildOccupationEntities();
+}
+
+/** 方向 4 取证出口：动态热点数量（旧数据字段已不适用，保留结构）。 */
+function hotspotFacilities() {
+  var out = { data: {}, anchors: {}, labels: {} };
+  (state.hotspotEntities || []).forEach(function (e) {
+    var kind = e.hsData ? (e.hsData.engaging > 0 ? 'engage' : 'proximity') : 'other';
+    out.data[kind] = (out.data[kind] || 0) + 1;
+    if (e.label) out.labels[kind] = (out.labels[kind] || 0) + 1;
+  });
+  return out;
 }
 
 // --------------------------------------------------------------------------
@@ -2392,6 +2644,19 @@ function createHotspots() {
  */
 function markScene(reason) {
   if (window.RenderGovernor) RenderGovernor.mark(reason);
+}
+
+/**
+ * 计划轨迹的显隐：单独抽出来，供 syncEntities 与**选中/取消选中**直接调用。
+ * 不能只依赖 syncEntities 的脏标记：它由帧循环里的 RenderGovernor 驱动，
+ * 在低帧率（或无头）环境下可能要等上好几秒，表现为"点了目标、计划线迟到"。
+ */
+function refreshPredictEntity(id) {
+  const rec = state.targets[id];
+  if (!rec || !rec.predict) return;
+  const pred = (state.selected === id && isVisible(rec.def) && state.layers.tracks)
+    ? predictedTrackPoints(rec.def) : [];
+  setEntityShow(rec.predict, pred.length >= 2);
 }
 
 function syncEntities() {
@@ -2430,10 +2695,12 @@ function syncEntities() {
     rec.lastTick = state.tick;
 
     if (!state.layers.tracks) rec.trail.length = 0;
+    // 历史轨迹**全程实线**：不按窗口切片。窗口只用于掩码取值（updateFocusMask），
+    // 绘制给用户看的是从第 0 帧到当前帧的完整航迹（需求：不要只画固定步长）。
     rec.entity.polyline.show = visible && state.layers.tracks && rec.trail.length > 1;
+    // 计划轨迹与历史轨迹同属「历史轨迹」图层；只给选中目标画，避免满屏虚线。
+    refreshPredictEntity(id);
   });
-  // 目标轨迹：只维护"当前选中目标"的一条态势标绘记录（见 syncTrackPlot）。
-  syncTrackPlot();
   // 掩码遮的是"整图减去选中目标与轨迹"：选中、时间、图层任一变化都要重画。
   updateFocusMask();
 
@@ -2444,16 +2711,11 @@ function syncEntities() {
     var key = id.indexOf('route-') === 0 ? id.slice(6) : null;
     e.show = !!state.layers.routes && !(key && state.hiddenRoutes[key]);
   });
-  const camHeightM = viewer.camera.positionCartographic.height;
-  // 热点面固定在 10 km：**低于该视点不可见**（面就悬在头顶之上，从下面看不出范围）。
-  // 这条与图层开关、单条隐藏是"与"的关系 —— 三者任一不满足就不画。
-  const hotspotAboveSurface = camHeightM > HOTSPOT_SURFACE_ALT_M;
+  // 热点/占领区都贴地，不再用"固定高度 + 低于该视点不可见"的旧判据。
   state.hotspotEntities.forEach(function (e) {
     var id = typeof e.id === 'string' ? e.id : '';
     var key = id.indexOf('hotspot-') === 0 ? id.slice(8) : null;
-    e.show = hotspotAboveSurface && !!state.layers.hotspots
-             && !(key && state.hiddenHotspots[key]);
-      if (e.hsKind && e.label) e.label.show = e.show && camHeightM <= FACILITY_TEXT_MAX_HEIGHT_M;
+    e.show = !!state.layers.hotspots && !(key && state.hiddenHotspots[key]);
   });
   updateOccupationAreas();
   if (state.selected) refreshRelations();
@@ -2469,39 +2731,29 @@ function trailWindowOf(rec, id) {
 }
 
 /**
- * 计划航路剩余段：当前位置 → 当前航段的终点及其后续航路点。
- * 不碰引擎、不做运动学外推 —— 这条线永远是"已声明的计划"，按虚线（计划）语义
- * 作为一条态势标绘呈现。返回 `[lon, lat, alt]`，高度用于空中目标。
- * waypoints 是 [lat, lon]（见 createRouteEntities 的 fromDegreesArrayHeights 调用）。
+ * 计划轨迹：从当前位置沿计划航路剩余段，或是航向外推。
+ * 返回 `[lon, lat, alt]`：虚线 + 终点箭头都基于它，与历史实线分开绘制。
  */
-function trackPlotPoints(def) {
+function predictedTrackPoints(def) {
   const s = positionFor(def.id, state.tick);
   if (!s) return [];
-  if (TRACK_MODE === 'kinematic') return kinematicTrackPoints(def, s);
-  if (!def.waypoints || def.waypoints.length < 2) return [];
+  const out = [[s.lon, s.lat, s.alt]];
+  if (!def.waypoints || def.waypoints.length < 2) return out;
   const alt = def.altitude_m || 0;
-  // 找当前位置最近的**航段**，从该航段的终点继续画。
-  //
-  // 为什么不是"最近航路点"：两点航路（起点→终点）时，目标走过中点之前离起点更近，
-  // 从起点继续画会先往回折一段——轨迹上出现一条明显倒车的线。按航段投影取
-  // "下一段", 已经走过的点不会再被画回来。
+  // 取**当前所在航段**的下一段：两点航路时，用"最近航路点"会在中点前先往回折。
   const cosLat = Math.cos(s.lat * Math.PI / 180) || 1;
-  let near = 1;
-  let best = Infinity;
+  let near = 1, best = Infinity;
   for (let i = 1; i < def.waypoints.length; i++) {
-    const a = def.waypoints[i - 1];
-    const b = def.waypoints[i];
-    // 以当前位置为原点的局部平面（经度按 cos(lat) 缩放，避免高纬度横向压扁）
+    const a = def.waypoints[i - 1], b = def.waypoints[i];
     const ax = (a[1] - s.lon) * cosLat, ay = a[0] - s.lat;
     const bx = (b[1] - s.lon) * cosLat, by = b[0] - s.lat;
     const dx = bx - ax, dy = by - ay;
     const len2 = dx * dx + dy * dy;
-    let t = len2 > 1e-12 ? -(ax * dx + ay * dy) / len2 : 0;
-    t = Math.max(0, Math.min(1, t));
-    const d = Math.hypot(ax + dx * t, ay + dy * t);
+    let tt = len2 > 1e-12 ? -(ax * dx + ay * dy) / len2 : 0;
+    tt = Math.max(0, Math.min(1, tt));
+    const d = Math.hypot(ax + dx * tt, ay + dy * tt);
     if (d < best) { best = d; near = i; }
   }
-  const out = [[s.lon, s.lat, s.alt]];
   for (let j = near; j < def.waypoints.length; j++) {
     const w = def.waypoints[j];
     out.push([w[1], w[0], alt]);
@@ -2509,96 +2761,13 @@ function trackPlotPoints(def) {
   return out;
 }
 
-/** 航向外推（TRACK_MODE 为 'kinematic' 的备选）：heading + speed_kn 直线外推。 */
-function kinematicTrackPoints(def, s) {
-  if (!s || !(s.speed_kn > 0.01)) return [];
-  const dM = s.speed_kn * 1852 / 3600 * TICK_SECONDS * TRACK_HORIZON_TICKS;
-  const rad = Cesium.Math.toRadians(s.heading || 0);
-  const dLat = dM * Math.cos(rad) / 110540;
-  const dLon = dM * Math.sin(rad) / (111320 * Math.cos(Cesium.Math.toRadians(s.lat)) || 1);
-  return [
-    [s.lon, s.lat, s.alt],
-    [s.lon + dLon, s.lat + dLat, s.alt],
-  ];
-}
-
-/**
- * 目标轨迹：作为**一条态势标绘要素**维护（type:'target_track'，line 族，虚线）。
- *
- * 与历史航迹（实线）是两条独立图元 —— 一条是已经发生的观测，一条是计划/外推，
- * 叠在同一条线上就分不清哪段是观测。这里不再创建独立的轨迹实体，
- * 也不再为它单独命名：它就是标绘层 `plot.track` 里的一条要素。
- */
-const TRACK_PLOT_TYPE = 'target_track';
-const TRACK_PLOT_LAYER = 'plot.track';
-
-function syncTrackPlot() {
-  if (!window.Plotting) return;
-  const id = state.selected;
-  const rec = id ? state.targets[id] : null;
-  // 目标被图层/阵营/域过滤或单要素隐藏时，它的轨迹也应一起消失（同一套可见性）。
-  const shown = !!rec && isVisible(rec.def);
-  const pts = shown ? trackPlotPoints(rec.def) : [];
-  if (!rec || pts.length < 2) {
-    if (state.trackPlotId) {
-      const old = state.trackPlotId;
-      state.trackPlotId = null;
-      state.trackPlotKey = null;
-      try { Plotting.remove(old); } catch (err) { /* 已被外部清掉 */ }
-    }
-    return;
-  }
-  const lonlat = pts.map(function (p) { return [p[0], p[1]]; });
-  const heights = pts.map(function (p) { return p[2]; });
-  // 只有空中目标（或确实带高度）才走 3D 折线；地面/水面目标保持贴地，
-  // 否则开了地形模型后 0 高度的虚线会被地形埋掉（clampToGround=false）。
-  const use3d = rec.def.domain === 'air' ||
-    heights.some(function (h) { return Math.abs(h) > 0.5; });
-  // 只在控制点/归属/贴地模式真的变了时重建：syncEntities 会随每帧/每次选中变化
-  // 走到这里，无条件 update 会把标绘实体每帧拆建一次。`3d|ground` 必须进 key：
-  // 目标从空中切到地面时坐标可能不变，但渲染模式必须跟着变。
-  const key = rec.def.affiliation + '|' + (use3d ? '3d' : 'ground') + '|' + lonlat.map(function (p) {
-    return p[0].toFixed(6) + ',' + p[1].toFixed(6) + ',' + Number(p[2]).toFixed(1);
-  }).join(';');
-  // 记录可能被外部移除（例如控制台调用 `Plotting.clearLayer()`）：先确认它还在，
-  // 否则"几何没变就跳过"会让轨迹在暂停状态下再也回不来。
-  const exists = !!(state.trackPlotId && Plotting.debug().items.some(function (it) {
-    return it.id === state.trackPlotId;
-  }));
-  if (exists && key === state.trackPlotKey) return;
-  if (!exists) {
-    state.trackPlotId = null;
-    state.trackPlotKey = null;
-  }
-  const spec = {
-    type: TRACK_PLOT_TYPE, layer: TRACK_PLOT_LAYER,
-    points: lonlat,
-    hostility: rec.def.affiliation === 'blue' ? 'enemy' : 'friendly',
-    // 地图上只说明"这是态势标绘"（不另外起名）
-    label: '态势标绘',
-  };
-  // 只有空中目标（或确实带高度）才走 3D 折线；地面/水面目标保持贴地，
-  // 否则开了地形模型后 0 高度的虚线会被地形埋掉（clampToGround=false）。
-  // **必须显式传 null**：update 时"省略 heights"会保留上一帧的高程，目标从空中
-  // 切到地面（或高度归零）后仍会悬空。
-  spec.heights = use3d ? heights : null;
-  try {
-    if (state.trackPlotId) {
-      Plotting.update(state.trackPlotId, spec);
-    } else {
-      state.trackPlotId = Plotting.add(spec).id;
-    }
-  } catch (err) {
-    // update 在 clearRec() 之后失败时，旧记录仍留在 Plotting 里（几何已空）。
-    // 必须先删掉它，否则 plot.track 会出现两条记录、其中一条永远删不掉。
-    const old = state.trackPlotId;
-    state.trackPlotId = null;
-    state.trackPlotKey = null;
-    if (old) { try { Plotting.remove(old); } catch (e) { /* 已不存在 */ } }
-    try { state.trackPlotId = Plotting.add(spec).id; } catch (err2) { return; }
-  }
-  state.trackPlotKey = key;
-}
+/** 计划轨迹箭头图标：16×16 的白色三角，按阵营色着色（billboard.color）。 */
+const PREDICT_ARROW_URI = (function () {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">'
+    + '<path d="M8 1 L14.5 14 L8 10.5 L1.5 14 Z" fill="#ffffff" '
+    + 'stroke="#ffffff" stroke-width="1" stroke-linejoin="round"/></svg>';
+  return 'data:image/svg+xml;base64,' + btoa(svg);
+})();
 
 /**
  * 幂等开关：ntity.show = x 每次都会换一个新的属性对象，逐帧写会让地面分类图元
@@ -2670,7 +2839,6 @@ function updateFocusMask() {
   setEntityShow(state.focusMaskEntity, true);
   state.focusMaskHole = { w: w, e: e, s: so, n: n };
 }
-
 /**
  * 轨迹窗口 / 目标轨迹标绘 / 掩码的取证读数：外部（自检、验收）只认这些数字 ——
  * 少了这个出口，"画得对不对"就只能靠肉眼，窗口与掩码是否生效也无从断言。
@@ -2686,29 +2854,26 @@ function focusDebug() {
     sum += n;
   });
   const mat = rec ? rec.entity.polyline.material : null;
-  // 目标轨迹现在是一条态势标绘要素（plot.track），取证读数直接读它的状态，
-  // 不再读旧的独立轨迹实体。
-  const trackDbg = (window.Plotting && state.trackPlotId)
-    ? Plotting.debug().items.filter(function (it) { return it.id === state.trackPlotId; })[0]
-    : null;
+  // 显隐可能是 Property 包装（setEntityShow 写的是布尔），两种形态都要读对。
+  const predShown = !!(rec && rec.predict &&
+    (rec.predict.show && rec.predict.show.getValue ? rec.predict.show.getValue() : rec.predict.show));
+  const pred = predShown ? predictedTrackPoints(rec.def) : [];
   return {
     focusMask: !!state.layers.focusMask,
     selected: id || null,
     tick: state.tick,
-    trackMode: TRACK_MODE,
+    // 轨迹窗口只影响掩码与取证读数；绘制给用户的历史线是**全程实线**。
     trailWindowTicks: TRAIL_WINDOW_TICKS,
     trailFull: rec ? rec.trail.length : 0,
     trailDrawn: rec ? trailWindowOf(rec, id).length : 0,
     maxTrailVertices: maxV,
     trailVertexSum: sum,
     historySolid: !!mat && !(mat instanceof Cesium.PolylineDashMaterialProperty),
-    trackPlotId: state.trackPlotId,
-    trackPlotExists: !!trackDbg,
-    trackPlotLayer: TRACK_PLOT_LAYER,
-    // 与 syncTrackPlot 的 shown 判据一致：目标被过滤/隐藏时轨迹不存在，点数也报 0。
-    trackPlotPoints: (rec && state.trackPlotId && isVisible(rec.def))
-      ? trackPlotPoints(rec.def).length : 0,
-    trackPlotEntities: trackDbg ? trackDbg.entities : 0,
+    // 计划轨迹：虚线 + 终点箭头；与历史实线同属「历史轨迹」图层。
+    predictPoints: pred.length,
+    predictDashed: !!(rec && rec.predict && rec.predict.polyline &&
+      rec.predict.polyline.material instanceof Cesium.PolylineDashMaterialProperty),
+    predictArrow: !!(rec && rec.predict && rec.predict.billboard),
     maskExists: !!state.focusMaskEntity,
     maskShow: !!(state.focusMaskEntity && state.focusMaskEntity.show),
     maskHole: state.focusMaskHole,
@@ -2727,27 +2892,21 @@ function occupationFrame() {
  * layer toggle), and the same map is pushed to the minimap mask.
  */
 function updateOccupationAreas() {
-  const list = state.occupationEntities || [];
-  const frame = occupationFrame();
-  const occ = (frame && frame.occupation) || {};
-  const on = !!state.layers.occupation;
-  for (let i = 0; i < list.length; i++) {
-    const e = list[i];
-    const status = occ[e.occName] || 'neutral';
-    if (e.occStatus !== status) {
-      e.occStatus = status;
-      const color = OCCUPATION_STATUS_COLORS[status] || OCCUPATION_STATUS_COLORS.neutral;
-      e.polygon.material = color.withAlpha(0.35);
-      e.polygon.outlineColor = color.withAlpha(0.95);
-    }
-    setEntityShow(e, on);
-  }
-  // Minimap mask shares the tick cadence. The overview module keeps the logical
-  // mask even when its viewer was never created (overview is off by default),
-  // so the evidence outlet stays readable in headless runs.
+  // 占领区现在由 rebuildOccupationEntities() 按目标影响圆动态重建，
+  // 每帧只做一次"是否需要重建"的判断（帧号/过滤/图层开关）。
+  rebuildDynamicAreas(false);
+  // 小地图掩码：把**动态占领区**（按阵营）推给 Overview。原来喂的是数据集
+  // 预设热点名 → 状态映射，与新的动态占领区已经不是一套东西。
   if (window.Overview && Overview.updateOccupation) {
-    Overview.updateOccupation(state.tick, occ,
-      (state.data && state.data.hotspots) || [], on);
+    const areas = computeOccupationArea();
+    const byId = {};
+    areas.forEach(function (a) { byId[a.id] = a.side; });
+    const hotspots = (state.occupationEntities || []).map(function (e) {
+      const a = areas.filter(function (x) { return x.id === e.occTarget; })[0];
+      return { name: e.occTarget, side: a ? a.side : 'neutral',
+               bbox: a ? [a.lon - 0.01, a.lat - 0.01, a.lon + 0.01, a.lat + 0.01] : null };
+    }).filter(function (h) { return !!h.bbox; });
+    Overview.updateOccupation(state.tick, byId, hotspots, !!state.layers.occupation);
   }
 }
 
@@ -2756,22 +2915,32 @@ function updateOccupationAreas() {
  * current frame, its histogram, and the minimap mask readings.
  */
 function occupationDebug() {
-  const frame = occupationFrame();
-  const occ = (frame && frame.occupation) || {};
-  const statuses = {};
+  // 占领区改为按目标影响圆动态重建后，取证读数直接数**场景里的图元**：
+  // 每侧可见数、半径统计、掩码读数。
+  const list = state.occupationEntities || [];
   const counts = { red: 0, blue: 0, contested: 0, neutral: 0 };
-  Object.keys(occ).forEach(function (name) {
-    const status = occ[name];
-    statuses[name] = status;
-    if (counts[status] === undefined) counts[status] = 0;
-    counts[status] += 1;
+  const sides = {};
+  list.forEach(function (e) {
+    const a = e.occTarget;
+    let side = null;
+    Object.keys(state.targets).some(function (id) {
+      if (id !== a) return false;
+      side = state.targets[id].def.affiliation;
+      return true;
+    });
+    if (side === 'red') counts.red++;
+    else if (side === 'blue') counts.blue++;
   });
   const ov = (window.Overview && Overview.occupationMaskDebug)
     ? Overview.occupationMaskDebug() : null;
+  for (const k of ['red', 'blue', 'contested', 'neutral']) counts[k] = counts[k] || 0;
   return {
     tick: state.tick,
-    statuses: statuses,
+    dynamic: true,
+    statuses: {},
     counts: counts,
+    entities: list.length,
+    visible: list.filter(function (e) { return !!e.show; }).length,
     maskVertices: ov ? ov.vertices : 0,
     maskTick: ov ? ov.tick : null,
   };
@@ -2889,9 +3058,12 @@ function updateInferenceUi() {
       : '该战区未定义阶段';
   }
 
-  // 热点区域表格里的TS等级与意图随之刷新。
-  state.hotspotRows.forEach(function (row, i) {
-    const r = inf.regions[i];
+  // 热点区域已改为**动态生成**，不再对应数据集里的预设 regions 索引；
+  // 旧的热点表格也已移除。这里只在行对象真的带 levelCell 时刷新（兼容旧形态），
+  // 否则跳过——曾经因为动态行没有 levelCell 在这里抛异常，导致整个选中流程失败。
+  (state.hotspotRows || []).forEach(function (row, i) {
+    if (!row || !row.levelCell) return;
+    const r = inf.regions && inf.regions[i];
     if (!r) return;
     row.levelCell.textContent = r[0] + ' ' + levelLabel(r[0]);
     row.levelCell.className = 'lv-cell ' + (LEVEL_CLASS[r[0]] || '');
@@ -3009,46 +3181,13 @@ function renderTargetCounts() {
 // 代码里；否则以后有人看到 selectHotspot 里的 active 行逻辑会一头雾水。
 
 function renderHotspotTable() {
-  // 没有真实表格就什么都不做——不能靠 dom 的惰性桩，否则会往一个空对象里塞 DOM。
+  // 热点区域表格已随界面重构移除（#hotspotBody 不存在）；热点已改为
+  // **按战况动态生成**，表格的数据源（数据集预设矩形）也不再成立。
+  // 保留函数与调用点，避免改动面扩大；实际只清空行缓存。
   if (!document.getElementById('hotspotBody')) {
     state.hotspotRows = [];
     return;
   }
-  const body = dom.hotspotBody;
-  body.innerHTML = '';
-  state.hotspotRows = [];
-  const hotspots = (state.data && state.data.hotspots) || [];
-
-  if (!hotspots.length) {
-    const tr = el('tr', 'hotspot-row');
-    const td = el('td', 'hs-empty', '未加载TS');
-    td.colSpan = 5;
-    tr.appendChild(td);
-    body.appendChild(tr);
-    return;
-  }
-
-  hotspots.forEach(function (hs, i) {
-    const tr = el('tr', 'hotspot-row');
-    tr.dataset.index = String(i);
-
-    const levelCell = el('td', 'lv-cell', '—');
-    // 主导意图列：区域级"这里在打什么"，与区域等级并列。
-    const intentCell = el('td', 'hs-intent', '—');
-    tr.appendChild(el('td', 'hs-idx', String(i + 1)));
-    tr.appendChild(el('td', 'hs-name', hs.name));
-    // 经纬范围直接取自 bbox，与地图上绘制的矩形同源，不会再出现"显示范围与
-    // 真实区域不一致"的问题。
-    tr.appendChild(el('td', 'hs-range',
-      hs.bbox[0].toFixed(2) + '–' + hs.bbox[2].toFixed(2) + '°E<br>' +
-      hs.bbox[1].toFixed(2) + '–' + hs.bbox[3].toFixed(2) + '°N'));
-    tr.appendChild(levelCell);
-    tr.appendChild(intentCell);
-
-    tr.addEventListener('click', function () { selectHotspot(i, true); });
-    body.appendChild(tr);
-    state.hotspotRows.push({ row: tr, levelCell: levelCell, intentCell: intentCell, hotspot: hs });
-  });
 }
 
 /**
@@ -3251,10 +3390,21 @@ function relKm(a, b) {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-function relColor(kind) {
-  var p = (window.Plotting && Plotting.palette) ? Plotting.palette() : null;
-  var css = (kind === 'own') ? ((p && p.friendly) || '#c8102e') : ((p && p.enemy) || '#123a6b');
-  return Cesium.Color.fromCssColorString(css);
+/**
+ * 关系线配色（方案见汇报）：
+ *   own    本方（同编队/同阵营）→ 绿色 #2F9E44：直观"协同/友军"，且不与红方
+ *          阵营色冲突（自动选择目标时本方也是红方时，用绿色才不会读成"敌对"）。
+ *   hostile 敌方 → 红色 #C0392B：与阵营色一致，最符合"威胁"直觉。
+ *   inferred 仅有推理依据的关系（见 relAddLine 的 dashed 参数）用浅一档的色，
+ *          配合虚线，双重编码"证据性质"。
+ */
+function relCss(kind, inferred) {
+  if (kind === 'own') return inferred ? '#74B98A' : '#2F9E44';
+  return inferred ? '#E0705F' : '#C0392B';
+}
+
+function relColor(kind, inferred) {
+  return Cesium.Color.fromCssColorString(relCss(kind, inferred));
 }
 
 function relClear() {
@@ -3278,7 +3428,8 @@ function relAddLine(from, to, dashed, color, text) {
     },
     position: Cesium.Cartesian3.fromDegrees((from.lon + to.lon) / 2, (from.lat + to.lat) / 2, alt),
     label: {
-      text: text, font: '12px sans-serif', fillColor: color, style: Cesium.LabelStyle.FILL,
+      text: text, font: '12px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
+      fillColor: color, style: Cesium.LabelStyle.FILL,
       showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('#ffffffd9'),
       horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
       verticalOrigin: Cesium.VerticalOrigin.CENTER,
@@ -3314,6 +3465,37 @@ function relCaseEngageOk() {
   return relView.caseEngage;
 }
 
+var PAIR_ZH = { lead: '长机', wingman: '僚机' };
+
+/** 关系的"证据性质"中文：dataset 实测 vs 由距离/覆盖推理。 */
+function relEvidenceZh(kind) {
+  return kind === 'measured' ? '实测' : '推理';
+}
+
+/**
+ * 关系文案。
+ *
+ * 友方（同一编队）：`协同 · 长机→僚机 · 实测`；同阵营不同编队：`友邻 · 同属红方 · 实测`。
+ * 敌方：不再只写"敌对 XX km"，而是把**系统实际具备的**证据说清楚：
+ *   · 进入交战射程（双方 engage 半径之和）→ `交战威胁 · 实测`
+ *   · 仅进入影响/探测范围 → `探测跟踪 · 推理`
+ *   · 其余 → `警戒距离 X km · 推理`
+ * 队伍代号（air-red-1 等）只用于内部，不再直接展示。
+ */
+function relText(kind, evidence, fromDef, toDef, km) {
+  var f = fromDef && fromDef.affiliation === 'red' ? '红方' : '蓝方';
+  if (kind === 'own') {
+    var fr = relAttr(fromDef, 'pair_role'), tr = relAttr(toDef, 'pair_role');
+    if (fr && tr) {
+      return '协同 · ' + (PAIR_ZH[fr] || fr) + '→' + (PAIR_ZH[tr] || tr) + ' · ' + relEvidenceZh(evidence);
+    }
+    return '友邻 · 同属' + f + ' · ' + relEvidenceZh(evidence);
+  }
+  var d = Math.round(km);
+  var verb = evidence === 'measured' ? '交战威胁' : '探测跟踪';
+  return verb + ' · 距离 ' + d + ' km · ' + relEvidenceZh(evidence);
+}
+
 function refreshRelations() {
   if (!window.Cesium || !viewer || !state || !state.targets) return;
   relClear();
@@ -3329,14 +3511,21 @@ function refreshRelations() {
     var def = state.targets[id] && state.targets[id].def;
     var pos = def ? positionFor(id, state.tick) : null;
     if (!pos) return;
+    // 友方：同编队（formation_id 一致）或同阵营。
+    // **同编队关系是数据集明确声明的 → 实测、实线、绿色。**
     if (fid && relAttr(def, 'formation_id') === fid) {
-      var role = relAttr(def, 'pair_role');
-      relAddLine(spos, pos, false, relColor('own'), role ? (fid + ' / ' + role) : fid);
+      relAddLine(spos, pos, false, relColor('own', false),
+                 relText('own', 'measured', sdef, def, relKm(spos, pos)));
       relView.own++;
       relView.peers.push(id);
       return;
     }
-    if (def.affiliation === sdef.affiliation) return;
+    if (def.affiliation === sdef.affiliation) {
+      relAddLine(spos, pos, false, relColor('own', false),
+                 relText('own', 'measured', sdef, def, relKm(spos, pos)));
+      relView.own++;
+      return;
+    }
     var km = relKm(spos, pos);
     if (km <= relNum(sdef, 'engage_km') + relNum(def, 'engage_km')) eng.push({ id: id, km: km });
     if (km <= relNum(sdef, 'influence_km') + relNum(def, 'influence_km')) inf.push({ id: id, km: km });
@@ -3345,9 +3534,11 @@ function refreshRelations() {
   relView.criterion = useInf ? 'influence' : 'engage';
   relView.hostileInf = inf.length;
   var drawn = useInf ? inf : eng;
+  // 敌方：距离阈值推出来的关系是**推理**（数据集没有声明交火），虚线 + 浅一档的颜色。
   drawn.forEach(function (o) {
-    relAddLine(spos, positionFor(o.id, state.tick), true, relColor('hostile'),
-               '\u654c\u5bf9 ' + Math.round(o.km) + ' km');
+    var def = state.targets[o.id].def;
+    relAddLine(spos, positionFor(o.id, state.tick), true, relColor('hostile', true),
+               relText('hostile', 'inferred', sdef, def, o.km));
   });
   relView.hostile = drawn.length;
 }
@@ -3465,14 +3656,35 @@ function registerRelationsLayer() {
   });
 }
 
-function selectTarget(id, fly) {
+/**
+ * 点击目标后：清掉当前场景里的标绘（用户手绘 + 预览），把视觉让给关系线。
+ * 标绘**记录**不删（图层/要素列表还在），只是隐藏；取消选中时恢复。
+ */
+function setPlottingHidden(hidden) {
+  if (!window.Plotting || !Plotting.debug) return;
+  var items = Plotting.debug().items || [];
+  for (var i = 0; i < items.length; i++) {
+    var id = items[i].id;
+    if (hidden) {
+      if (items[i].visible !== false) Plotting.setVisible(id, false);
+    } else if (items[i].visible === false) {
+      Plotting.setVisible(id, true);
+    }
+  }
+}
+
+function selectTarget(id, fly, height) {
+  const prev = state.selected;
   state.selected = id;
+  if (prev && prev !== id) refreshPredictEntity(prev);
+  if (id) refreshPredictEntity(id);
+  setPlottingHidden(!!id);
   const s = positionFor(id, state.tick);
   if (state.follow.enabled) {
     // 跟随开启时，点击目标是"换一个跟随对象"，不能再走 flyTo —— 两者会互抢相机
     startFollow(id);
   } else if (fly && s) {
-    flyTo(s.lon, s.lat, 180000);
+    flyTo(s.lon, s.lat, height || 180000);
   }
   syncSelection();
   renderTargetCounts();
@@ -3487,7 +3699,10 @@ function selectTarget(id, fly) {
 
 /** 清除选中态并把目标TS栏复位成提示语。Esc 与「解除跟随」都会走到这里。 */
 function clearTargetSelection() {
+  const prev = state.selected;
   state.selected = null;
+  if (prev) refreshPredictEntity(prev);
+  setPlottingHidden(false);
   syncSelection();
   renderTargetStatus(null);
   refreshRelations();
@@ -4907,6 +5122,31 @@ window.SituationHost = {
   // 图层顺序取证：imagery 的真实 index 顺序 + 每个图层的意图/事实。
   // 「哪个层压在哪个层上面」光看画面猜不出来，必须能读到 index。
   debugLayers: debugLayers,
+  /**
+   * 面状要素的 GeoJSON 导出：用户标绘（Plotting）+ 当前帧热点 + 占领区。
+   * 所有面都是 Polygon（WGS84），可直接在 QGIS 等工具里打开。
+   */
+  plotFeatureCollection: function () {
+    const fc = (window.Plotting && Plotting.toFeatureCollection)
+      ? Plotting.toFeatureCollection()
+      : { type: 'FeatureCollection', features: [] };
+    (state.hotspotRows || []).forEach(function (h) {
+      const e = (state.hotspotEntities || []).filter(function (en) {
+        return en.hsData && en.hsData.name === h.name;
+      })[0];
+      if (e && e.hsData.feature) fc.features.push(e.hsData.feature);
+    });
+    computeOccupationArea().forEach(function (a) {
+      if (a.feature) fc.features.push(a.feature);
+    });
+    return fc;
+  },
+  /** GeoJSON 导入（用户标绘）。返回 {added, errors}。 */
+  importPlotFeatures: function (fc) {
+    return (window.Plotting && Plotting.fromFeatureCollection)
+      ? Plotting.fromFeatureCollection(fc)
+      : { added: 0, errors: ['Plotting 未加载'] };
+  },
   // 动态标绘图层取证：注册表里实际存在的标绘类别图层 vs 要素所属图层。
   // "图层由实际要素驱动"不能靠肉眼判断，必须能读出两侧的集合。
   debugPlotLayers: function () {
@@ -4925,7 +5165,6 @@ window.SituationHost = {
       items: items.map(function (it) {
         return { id: it.id, type: it.type, layer: it.layer, system: it.system };
       }),
-      trackPlotId: state.trackPlotId,
     };
   },
   // 图层自动定位：取证/测试入口（面板开关是唯一会触发飞行的用户路径）。
@@ -5054,8 +5293,8 @@ window.SituationHost = {
   exportCsv: exportCsv,
   // 选中入口（与点选/面板"定位"走**同一条路径**）：自检自动化要选中/取消选中时用它。
   // 另抄一份状态改动就会漏掉 markScene 与掩码重算 —— 那正是本仓修过 4 起的老毛病。
-  selectTarget: function (id) {
-    selectTarget(id || null, false);
+  selectTarget: function (id, fly, height) {
+    selectTarget(id || null, !!fly, height);
     return state.selected;
   },
   // 轨迹窗口 / 目标轨迹标绘 / 掩码的取证读数：外部（自检、验收）只认这些数字，
@@ -5148,7 +5387,7 @@ function plotTypeZh(type) {
   return zh;
 }
 
-/** 标绘类别下拉项：`[['plot.offense','标绘·进攻'], …]`（创建/改归属共用）。 */
+/** 标绘类别下拉项：`[['plot.offense','进攻'], …]`（创建/改归属共用）。 */
 function plotLayerOptions() {
   var out = [];
   if (!window.Plotting || !Plotting.categories) return out;
@@ -5159,7 +5398,7 @@ function plotLayerOptions() {
   });
   Plotting.categories().forEach(function (c) {
     if (!anyManual[c.id]) return;
-    out.push([c.layer, '标绘·' + c.zh]);
+    out.push([c.layer, c.zh]);
   });
   return out;
 }
@@ -5244,7 +5483,7 @@ function ensurePlotLayer(layerId) {
   var cat = Plotting.categoryOfLayer(layerId);
   LayerRegistry.register({
     id: layerId, kind: 'plot', z: cat.z,
-    label: '标绘·' + cat.zh, group: '标绘', default: true,
+    label: cat.zh, group: '标绘', default: true,
   });
   // register() 的 runtime 初始 desired=false。新类别默认可见，但**用户之前关掉过的
   // 类别要恢复为关**（图层会因清空而注销，显隐意图不能跟着丢）。
@@ -5314,59 +5553,79 @@ function registerLayerProviders() {
     });
   }
 
-  // ---- 目标：TS信息可改，可单独显隐，可从当前TS移除 -----------------------
-  LayerRegistry.setProvider('layerTargets', function () {
-    var d = state.data;
-    if (!d || !d.targets) return null;
-    return d.targets
-      .filter(function (t) { return !state.removedTargets[t.id]; })
-      .map(function (t) {
-        var ov = state.targetOverrides[t.id] || {};
-        var def = { id: t.id, name: ov.name || t.name,
-                    affiliation: ov.affiliation || t.affiliation,
-                    domain: ov.domain || t.domain };
-        return {
-          key: t.id,
-          label: t.id + ' ' + def.name,
-          sub: (AFF_ZH[def.affiliation] || def.affiliation) + ' · ' +
-               (DOM_ZH[def.domain] || def.domain),
-          visible: isVisible(t),
-          actions: ['toggle', 'locate', 'edit', 'delete'],
-          onToggle: function (on) {
-            if (on) delete state.hiddenTargets[t.id];
-            else state.hiddenTargets[t.id] = true;
-            markScene('singleTarget');
-            touch();
-          },
-          onLocate: function () { selectTarget(t.id, false); },
-          onDelete: function () {
-            // **从当前 TS 移除**：会话内状态。数据集文件不动，重新加载案例即恢复。
-            state.removedTargets[t.id] = true;
-            if (state.selected === t.id) selectTarget(null, false);
-            markScene('removeTarget');
-            touch();
-          },
-          editFields: [
-            { key: 'name', label: '名称', value: def.name },
-            { key: 'affiliation', label: '阵营', value: def.affiliation,
-              options: [['red', '红方'], ['blue', '蓝方']] },
-            { key: 'domain', label: '域', value: def.domain,
-              options: [['sea', '水面'], ['land', '陆上'], ['air', '空中']] },
-            { key: 'model', label: '型号', value: (ov.model !== undefined ? ov.model : t.model) || '' },
-          ],
-          onSave: function (v) {
-            // 只改 **TS 信息**。几何与航迹来自数据集帧，改它们等于改数据 ——
-            // 你明确要求目标要素"只有其 TS 信息可更改"。
-            state.targetOverrides[t.id] = {
-              name: v.name, affiliation: v.affiliation, domain: v.domain, model: v.model,
-            };
-            applyTargetOverrides();
-            markScene('targetOverride');
-            renderTargetStatus(state.selected);
-            touch();
-          },
+  // ---- 目标：红方 / 蓝方两个图层，各列出目标型号 ---------------------------
+  //
+  // 需求：可见目标按红/蓝拆成两行；列表里优先显示**型号**（platform_class），
+  // 而不是 "R01 红方驱逐舰编队指挥舰" 这种以编号开头的长名。
+  // 这里只改**图层里的展示名**：`t.id` 与 `t.name` 都不动，面板编辑仍按原字段走。
+  function targetModelName(t, ov) {
+    return (ov.model !== undefined ? ov.model : t.model)
+      || t.platform_class || (AFF_ZH[t.affiliation] || '') || t.id;
+  }
+
+  function targetItem(t) {
+    var ov = state.targetOverrides[t.id] || {};
+    var def = { id: t.id, name: ov.name || t.name,
+                affiliation: ov.affiliation || t.affiliation,
+                domain: ov.domain || t.domain };
+    var model = targetModelName(t, ov);
+    var side = AFF_ZH[def.affiliation] || def.affiliation;
+    return {
+      key: t.id,
+      // 展示名 = 型号；编号放在副标题里（仍然能找到唯一目标）。
+      label: model,
+      sub: t.id + ' · ' + side + ' · ' + (DOM_ZH[def.domain] || def.domain),
+      visible: isVisible(t),
+      actions: ['toggle', 'locate', 'edit', 'delete'],
+      onToggle: function (on) {
+        if (on) delete state.hiddenTargets[t.id];
+        else state.hiddenTargets[t.id] = true;
+        markScene('singleTarget');
+        touch();
+      },
+      onLocate: function () { selectTarget(t.id, true, 60000); },
+      onDelete: function () {
+        // **从当前 TS 移除**：会话内状态。数据集文件不动，重新加载案例即恢复。
+        state.removedTargets[t.id] = true;
+        if (state.selected === t.id) selectTarget(null, false);
+        markScene('removeTarget');
+        touch();
+      },
+      editFields: [
+        { key: 'name', label: '名称', value: def.name },
+        { key: 'affiliation', label: '阵营', value: def.affiliation,
+          options: [['red', '红方'], ['blue', '蓝方']] },
+        { key: 'domain', label: '域', value: def.domain,
+          options: [['sea', '水面'], ['land', '陆上'], ['air', '空中']] },
+        { key: 'model', label: '型号', value: (ov.model !== undefined ? ov.model : t.model) || '' },
+      ],
+      onSave: function (v) {
+        // 只改 **TS 信息**。几何与航迹来自数据集帧，改它们等于改数据 ——
+        // 你明确要求目标要素"只有其 TS 信息可更改"。
+        state.targetOverrides[t.id] = {
+          name: v.name, affiliation: v.affiliation, domain: v.domain, model: v.model,
         };
-      });
+        applyTargetOverrides();
+        markScene('targetOverride');
+        renderTargetStatus(state.selected);
+        touch();
+      },
+    };
+  }
+
+  ['layerTargetsRed', 'layerTargetsBlue'].forEach(function (lid) {
+    LayerRegistry.setProvider(lid, function () {
+      var d = state.data;
+      if (!d || !d.targets) return null;
+      var side = lid === 'layerTargetsRed' ? 'red' : 'blue';
+      return d.targets
+        .filter(function (t) {
+          if (state.removedTargets[t.id]) return false;
+          var ov = state.targetOverrides[t.id] || {};
+          return (ov.affiliation || t.affiliation) === side;
+        })
+        .map(targetItem);
+    });
   });
 
   // ---- 计划航路：每条航路对应一个目标 -------------------------------------
@@ -5396,12 +5655,13 @@ function registerLayerProviders() {
   // ---- 热点区域 -----------------------------------------------------------
   LayerRegistry.setProvider('layerHotspots', function () {
     var d = state.data;
-    if (!d || !d.hotspots || !d.hotspots.length) return null;
-    return d.hotspots.map(function (h, i) {
+    if (!d) return null;
+    // 热点改为按战况动态生成：列表直接反映**当前帧**的热点（交火/对峙聚集区）。
+    return (state.hotspotRows || []).map(function (h, i) {
       return {
         key: 'hotspot-' + i,
         label: h.name || ('热点 ' + (i + 1)),
-        sub: h.level_label || '',
+        sub: (h.level_label || '') + (h.radiusKm ? ' · 半径 ' + Math.round(h.radiusKm) + ' km' : ''),
         visible: !!state.layers.hotspots && !state.hiddenHotspots[i],
         actions: ['toggle', 'locate'],
         onToggle: function (on) {
@@ -5409,7 +5669,11 @@ function registerLayerProviders() {
           markScene('singleHotspot');
           touch();
         },
-        onLocate: function () { selectHotspot(i, false); },
+        onLocate: function () {
+          var e = state.hotspotEntities[i];
+          if (!e || !e.hsData) return;
+          flyTo(e.hsData.center[1], e.hsData.center[0], e.hsData.radiusKm * 3000);
+        },
       };
     });
   });
@@ -5566,7 +5830,16 @@ function bindUI() {
   [
     ['layerHotspots', function (v) { state.layers.hotspots = v; markScene('layerHotspots'); }],
     ['layerRoutes', function (v) { state.layers.routes = v; markScene('layerRoutes'); }],
-    ['layerTargets', function (v) { state.layers.targets = v; markScene('layerTargets'); guardFollow(); }],
+    ['layerTargetsRed', function (v) {
+      state.layers.targetsRed = v;
+      state.layers.targets = !!(state.layers.targetsRed || state.layers.targetsBlue);
+      markScene('layerTargets'); guardFollow();
+    }],
+    ['layerTargetsBlue', function (v) {
+      state.layers.targetsBlue = v;
+      state.layers.targets = !!(state.layers.targetsRed || state.layers.targetsBlue);
+      markScene('layerTargets'); guardFollow();
+    }],
     ['layerLabels', function (v) { state.layers.labels = v; markScene('layerLabels'); }],
     ['layerTracks', function (v) { state.layers.tracks = v; markScene('layerTracks'); }],
     ['modelSensor', function (v) { setSensors(v); }],
@@ -6117,7 +6390,7 @@ function refreshPlotLayerSelect() {
   opts.forEach(function (o) {
     const n = document.createElement('option');
     n.value = o[0];
-    n.textContent = o[1].replace('标绘·', '');
+    n.textContent = o[1];
     layerSel.appendChild(n);
   });
   if (cur && opts.some(function (o) { return o[0] === cur; })) {
