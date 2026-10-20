@@ -2547,6 +2547,13 @@ var _dynAreasKey = null;
 
 function rebuildDynamicAreas(force) {
   if (!viewer) return;
+  // ⚠ 实测：本函数在 `createHotspots()` 里被调用时，`state.tick` 与 `layers` 已就绪；
+  // 但**不能**只在 key 相同时短路——开局会把"0 个热点"写进 key，之后数据补齐
+  // 也不会重算。因此 force=true 是唯一的确定性入口（案例加载、图层开关、手工刷新）。
+  if (force) _dynAreasKey = null;
+  // 局部 import 一次就能全部重建，开销很小；只有**播放推进**（每秒几十次）才需要
+  // 用 key 短路。之前只在"帧号+开关+数量"变化时重建，而开局时数量恰好都是 0
+  // （数据集未就绪），key 不再变化，热点就永远不出现（实测）。
   const key = dynamicAreasKey();
   if (!force && key === _dynAreasKey) return;
   // 结果集本身就进 key：开局时 inference 往往还没就绪，强度全 0 → 热点为空；
@@ -2658,13 +2665,10 @@ function rebuildOccupationEntities(areas) {
 // 兼容旧调用点：原先 createHotspots() 同时建热点与占领面。
 // 现在统一走重建入口（force=true 时忽略帧号缓存）。
 function createHotspots() {
-  // 只重建热点/占领图元。**不要**在这里跑 rebuildDynamicAreas(true)：
-  // 应用启动时图层意图还没按 LAYERS 的 default 写入（applyLayers 在后面），
-  // 那时 state.layers.hotspots / occupation 仍是初始值，会建出空集合，
-  // 之后 updateOccupationAreas 又因 key 未变而跳过。
+  // 启动时立即建一次（`state.layers.hotspots` 已在 initViewer 里预置为 true，
+  // 见那里的说明）；帧号变化后再由 updateOccupationAreas 按 key 增量重建。
   _dynAreasKey = null;
-  rebuildHotspotEntities();
-  // 占领区域已下线（原 rebuildOccupationEntities 调用）
+  rebuildDynamicAreas(true);
 }
 
 /** 方向 4 取证出口：动态热点数量（旧数据字段已不适用，保留结构）。 */
@@ -3080,7 +3084,11 @@ function occupationFrame() {
  * 恢复时把 `rebuildOccupationEntities/computeOccupationArea` 的调用放回即可。
  */
 function updateOccupationAreas() {
-  // no-op（占领区域已下线）
+  // ⚠ 必须 force：调用点在 syncEntities 末尾，`state.tick` 要到下一帧同步才更新；
+  // 若按 key 短路，首帧会用"第 0 帧的空热点"锁死 key，之后播放/拖时间轴都不再重建
+  // （实测 tick=720 时热点仍为 0）。重建只在脏帧发生一次，不是逐帧开销。
+  // 占领区域已下线（原 rebuildOccupationEntities 调用保留注释）。
+  rebuildDynamicAreas(true);
 }
 
 /**
