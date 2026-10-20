@@ -2476,27 +2476,37 @@ function computeHotspots() {
   // 30–60 km 的圆互相大面积重叠，读起来像"两个不同的交火区"，其实是同一处。
   // 这里做一次贪心吸收：后者的圆心落进前者的圆内（或反之）就并入前者——
   // 圆心按强度加权、半径取能同时包住两者的最小半径（距离 + 对方半径）。
-  const merged = [];
-  out.forEach(function (h) {
-    for (let i = 0; i < merged.length; i++) {
-      const m = merged[i];
-      const d = relKm({ lat: m.center[0], lon: m.center[1] },
-                       { lat: h.center[0], lon: h.center[1] });
-      if (d <= m.radiusKm || d + h.radiusKm <= m.radiusKm) {
-        const wSum = m.score + h.score;
-        const lat = (m.center[0] * m.score + h.center[0] * h.score) / wSum;
-        const lon = (m.center[1] * m.score + h.center[1] * h.score) / wSum;
-        m.center = [lat, lon];
-        m.radiusKm = Math.min(100, Math.max(m.radiusKm, d + h.radiusKm) * 0.85);
-        m.score += h.score;
-        m.contacts += h.contacts;
-        m.engaging += h.engaging;
-        m.merged = (m.merged || 1) + 1;
-        return;
+  let merged = out.slice();
+  // 反复吸收直到稳定：一次遍历只能合并相邻簇，合并后的新圆心会重新覆盖第三个簇，
+  // 必须迭代到"任意两个圆心都不落在对方半径内"为止（实测 11 个热点里仍有两两重叠）。
+  for (let pass = 0; pass < 12; pass++) {
+    let changed = false;
+    const next = [];
+    merged.forEach(function (h) {
+      for (let i = 0; i < next.length; i++) {
+        const m = next[i];
+        const d = relKm({ lat: m.center[0], lon: m.center[1] },
+                         { lat: h.center[0], lon: h.center[1] });
+        // 任一方圆内包含对方圆心 → 同一处战场，合并。
+        if (d < Math.max(m.radiusKm, h.radiusKm)) {
+          const wSum = m.score + h.score;
+          const lat = (m.center[0] * m.score + h.center[0] * h.score) / wSum;
+          const lon = (m.center[1] * m.score + h.center[1] * h.score) / wSum;
+          m.center = [lat, lon];
+          m.radiusKm = Math.min(100, Math.max(m.radiusKm, d + h.radiusKm));
+          m.score += h.score;
+          m.contacts += h.contacts;
+          m.engaging += h.engaging;
+          m.merged = (m.merged || 1) + 1;
+          changed = true;
+          return;
+        }
       }
-    }
-    merged.push(h);
-  });
+      next.push(h);
+    });
+    merged = next;
+    if (!changed) break;
+  }
   merged.forEach(function (m) {
     m.feature = ringToFeature(circleRing(m.center[0], m.center[1], m.radiusKm, 28), {
       kind: 'hotspot', level: m.engaging > 0 ? 'engage' : 'proximity',
@@ -6050,7 +6060,12 @@ function bindUI() {
   // 这样它们与底图/标绘走**同一条 apply 通路**，面板才能把它们当普通图层行渲染并
   // 统计要素数量。回调体是从这里原样搬过去的，行为不变。
   [
-    ['layerHotspots', function (v) { state.layers.hotspots = v; markScene('layerHotspots'); }],
+    // 开关立即重建/清除热点（不等下一帧 syncEntities；无头/低帧率下会滞后）。
+    ['layerHotspots', function (v) {
+      state.layers.hotspots = v;
+      rebuildDynamicAreas(true);
+      markScene('layerHotspots');
+    }],
     ['layerRoutes', function (v) { state.layers.routes = v; markScene('layerRoutes'); }],
     ['layerTargetsRed', function (v) {
       state.layers.targetsRed = v;
