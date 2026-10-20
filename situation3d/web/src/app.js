@@ -1420,6 +1420,7 @@ function applySituationData(data, caseId) {
       clearTargetSelection();
       setTick(0);
       updateInferenceUi();
+      if (window.CampaignUi) CampaignUi.onCase(data);
 
       setTransportEnabled(true);
       if (dom.followTarget) {
@@ -1717,6 +1718,7 @@ function clearSituation() {
 
   state.data = null;
   state.caseId = null;
+  if (window.CampaignUi) CampaignUi.onCase(null);
   state.inference = null;
   state.tick = 0;
   state.tickFloat = 0;
@@ -4667,6 +4669,7 @@ function setTick(tick) {
   state.tick = Math.max(0, Math.min(max, Math.round(tick)));
   state.tickFloat = state.tick;
   markScene('setTick');
+  if (window.CampaignUi) CampaignUi.onTick(state.tick);
 }
 
 function setPlaying(on) {
@@ -4700,6 +4703,7 @@ function loop(nowMs) {
       updateInferenceUi();
       // 播放推进也是一次状态变化：不标记的话画面会停在原地（只在拖动时间轴时更新）。
       markScene('playback-tick');
+      if (window.CampaignUi) CampaignUi.onTick(state.tick);
     }
   }
 
@@ -4798,6 +4802,8 @@ window.SituationHost = {
   eventsPush: function (e) { return window.EventFeed ? window.EventFeed.push(e) : null; },
   relationsDebug: relationsDebug,
   selectTarget: function (id, fly) { selectTarget(id || null, !!fly); },
+  flyTo: function (lon, lat, height, pitch) { flyTo(lon, lat, height, pitch); },
+  setTick: function (t) { setTick(t); },
   viewer: function () { return viewer; },
   // 取证用：建筑体块的短路条件逐条报出来。`?buildings=1` 不生效时，
   // "到底卡在哪个 return"光看结果猜不出来。

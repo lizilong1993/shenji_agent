@@ -66,6 +66,27 @@ def _enemy_goal_sea(unit: Unit, state: GameState) -> Optional[int]:
     return min(enemies, key=lambda u: hexmap.distance(unit.pos, u.pos)).pos
 
 
+def _beach_water_goal(state: GameState, unit: Unit) -> Optional[int]:
+    """Nearest water hex within 3 rings of the declared landing beach."""
+    from collections import deque
+    start = getattr(state, "landing_target", None)
+    if start is None:
+        return None
+    q = deque([(start, 0)])
+    seen = {start}
+    while q:
+        cur, d = q.popleft()
+        if d > 0 and state.map.cond(cur) == hexmap.RIVER:
+            return cur
+        if d >= 3:
+            continue
+        for nb in state.map.neighbors(cur):
+            if nb >= 0 and nb not in seen:
+                seen.add(nb)
+                q.append((nb, d + 1))
+    return None
+
+
 def _cached_path(state: GameState, key: tuple, fn):
     """Plan at most once per (unit, goal); A* dominates the tick cost."""
     if key in state.path_cache:
@@ -102,12 +123,15 @@ def auto_orders(state: GameState) -> List[Order]:
             orders.append(Order(u.uid, "hold"))
             continue
         if u.domain in ("sea", "sub"):
-            # Ships only pursue water objectives or enemy ships.
             goal = None
-            for o in state.objectives:
-                if o.flag != u.color and state.map.cond(o.coord) == hexmap.RIVER:
-                    if goal is None or hexmap.distance(u.pos, o.coord) < hexmap.distance(u.pos, goal):
-                        goal = o.coord
+            if getattr(u, "raw", {}).get("beaching") and getattr(state, "landing_target", None):
+                goal = _beach_water_goal(state, u)
+            if goal is None:
+                # Ships pursue water objectives or enemy ships.
+                for o in state.objectives:
+                    if o.flag != u.color and state.map.cond(o.coord) == hexmap.RIVER:
+                        if goal is None or hexmap.distance(u.pos, o.coord) < hexmap.distance(u.pos, goal):
+                            goal = o.coord
             if goal is None:
                 goal = _enemy_goal_sea(u, state)
             if goal is None:

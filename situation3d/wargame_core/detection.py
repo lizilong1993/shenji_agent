@@ -21,6 +21,15 @@ OBSERVE_TABLE: Dict[str, Dict[str, int]] = {
     "uav": {"infantry": 2, "vehicle": 2, "helicopter": 0, "uav": 0},
 }
 
+# Synthetic real-world observation ranges (km) for campaign maps.  These are
+# demonstration values, not measured performance.
+OBSERVE_KM: Dict[str, Dict[str, float]] = {
+    "infantry": {"infantry": 3.0, "vehicle": 5.0, "helicopter": 5.0, "uav": 1.0},
+    "vehicle": {"infantry": 4.0, "vehicle": 8.0, "helicopter": 8.0, "uav": 1.5},
+    "helicopter": {"infantry": 8.0, "vehicle": 15.0, "helicopter": 15.0, "uav": 2.0},
+    "uav": {"infantry": 3.0, "vehicle": 4.0, "helicopter": 0.0, "uav": 0.0},
+}
+
 
 def _kind(unit) -> str:
     kind = str(getattr(unit, "unit_type", "vehicle"))
@@ -34,9 +43,21 @@ def _kind(unit) -> str:
 
 
 def observe_range(observer, target, hmap: hexmap.HexMap) -> int:
-    """Effective observation range in hexes after terrain concealment."""
-    table = OBSERVE_TABLE.get(_kind(observer), OBSERVE_TABLE["vehicle"])
-    base = table.get(_kind(target), 25)
+    """Effective observation range in hexes after terrain concealment.
+
+    Two scale regimes:
+
+    * public 200 m/hex maps keep the documented hex table unchanged;
+    * campaign maps (kilometre-scale hexes) use synthetic real-world ranges,
+      otherwise a 25-hex table entry would mean 75 km of sight at 3 km/hex.
+    """
+    kind_o, kind_t = _kind(observer), _kind(target)
+    if hmap.scale_m > 500.0:
+        km = OBSERVE_KM.get(kind_o, OBSERVE_KM["vehicle"]).get(kind_t, 8.0)
+        base = max(1, int(round(km * 1000.0 / hmap.scale_m)))
+    else:
+        table = OBSERVE_TABLE.get(kind_o, OBSERVE_TABLE["vehicle"])
+        base = table.get(kind_t, 25)
     if base <= 0:
         return 0
     # Concealed units are observed at half range, unless the observer is on

@@ -110,6 +110,8 @@ def _rich_unit(op: dict, hmap: Optional[hexmap.HexMap] = None) -> Unit:
         u.sea_air_weapons = prof
         for w in prof:
             u.ammo.setdefault(w.key, int(w.ammo))
+    if op.get("beaching"):
+        u.raw["beaching"] = True
     return u
 
 

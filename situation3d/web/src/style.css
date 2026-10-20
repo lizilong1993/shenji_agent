@@ -1507,3 +1507,53 @@ select {
 
 /* 作战阶段（.rl-phase）的配色在 .region-level 那一节里定义——横幅移除后这里不再有
    第二份 .lb-phase 规则。 */
+
+/* ---- 战役演示（campaign.v3） ------------------------------------------ */
+.cp-ribbon {
+  display: flex; align-items: stretch; gap: 2px;
+  padding: 4px 8px 6px; border-bottom: 1px solid var(--line, #263241);
+  background: rgba(15, 23, 32, .55);
+}
+.cp-seg {
+  flex: 1 1 auto; min-width: 56px; padding: 3px 6px; border: 0;
+  border-radius: 3px; cursor: pointer; font-size: 12px; color: #cfd8e3;
+  background: #22303f; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cp-seg.done { background: #2f4a3c; color: #a9d3b8; }
+.cp-seg.active { background: #1f5fbf; color: #fff; }
+.cp-clock { margin-left: 8px; font-family: monospace; font-size: 12px;
+  color: #9fb0c3; align-self: center; }
+.campaign-panel .cp-stage {
+  display: grid; grid-template-columns: 20px 1fr auto; gap: 6px;
+  padding: 3px 4px; border-radius: 3px; cursor: pointer; font-size: 12px;
+}
+.campaign-panel .cp-stage:hover { background: rgba(31, 95, 191, .18); }
+.campaign-panel .cp-stage.active { background: rgba(31, 95, 191, .32); }
+.campaign-panel .cp-stage.done { color: #7f8b99; }
+.campaign-panel .cp-idx { color: #7f8b99; }
+.campaign-panel .cp-ticks { color: #7f8b99; font-family: monospace; }
+.campaign-panel .cp-sub { margin: 8px 0 4px; font-weight: 600; color: #cfd8e3; }
+.campaign-panel .cp-obj { display: flex; align-items: center; gap: 6px;
+  font-size: 12px; padding: 2px 0; }
+.campaign-panel .cp-obj i { width: 9px; height: 9px; border-radius: 50%; }
+.campaign-panel .cp-obj b { margin-left: auto; font-weight: 500; color: #9fb0c3; }
+.campaign-panel .cp-filter { display: flex; gap: 4px; margin-bottom: 4px; }
+.campaign-panel .cp-filter button {
+  border: 0; border-radius: 3px; padding: 2px 8px; font-size: 12px;
+  cursor: pointer; background: #22303f; color: #cfd8e3;
+}
+.campaign-panel .cp-filter button.on { background: #1f5fbf; color: #fff; }
+.campaign-panel .cp-event-list { max-height: 240px; overflow-y: auto; }
+.campaign-panel .cp-event {
+  display: grid; grid-template-columns: 52px 30px 1fr; gap: 6px;
+  font-size: 12px; padding: 3px 2px; cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.campaign-panel .cp-event:hover { background: rgba(31, 95, 191, .15); }
+.campaign-panel .cp-event.active { border-left-color: #1f5fbf; }
+.campaign-panel .cp-event.lv-warn { color: #f0b45a; }
+.campaign-panel .cp-t { font-family: monospace; color: #7f8b99; }
+.campaign-panel .cp-src { color: #8a94a6; }
+.campaign-panel .cp-out { font-size: 12px; padding: 2px 0; }
+.campaign-panel .cp-note { font-size: 11px; color: #7f8b99; margin-top: 4px; }

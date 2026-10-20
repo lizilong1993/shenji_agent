@@ -75,6 +75,13 @@ def _result(attack_level: int, roll: int, target, target_kind: str) -> Tuple[str
     return "none", 0
 
 
+def weapon_max_hexes(w, hmap: hexmap.HexMap) -> int:
+    """Effective maximum range of ``w`` in hexes for this map scale."""
+    if hmap.scale_m <= 500.0:
+        return int(w.max_range)
+    return max(1, int(round(w.range_km * 1000.0 / hmap.scale_m)))
+
+
 def select_weapon(attacker, target, hmap: hexmap.HexMap) -> Optional[weapons.WeaponProfile]:
     d = hexmap.distance(attacker.pos, target.pos)
     best = None
@@ -84,7 +91,9 @@ def select_weapon(attacker, target, hmap: hexmap.HexMap) -> Optional[weapons.Wea
             continue
         if getattr(attacker, "ammo", {}).get(w.key, 0) <= 0:
             continue
-        level = w.attack_level(d, _target_kind(target))
+        if d > weapon_max_hexes(w, hmap):
+            continue
+        level = w.attack_level_at(d, hmap.scale_m, _target_kind(target))
         if level > best_level:
             best_level = level
             best = w
@@ -120,7 +129,7 @@ def resolve_direct_fire(attacker, target, state) -> Optional[dict]:
     if w is None:
         return None
     d = hexmap.distance(attacker.pos, target.pos)
-    base = w.attack_level(d, _target_kind(target))
+    base = w.attack_level_at(d, state.map.scale_m, _target_kind(target))
     mods = attack_modifiers(attacker, target, state.map)
     effective = max(0, base + sum(mods.values()))
     roll = state.rng.randint(2, 12)
@@ -178,7 +187,7 @@ def best_target(attacker, state) -> Optional[object]:
             continue
         d = hexmap.distance(attacker.pos, u.pos)
         w = select_weapon(attacker, u, state.map)
-        if w is None or d > w.max_range:
+        if w is None:
             continue
         if not detection.can_observe(attacker, u, state.map, state.los):
             continue

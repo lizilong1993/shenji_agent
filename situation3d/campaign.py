@@ -70,6 +70,9 @@ class CampaignSpec:
     disclaimer: str = ""
     supply_points: List[dict] = field(default_factory=list)
     tick_seconds: float = 30.0
+    # Hex the amphibious force is heading for; beaching units steer to the
+    # nearest water hex beside it instead of chasing sea objectives.
+    landing_target: Optional[int] = None
 
 
 class CampaignRunner(object):
@@ -84,6 +87,8 @@ class CampaignRunner(object):
         self.fired_script: List[dict] = []
         self.frames: List[dict] = []
         self.state.supply_points = list(spec.supply_points or [])
+        if spec.landing_target is not None:
+            self.state.landing_target = int(spec.landing_target)
 
     # -- helpers -----------------------------------------------------------
     def _objective_by_id(self, oid: str):
@@ -164,7 +169,11 @@ class CampaignRunner(object):
         elif action == "clear_jam":
             self.state.jam = 0.0
         elif action == "convert_land":
-            for uid in (ev.action_args.get("units") or []):
+            units = ev.action_args.get("units")
+            if units == "beaching":
+                units = [u.uid for u in self.state.units.values()
+                         if u.alive and u.raw.get("beaching")]
+            for uid in (units or []):
                 u = self.state.units.get(int(uid))
                 if u is not None and u.alive:
                     beach.convert_to_land(self.state, u, ev.action_args.get("name"))
@@ -173,8 +182,6 @@ class CampaignRunner(object):
         """One compact frame per tick for the front end."""
         targets = []
         for u in self.state.units.values():
-            if not u.alive:
-                continue
             try:
                 lon, lat = self.state.map.pos_to_lonlat(u.pos)
             except KeyError:
@@ -186,6 +193,7 @@ class CampaignRunner(object):
                 "alt": 0.0,
                 "speed_kn": round(u.speed_kmh / 1.852, 1),
                 "heading": round(u.heading, 1),
+                "alive": u.alive,
                 "status": ("destroyed" if not u.alive else
                            "damaged" if u.blood < u.max_blood else "ready"),
                 "strength": round(u.strength, 1),
@@ -194,6 +202,7 @@ class CampaignRunner(object):
             })
         frames.append({
             "tick": self.state.tick,
+            "t_seconds": round(self.state.tick * self.state.tick_seconds, 1),
             "t": round(self.state.tick * self.state.tick_seconds, 1),
             "stage": self.state.stage_id,
             "targets": targets,

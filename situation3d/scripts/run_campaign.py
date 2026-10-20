@@ -44,6 +44,21 @@ def _write_json(path: str, payload) -> int:
     return os.path.getsize(path)
 
 
+def _geo_from_hex(state, loc):
+    """Event location is [row, col]; resolve to [lon, lat] when in range."""
+    try:
+        r, c = int(loc[0]), int(loc[1])
+    except (TypeError, ValueError):
+        return None
+    if not (0 <= r < state.map.rows and 0 <= c < state.map.cols):
+        return None
+    try:
+        lon, lat = state.map.pos_to_lonlat(r * 100 + c)
+    except KeyError:
+        return None
+    return [round(lon, 6), round(lat, 6)]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--case", required=True,
@@ -130,15 +145,28 @@ def main(argv=None) -> int:
         "final": result["final"],
         "targets": mod.target_defs(state),
         "hotspots": hotspots,
+        "plots": mod.plots() if hasattr(mod, "plots") else [],
+        "camera": mod.camera(),
+        # The front end matches frames[].targets[].id against targets[].id with
+        # ===, so both must use the same type.
+        "target_id_type": "int",
         "urban_aoi": base.get("urban_aoi") or [],
         "symbology": base.get("symbology"),
-        "inference_frames": [],
+        "inference_frames": None,
         "inference_model": None,
         "supply_points": [
             {"pos": sp.get("pos"), "color": sp.get("color"), "kind": sp.get("kind")}
             for sp in (spec.supply_points or [])
         ],
     }
+    # Resolve event locations (hex row/col) to lon/lat for the map UI.
+    for e in payload["events"]:
+        loc = e.get("location")
+        if isinstance(loc, list) and len(loc) == 2:
+            geo = _geo_from_hex(state, loc)
+            if geo:
+                e["geo"] = geo
+
     os.makedirs(args.out, exist_ok=True)
     out_path = os.path.join(args.out, spec.id + ".json")
     size = _write_json(out_path, payload)
