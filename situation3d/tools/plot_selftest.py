@@ -1626,10 +1626,12 @@ def main() -> int:
           all("标绘" not in x for x in ar.get("plotLabels") or []),
           "%r" % (ar.get("plotLabels"),))
     rt = ar.get("relTexts") or []
+    # 文字只描述关系本身；证据性质（实测/推理）由实线/虚线表达，不再写进文案。
     check("relation labels are Chinese and semantic (no raw ids / 敌对 N km)",
           bool(rt) and all(("协同" in t or "友邻" in t or "交战" in t or "探测" in t
                            or "警戒" in t) for t in rt)
           and not any("敌对" in t for t in rt)
+          and not any(("实测" in t or "推理" in t) for t in rt)
           and all("wingman" not in t and "lead" not in t for t in rt),
           json.dumps(rt, ensure_ascii=False))
     cp = ar.get("centerPx") or {}

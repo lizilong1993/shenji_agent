@@ -2667,6 +2667,117 @@ function markScene(reason) {
  * 不能只依赖 syncEntities 的脏标记：它由帧循环里的 RenderGovernor 驱动，
  * 在低帧率（或无头）环境下可能要等上好几秒，表现为"点了目标、计划线迟到"。
  */
+// --------------------------------------------------------------------------
+// 屏幕空间标签避让（目标标牌 + 关系文字）
+// --------------------------------------------------------------------------
+//
+// Cesium 不会在实体之间做标签避让：目标密集时标牌叠成一团，关系文字的
+// 中点也常落在别的标牌上。这里统一做一次屏幕空间矩形相交判定：
+//
+//   优先级  选中目标 > 关系文字 > 其它目标标牌
+//   规则    被更高优先级的矩形压住就隐藏这一帧（**不删除实体**，只置 show）
+//   代价    每帧约 N 次 worldToWindowCoordinates（N≈60），按 200 ms 节流
+//
+// 被隐藏的标签记在 `_declutterHid` 里，下一轮先全部恢复再重新判定——
+// 否则相机一停，被隐藏的标签永远不会回来。
+
+var _declutterHid = [];
+var _declutterLastMs = 0;
+var DECLUTTER_THROTTLE_MS = 180;
+var DECLUTTER_PAD = 2;
+
+/**
+ * 估一个标签的屏幕矩形（Cesium 没给 label 的包围盒，按字号与字数近似）。
+ *
+ * `pos` 是**实体锚点**；标签相对锚点还有 pixelOffset 与 verticalOrigin：
+ *   目标标牌：pixelOffset(0,-24)、verticalOrigin.BOTTOM → 底边在 anchorY-24
+ *   关系文字：pixelOffset(0,0)、CENTER → 中心在 anchorY
+ */
+function labelRect(pos, text, size, anchorOffsetY, verticalCenter) {
+  var chars = String(text || '').length;
+  // 中文按 1.0 字宽、ASCII 按 0.55；背景 padding 各 4/2 px。
+  var w = 0;
+  for (var i = 0; i < chars; i++) {
+    w += String(text).charCodeAt(i) > 255 ? size : size * 0.55;
+  }
+  w += 10;
+  var h = size + 8;
+  var cy = pos.y + (anchorOffsetY || 0);
+  return { x: pos.x - w / 2, y: verticalCenter ? cy - h / 2 : cy - h, w: w, h: h };
+}
+
+function rectsOverlap(a, b) {
+  return !(a.x + a.w + DECLUTTER_PAD < b.x || b.x + b.w + DECLUTTER_PAD < a.x ||
+           a.y + a.h + DECLUTTER_PAD < b.y || b.y + b.h + DECLUTTER_PAD < a.y);
+}
+
+function declutterLabels(force) {
+  if (!viewer || !window.Cesium || !Cesium.SceneTransforms) return null;
+  var now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  if (!force && now - _declutterLastMs < DECLUTTER_THROTTLE_MS) return null;
+  _declutterLastMs = now;
+
+  // 先恢复上一轮被我们隐藏的标签。
+  for (var k = 0; k < _declutterHid.length; k++) {
+    try { _declutterHid[k].show = true; } catch (e) { /* 实体已移除 */ }
+  }
+  _declutterHid.length = 0;
+
+  var time = viewer.clock.currentTime;
+  var items = [];
+
+  Object.keys(state.targets).forEach(function (id) {
+    var rec = state.targets[id];
+    var ent = rec && rec.entity;
+    if (!ent || !ent.show || !ent.label || !ent.label.show) return;
+    var text = ent.label.text;
+    text = (text && text.getValue) ? text.getValue() : text;
+    if (!text) return;
+    var p = ent.position && ent.position.getValue ? ent.position.getValue(time) : null;
+    if (!p) return;
+    var w = Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, p);
+    if (!w) return;
+    items.push({ label: ent.label, text: text, size: 12,
+                 pri: state.selected === id ? 3 : 1, w: w, offY: -24, vc: false });
+  });
+
+  relView.ents.forEach(function (e) {
+    if (!e.show || !e.label) return;
+    var text = e.label.text;
+    text = (text && text.getValue) ? text.getValue() : text;
+    if (!text) return;
+    var p = e.position && e.position.getValue ? e.position.getValue(time) : null;
+    if (!p) return;
+    var w = Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, p);
+    if (!w) return;
+    items.push({ label: e.label, text: text, size: 12, pri: 2, w: w, offY: 0, vc: true });
+  });
+
+  // 优先级高者先占位；同优先级按屏幕纵向排序，让靠上的先留。
+  items.sort(function (a, b) { return (b.pri - a.pri) || (a.w.y - b.w.y); });
+
+  var placed = [];
+  var hidden = 0;
+  items.forEach(function (it) {
+    var r = labelRect(it.w, it.text, it.size, it.offY, it.vc);
+    // 视窗外的标签直接隐藏（省 GPU 也避免边缘重叠）。
+    if (it.w.x < -r.w || it.w.y < -r.h ||
+        it.w.x > viewer.canvas.clientWidth + r.w || it.w.y > viewer.canvas.clientHeight + r.h) {
+      it.label.show = false; _declutterHid.push(it.label); hidden++; return;
+    }
+    for (var i = 0; i < placed.length; i++) {
+      if (rectsOverlap(r, placed[i])) {
+        it.label.show = false;
+        _declutterHid.push(it.label);
+        hidden++;
+        return;
+      }
+    }
+    placed.push(r);
+  });
+  return { total: items.length, shown: placed.length, hidden: hidden };
+}
+
 function refreshPredictEntity(id) {
   const rec = state.targets[id];
   if (!rec || !rec.predict) return;
@@ -3508,19 +3619,14 @@ function relCaseEngageOk() {
 
 var PAIR_ZH = { lead: '长机', wingman: '僚机' };
 
-/** 关系的"证据性质"中文：dataset 实测 vs 由距离/覆盖推理。 */
-function relEvidenceZh(kind) {
-  return kind === 'measured' ? '实测' : '推理';
-}
-
 /**
  * 关系文案。
  *
- * 友方（同一编队）：`协同 · 长机→僚机 · 实测`；同阵营不同编队：`友邻 · 同属红方 · 实测`。
+ * 友方（同一编队）：`协同 · 长机→僚机`；同阵营不同编队：`友邻 · 同属红方`。
  * 敌方：不再只写"敌对 XX km"，而是把**系统实际具备的**证据说清楚：
- *   · 进入交战射程（双方 engage 半径之和）→ `交战威胁 · 实测`
- *   · 仅进入影响/探测范围 → `探测跟踪 · 推理`
- *   · 其余 → `警戒距离 X km · 推理`
+ *   · 进入交战射程（双方 engage 半径之和）→ `交战威胁 · 距离 X km`
+ *   · 仅进入影响/探测范围 → `探测跟踪 · 距离 X km`
+ * 证据性质（实测 / 推理）**不写进文字**：实线=实测、虚线=推理，线型已经表达。
  * 队伍代号（air-red-1 等）只用于内部，不再直接展示。
  */
 function relText(kind, evidence, fromDef, toDef, km) {
@@ -3528,13 +3634,13 @@ function relText(kind, evidence, fromDef, toDef, km) {
   if (kind === 'own') {
     var fr = relAttr(fromDef, 'pair_role'), tr = relAttr(toDef, 'pair_role');
     if (fr && tr) {
-      return '协同 · ' + (PAIR_ZH[fr] || fr) + '→' + (PAIR_ZH[tr] || tr) + ' · ' + relEvidenceZh(evidence);
+      return '协同 · ' + (PAIR_ZH[fr] || fr) + '→' + (PAIR_ZH[tr] || tr);
     }
-    return '友邻 · 同属' + f + ' · ' + relEvidenceZh(evidence);
+    return '友邻 · 同属' + f;
   }
   var d = Math.round(km);
   var verb = evidence === 'measured' ? '交战威胁' : '探测跟踪';
-  return verb + ' · 距离 ' + d + ' km · ' + relEvidenceZh(evidence);
+  return verb + ' · 距离 ' + d + ' km';
 }
 
 function refreshRelations() {
@@ -5018,6 +5124,8 @@ function loop(nowMs) {
   if (window.TargetFx) TargetFx.frame(dt);
 
   if (RenderGovernor.take()) syncEntities();
+  // 标签避让按时间节流（不受 RenderGovernor 的脏标记影响：相机微动也要重排）。
+  declutterLabels(false);
 
   // 相机静止时 camera.changed 不会再触发，而它第一次触发时场景可能尚未渲染
   // （globe.pick 返回 null），所以这里兜底按秒刷新一次。
@@ -5191,6 +5299,8 @@ window.SituationHost = {
       ? Plotting.fromFeatureCollection(fc)
       : { added: 0, errors: ['Plotting 未加载'] };
   },
+  /** 标签避让取证：本轮参与判定/显示/隐藏的数量。 */
+  declutterDebug: function () { return declutterLabels(true); },
   /** 动态热点/占领区的取证出口：计算值 vs 场景图元数（数据集可能有/无威胁数据）。 */
   dynamicAreasDebug: function () {
     const spots = computeHotspots();
