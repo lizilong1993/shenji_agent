@@ -70,6 +70,7 @@ eq(L.formClassOf({ domain: 'air', platform_class: '战斗机', model: '歼-16 �
 eq(L.formClassOf({ domain: 'air', platform_class: '预警机', model: '空警-500 预警机' }), 'aew', '空警-500 -> aew');
 eq(L.formClassOf({ domain: 'air', platform_class: '武装直升机', model: '直-10 武装直升机' }), 'helicopter', '直-10 -> helicopter');
 eq(L.formClassOf({ domain: 'air', platform_class: '无人机', model: '中高空长航时无人机' }), 'uav', '无人机 -> uav');
+eq(L.formClassOf({ domain: 'air', platform_class: '无人机', icon: 'aew' }), 'uav', '无人机(icon=aew) 仍 -> uav');
 
 // --- 7. 精确型号优先，缺失型号回退大类 ---
 const exact = [
@@ -122,6 +123,12 @@ for (const url of urls) {
   const p = path.join(__dirname, '..', 'web', url.replace(/^\.\//, ''));
   if (fs.existsSync(p)) pass++;
   else failures.push(`映射的模型文件不存在: ${p}`);
+}
+
+// --- 8b. 尾流/尾气长度表：每个大类都要有代表长度 ---
+for (const k of Object.keys(L.MODEL_MAP)) {
+  if (L.REAL_LENGTH_M[k] > 0) pass++;
+  else failures.push(k + ' 缺少 REAL_LENGTH_M（targetFx 尾流会退化）');
 }
 
 // --- 9. 尺度：资产按米归一，scale 恒为 1 ---

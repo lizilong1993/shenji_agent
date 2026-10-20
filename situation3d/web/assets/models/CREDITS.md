@@ -24,6 +24,7 @@
 | `type_m109a6.glb` | M109A6 Paladin Self-Propelled Howitzer | MirzaArrafiERV_45 | CC Attribution | M109A6 自行榴弹炮 |
 | `type_hq9.glb` | Chinese HQ-9 | 42manako | CC Attribution | 红旗-9 防空系统 |
 | `type_pac3.glb` | MIM-104 Patriot Air Defense System | MirzaArrafiERV_45 | CC Attribution | 爱国者 PAC-3 |
+| `type_phl03.glb` | PHL-03 03式远程火箭炮系统 | EXcalibur117 | Free Standard | PHL-03 远程火箭炮 |
 | `type_eq240.glb` | Dongfeng EQ240/EQ2081 | 42manako | CC Attribution | 东风 EQ240（运输车队） |
 | `type_056a.glb` | 自建（tools/modelgen/build_custom.py） | 本项目 | 项目内部 | 056A 型轻型护卫舰 |
 | `type_903.glb` | 自建（tools/modelgen/build_custom.py） | 本项目 | 项目内部 | 903 型综合补给舰 |

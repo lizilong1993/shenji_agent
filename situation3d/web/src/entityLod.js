@@ -9,9 +9,10 @@
  *   - 无公开资产的型号（056A/903/磐石/沱江/基隆/红旗-16/鹰击-62）由
  *     tools/modelgen/build_custom.py 按公开尺寸自建。
  *
- * 因此：**所有模型 scale 都是 1、机头/舰艏一律 +Y**（Blender +Y → glTF -Z →
- * Cesium 局部 +Y）。旧版的"真实长度 ÷ 资产单位长度"缩放表与逐资产 FORWARD_AXIS
- * 已删除——资产在生成阶段就归一，运行时不再做尺度/朝向补偿。
+ * 因此：**所有模型 scale 都是 1、机头/舰艏在 Blender 里一律 +Y**。导出后
+ * 实测 Cesium 1.145 的局部轴映射为 glTF +Z→局部 +X、glTF +X→局部 +Y，而
+ * Blender +Y 导出为 glTF -Z，所以模型在 Cesium 局部系的前向是 **-X**
+ * （forwardAxis() 返回 '-X'）。旧版的尺度表与逐资产轴表已删除。
  *
  * 选型规则（用户 2026-10-20）：
  *   1. 先用 def.model（如"052D 型驱逐舰"）匹配精确型号；
@@ -183,9 +184,10 @@
       String(def.model || '');
 
     if (d === 'air') {
+      // 无人机要先于预警机判：实测部分无人机数据的 icon 是 aew。
+      if (/无人机|uav|drone|侦察机/i.test(p)) return 'uav';
       if (/预警|aew|awacs/i.test(p)) return 'aew';
       if (/直升机|helicopter|rotor|旋翼/i.test(p)) return 'helicopter';
-      if (/无人机|uav|drone|侦察机/i.test(p)) return 'uav';
       if (/战斗机|歼击机|fighter|air.?superiority|多用途|阵风|rafale/i.test(p)) return 'fighter';
       return null;
     }
@@ -230,7 +232,15 @@
   }
 
   // 兼容旧引用：这两张表已不再参与计算（资产是米制、scale=1）。
-  var REAL_LENGTH_M = {};
+  // targetFx 的尾流/尾气仍按大类取长度；逐型号长度在资产管线里已归一，
+  // 这里给各大类的代表值（米），避免尾流起点落在船体/机身内部。
+  var REAL_LENGTH_M = {
+    destroyer: 155, frigate: 134, corvette: 89, patrol: 89,
+    amphibious: 210, replenishment: 178, boat_speed: 15,
+    tank: 11, light_tank: 11, amphibious_vehicle: 9.5, spg: 11.6,
+    howitzer: 10.2, mlrs: 11, sam: 12, anti_ship: 13, truck: 6.9,
+    fighter: 21.9, aew: 46.6, helicopter: 14.15, uav: 11,
+  };
   var MODEL_UNITS = {};
   var FORWARD_AXIS = {};
   var WHEEL_NODES = {};

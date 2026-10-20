@@ -3,7 +3,8 @@
 按具体型号自建的目标模型（Blender 4.5 无头）。
 
 约定：1 单位 = 1 米，+Y 为舰艏/机头/车头，+Z 向上；海面/地面目标原点在
-水线/地面（z=0）。输出 GLB 后 Cesium 中 scale=1，EntityLod.FORWARD_AXIS 记 '+Y'。
+水线/地面（z=0）。输出 GLB 后 Cesium 中 scale=1；Cesium 1.145 实测模型
+局部前向为 -X（EntityLod.forwardAxis() 返回 '-X'）。
 
 运行：
   blender -b --python build_custom.py -- <输出目录> [型号 ...]
@@ -757,10 +758,42 @@ def build_yj62():
     finish("t_yj62", "ground")
 
 
+# ---------------------------------------------------------------------------
+# M777 超轻型榴弹炮（牵引状态）：全长 10.2 m，宽 2.8 m
+# ---------------------------------------------------------------------------
+def build_m777():
+    reset()
+    green = mat("mil_green", (0.20, 0.24, 0.16), 0.75)
+    darkm = mat("dark", (0.05, 0.05, 0.055), 0.7)
+    rubber = mat("rubber", (0.04, 0.04, 0.045), 0.9)
+    # 炮管（+Y 向前，略上扬）
+    cyl("m777_barrel", (0, 3.6, 1.55), 0.09, 5.4, green, axis="Y", verts=16)
+    box("m777_muzzle", (0, 6.2, 1.62), (0.34, 0.7, 0.34), darkm, bevel=0.04)
+    # 炮闩/摇架
+    box("m777_cradle", (0, 1.0, 1.35), (0.7, 1.8, 0.8), green, bevel=0.06)
+    cyl("m777_recoil1", (0.45, 1.6, 1.55), 0.12, 2.0, darkm, axis="Y", verts=10)
+    cyl("m777_recoil2", (-0.45, 1.6, 1.55), 0.12, 2.0, darkm, axis="Y", verts=10)
+    # 防盾（两块内倾板）
+    box("m777_shield_l", (-0.85, 2.2, 1.1), (0.08, 1.6, 1.3), green, rot_z=0.0)
+    box("m777_shield_r", (0.85, 2.2, 1.1), (0.08, 1.6, 1.3), green, rot_z=0.0)
+    # 车轮
+    for sx in (-1, 1):
+        cyl("m777_wheel_%d" % sx, (sx * 1.25, 0.8, 0.62), 0.62, 0.45, rubber, axis="X", verts=20)
+        cyl("m777_hub_%d" % sx, (sx * 1.5, 0.8, 0.62), 0.22, 0.12, green, axis="X", verts=12)
+    # 大架（两条向后张开的梁）+ 驻锄
+    for sx in (-1, 1):
+        o = box("m777_trail_%d" % sx, (sx * 0.9, -1.3, 0.45), (0.22, 4.2, 0.25), green, rot_z=sx * 0.12)
+        box("m777_spade_%d" % sx, (sx * 1.4, -3.35, 0.45), (0.5, 0.5, 0.8), darkm, bevel=0.03)
+    # 液压/工具箱
+    box("m777_box", (0, 0.4, 0.95), (1.1, 0.9, 0.5), green, bevel=0.04)
+    box("m777_seat", (-0.7, 0.2, 1.05), (0.4, 0.5, 0.35), darkm)
+    finish("t_m777", "ground")
+
+
 BUILDERS = {
     "052d": build_052d, "056a": build_056a, "903": build_903, "panshi": build_panshi,
     "tuochiang": build_tuochiang, "kidd": build_kidd, "kj500": build_kj500,
-    "hq16": build_hq16, "yj62": build_yj62,
+    "hq16": build_hq16, "yj62": build_yj62, "m777": build_m777,
 }
 
 for key, fn in BUILDERS.items():

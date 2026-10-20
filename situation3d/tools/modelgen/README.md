@@ -30,7 +30,7 @@
 | `type_ztd05.glb` | 05 式两栖突击车 | Sketchfab |
 | `type_plz05.glb` | PLZ-05 | Sketchfab |
 | `type_m109a6.glb` | M109A6 | Sketchfab |
-| `type_m777.glb` | M777 | Sketchfab |
+| `type_m777.glb` | M777 超轻型榴弹炮 | 自建 |
 | `type_phl03.glb` | PHL-03 | Sketchfab |
 | `type_hq9.glb` | 红旗-9 | Sketchfab |
 | `type_hq16.glb` | 红旗-16 发射车 | 自建 |
@@ -44,7 +44,7 @@
 | `type_e2d.glb` | E-2D（E-2K 近似） | Sketchfab |
 | `type_z10.glb` | 直-10 | Sketchfab |
 | `type_mq9.glb` | MQ-9（无人机） | Sketchfab |
-| `type_ural4320.glb` | Ural-4320（运输车队） | Sketchfab |
+| `type_eq240.glb` | 东风 EQ240（运输车队） | Sketchfab |
 
 ## 管线
 
