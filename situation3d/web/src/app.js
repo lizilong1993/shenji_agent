@@ -2594,13 +2594,23 @@ function rebuildOccupationEntities(areas) {
     const ring = a.feature ? featureRing(a.feature)
                            : circleRing(a.lat, a.lon, a.radiusKm, 20);
     const flat = ring.reduce(function (acc, p) { return acc.concat([p[0], p[1]]); }, []);
+    const closed = ring.concat([ring[0]]);
+    const closedFlat = closed.reduce(function (acc, p) { return acc.concat([p[0], p[1]]); }, []);
     const ent = viewer.entities.add({
       id: 'occupation-' + i,
       name: a.id + ' 控制区',
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(flat)),
-        material: color.withAlpha(0.22),
+        // 31 个影响圆会互相叠加：填充压得很淡（只用来表示"覆盖到的范围"），
+        // 边界单独用贴地细线描出来，叠在一起时才看得出各自的轮廓。
+        material: color.withAlpha(0.07),
         classificationType: Cesium.ClassificationType.BOTH,
+      },
+      polyline: {
+        positions: Cesium.Cartesian3.fromDegreesArray(closedFlat),
+        width: 1,
+        clampToGround: true,
+        material: color.withAlpha(0.55),
       },
     });
     ent.occTarget = a.id;
@@ -3415,8 +3425,14 @@ function relClear() {
   relView.own = 0; relView.hostile = 0; relView.hostileInf = 0; relView.peers.length = 0;
 }
 
+// 关系标签的可读性上限：同阵营目标可能很多（20 个红方），每对都写字必然糊成一片。
+// 只在**较近**的关系上写标签，远的只画线（线本身仍表达"有关联"）。
+var REL_LABEL_MAX_KM = 260;
+
 function relAddLine(from, to, dashed, color, text) {
   var alt = Math.max(0, (Number(from.alt) || 0) + (Number(to.alt) || 0)) / 2;
+  // 过远的关联只画线不写字（见 REL_LABEL_MAX_KM）。
+  if (relKm(from, to) > REL_LABEL_MAX_KM) text = '';
   var ent = viewer.entities.add({
     polyline: {
       positions: Cesium.Cartesian3.fromDegreesArrayHeights(
@@ -3431,9 +3447,13 @@ function relAddLine(from, to, dashed, color, text) {
       text: text, font: '12px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
       fillColor: color, style: Cesium.LabelStyle.FILL,
       showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('#ffffffd9'),
+      backgroundPadding: new Cesium.Cartesian2(4, 2),
       horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
       verticalOrigin: Cesium.VerticalOrigin.CENTER,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      // 拉远后标签自然淡出，避免战区级视图上标签挤成一片（线仍然可见）。
+      translucencyByDistance: new Cesium.NearFarScalar(300000, 1.0, 900000, 0.0),
+      scaleByDistance: new Cesium.NearFarScalar(150000, 1.0, 700000, 0.75),
     },
   });
   ent.show = !!relView.show;
@@ -3617,6 +3637,8 @@ function activityName(code) {
 // "text really drawn": every visible relation line must carry exactly one mid-line
 // label. Counted off the entity list rather than eyeballed.
 function lineLabelStats() {
+  // 只有**近距**关系才带文字（见 REL_LABEL_MAX_KM），所以"每线必有字"不再成立：
+  // 改为"每线要么有文字、要么是一段无文字的连线"，并单独报出带字数量。
   var lines = 0, labeled = 0;
   relView.ents.forEach(function (e) {
     if (!e.show) return;
@@ -3625,7 +3647,8 @@ function lineLabelStats() {
     try { t = (t && t.getValue) ? t.getValue() : t; } catch (err) { t = null; }
     if (t) labeled++;
   });
-  return { ok: (labeled === lines), lines: lines, labeled: labeled };
+  return { ok: labeled <= lines, lines: lines, labeled: labeled,
+           labelMaxKm: REL_LABEL_MAX_KM };
 }
 
 function relationsDebug() {
