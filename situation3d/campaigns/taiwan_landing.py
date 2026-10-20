@@ -269,8 +269,9 @@ def start_time_utc() -> str:
 
 
 def camera() -> dict:
-    return {"lon": 119.9, "lat": 23.3, "height": 420000.0,
-            "heading": 0.0, "pitch": -70.0}
+    # 初始机位：海峡南段、厦门—澎湖—台南都能看到，又能分辨营级目标。
+    return {"lon": 119.98, "lat": 23.10, "height": 230000.0,
+            "heading": 0.0, "pitch": -62.0}
 
 
 def runner_class():
@@ -300,10 +301,19 @@ def _engage_km(u) -> float:
 
 
 def _influence_km(u) -> float:
-    """Sensor reach in km, used for the influence/occupation overlay."""
+    """Sensor reach in km, used for the influence/occupation overlay.
+
+    Air platforms do not hold ground, so their influence circle is kept small
+    (the front end falls back to 160 km for air when this field is 0).  Ships
+    are capped so their circles stay readable.
+    """
+    if getattr(u, "domain", "") == "air":
+        return 30.0
     rng = 0.0
     for s in getattr(u, "sensors", []) or []:
         rng = max(rng, float(getattr(s, "range_km", 0.0)))
+    if getattr(u, "domain", "") in ("sea", "sub"):
+        rng = min(rng, 120.0)
     return round(rng, 1)
 
 

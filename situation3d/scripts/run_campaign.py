@@ -119,6 +119,16 @@ def main(argv=None) -> int:
             "kind": "objective",
         })
 
+    # L1/L2/L3 inference for the right-hand panels and the hotspot layer.
+    # Campaign frames carry the wargame-core state, not the legacy static
+    # definitions, so the levels are recomputed here.
+    from campaign_inference import infer_campaign
+    targets = mod.target_defs(state)
+    inference = infer_campaign(result["frames"], targets, hotspots)
+    result["frames"], _ = result["frames"], None
+    # Normalise the region list to the objective order used by the panel.
+    inference["regions_order"] = [h["name"] for h in hotspots]
+
     payload = {
         "schema": "situation3d.campaign.v3",
         "case_id": spec.id,
@@ -143,7 +153,7 @@ def main(argv=None) -> int:
         "frames": result["frames"],
         "outcome": result["outcome"],
         "final": result["final"],
-        "targets": mod.target_defs(state),
+        "targets": targets,
         "hotspots": hotspots,
         "plots": mod.plots() if hasattr(mod, "plots") else [],
         "camera": mod.camera(),
@@ -152,8 +162,9 @@ def main(argv=None) -> int:
         "target_id_type": "str",
         "urban_aoi": base.get("urban_aoi") or [],
         "symbology": base.get("symbology"),
-        "inference_frames": None,
-        "inference_model": None,
+        "inference_frames": inference["frames"],
+        "inference_model": inference["model"],
+        "inference_summary": inference["summary"],
         "supply_points": [
             {"pos": sp.get("pos"), "color": sp.get("color"), "kind": sp.get("kind")}
             for sp in (spec.supply_points or [])
