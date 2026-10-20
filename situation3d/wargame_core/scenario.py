@@ -38,8 +38,21 @@ def _unit_type(name: str, op_type: int) -> str:
         return "artillery"
     if "防空" in name:
         return "aa"
-    if "侦察" in name:
+    if "侦察" in name or "校射" in name:
         return "recon"
+    if "工程" in name or "工兵" in name or "扫雷" in name or "布雷" in name:
+        return "engineering"
+    # op_type == 2 ("车辆") is also used by ships in the public fixtures, so a
+    # name-based check must run before the generic vehicle fallback.
+    if any(k in name for k in ("驱逐舰", "护卫舰", "巡逻舰", "补给舰",
+                               "登陆舰", "两栖舰", "航母", "舰艇")):
+        return "ship"
+    if "潜艇" in name:
+        return "submarine"
+    if "两栖" in name:
+        return "amphibious"
+    if "运输" in name and "机" not in name:
+        return "transport"
     return "vehicle"
 
 

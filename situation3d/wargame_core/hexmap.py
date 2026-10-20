@@ -158,6 +158,8 @@ class HexMap(object):
         self.upper_left_lon = doc.get("upper_left_longitude")
         self.upper_left_lat = doc.get("upper_left_latitude")
         self.coordinate_system = doc.get("coordinate_system") or "oddr"
+        # Campaign maps set this: vehicles must stay on the road network.
+        self.vehicle_road_bound = bool(doc.get("vehicle_road_bound"))
         self._cells: List[List[dict]] = doc.get("map_data") or []
         if len(self._cells) != self.rows:
             self.rows = len(self._cells)
@@ -257,6 +259,11 @@ class HexMap(object):
             return 1.0
 
         # vehicle
+        if self.vehicle_road_bound and road_class <= 0:
+            # Campaign maps: a wheeled/tracked unit may only move along a road
+            # edge.  This is the coarse-grid equivalent of the OSM network
+            # constraint used by engine/roads.py.
+            return float("inf")
         cost = VEHICLE_TERRAIN_COST.get(cond, 1.0)
         if road_class > 0:
             return 1.0

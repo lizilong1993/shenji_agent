@@ -51,8 +51,12 @@ PROFILES = {
     "taiwan_south": {
         "map_id": 9001,
         "name": "台海南段（虚构演示）",
-        "center_lon": 119.55, "center_lat": 23.55,
-        "rows": 100, "cols": 100, "scale_m": 3000,
+        # Two local battlefields inside one 150 x 130 km frame:
+        #   A 澎湖—海峡中段（海上拦截）  B 台南—高雄（登陆与地面）
+        # A 3 km hex made the two ends 100 km apart and forced a 400 km camera;
+        # 1.5 km keeps both in one readable view without shrinking the theatre.
+        "center_lon": 119.95, "center_lat": 23.10,
+        "rows": 100, "cols": 100, "scale_m": 1500,
         "elev_grade": 10,
     },
     "india_china_west": {
@@ -650,6 +654,7 @@ def main(argv=None) -> int:
         "coordinate_number_length": 4,
         "coordinate_number_mode": 0,
         "coordinate_system": "oddr",
+        "vehicle_road_bound": True,
         "upper_left_longitude": profile["west"],
         "upper_left_latitude": profile["north"],
         "max_row": profile["rows"],

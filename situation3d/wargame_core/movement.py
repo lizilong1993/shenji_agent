@@ -79,7 +79,12 @@ def advance(unit, path: Sequence[int], tick_seconds: float,
         unit.path = list(path)
         unit.path_index = 0
     entered: List[int] = []
-    budget = hex_budget(unit, tick_seconds, hmap)
+    # The budget is fractional hexes per tick (a 30 km/h unit on a 3 km hex
+    # covers 0.083 hex per 30 s tick), so unused progress must carry across
+    # ticks.  Without the carry a unit could never accumulate the 1.0 needed
+    # to enter the next hex and every ground unit stood still.
+    budget = hex_budget(unit, tick_seconds, hmap) + float(
+        getattr(unit, "move_progress", 0.0) or 0.0)
     idx = max(0, int(getattr(unit, "path_index", 0)))
     cur = int(unit.pos)
     while idx + 1 < len(unit.path) and budget > 0.0:
@@ -90,7 +95,9 @@ def advance(unit, path: Sequence[int], tick_seconds: float,
         if can_enter is not None and not can_enter(nxt):
             break
         cost = hmap.move_cost(cur, nxt, mode)
-        if cost == float("inf") or cost > budget:
+        if cost == float("inf"):
+            break
+        if cost > budget:
             break
         cur = nxt
         idx += 1
@@ -98,6 +105,7 @@ def advance(unit, path: Sequence[int], tick_seconds: float,
         entered.append(cur)
     unit.pos = cur
     unit.path_index = idx
+    unit.move_progress = max(0.0, budget) if idx + 1 < len(unit.path) else 0.0
     return entered
 
 

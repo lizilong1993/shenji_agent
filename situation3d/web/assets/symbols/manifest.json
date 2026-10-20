@@ -17,6 +17,20 @@
       "sidc": "10060100001101160000",
       "viewBoxSize": "174"
     },
+    "amphibious_blue": {
+      "affiliation": "blue",
+      "icon": "amphibious",
+      "selectedVariant": "amphibious_blue_sel.svg",
+      "sidc": "10031000001203000000",
+      "viewBoxSize": "194"
+    },
+    "amphibious_red": {
+      "affiliation": "red",
+      "icon": "amphibious",
+      "selectedVariant": "amphibious_red_sel.svg",
+      "sidc": "10061000001203000000",
+      "viewBoxSize": "188"
+    },
     "armor_blue": {
       "affiliation": "blue",
       "icon": "armor",
@@ -87,6 +101,20 @@
       "sidc": "10063000001202030000",
       "viewBoxSize": "188"
     },
+    "engineering_blue": {
+      "affiliation": "blue",
+      "icon": "engineering",
+      "selectedVariant": "engineering_blue_sel.svg",
+      "sidc": "10031000001411000000",
+      "viewBoxSize": "194"
+    },
+    "engineering_red": {
+      "affiliation": "red",
+      "icon": "engineering",
+      "selectedVariant": "engineering_red_sel.svg",
+      "sidc": "10061000001411000000",
+      "viewBoxSize": "188"
+    },
     "fighter_blue": {
       "affiliation": "blue",
       "icon": "fighter",
@@ -113,6 +141,48 @@
       "icon": "frigate",
       "selectedVariant": "frigate_red_sel.svg",
       "sidc": "10063000001202040000",
+      "viewBoxSize": "188"
+    },
+    "helicopter_blue": {
+      "affiliation": "blue",
+      "icon": "helicopter",
+      "selectedVariant": "helicopter_blue_sel.svg",
+      "sidc": "10030100001202020000",
+      "viewBoxSize": "164"
+    },
+    "helicopter_red": {
+      "affiliation": "red",
+      "icon": "helicopter",
+      "selectedVariant": "helicopter_red_sel.svg",
+      "sidc": "10060100001202020000",
+      "viewBoxSize": "174"
+    },
+    "infantry_blue": {
+      "affiliation": "blue",
+      "icon": "infantry",
+      "selectedVariant": "infantry_blue_sel.svg",
+      "sidc": "10031000001211000000",
+      "viewBoxSize": "194"
+    },
+    "infantry_red": {
+      "affiliation": "red",
+      "icon": "infantry",
+      "selectedVariant": "infantry_red_sel.svg",
+      "sidc": "10061000001211000000",
+      "viewBoxSize": "188"
+    },
+    "landing_craft_blue": {
+      "affiliation": "blue",
+      "icon": "landing_craft",
+      "selectedVariant": "landing_craft_blue_sel.svg",
+      "sidc": "10033000001202060000",
+      "viewBoxSize": "164"
+    },
+    "landing_craft_red": {
+      "affiliation": "red",
+      "icon": "landing_craft",
+      "selectedVariant": "landing_craft_red_sel.svg",
+      "sidc": "10063000001202060000",
       "viewBoxSize": "188"
     },
     "replenishment_blue": {
@@ -142,6 +212,34 @@
       "selectedVariant": "sam_battalion_red_sel.svg",
       "sidc": "10061000001301020000",
       "viewBoxSize": "188"
+    },
+    "transport_blue": {
+      "affiliation": "blue",
+      "icon": "transport",
+      "selectedVariant": "transport_blue_sel.svg",
+      "sidc": "10031000001401000000",
+      "viewBoxSize": "194"
+    },
+    "transport_red": {
+      "affiliation": "red",
+      "icon": "transport",
+      "selectedVariant": "transport_red_sel.svg",
+      "sidc": "10061000001401000000",
+      "viewBoxSize": "188"
+    },
+    "uav_blue": {
+      "affiliation": "blue",
+      "icon": "uav",
+      "selectedVariant": "uav_blue_sel.svg",
+      "sidc": "10030100001101030000",
+      "viewBoxSize": "164"
+    },
+    "uav_red": {
+      "affiliation": "red",
+      "icon": "uav",
+      "selectedVariant": "uav_red_sel.svg",
+      "sidc": "10060100001101030000",
+      "viewBoxSize": "174"
     }
   }
 }

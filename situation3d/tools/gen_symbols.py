@@ -73,6 +73,14 @@ PLATFORMS = {
     "artillery":       ("10", "130300"),   # Land Unit / Field Artillery
     "fighter":         ("01", "110104"),   # Air / Fixed Wing / Fighter
     "aew":             ("01", "110116"),   # Air / Fixed Wing / AEW
+    # -- campaign additions ----------------------------------------------
+    "uav":             ("01", "110103"),   # Air / Fixed Wing / UAV
+    "helicopter":      ("01", "120202"),   # Air / Rotary Wing / Utility
+    "amphibious":      ("10", "120300"),   # Land Unit / Amphibious
+    "landing_craft":   ("30", "120206"),   # Sea Surface / Landing Craft
+    "infantry":        ("10", "121100"),   # Land Unit / Infantry
+    "transport":       ("10", "140100"),   # Land Unit / Sustainment / Transport
+    "engineering":     ("10", "141100"),   # Land Unit / Sustainment / Engineer
 }
 
 # blue force = Friend, red force = Hostile. Colour comes from the SIDC itself
@@ -117,6 +125,14 @@ ICON_PARTS = {
     "artillery": "field-gun",
     "fighter": "jet-fighter",
     "aew": "radar-dish",
+    # campaign additions
+    "uav": "delivery-drone",
+    "helicopter": "helicopter",
+    "amphibious": "apc",
+    "landing_craft": "speed-boat",
+    "infantry": "rifle",
+    "transport": "truck",
+    "engineering": "parachute",
 }
 
 GAME_ICONS_TARBALL = "/tmp/iconprobe/gi.tgz"   # tools/fetch_icons.py 会下到这里

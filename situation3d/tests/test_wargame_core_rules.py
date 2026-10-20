@@ -165,10 +165,16 @@ class CombatTests(unittest.TestCase):
         self.assertEqual(b1.blood, b2.blood)
 
     def test_objective_capture(self):
+        # Ownership flips only after the objective has been held for
+        # CONTROL_HOLD_TICKS ticks (hysteresis against per-tick flapping).
+        from wargame_core.state import CONTROL_HOLD_TICKS
         m = make_map(rows=5, cols=5)
         a = make_unit(1, 0, hexmap.encode(2, 2))
         s = GameState(m, {1: a}, [Objective(hexmap.encode(2, 2), 10, -1)])
-        changes = s.control_objectives()
+        changes = []
+        for _ in range(CONTROL_HOLD_TICKS):
+            changes = s.control_objectives()
+            s.tick += 1
         self.assertEqual(s.objectives[0].flag, 0)
         self.assertEqual(len(changes), 1)
 

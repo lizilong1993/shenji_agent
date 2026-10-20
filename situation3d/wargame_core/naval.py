@@ -39,13 +39,16 @@ def naval_edge_cost(hmap: hexmap.HexMap, a: int, b: int, unit) -> float:
     if not hmap.valid(b):
         return float("inf")
     cond = hmap.cond(b)
-    if getattr(unit, "domain", "") in ("sea", "sub"):
+    if unit is None or getattr(unit, "domain", "") in ("sea", "sub"):
         # In the theatre map, terrain 4 (large river / sea) is water, and the
-        # generated campaign map marks sea as terrain 4 too.
-        if cond not in (4,):
+        # generated campaign map marks sea as terrain 4 too.  ``unit`` may be
+        # None when the caller only wants the water mask (naval_path uses a
+        # synthetic unit for ships), so the domain check must tolerate it.
+        if cond != 4:
             return float("inf")
-        if getattr(unit, "domain", "") == "sub":
-            return SUBMARINE_SURFACED_COST if getattr(unit, "depth", "surface") == "surface" else 1.4
+        if unit is not None and getattr(unit, "domain", "") == "sub":
+            return (SUBMARINE_SURFACED_COST
+                    if getattr(unit, "depth", "surface") == "surface" else 1.4)
         return SEA_MOVE_COST
     return hmap.move_cost(a, b, "vehicle")
 
@@ -63,6 +66,9 @@ def advance_naval(unit, path, tick_seconds: float, hmap: hexmap.HexMap) -> List[
             or unit.pos not in unit.path):
         unit.path = list(path)
         unit.path_index = 0
+    # Same fractional carry as land movement: one 3 km hex at 50 km/h takes
+    # 216 s, i.e. 7.2 ticks, so a per-tick budget below 1.0 must accumulate.
+    budget += float(getattr(unit, "move_progress", 0.0) or 0.0)
     cur = int(unit.pos)
     idx = max(0, int(getattr(unit, "path_index", 0)))
     entered: List[int] = []
@@ -79,6 +85,7 @@ def advance_naval(unit, path, tick_seconds: float, hmap: hexmap.HexMap) -> List[
         entered.append(cur)
     unit.pos = cur
     unit.path_index = idx
+    unit.move_progress = max(0.0, budget) if idx + 1 < len(unit.path) else 0.0
     return entered
 
 

@@ -68,6 +68,17 @@ ICONS: Dict[str, dict] = {
     # -- air -------------------------------------------------------------
     "fighter": {"label": "战斗机", "domain": "air", "family": "作战飞机", "abbrev": "FTR"},
     "aew": {"label": "预警机", "domain": "air", "family": "支援飞机", "abbrev": "AEW"},
+    # -- campaign additions ----------------------------------------------
+    # The campaign demo needs a few more distinct silhouettes: a UAV that is
+    # not an AEW dish, a helicopter that is not a jet, an amphibious vehicle
+    # that is not a tank, and a landing craft that is not a cargo ship.
+    "uav": {"label": "无人机", "domain": "air", "family": "支援飞机", "abbrev": "UAV"},
+    "helicopter": {"label": "直升机", "domain": "air", "family": "作战飞机", "abbrev": "HEL"},
+    "amphibious": {"label": "两栖车辆", "domain": "land", "family": "地面机动", "abbrev": "AAV"},
+    "landing_craft": {"label": "登陆艇", "domain": "sea", "family": "两栖舰船", "abbrev": "LCU"},
+    "infantry": {"label": "步兵", "domain": "land", "family": "地面机动", "abbrev": "INF"},
+    "transport": {"label": "运输分队", "domain": "land", "family": "后勤保障", "abbrev": "TRN"},
+    "engineering": {"label": "工兵", "domain": "land", "family": "工程保障", "abbrev": "ENG"},
 }
 
 

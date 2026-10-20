@@ -103,6 +103,7 @@ def advance_air(unit, path, tick_seconds: float, hmap: hexmap.HexMap) -> List[in
             or unit.pos not in unit.path):
         unit.path = list(path)
         unit.path_index = 0
+    budget += float(getattr(unit, "move_progress", 0.0) or 0.0)
     cur = int(unit.pos)
     idx = max(0, int(getattr(unit, "path_index", 0)))
     entered: List[int] = []
@@ -116,6 +117,7 @@ def advance_air(unit, path, tick_seconds: float, hmap: hexmap.HexMap) -> List[in
         entered.append(cur)
     unit.pos = cur
     unit.path_index = idx
+    unit.move_progress = max(0.0, budget) if idx + 1 < len(unit.path) else 0.0
     return entered
 
 

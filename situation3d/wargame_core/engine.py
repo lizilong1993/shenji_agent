@@ -38,11 +38,29 @@ def _enemy_goal(unit: Unit, state: GameState) -> Optional[int]:
     return min(enemies, key=lambda u: hexmap.distance(unit.pos, u.pos)).pos
 
 
+def _objective_fits(unit: Unit, state: GameState, obj) -> bool:
+    """Can this unit act on this objective at all?
+
+    A land unit cannot take a water objective and a ship cannot take an inland
+    one; picking by distance alone sent the whole land force at the mid-strait
+    objective, where it sat still because no path exists.
+    """
+    water = state.map.cond(obj.coord) == hexmap.RIVER
+    if unit.domain in ("sea", "sub"):
+        return water
+    if unit.domain == "land":
+        return not water
+    return True          # air can overfly either
+
+
 def _objective_goal(unit: Unit, state: GameState) -> Optional[int]:
-    # Prefer an objective not owned by this side, then the nearest one.
-    candidates = [o for o in state.objectives if o.flag != unit.color]
+    # Prefer an objective not owned by this side, then the nearest one; only
+    # among objectives this unit's domain can actually reach.
+    candidates = [o for o in state.objectives
+                  if o.flag != unit.color and _objective_fits(unit, state, o)]
     if not candidates:
-        candidates = list(state.objectives)
+        candidates = [o for o in state.objectives
+                      if _objective_fits(unit, state, o)]
     if not candidates:
         return None
     return min(candidates, key=lambda o: hexmap.distance(unit.pos, o.coord)).coord
@@ -61,6 +79,14 @@ def _target_for(unit: Unit, state: GameState):
 def _enemy_goal_sea(unit: Unit, state: GameState) -> Optional[int]:
     enemies = [u for u in state.living()
                if u.color != unit.color and u.domain in ("sea", "sub")]
+    if not enemies:
+        return None
+    return min(enemies, key=lambda u: hexmap.distance(unit.pos, u.pos)).pos
+
+
+def _enemy_goal_land(unit: Unit, state: GameState) -> Optional[int]:
+    enemies = [u for u in state.living()
+               if u.color != unit.color and u.domain == "land"]
     if not enemies:
         return None
     return min(enemies, key=lambda u: hexmap.distance(unit.pos, u.pos)).pos
@@ -86,6 +112,24 @@ def _beach_water_goal(state: GameState, unit: Unit) -> Optional[int]:
                 q.append((nb, d + 1))
     return None
 
+
+
+def _nearest_road(hmap, start: int, max_rings: int = 3):
+    """Nearest hex with a road edge, within ``max_rings``; else ``None``."""
+    from collections import deque
+    q = deque([(start, 0)])
+    seen = {start}
+    while q:
+        cur, d = q.popleft()
+        if any(hmap.roads(cur)):
+            return cur
+        if d >= max_rings:
+            continue
+        for nb in hmap.neighbors(cur):
+            if nb >= 0 and nb not in seen:
+                seen.add(nb)
+                q.append((nb, d + 1))
+    return None
 
 def _cached_path(state: GameState, key: tuple, fn):
     """Plan at most once per (unit, goal); A* dominates the tick cost."""
@@ -153,11 +197,23 @@ def auto_orders(state: GameState) -> List[Order]:
                 lambda: air.air_path(state.map, u.pos, goal))
         else:
             mode = _move_mode(u)
+            start = u.pos
+            if (mode == "vehicle" and state.map.vehicle_road_bound
+                    and not any(state.map.roads(start))):
+                # Units that start off-road (e.g. a beachhead) snap to the
+                # nearest road cell once; every later leg is road-bound.
+                snapped = _nearest_road(state.map, start, max_rings=3)
+                if snapped is not None:
+                    u.pos = snapped
+                    u.path = []
+                    u.path_index = 0
+                    start = snapped
             path = _cached_path(
-                state, (u.uid, u.pos, goal),
-                lambda: movement.find_path(state.map, u.pos, goal, mode))
+                state, (u.uid, start, goal),
+                lambda: movement.find_path(state.map, start, goal, mode))
             if not path:
-                goal = _enemy_goal(u, state)
+                goal = (_enemy_goal_land(u, state) if u.domain == "land"
+                        else _enemy_goal(u, state))
                 path = _cached_path(
                     state, (u.uid, u.pos, goal),
                     lambda: movement.find_path(state.map, u.pos, goal, mode)) if goal is not None else None

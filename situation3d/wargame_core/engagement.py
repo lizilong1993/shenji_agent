@@ -50,6 +50,9 @@ class SeaAirWeapon:
     ammo: int = 8
     min_range_km: float = 0.0
     anti: Tuple[str, ...] = ("sea",)   # target domains this weapon can engage
+    # Reload/cooldown in ticks (30 s each).  Without it every platform fires
+    # every tick and the whole force is destroyed inside the first 15 minutes.
+    cooldown_ticks: int = 6
 
     def to_dict(self) -> dict:
         return {"key": self.key, "name": self.name, "kind": self.kind,
@@ -61,22 +64,22 @@ class SeaAirWeapon:
 # Synthetic sea/air weapon profiles.  Numbers are chosen to make a 12-hour
 # demonstration legible, not to model real systems.
 SEA_AIR_PROFILES: Dict[str, SeaAirWeapon] = {
-    "asm": SeaAirWeapon("asm", "反舰导弹", "asm", 180.0, 0.55, 2, 8, 15.0, ("sea",)),
-    "asm_light": SeaAirWeapon("asm_light", "轻型反舰导弹", "asm", 90.0, 0.45, 1, 8, 10.0, ("sea",)),
-    "sam_long": SeaAirWeapon("sam_long", "远程舰空导弹", "sam", 120.0, 0.55, 1, 12, 5.0, ("air",)),
-    "sam_medium": SeaAirWeapon("sam_medium", "中程舰空导弹", "sam", 50.0, 0.5, 1, 16, 3.0, ("air",)),
-    "ciws": SeaAirWeapon("ciws", "近防炮", "ciws", 8.0, 0.35, 1, 30, 0.0, ("air",)),
-    "naval_gun": SeaAirWeapon("naval_gun", "舰炮", "naval_gun", 25.0, 0.4, 1, 40, 1.0, ("sea", "land")),
-    "land_attack": SeaAirWeapon("land_attack", "对地巡航导弹", "land_attack", 200.0, 0.5, 2, 6, 20.0, ("land",)),
-    "torpedo": SeaAirWeapon("torpedo", "重型鱼雷", "torpedo", 40.0, 0.6, 3, 6, 2.0, ("sea", "sub")),
-    "depth_charge": SeaAirWeapon("depth_charge", "深水炸弹", "depth_charge", 10.0, 0.3, 1, 20, 0.0, ("sub",)),
-    "asroc": SeaAirWeapon("asroc", "反潜火箭", "asroc", 30.0, 0.4, 2, 10, 2.0, ("sub",)),
-    "bvr": SeaAirWeapon("bvr", "中距空空导弹", "bvr", 100.0, 0.45, 2, 8, 10.0, ("air",)),
-    "wvr": SeaAirWeapon("wvr", "近距空空导弹", "wvr", 15.0, 0.35, 1, 6, 0.0, ("air",)),
-    "air_ground": SeaAirWeapon("air_ground", "航空制导炸弹", "air_ground", 25.0, 0.5, 2, 8, 0.0, ("land",)),
-    "coastal_asm": SeaAirWeapon("coastal_asm", "岸舰导弹", "coastal_asm", 160.0, 0.5, 2, 8, 20.0, ("sea",)),
-    "sam": SeaAirWeapon("sam", "地空导弹", "sam", 60.0, 0.5, 1, 16, 3.0, ("air",)),
-    "aaa": SeaAirWeapon("aaa", "高炮", "aaa", 10.0, 0.3, 1, 30, 0.0, ("air",)),
+    "asm": SeaAirWeapon("asm", "反舰导弹", "asm", 180.0, 0.176, 1, 8, 15.0, ("sea",), 24),
+    "asm_light": SeaAirWeapon("asm_light", "轻型反舰导弹", "asm", 90.0, 0.154, 1, 8, 10.0, ("sea",), 20),
+    "sam_long": SeaAirWeapon("sam_long", "远程舰空导弹", "sam", 120.0, 0.193, 1, 12, 5.0, ("air",), 16),
+    "sam_medium": SeaAirWeapon("sam_medium", "中程舰空导弹", "sam", 50.0, 0.165, 1, 16, 3.0, ("air",), 12),
+    "ciws": SeaAirWeapon("ciws", "近防炮", "ciws", 8.0, 0.138, 1, 30, 0.0, ("air",), 4),
+    "naval_gun": SeaAirWeapon("naval_gun", "舰炮", "naval_gun", 25.0, 0.121, 1, 40, 1.0, ("sea", "land"), 8),
+    "land_attack": SeaAirWeapon("land_attack", "对地巡航导弹", "land_attack", 200.0, 0.220, 1, 6, 20.0, ("land",), 80),
+    "torpedo": SeaAirWeapon("torpedo", "重型鱼雷", "torpedo", 40.0, 0.220, 2, 6, 2.0, ("sea", "sub"), 40),
+    "depth_charge": SeaAirWeapon("depth_charge", "深水炸弹", "depth_charge", 10.0, 0.2, 1, 20, 0.0, ("sub",), 10),
+    "asroc": SeaAirWeapon("asroc", "反潜火箭", "asroc", 30.0, 0.25, 1, 10, 2.0, ("sub",), 12),
+    "bvr": SeaAirWeapon("bvr", "中距空空导弹", "bvr", 100.0, 0.165, 1, 8, 10.0, ("air",), 20),
+    "wvr": SeaAirWeapon("wvr", "近距空空导弹", "wvr", 15.0, 0.138, 1, 6, 0.0, ("air",), 12),
+    "air_ground": SeaAirWeapon("air_ground", "航空制导炸弹", "air_ground", 25.0, 0.165, 1, 8, 0.0, ("land",), 24),
+    "coastal_asm": SeaAirWeapon("coastal_asm", "岸舰导弹", "coastal_asm", 160.0, 0.165, 1, 8, 20.0, ("sea",), 60),
+    "sam": SeaAirWeapon("sam", "地空导弹", "sam", 60.0, 0.176, 1, 16, 3.0, ("air",), 20),
+    "aaa": SeaAirWeapon("aaa", "高炮", "aaa", 10.0, 0.110, 1, 30, 0.0, ("air",), 6),
 }
 
 
@@ -163,12 +166,16 @@ def resolve_sea_air(attacker, target, state) -> Optional[dict]:
         return None
     if not _sea_air_detected(attacker, target, state, best):
         return None
+    ready = state.weapon_ready_at(attacker.uid, best.key)
+    if state.tick < ready:
+        return None
 
     jam = 1.0 - float(getattr(state, "jam", 0.0) or 0.0)
     readiness = float(getattr(attacker, "readiness", 0.85))
     pk = best.base_pk * jam * readiness
     roll = state.rng.random()
     attacker.ammo[best.key] = max(0, attacker.ammo.get(best.key, 0) - 1)
+    state.mark_weapon_fired(attacker.uid, best.key, best.cooldown_ticks)
     hit = roll <= pk
     damage = best.damage if hit else 0
     if hit:
@@ -238,9 +245,10 @@ def best_sea_air_target(attacker, state) -> Optional[object]:
         d_km = hexmap.distance(attacker.pos, u.pos) * state.map.scale_m / 1000.0
         in_range = False
         for w in getattr(attacker, "sea_air_weapons", []):
-            if w.kind in allowed_kinds(attacker.domain, u.domain) \
-                    and w.min_range_km <= d_km <= w.max_range_km \
-                    and attacker.ammo.get(w.key, 0) > 0:
+            if (w.kind in allowed_kinds(attacker.domain, u.domain)
+                    and w.min_range_km <= d_km <= w.max_range_km
+                    and attacker.ammo.get(w.key, 0) > 0
+                    and state.tick >= state.weapon_ready_at(attacker.uid, w.key)):
                 in_range = True
                 break
         if not in_range:

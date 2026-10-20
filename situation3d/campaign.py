@@ -199,6 +199,8 @@ class CampaignRunner(object):
                 "strength": round(u.strength, 1),
                 "blood": u.blood,
                 "domain": u.domain,
+                "unit_type": u.unit_type,
+                "name": u.name,
             })
         frames.append({
             "tick": self.state.tick,

@@ -37,6 +37,8 @@ class Unit:
     stacked: bool = False
     path: List[int] = field(default_factory=list)
     path_index: int = 0
+    # Fractional progress towards the next hex, carried across ticks.
+    move_progress: float = 0.0
     move_state: int = 0
     raw: dict = field(default_factory=dict)
 
@@ -100,6 +102,10 @@ class Objective:
         }
 
 
+# A captured objective must be held this many ticks before ownership flips.
+CONTROL_HOLD_TICKS = 5
+
+
 class GameState(object):
     def __init__(self, hmap: hexmap.HexMap, units: Dict[int, Unit],
                  objectives: List[Objective], seed: int = 20261019,
@@ -126,6 +132,15 @@ class GameState(object):
         # (uid, goal) -> path or None.  Re-planning A* every tick is the
         # dominant cost once ships and aircraft are in the loop.
         self.path_cache: Dict[tuple, Optional[List[int]]] = {}
+
+    # -- weapon cooldown -------------------------------------------------
+    def weapon_ready_at(self, uid: int, key: str) -> int:
+        return int((getattr(self, "cooldowns", {}) or {}).get((uid, key), 0))
+
+    def mark_weapon_fired(self, uid: int, key: str, ticks: int) -> None:
+        if not hasattr(self, "cooldowns"):
+            self.cooldowns = {}
+        self.cooldowns[(uid, key)] = self.tick + max(0, int(ticks))
 
     def allocate_uid(self) -> int:
         # Keep new IDs clear of public scenario IDs.
@@ -169,6 +184,26 @@ class GameState(object):
             if enemy_adjacent:
                 continue
             new_flag = 0 if reds and not blues else 1 if blues and not reds else obj.flag
+            # Hysteresis: a flip has to be held for CONTROL_HOLD_TICKS before
+            # it counts.  Without this, units drifting across the objective
+            # hex flip ownership every tick (measured: 356 events in 12 h).
+            if new_flag != obj.flag:
+                streaks = getattr(self, "_control_streak", None)
+                if streaks is None:
+                    streaks = self._control_streak = {}
+                key = obj.coord
+                cand = streaks.get(key, (obj.flag, 0))
+                if cand[0] != new_flag:
+                    cand = (new_flag, 1)
+                else:
+                    cand = (new_flag, cand[1] + 1)
+                streaks[key] = cand
+                if cand[1] < CONTROL_HOLD_TICKS:
+                    continue
+            else:
+                streaks = getattr(self, "_control_streak", None)
+                if streaks is not None:
+                    streaks.pop(obj.coord, None)
             if new_flag != obj.flag:
                 old = obj.flag
                 obj.flag = new_flag

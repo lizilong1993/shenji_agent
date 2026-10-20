@@ -91,6 +91,9 @@ def main(argv=None) -> int:
                                       name=str(o.get("name") or ""))
                             for o in spec.objectives]
     runner = mod.runner_class()(spec, state)
+    # Snapshot the starting order of battle before the run mutates it.
+    import copy
+    initial = copy.deepcopy(state)
     result = runner.run(max_ticks_per_stage=args.max_ticks_per_stage)
 
     # Compatibility fields so the existing player can open the case without
@@ -123,7 +126,10 @@ def main(argv=None) -> int:
     # Campaign frames carry the wargame-core state, not the legacy static
     # definitions, so the levels are recomputed here.
     from campaign_inference import infer_campaign
-    targets = mod.target_defs(state)
+    # Target definitions describe the starting order of battle; deriving them
+    # from the final state would label a beached unit as "land" even though it
+    # spent most of the run afloat (and vice versa).
+    targets = mod.target_defs(initial)
     inference = infer_campaign(result["frames"], targets, hotspots)
     result["frames"], _ = result["frames"], None
     # Normalise the region list to the objective order used by the panel.

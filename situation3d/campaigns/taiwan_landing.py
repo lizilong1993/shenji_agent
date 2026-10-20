@@ -32,22 +32,24 @@ MAP_PATH = os.path.join(REPO, "situation3d", "web", "data",
 
 # Hex anchors (row, col) verified against the generated theatre map.
 P = {
-    "beach": 7371,          # 台南西侧滩头（陆，紧邻水道）
-    "beach_north": 6871,    # 北侧备用滩头
-    "tainan": 7372,         # 台南（居民地）
-    "tainan_east": 7576,    # 台南以东
-    "kaohsiung": 8975,      # 高雄（居民地）
-    "kaohsiung_port": 8974, # 高雄港区
-    "penghu": 4950,         # 澎湖
-    "strait_mid": 5231,     # 海峡中段
-    "offshore_a": 6038,     # 安平外海
-    "offshore_b": 6927,     # 外海 B
-    "offshore_c": 7717,     # 外海 C
-    "xiamen_off": 1310,     # 厦门外海
-    "pingtan_off": 544,     # 平潭方向
-    "east_coast": 4799,     # 东岸
-    "kinmen": 1208,         # 金门
-    "landing_lane": 6870,   # 换乘海域（水道）
+    # 局部战场 A：澎湖以西（海上拦截）
+    "mid_strait": 3030,     # 海峡中段（水）
+    "penghu": 1024,         # 澎湖（陆）
+    "penghu_w": 1020,       # 澎湖以西（水）
+    # 局部战场 B：台南—高雄（登陆与地面）
+    "beach": 5865,          # 安平滩头（陆，紧邻水道）
+    "beach_water": 5862,    # 换乘海域（水）
+    "offshore_b": 5860,     # 安平外海（水）
+    "offshore_c": 5760,     # 外海（水）
+    "tainan": 5967,         # 台南（居民地）
+    "tainan_east": 6066,    # 台南以东（路网）
+    "kaohsiung": 9075,      # 高雄（居民地）
+    "kaohsiung_port": 9074, # 高雄港区（陆）
+    "south_sea": 9268,      # 高雄西南海域（水）
+    "east_land": 1086,      # 台东纵谷（内陆路网）
+    "xiamen_off": 0,        # 厦门外海（水）
+    "pingtan_off": 1096,    # 北侧空域
+    "kinmen": 1085,         # 金门（陆，路网）
 }
 
 
@@ -83,18 +85,18 @@ def scenario_dict() -> dict:
         _op(1001, "两栖船坞登陆舰", 0, 2, 0, P["offshore_b"], 4, 30,
             "sea", "水面", 3, 30, "large"),
         _op(1002, "登陆舰", 0, 2, 0, P["offshore_c"], 4, 32, "sea", "水面", 2, 20, "large"),
-        _op(1003, "登陆舰", 0, 2, 0, P["offshore_a"], 4, 32, "sea", "水面", 2, 20, "large"),
+        _op(1003, "登陆舰", 0, 2, 0, P["beach_water"], 4, 32, "sea", "水面", 2, 20, "large"),
         # surface escort
-        _op(1010, "驱逐舰", 0, 2, 0, P["strait_mid"], 5, 50, "sea", "水面", 4, 35, "large"),
-        _op(1011, "护卫舰", 0, 2, 0, P["offshore_a"], 4, 45, "sea", "水面", 3, 20, "medium"),
+        _op(1010, "驱逐舰", 0, 2, 0, P["mid_strait"], 5, 50, "sea", "水面", 4, 35, "large"),
+        _op(1011, "护卫舰", 0, 2, 0, P["beach_water"], 4, 45, "sea", "水面", 3, 20, "medium"),
         _op(1012, "护卫舰", 0, 2, 0, P["offshore_c"], 4, 45, "sea", "水面", 3, 20, "medium"),
-        _op(1013, "补给舰", 0, 2, 0, P["strait_mid"], 3, 28, "sea", "水面", 1, 8, "medium"),
+        _op(1013, "补给舰", 0, 2, 0, P["mid_strait"], 3, 28, "sea", "水面", 1, 8, "medium"),
         # air
         _op(1020, "战斗机", 0, 3, 0, P["pingtan_off"], 3, 1600, "air", "中空", 1, 30, "small"),
         _op(1021, "战斗机", 0, 3, 0, P["pingtan_off"], 3, 1600, "air", "中空", 1, 30, "small"),
         _op(1022, "预警机", 0, 3, 0, P["xiamen_off"], 3, 550, "air", "高空", 1, 25, "medium"),
         _op(1023, "电子战飞机", 0, 3, 0, P["xiamen_off"], 2, 800, "air", "高空", 1, 18, "medium"),
-        _op(1024, "武装直升机", 0, 3, 0, P["offshore_a"], 2, 250, "air", "低空", 1, 12, "small"),
+        _op(1024, "武装直升机", 0, 3, 0, P["beach_water"], 2, 250, "air", "低空", 1, 12, "small"),
         # landing force: starts embarked as amphibious vehicles afloat
         _op(1030, "两栖战车", 0, 2, 4, P["offshore_b"], 3, 12, "sea", "水面", 2, 15, "small", beaching=True),
         _op(1031, "两栖战车", 0, 2, 4, P["offshore_b"], 3, 12, "sea", "水面", 2, 15, "small", beaching=True),
@@ -110,22 +112,22 @@ def scenario_dict() -> dict:
         _op(2001, "驱逐舰", 1, 2, 0, P["offshore_b"], 5, 50, "sea", "水面", 4, 35, "large"),
         _op(2002, "护卫舰", 1, 2, 0, P["offshore_c"], 4, 45, "sea", "水面", 3, 20, "medium"),
         _op(2003, "巡逻舰", 1, 2, 0, P["kaohsiung_port"], 3, 55, "sea", "水面", 1, 12, "small"),
-        _op(2004, "补给舰", 1, 2, 0, P["east_coast"], 3, 28, "sea", "水面", 1, 8, "medium"),
+        _op(2004, "补给舰", 1, 2, 0, P["south_sea"], 3, 28, "sea", "水面", 1, 8, "medium"),
         # air
         _op(2010, "战斗机", 1, 3, 0, P["tainan"], 3, 1500, "air", "中空", 1, 30, "small"),
         _op(2011, "战斗机", 1, 3, 0, P["tainan"], 3, 1500, "air", "中空", 1, 30, "small"),
-        _op(2012, "预警机", 1, 3, 0, P["east_coast"], 3, 500, "air", "高空", 1, 25, "medium"),
+        _op(2012, "预警机", 1, 3, 0, P["east_land"], 3, 500, "air", "高空", 1, 25, "medium"),
         _op(2013, "无人机", 1, 3, 5, P["tainan"], 2, 300, "air", "低空", 1, 8, "small"),
         # coastal defence / air defence
         _op(2020, "岸舰导弹营", 1, 2, 0, P["kaohsiung"], 3, 20, "land", "ground", 1, 18),
         _op(2021, "防空导弹排", 1, 1, 16, P["tainan"], 2, 10, "land", "ground", 0, 15),
         # ground: defenders inland of the beach
         _op(2030, "重型坦克", 1, 2, 0, P["tainan_east"], 4, 30, "land", "ground", 4, 15),
-        _op(2031, "重型战车", 1, 2, 1, P["tainan_east"] + 3, 3, 28, "land", "ground", 2, 12),
+        _op(2031, "重型战车", 1, 2, 1, P["tainan_east"], 3, 28, "land", "ground", 2, 12),
         _op(2032, "步兵小队", 1, 1, 2, P["kaohsiung"], 4, 6, "land", "ground", 0, 8),
-        _op(2033, "炮兵", 1, 2, 3, P["tainan_east"] + 6, 3, 15, "land", "ground", 1, 14),
+        _op(2033, "炮兵", 1, 2, 3, P["tainan_east"], 3, 15, "land", "ground", 1, 14),
         # logistics
-        _op(2040, "补给舰", 1, 2, 0, P["east_coast"], 3, 26, "sea", "水面", 1, 8, "medium"),
+        _op(2040, "补给舰", 1, 2, 0, P["south_sea"], 3, 26, "sea", "水面", 1, 8, "medium"),
     ]
     return {
         "scenario_id": MAP_ID,
@@ -137,7 +139,7 @@ def scenario_dict() -> dict:
             {"color": 0, "pos": P["xiamen_off"], "kind": "airbase"},
             {"color": 1, "pos": P["kaohsiung"], "kind": "port"},
             {"color": 1, "pos": P["tainan"], "kind": "airbase"},
-            {"color": 1, "pos": P["east_coast"], "kind": "airbase"},
+            {"color": 1, "pos": P["east_land"], "kind": "airbase"},
         ],
     }
 
@@ -185,7 +187,7 @@ def build_spec() -> C.CampaignSpec:
         {"coord": P["tainan"], "value": 25, "flag": 1, "name": "OBJ-TAINAN"},
         {"coord": P["kaohsiung"], "value": 20, "flag": 1, "name": "OBJ-KAOHSIUNG"},
         {"coord": P["penghu"], "value": 15, "flag": 1, "name": "OBJ-PENGHU"},
-        {"coord": P["strait_mid"], "value": 10, "flag": -1, "name": "OBJ-STRAIT"},
+        {"coord": P["mid_strait"], "value": 10, "flag": -1, "name": "OBJ-STRAIT"},
     ]
     events = [
         # S0
@@ -240,7 +242,7 @@ def build_spec() -> C.CampaignSpec:
                       location=[120.2, 23.0]),
     ]
     return C.CampaignSpec(
-        id="taiwan_landing", name="台海联合登陆战役演示（虚构）",
+        id="taiwan_campaign", name="台海联合登陆战役演示（虚构）",
         theatre="taiwan_strait", seed=20261019, stages=stages,
         objectives=objectives, script_events=events,
         script_outcome={"winner": "red",
@@ -270,12 +272,57 @@ def start_time_utc() -> str:
 
 def camera() -> dict:
     # 初始机位：海峡南段、厦门—澎湖—台南都能看到，又能分辨营级目标。
-    return {"lon": 119.98, "lat": 23.10, "height": 230000.0,
-            "heading": 0.0, "pitch": -62.0}
+    # 两个局部战场（澎湖西 / 台南—高雄）在同一帧内都可见：150 km 高、-60° 俯视，
+    # 目标仍能辨认出模型，不必在“看清单目标”和“看全局”之间二选一。
+    return {"lon": 119.95, "lat": 23.10, "height": 150000.0,
+            "heading": 0.0, "pitch": -60.0}
 
 
 def runner_class():
     return C.CampaignRunner
+
+
+def _icon_for(u) -> str:
+    """Military symbol key, chosen by platform class.
+
+    The catalogue is limited to the symbols that actually exist in
+    web/assets/symbols; an unknown key would silently fall back to the
+    "unknown" glyph.
+    """
+    name = u.name
+    domain = getattr(u, "domain", "")
+    if "两栖" in name:
+        return "landing_craft" if domain == "sea" else "amphibious"
+    if domain == "sea":
+        if "驱逐舰" in name:
+            return "destroyer"
+        if "护卫舰" in name:
+            return "frigate"
+        if "巡逻舰" in name:
+            return "corvette"
+        return "replenishment"
+    if domain == "air":
+        if "预警" in name:
+            return "aew"
+        if "无人机" in name:
+            return "uav"
+        if "直升机" in name:
+            return "helicopter"
+        return "fighter"
+    # land
+    if "岸舰" in name:
+        return "coastal_missile"
+    if "防空" in name:
+        return "sam_battalion"
+    if "炮兵" in name:
+        return "artillery"
+    if "步兵" in name:
+        return "infantry"
+    if "运输" in name:
+        return "transport"
+    if "工兵" in name or "工程" in name:
+        return "engineering"
+    return "armor"
 
 
 ICONS = {
@@ -291,13 +338,18 @@ ICONS = {
 
 
 def _engage_km(u) -> float:
-    """Weapon reach in km, used by the front end to draw contact hotspots."""
+    """Weapon reach in km, used by the front end to draw contact hotspots.
+
+    Capped at 60 km: the front end paints one circle per opposing pair, and
+    ship-sized radii (90-180 km) cover the whole strait with dozens of
+    overlapping discs.
+    """
     rng = 0.0
     for w in getattr(u, "sea_air_weapons", []) or []:
         rng = max(rng, float(getattr(w, "max_range_km", 0.0)))
     for w in getattr(u, "weapons", []) or []:
         rng = max(rng, float(getattr(w, "range_km", 0.0)))
-    return round(rng, 1)
+    return round(min(rng, 60.0), 1)
 
 
 def _influence_km(u) -> float:
@@ -308,12 +360,16 @@ def _influence_km(u) -> float:
     are capped so their circles stay readable.
     """
     if getattr(u, "domain", "") == "air":
-        return 30.0
+        return 0.0
     rng = 0.0
     for s in getattr(u, "sensors", []) or []:
         rng = max(rng, float(getattr(s, "range_km", 0.0)))
+    # Ground: 8-12 km of local influence; ships: 25 km.  Anything larger turns
+    # the occupation layer into one solid block over the map.
     if getattr(u, "domain", "") in ("sea", "sub"):
-        rng = min(rng, 120.0)
+        rng = min(rng, 25.0)
+    else:
+        rng = min(rng, 10.0)
     return round(rng, 1)
 
 
@@ -321,8 +377,19 @@ UNIT_CLASS_ZH = {
     "ship": "水面舰艇", "submarine": "潜艇", "aircraft": "作战飞机",
     "helicopter": "直升机", "uav": "无人机", "infantry": "步兵",
     "vehicle": "地面车辆", "artillery": "炮兵", "aa": "防空兵力",
-    "recon": "侦察分队", "fort": "工事",
+    "recon": "侦察分队", "fort": "工事", "transport": "运输分队",
+    "amphibious": "两栖战车", "landing_craft": "登陆艇",
 }
+
+
+def _class_zh(u) -> str:
+    """Platform class shown in the label and the target panel."""
+    if "两栖" in u.name:
+        if getattr(u, "domain", "") == "sea":
+            return ("登陆艇" if u.unit_type == "landing_craft"
+                    else "两栖战车（泛水）")
+        return "两栖战车"
+    return UNIT_CLASS_ZH.get(u.unit_type, u.unit_type)
 
 
 def target_defs(state) -> list:
@@ -334,8 +401,8 @@ def target_defs(state) -> list:
             "domain": {"land": "land", "sea": "sea", "sub": "sea",
                        "air": "air"}.get(u.domain, u.domain),
             "unit_type": u.unit_type,
-            "platform_class": UNIT_CLASS_ZH.get(u.unit_type, u.unit_type),
-            "icon": ICONS.get(u.name, "armor" if u.domain == "land" else "destroyer"),
+            "platform_class": _class_zh(u),
+            "icon": _icon_for(u),
             "blood": u.blood, "max_blood": u.max_blood,
             "speed_kn": round(u.speed_kmh / 1.852, 1),
             # 前端按这两个字段算“交火区/对峙区”热点与控制区覆盖。
