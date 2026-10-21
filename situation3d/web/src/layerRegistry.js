@@ -175,8 +175,10 @@
     // `checkbox` 字段仍然写上：URL 钩子（`?terrain=` / `?weather=`）靠它把
     // 复选框 id 反查成图层 id（见 app.js 的 layerIdForCheckbox）。
     {
+      // 【2026-10-21 改：默认开】用户要求 DEM（地形）也默认加载：初始化时除天地图
+      // 影像+注记外，再开这一层。台湾 20m 网格（terrain.mesh）保持默认关，两者互斥。
       id: 'terrain.model', kind: 'globe', z: 10, label: '地形模型（离线）',
-      group: '底图', default: false, checkbox: 'modelTerrain',
+      group: '底图', default: true, checkbox: 'modelTerrain',
       // 与 20m 网格互斥：Cesium 只有一个 terrainProvider，两者同时开时后动的赢
       // （见 resolve() 的对称仲裁）。对称互斥在另一边也有声明。
       exclusives: ['terrain.mesh'] },
