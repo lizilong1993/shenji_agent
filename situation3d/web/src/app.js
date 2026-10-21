@@ -1809,11 +1809,40 @@ function clearSituation() {
 // 案例菜单
 // --------------------------------------------------------------------------
 
+// 案例菜单按名称自然排序（登台2 在 登台10 前），名称相同再按 id。
+// 服务端索引已排序；前端再排一次，保证旧缓存/旧服务下顺序也一致。
+function caseNaturalKey(text) {
+  var parts = String(text || '').split(/(\d+)/);
+  var key = [];
+  parts.forEach(function (part) {
+    if (!part) return;
+    if (/^\d+$/.test(part)) key.push([1, parseInt(part, 10)]);
+    else key.push([0, part]);
+  });
+  return key;
+}
+
+function compareCaseEntries(a, b) {
+  var ak = caseNaturalKey(a.name || a.id);
+  var bk = caseNaturalKey(b.name || b.id);
+  var n = Math.min(ak.length, bk.length);
+  for (var i = 0; i < n; i++) {
+    if (ak[i][0] !== bk[i][0]) return ak[i][0] - bk[i][0];
+    if (ak[i][0] === 1) {
+      if (ak[i][1] !== bk[i][1]) return ak[i][1] - bk[i][1];
+    } else if (ak[i][1] !== bk[i][1]) {
+      return ak[i][1] < bk[i][1] ? -1 : 1;
+    }
+  }
+  if (ak.length !== bk.length) return ak.length - bk.length;
+  return String(a.id || '').localeCompare(String(b.id || ''));
+}
+
 function renderCaseMenu() {
   const list = dom.menuCaseList;
   list.innerHTML = '';
 
-  state.caseIndex.cases.forEach(function (c) {
+  state.caseIndex.cases.slice().sort(compareCaseEntries).forEach(function (c) {
     const item = el('button', 'menu-item', '');
     item.type = 'button';
     item.setAttribute('role', 'menuitem');
