@@ -5051,9 +5051,14 @@ function setComponent(name, on) {
 // --------------------------------------------------------------------------
 //
 // 两种模式共用同一套参考系：camera.lookAt + HeadingPitchRange 把相机锁在
-// 目标 ENU 上。锁定的好处正是需求要的语义 —— 目标始终在视窗中心，滚轮缩放
-// 围绕目标而不是鼠标位置；代价是解除时必须 lookAtTransform(Matrix4.IDENTITY)
-// （见 detachFollow 的说明）。
+// 目标 ENU 上。锁定的好处正是需求要的语义 —— 目标始终在视窗中心，拖动是绕
+// 目标公转；代价是解除时必须 lookAtTransform(Matrix4.IDENTITY)（见
+// detachFollow 的说明）。
+//
+// ⚠ 缩放**不能交给 Cesium 的默认滚轮**：1.145 的 ScreenSpaceCameraController
+// 在 3D 下按光标位置缩放，光标偏离目标时目标会被推离中心。本模块在 canvas 的
+// capture 阶段接管 wheel（center/chase 都直接改"相机→目标"的斜距再 lookAt），
+// 因此缩放中心恒为目标。没有绑定目标时才交回 Cesium。
 //
 //   center  普通选中模式：跟随目标平移，保留用户自己的方位/俯仰/距离；
 //           拖动=绕目标公转，滚轮=以目标为中心缩放。
@@ -5112,6 +5117,19 @@ function shortestAngle(from, to) {
 
 function clampRange(r) {
   return Math.max(FOLLOW_RANGE_MIN, Math.min(FOLLOW_RANGE_MAX, r));
+}
+
+// 用户缩放不受"跟随预设"的 120 km 上限约束，只防相机穿进模型或飞出地球。
+const ZOOM_RANGE_MIN = 10;
+const ZOOM_RANGE_MAX = 20000000;
+
+function clampZoomRange(r) {
+  return Math.max(ZOOM_RANGE_MIN, Math.min(ZOOM_RANGE_MAX, r));
+}
+
+/** 滚轮增量（像素）。deltaMode: 0=pixel, 1=行, 2=页（Firefox 常用行模式）。 */
+function wheelPixels(e) {
+  return e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
 }
 
 function easeInOut(t) {
@@ -5593,30 +5611,43 @@ function bindFollowInput() {
     const f = state.follow;
     if (!f.id) return;
     if (f.mode === 'glide') finishGlideNow();
-    if (f.mode !== 'chase') return;   // center：交给 Cesium，lookAt 原点就是目标
-    // chase：直接改跟随距离并拦下 Cesium 默认缩放。让控制器先改相机、再回读
-    // 距离（旧的 adoptRange 方案）会与阻尼抢同一帧，实测缩放会被拉回。
+    if (f.mode !== 'chase' && f.mode !== 'center') return;
+
+    // 两种模式都由 rig 自己缩放，并拦下 Cesium 默认滚轮。Cesium 1.145 的
+    // controller 在 3D 下**按光标位置**缩放：光标不在目标上时，目标会被推离
+    // 视窗中心。这里一律按"相机→目标"的视线改变距离，目标永远留在中心。
     e.preventDefault();
     e.stopPropagation();
     // Cesium 的 controller 监听在同一个 canvas 上；stopPropagation 不会拦住
     // 同元素上的其它监听，必须 stopImmediatePropagation，否则两套缩放同帧打架。
     if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+    const dy = wheelPixels(e);
+    if (!dy) return;
+    const factor = Math.exp(dy * 0.0015);
+    const pos = liveTargetPosition(f.id);
+    if (!pos) return;
+
+    if (f.mode === 'center') {
+      // 保留用户当前方位/俯仰，只改到目标的距离；lookAt 的目标点不变，
+      // 因此无论光标在屏幕哪里，缩放中心都是目标。
+      const cur = hprFromCameraTo(pos);
+      cur.range = clampZoomRange(cur.range * factor);
+      lockAt(pos, cur);
+      return;
+    }
+
     const rec = state.targets[f.id];
     const v = CHASE_VIEW[(rec && rec.def.domain) || 'sea'] || CHASE_VIEW.sea;
     const base = f.chaseRange || f.pose.range || v.range;
-    // deltaMode: 0=pixel, 1=行, 2=页（Firefox 常用行模式）。
-    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
-    f.chaseRange = clampRange(base * Math.exp(dy * 0.0015));
+    f.chaseRange = clampRange(base * factor);
     f.lastNow = 0;                    // 让阻尼以当前时刻重新计时
     // suspend（拖拽/松手后的停顿窗口）里 rig 走的是 center 分支，不会消费
     // chaseRange；这里立即按当前视线方向应用新距离，滚轮才是"所见即所得"。
     if (f.suspend) {
-      const pos = liveTargetPosition(f.id);
-      if (pos) {
-        const cur = hprFromCameraTo(pos);
-        cur.range = f.chaseRange;
-        lockAt(pos, cur);
-      }
+      const cur = hprFromCameraTo(pos);
+      cur.range = f.chaseRange;
+      lockAt(pos, cur);
     }
   }, { capture: true, passive: false });
 }
