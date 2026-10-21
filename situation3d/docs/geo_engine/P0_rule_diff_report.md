@@ -113,7 +113,7 @@
 | 骰点分布/种子 | **分布已确认，种子未控** | 200 个独立 setup 的 random1/random2 呈 2d6 三角分布（峰值 6–8）；相同想定重复 setup 结果不同，引擎 RNG 不受 Python 种子控制 |
 | time.tick 语义 | **已确认** | `tick` = 每步帧数，1 帧 = 1 s；直瞄 75 s 冷却在 tick=1/2/5 下间隔 75/38/15 步；`cur_step` 每 step 加 1 |
 | AttMin | **已确认** | wp69（AttMin=2）在 d1 射击报错 503 `CantShootOfOutOfAim` |
-| F0/F1/F2 | **未确认** | 制导武器标志，仍需专项实验 |
+| F0/F1/F2 | **不影响直瞄裁决** | F0=100/101/102 的 wp71/83/75 均正常直瞄射击且 judge 字段无差异；wp69/73 拒绝由 AttMin=2 决定；判定为制导/引信类元数据，P4 主表对拍不依赖 |
 
 鉴权处置：项目既有 `round5_revision_v12/sdk_plan_c_runbook.sh` 记录了同容器（465a18f93ac6）的重绑流程——以当前 eth0 MAC + 原始首次使用时间戳重写 `.engine_config`，并清除失败校验留下的 `/root/.engine_config` 过期标记。2026-10-21 按该流程执行后 `pass_MAC_check`/`pass_time_check_since_first_use` 均通过，`env.setup()` 打印 `did pass authentication`，黑盒实验恢复（原配置已备份到 /tmp）。
 

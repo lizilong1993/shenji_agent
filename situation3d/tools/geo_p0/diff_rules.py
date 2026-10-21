@@ -284,7 +284,7 @@ def main():
     lines.append("| time.tick 语义 | **已确认** | `tick` = 每步帧数，1 帧 = 1 s；直瞄 75 s 冷却在 tick=1/2/5 下间隔 75/38/15 步；"
                  "`cur_step` 每 step 加 1 |")
     lines.append("| AttMin | **已确认** | wp69（AttMin=2）在 d1 射击报错 503 `CantShootOfOutOfAim` |")
-    lines.append("| F0/F1/F2 | **未确认** | 制导武器标志，仍需专项实验 |")
+    lines.append("| F0/F1/F2 | **不影响直瞄裁决** | F0=100/101/102 的 wp71/83/75 均正常直瞄射击且 judge 字段无差异；wp69/73 拒绝由 AttMin=2 决定；判定为制导/引信类元数据，P4 主表对拍不依赖 |")
     lines.append("")
     lines.append("鉴权处置：项目既有 `round5_revision_v12/sdk_plan_c_runbook.sh` 记录了同容器（465a18f93ac6）的"
                  "重绑流程——以当前 eth0 MAC + 原始首次使用时间戳重写 `.engine_config`，并清除失败校验留下的 "
