@@ -1,0 +1,44 @@
+{
+ "seed": 20261021,
+ "model": "/remote-home/lizilong/jev_gpu/models/openjev/qwen3.5-4b-nli-v5",
+ "results": {
+  "heuristic": {
+   "policy": "heuristic",
+   "ticks": 96,
+   "decisions": 8,
+   "actions_applied": 6,
+   "red_alive": 2,
+   "blue_alive": 0,
+   "red_blood": 5,
+   "blue_blood": 0,
+   "objectives": {
+    "(10, 20)": 0,
+    "(20, 10)": 1
+   },
+   "events": 11,
+   "direct_fire": 5,
+   "destroyed": 2,
+   "decision_latency_ms": null,
+   "decision_latency_max_ms": null
+  },
+  "jev": {
+   "policy": "jev",
+   "ticks": 96,
+   "decisions": 8,
+   "actions_applied": 15,
+   "red_alive": 1,
+   "blue_alive": 1,
+   "red_blood": 1,
+   "blue_blood": 1,
+   "objectives": {
+    "(10, 20)": 0,
+    "(20, 10)": 1
+   },
+   "events": 16,
+   "direct_fire": 11,
+   "destroyed": 2,
+   "decision_latency_ms": 420.4,
+   "decision_latency_max_ms": 1435.6
+  }
+ }
+}

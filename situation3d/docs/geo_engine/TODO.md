@@ -54,13 +54,13 @@ JEV 适配与规则 vs JEV 的意图/行为评测、建议层 `World.intel`、CO
 ## P1（随后 2–4 周）
 
 ### 5. JEV 标注数据、GPU 与复测
-- 现状：规则基线意图/行为 1.00 vs JEV 0.50（受控合成集），JEV 约 15 s/窗口，仅建议层。
+- 现状：规则基线意图/行为 1.00 vs JEV 0.50（受控合成集）。GPU 复测已完成（2026-10-21，4B v5 单卡 3090：0.42–0.57 s/窗口，意图/行为 0.50/0.25，见 JEV_integration_research.md §7.6），仍仅建议层。
 - 交付：
   - 从 replay/campaign 日志切 100–200 个标注窗口（意图/下一行为/提前量）；
   - GPU 部署 openjev（4B v5 优先）或 SGLang；推理服务与引擎解耦、超时回退；
   - 用 `scripts/evaluate_intent.py` 同口径复测 F1/top-3/Brier/ECE/延迟。
 - 验收：意图 macro-F1、行为 top-3 达到约定阈值；若不达标，继续保持规则基线，不闭环。
-- 依赖：GPU 资源（当前 NVML 不可用）、标注人力、模型许可确认。
+- 依赖：标注人力、模型许可确认（GPU 已可用：155 的 3090 经 CUDA 直用，NVML 故障不影响计算）。
 
 ### 6. CZML/前端回放（需用户确认 UI）
 - 现状：CZML 快照可用；前端尚未接 `cartographic` 逐帧位置/事件。

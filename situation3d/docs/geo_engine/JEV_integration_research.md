@@ -189,6 +189,50 @@ HF Space（0.8B v2s-long）以避免本地 CPU 慢；同口径取 4 个窗口（
 JEV 要进入意图/行为预测，至少需要：GPU 服务、用本引擎回放标注的意图/行为数据做微调、再按同口径复测；
 在 F1/top-3 达标前只保留建议层。
 
+## 7.6 GPU 复测：openjev 4B v5（2026-10-21）
+
+同一评测脚本、同一合成集，改在 GPU 上跑 4B v5（`--device cuda`，本轮新增参数）：
+
+- 环境：server155，单张 RTX 3090（`CUDA_VISIBLE_DEVICES=0`），驱动 550.54.15，torch 2.6.0+cu124，
+  transformers 5.20.2，bf16 权重；NVML 仍因一张故障卡不可用，但 CUDA 运行正常。
+  `causal_conv1d`/`flash-linear-attention` 未装（走 PyTorch 参考实现，延迟仍有优化空间）。
+- 模型：`AlexWortega/openjev` `qwen3.5-4b-nli-v5`（9.1 GB，MIT），每选项独立前向。
+
+意图/行为（受控合成集，24 窗口 = 每类 6 个，同口径含规则子集）：
+
+| 任务 | 规则基线 | JEV 4B v5（GPU） | JEV 0.8B（CPU，4 窗口） |
+|---|---|---|---|
+| 意图识别 | acc 1.00 / macro-F1 1.00 | acc 0.50 / macro-F1 0.375 | acc 0.50 / macro-F1 0.375 |
+| 行为预测 | acc 1.00 / macro-F1 1.00 | acc 0.25 / macro-F1 0.20 | acc 0.50 / macro-F1 0.40 |
+| 每窗口延迟 | — | 498.5 ms（intent）/ 570.3 ms（behavior），最大 1.35 s | 约 14.8 / 15.3 s |
+
+回合对比（30×30 格、2v2、96 tick、每 12 tick 决策，seed 20261021）：
+
+| 指标 | 当前启发式 | JEV 4B v5 | JEV 0.8B CPU |
+|---|---|---|---|
+| 红方存活/血量 | 2 / 5 | 1 / 1 | 2 / 4 |
+| 蓝方存活/血量 | 0 / 0 | 1 / 1 | 1 / 1 |
+| 毁伤 | 2 | 2 | 1 |
+| 直瞄次数 | 5 | 11 | 9 |
+| 决策延迟 | 毫秒级 | 平均 420.4 ms，最大 1.44 s | 平均 7.5 s，最大 10.4 s |
+
+结论：**GPU 把延迟问题解决了**（约 18×，已进入 1–5 s 决策节奏），但 **4B 零样本并没有改善域偏移**——
+意图仍是 50%（把 recon/retreat 全判成 assault），行为反而降到 25%；回合结果也劣于启发式。
+这说明瓶颈不是模型规模而是领域数据：下一步必须先建本引擎回放标注的 100–200 个窗口，按 7.4 口径复测/微调，
+达标前继续用启发式。原始结果：`docs/geo_engine/intent_eval_gpu4b_20261021.json`、
+`docs/geo_engine/jev_eval_gpu4b_20261021.json`。
+
+复现：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python3 scripts/evaluate_intent.py \
+  --model /remote-home/lizilong/jev_gpu/models/openjev/qwen3.5-4b-nli-v5 \
+  --device cuda --jev-limit 24 --out docs/geo_engine/intent_eval_gpu4b_20261021.json
+CUDA_VISIBLE_DEVICES=0 python3 scripts/evaluate_jev.py \
+  --model /remote-home/lizilong/jev_gpu/models/openjev/qwen3.5-4b-nli-v5 \
+  --device cuda --ticks 96 --decision-every 12 --out docs/geo_engine/jev_eval_gpu4b_20261021.json
+```
+
 ## 8. 参考
 
 - openjev 模型卡与 serving：<https://huggingface.co/AlexWortega/openjev>
