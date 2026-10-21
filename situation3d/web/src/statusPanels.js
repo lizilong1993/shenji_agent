@@ -401,6 +401,25 @@
     }
     html += '</div>';
 
+    // ---- 1b. 能力（角色卡）：只读展示；无卡数据不出现该分区 ----
+    var rc = (window.RoleCard && window.RoleCard.summary)
+      ? window.RoleCard.summary(def) : null;
+    if (rc) {
+      var sensorText = window.RoleCard.sensorText(rc);
+      var weaponText = window.RoleCard.weaponText(rc);
+      var capacityText = window.RoleCard.capacityText(rc);
+      html += '<div class="ts-sec">'
+        + '<h4>能力（角色卡）</h4>'
+        + kv('类型', window.RoleCard.typeText(rc) + (rc.unknown ? ' · 未识别小类' : ''))
+        + kv('速度', window.RoleCard.speedText(rc))
+        + kv('防护', window.RoleCard.armorText(rc));
+      if (sensorText) html += kv('传感器', sensorText);
+      if (weaponText) html += kv('武器', weaponText);
+      if (capacityText) html += kv('运载', capacityText);
+      if (rc.confidence === 'legacy') html += kv('数据', '旧数据迁移快照');
+      html += '</div>';
+    }
+
     // ---- 2. 目标活动规律：从帧序列尾窗推导 ----
     html += '<div class="ts-sec">'
       + '<h4>目标活动规律</h4>';

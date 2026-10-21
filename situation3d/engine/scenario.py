@@ -262,6 +262,11 @@ class Target:
     # moving between positions, logistics - are road-bound.
     road_bound: bool = True
     attributes: Dict[str, str] = field(default_factory=dict)
+    # Frozen role-card snapshot (class/subclass/effective). ``None`` for bare
+    # targets built by tests; ``attach_role_cards()`` fills it before serialising
+    # or simulating a dataset. Movement reads the card when present and falls
+    # back to ``speed_kn`` otherwise, so P1 can migrate without changing tracks.
+    role_card: Optional[dict] = None
 
     @property
     def speed_mps(self) -> float:
@@ -278,7 +283,7 @@ class Target:
 
     def to_dataset_entry(self) -> dict:
         """Serialise the definition for the web front end."""
-        return {
+        entry = {
             "id": self.target_id,
             "name": self.name,
             "platform_class": self.platform_class,
@@ -305,6 +310,9 @@ class Target:
             "attributes": self.attributes,
             "waypoints": [[round(a, 6), round(b, 6)] for a, b in self.waypoints],
         }
+        if self.role_card:
+            entry["role_card"] = self.role_card
+        return entry
 
 
 def _build_targets() -> List[Target]:
@@ -545,7 +553,10 @@ def _build_targets() -> List[Target]:
             # emplaced, so it is not routed on the road network.
             road_bound=False,
             waypoints=coastal_route,
-            speed_kn=geo.kmh_to_knots(45.0),
+            # Positional battery: it fights from where it is emplaced. The
+            # km/h value here used to be swallowed by the geo.kmh_to_knots unit
+            # bug; now that the conversion is fixed, express "static" directly.
+            speed_kn=0.0,
             role="岸海打击",
             model="鹰击-62 岸舰导弹",
             model_note="机动岸防发射营",
@@ -572,7 +583,7 @@ def _build_targets() -> List[Target]:
             # emplaced, so it is not routed on the road network.
             road_bound=False,
             waypoints=sam_route,
-            speed_kn=geo.kmh_to_knots(30.0),
+            speed_kn=0.0,
             role="要地防空",
             model="红旗-9B 远程防空导弹",
             model_note="旅属火力单元",
@@ -705,7 +716,7 @@ def _build_targets() -> List[Target]:
             # emplaced, so it is not routed on the road network.
             road_bound=False,
             waypoints=blue_sam_route,
-            speed_kn=geo.kmh_to_knots(25.0),
+            speed_kn=0.0,
             role="要地防空",
             model="爱国者-3 防空导弹",
             model_note="PAC-3 MSE 构型",
@@ -1051,6 +1062,61 @@ def occupation_state(state, targets, hotspots,
 
 
 
+_ROLE_REGISTRY = None
+
+
+def _role_registry():
+    """Lazy singleton so importing scenario does not load card data eagerly."""
+    global _ROLE_REGISTRY
+    if _ROLE_REGISTRY is None:
+        from .rolecards import load_registry
+        _ROLE_REGISTRY = load_registry()
+    return _ROLE_REGISTRY
+
+
+def attach_role_cards(targets: Sequence[Target]) -> Sequence[Target]:
+    """Attach a frozen role-card snapshot to each target (idempotent)."""
+    from .rolecards import card_from_legacy
+    registry = _role_registry()
+    for target in targets:
+        if getattr(target, "role_card", None) is None:
+            target.role_card = card_from_legacy(target, registry)
+    return targets
+
+
+def _target_speed_mps(target: Target) -> float:
+    """Speed used by the trajectory generator.
+
+    The card is authoritative for mobile platforms when attached; positional
+    installations keep their legacy micro-speed until the separate
+    ``geo.kmh_to_knots`` fix lands, so P1 does not silently move or freeze
+    batteries. Bare targets in tests fall back to ``speed_kn``.
+    """
+    card = getattr(target, "role_card", None) or {}
+    motion = (card.get("effective") or {}).get("motion") or {}
+    if motion.get("immobile"):
+        return 0.0
+    speed = motion.get("cruise_speed_ms")
+    return float(speed) if speed is not None else target.speed_mps
+
+
+def _target_speed_state_kn(target: Target) -> float:
+    """Speed value written into each frame.
+
+    Keeps the legacy number verbatim for immobile/uncarded targets so the frame
+    hash does not change for reasons unrelated to movement.
+    """
+    card = getattr(target, "role_card", None) or {}
+    motion = (card.get("effective") or {}).get("motion") or {}
+    if motion.get("immobile"):
+        return target.speed_kn
+    speed = motion.get("cruise_speed_ms")
+    if speed is None:
+        return target.speed_kn
+    ratio = float(speed) / (geo.NM_IN_M / 3600.0)
+    return round(ratio, 6)
+
+
 def build_frames(targets: Optional[List[Target]] = None,
                  theatre: Optional[str] = None,
                  routes: Optional[Dict[str, List]] = None,
@@ -1090,7 +1156,7 @@ def build_frames(targets: Optional[List[Target]] = None,
         t_seconds = tick * TICK_SECONDS
         state = []
         for t in targets:
-            travelled = t.speed_mps * t_seconds
+            travelled = _target_speed_mps(t) * t_seconds
             total = lengths[t.target_id]
             if t.loop and total > 0.0:
                 # Patrol circuits repeat; the along-track distance is the
@@ -1107,7 +1173,7 @@ def build_frames(targets: Optional[List[Target]] = None,
                     "lat": round(lat, 6),
                     "lon": round(lon, 6),
                     "alt": round(t.altitude_m, 1),
-                    "speed_kn": t.speed_kn,
+                    "speed_kn": _target_speed_state_kn(t),
                     "heading": round(bearing, 1),
                     "travelled_m": round(along, 1),
                     "laps": on_lap,
@@ -1685,6 +1751,7 @@ def build_dataset(case=None) -> dict:
         case = cases_mod.get_case(cases_mod.DEFAULT_CASE_ID)
 
     targets = targets_for(case)
+    attach_role_cards(targets)
     # 陆军先沿路网路由，再把路由结果交给 build_frames。放在这里而不是
     # build_frames 内部，是因为要同时拿到 meta（哪些目标真的路由成功）写进数据集，
     # 让 road_selftest 能区分"已约束且正确"与"没能路由"。

@@ -1,0 +1,17 @@
+{
+  "india_china_west": {
+    "sha256": "9ca06fd8074fa30184430fe8a5edb4364f56e8b470abd6bb682b32cab7db3a2e",
+    "frames": 1441,
+    "targets": 10
+  },
+  "taiwan_landing": {
+    "sha256": "866dd16299a7f3701ef8275cc4db313f22e827b0fc0269e55c162be04ba6f7d1",
+    "frames": 1441,
+    "targets": 31
+  },
+  "taiwan_dense_transfer_v1": {
+    "sha256": "1a17f6a129bba591b3764ec581a32f81a5e43bc83ff3692b54f6e040fe4d5eaa",
+    "frames": 1441,
+    "targets": 80
+  }
+}

@@ -31,6 +31,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -394,6 +395,27 @@ def _situations_key():
     return tuple(key), names, listed
 
 
+def _natural_key(text):
+    """Stable, numeric-aware sort key for case names (登台2 before 登台10).
+
+    Unicode code-point order is used for text segments, not pinyin, so the
+    result is deterministic across servers and matches the case-id order
+    (中印1 → 登台1 → 登台2).
+    """
+    out = []
+    for part in re.split(r"(\d+)", str(text or "")):
+        if part.isdigit():
+            out.append((1, int(part)))
+        elif part:
+            out.append((0, part))
+    return tuple(out)
+
+
+def _case_sort_key(case):
+    return (_natural_key(case.get("name") or case.get("id")),
+            str(case.get("id") or ""))
+
+
 def _build_situations_index(names, listed):
     """
     真正去解析案例文件，产出索引响应体。
@@ -440,7 +462,7 @@ def _build_situations_index(names, listed):
             "region": doc.get("region"),
             "theatre": doc.get("theatre"),
         })
-    cases.sort(key=lambda c: c["id"])
+    cases.sort(key=_case_sort_key)
     ids = {c["id"] for c in cases}
     default = SITUATION_DEFAULT if SITUATION_DEFAULT in ids else (
         cases[0]["id"] if cases else None)

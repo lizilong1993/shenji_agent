@@ -1,0 +1,668 @@
+{
+  "schema": "situation3d.rolecard-subclasses.v1",
+  "class_id": "land.installation",
+  "subclasses": [
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.installation.personnel_fort",
+      "class_id": "land.installation",
+      "label": "人员工事",
+      "tags": [
+        "fort",
+        "personnel"
+      ],
+      "reference_model": null,
+      "confidence": "medium",
+      "sdk": {
+        "type": 4,
+        "sub_type": 11,
+        "basic_speed_kmh": 0,
+        "armor": 2,
+        "max_blood": 5,
+        "observe_distance": {
+          "infantry": 10,
+          "vehicle": 25
+        }
+      },
+      "source": {
+        "refs": [
+          "zm:scenario_operators"
+        ],
+        "note": "庙算人员工事 type4/sub11，max_blood 5。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [],
+          "symbol": {
+            "icon": "outpost",
+            "family": "防御阵地"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 20.0,
+            "width_m": 15.0,
+            "height_m": 4.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 0.0,
+          "cruise_speed_ms": 0.0,
+          "immobile": true
+        },
+        "protection": {
+          "armor_class": 3,
+          "max_blood": 5,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "fort",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.7.62mm.mg",
+            "mount": "fort",
+            "count": 2,
+            "ammo_max": 2000,
+            "ammo_default": 2000,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.squad",
+            "mount": "fort",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 10,
+          "cargo_t": 0.5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.fortification"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "defensive",
+          "reaction_time_s": 10
+        },
+        "extensions": {
+          "fortification": {
+            "hardened": true
+          },
+          "deploy_time_s": 0
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.installation.vehicle_fort",
+      "class_id": "land.installation",
+      "label": "车辆工事",
+      "tags": [
+        "fort",
+        "vehicle"
+      ],
+      "reference_model": null,
+      "confidence": "medium",
+      "sdk": {
+        "type": 4,
+        "sub_type": 12,
+        "basic_speed_kmh": 0,
+        "armor": 2,
+        "max_blood": 5
+      },
+      "source": {
+        "refs": [
+          "zm:scenario_operators"
+        ],
+        "note": "庙算车辆工事 type4/sub12，可为车辆提供掩蔽。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [],
+          "symbol": {
+            "icon": "outpost",
+            "family": "防御阵地"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 25.0,
+            "width_m": 20.0,
+            "height_m": 4.5
+          }
+        },
+        "motion": {
+          "max_speed_ms": 0.0,
+          "cruise_speed_ms": 0.0,
+          "immobile": true
+        },
+        "protection": {
+          "armor_class": 3,
+          "max_blood": 5,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "fort",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "fort",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 0,
+          "cargo_t": 0,
+          "vehicles": 4
+        },
+        "logistics": {
+          "supply_class": "ground.fortification"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "defensive",
+          "reaction_time_s": 10
+        },
+        "extensions": {
+          "fortification": {
+            "hardened": true
+          },
+          "deploy_time_s": 0
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.installation.coastal_battery",
+      "class_id": "land.installation",
+      "label": "岸舰导弹阵地",
+      "tags": [
+        "coastal",
+        "anti_ship",
+        "fort"
+      ],
+      "reference_model": "YJ-62 battery",
+      "confidence": "high",
+      "sdk": {
+        "type": 4,
+        "sub_type": null,
+        "basic_speed_kmh": 0,
+        "armor": 0,
+        "max_blood": 3,
+        "weapon_ids": [
+          73
+        ]
+      },
+      "source": {
+        "refs": [
+          "wiki:YJ-62"
+        ],
+        "note": "固定部署的岸舰导弹阵地；YJ-62 280 km。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [],
+          "symbol": {
+            "icon": "coastal_missile",
+            "family": "岸防兵力"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": "YJ-62 battery"
+          },
+          "dimensions": {
+            "length_m": 40.0,
+            "width_m": 30.0,
+            "height_m": 6.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 0.0,
+          "cruise_speed_ms": 0.0,
+          "immobile": true
+        },
+        "protection": {
+          "armor_class": 2,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.coastal",
+            "mount": "site",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.yj62",
+            "mount": "site",
+            "count": 6,
+            "ammo_max": 6,
+            "ammo_default": 6,
+            "shoot_on_move": false
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "site",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "site",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 20,
+          "cargo_t": 2.0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.anti_ship"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "surface_first",
+          "reaction_time_s": 30
+        },
+        "extensions": {
+          "fortification": {
+            "hardened": true
+          },
+          "deploy_time_s": 0
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.installation.sam_site",
+      "class_id": "land.installation",
+      "label": "防空导弹阵地",
+      "tags": [
+        "sam",
+        "air_defense",
+        "fort"
+      ],
+      "reference_model": "HQ-9B site",
+      "confidence": "high",
+      "sdk": {
+        "type": 4,
+        "sub_type": null,
+        "basic_speed_kmh": 0,
+        "armor": 0,
+        "max_blood": 3,
+        "weapon_ids": [
+          3
+        ]
+      },
+      "source": {
+        "refs": [
+          "wiki:HQ-9",
+          "zm:scenario_operators"
+        ],
+        "note": "红旗-9B 营级阵地，射程 260 km。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [],
+          "symbol": {
+            "icon": "sam_battalion",
+            "family": "地面防空"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": "HQ-9B site"
+          },
+          "dimensions": {
+            "length_m": 60.0,
+            "width_m": 50.0,
+            "height_m": 8.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 0.0,
+          "cruise_speed_ms": 0.0,
+          "immobile": true
+        },
+        "protection": {
+          "armor_class": 2,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.sam",
+            "mount": "site",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.hq9b",
+            "mount": "site",
+            "count": 8,
+            "ammo_max": 8,
+            "ammo_default": 8,
+            "shoot_on_move": false
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "site",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "site",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 40,
+          "cargo_t": 3.0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.air_defense"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "air_first",
+          "reaction_time_s": 15
+        },
+        "extensions": {
+          "fortification": {
+            "hardened": true
+          },
+          "deploy_time_s": 0
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.installation.outpost",
+      "class_id": "land.installation",
+      "label": "哨所",
+      "tags": [
+        "outpost",
+        "fort"
+      ],
+      "reference_model": null,
+      "confidence": "medium",
+      "sdk": {
+        "type": 4,
+        "sub_type": 11,
+        "basic_speed_kmh": 0,
+        "armor": 2,
+        "max_blood": 2
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "边境/要点哨所，观察距离 8 km。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [],
+          "symbol": {
+            "icon": "outpost",
+            "family": "防御阵地"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 15.0,
+            "width_m": 15.0,
+            "height_m": 5.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 0.0,
+          "cruise_speed_ms": 0.0,
+          "immobile": true
+        },
+        "protection": {
+          "armor_class": 2,
+          "max_blood": 2,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.recon",
+            "mount": "tower",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.12.7mm.hmg",
+            "mount": "tower",
+            "count": 1,
+            "ammo_max": 500,
+            "ammo_default": 500,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.squad",
+            "mount": "tower",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 10,
+          "cargo_t": 0.5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.fortification"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "defensive",
+          "reaction_time_s": 10
+        },
+        "extensions": {
+          "fortification": {
+            "hardened": true
+          },
+          "deploy_time_s": 0
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.installation.unknown",
+      "class_id": "land.installation",
+      "label": "工事（未知小类）",
+      "tags": [
+        "unknown"
+      ],
+      "reference_model": null,
+      "confidence": "unknown",
+      "sdk": {
+        "type": 4,
+        "sub_type": null,
+        "basic_speed_kmh": 0,
+        "armor": 1,
+        "max_blood": 2
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "只确定到工事大类时的保守卡。"
+      },
+      "unknown_policy": {
+        "combat": "soft",
+        "engage": false,
+        "note": "能力未知，不主动交战"
+      },
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [],
+          "symbol": {
+            "icon": "outpost",
+            "family": "防御阵地"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 20.0,
+            "width_m": 20.0,
+            "height_m": 4.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 0.0,
+          "cruise_speed_ms": 0.0,
+          "immobile": true
+        },
+        "protection": {
+          "armor_class": 1,
+          "max_blood": 2,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "fort",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.squad",
+            "mount": "fort",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 5,
+          "cargo_t": 0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.fortification"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 15
+        },
+        "extensions": {
+          "fortification": {
+            "hardened": true
+          },
+          "deploy_time_s": 0
+        }
+      }
+    }
+  ]
+}

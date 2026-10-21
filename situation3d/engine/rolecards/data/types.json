@@ -1,0 +1,173 @@
+{
+  "schema": "situation3d.types.v2",
+  "classes": [
+    {
+      "class_id": "land.infantry",
+      "label": "人员",
+      "domain": "land",
+      "unknown_subclass": "land.infantry.unknown",
+      "subclasses": [
+        "land.infantry.rifle",
+        "land.infantry.recon",
+        "land.infantry.atgm",
+        "land.infantry.manpads",
+        "land.infantry.engineer",
+        "land.infantry.unknown"
+      ]
+    },
+    {
+      "class_id": "land.vehicle",
+      "label": "车辆",
+      "domain": "land",
+      "unknown_subclass": "land.vehicle.unknown",
+      "subclasses": [
+        "land.vehicle.mbt",
+        "land.vehicle.light_tank",
+        "land.vehicle.ifv",
+        "land.vehicle.apc",
+        "land.vehicle.amphibious",
+        "land.vehicle.recon",
+        "land.vehicle.spg",
+        "land.vehicle.towed_artillery",
+        "land.vehicle.mlrs",
+        "land.vehicle.sam",
+        "land.vehicle.aaa",
+        "land.vehicle.coastal_launcher",
+        "land.vehicle.truck",
+        "land.vehicle.car",
+        "land.vehicle.engineer",
+        "land.vehicle.ugv",
+        "land.vehicle.radar",
+        "land.vehicle.command",
+        "land.vehicle.unknown"
+      ]
+    },
+    {
+      "class_id": "land.installation",
+      "label": "工事与固定阵地",
+      "domain": "land",
+      "unknown_subclass": "land.installation.unknown",
+      "subclasses": [
+        "land.installation.personnel_fort",
+        "land.installation.vehicle_fort",
+        "land.installation.coastal_battery",
+        "land.installation.sam_site",
+        "land.installation.outpost",
+        "land.installation.unknown"
+      ]
+    },
+    {
+      "class_id": "sea.surface",
+      "label": "水面舰艇",
+      "domain": "sea",
+      "unknown_subclass": "sea.surface.unknown",
+      "subclasses": [
+        "sea.surface.destroyer",
+        "sea.surface.frigate",
+        "sea.surface.corvette",
+        "sea.surface.missile_boat",
+        "sea.surface.landing_ship",
+        "sea.surface.transport_ship",
+        "sea.surface.replenishment",
+        "sea.surface.carrier",
+        "sea.surface.auxiliary",
+        "sea.surface.unknown"
+      ]
+    },
+    {
+      "class_id": "sea.subsurface",
+      "label": "潜艇",
+      "domain": "subsurface",
+      "unknown_subclass": "sea.subsurface.unknown",
+      "subclasses": [
+        "sea.subsurface.attack",
+        "sea.subsurface.missile",
+        "sea.subsurface.unknown"
+      ]
+    },
+    {
+      "class_id": "air.aircraft",
+      "label": "飞机",
+      "domain": "air",
+      "unknown_subclass": "air.aircraft.unknown",
+      "subclasses": [
+        "air.aircraft.fighter",
+        "air.aircraft.stealth_fighter",
+        "air.aircraft.strike",
+        "air.aircraft.bomber",
+        "air.aircraft.aew",
+        "air.aircraft.transport",
+        "air.aircraft.tanker",
+        "air.aircraft.patrol",
+        "air.aircraft.unknown"
+      ]
+    },
+    {
+      "class_id": "air.helicopter",
+      "label": "直升机",
+      "domain": "air",
+      "unknown_subclass": "air.helicopter.unknown",
+      "subclasses": [
+        "air.helicopter.attack",
+        "air.helicopter.transport",
+        "air.helicopter.recon",
+        "air.helicopter.unknown"
+      ]
+    },
+    {
+      "class_id": "air.uav",
+      "label": "无人机",
+      "domain": "air",
+      "unknown_subclass": "air.uav.unknown",
+      "subclasses": [
+        "air.uav.male",
+        "air.uav.tactical",
+        "air.uav.loitering",
+        "air.uav.unknown"
+      ]
+    }
+  ],
+  "aliases": {
+    "icon.armor": "land.vehicle.mbt",
+    "icon.light_vehicle": "land.vehicle.amphibious",
+    "icon.truck": "land.vehicle.truck",
+    "icon.engineer_vehicle": "land.vehicle.engineer",
+    "icon.artillery": "land.vehicle.spg",
+    "icon.sam_battalion": "land.installation.sam_site",
+    "icon.coastal_missile": "land.installation.coastal_battery",
+    "icon.outpost": "land.installation.outpost",
+    "icon.destroyer": "sea.surface.destroyer",
+    "icon.frigate": "sea.surface.frigate",
+    "icon.corvette": "sea.surface.corvette",
+    "icon.landing_ship": "sea.surface.landing_ship",
+    "icon.transport_ship": "sea.surface.transport_ship",
+    "icon.replenishment": "sea.surface.replenishment",
+    "icon.fighter": "air.aircraft.fighter",
+    "icon.aew": "air.aircraft.aew",
+    "icon.helicopter": "air.helicopter.attack",
+    "icon.uav": "air.uav.male",
+    "icon.generic_sea": "sea.surface.unknown",
+    "icon.generic_land": "land.vehicle.unknown",
+    "icon.generic_air": "air.aircraft.unknown"
+  },
+  "sdk_map": {
+    "1.2": "land.infantry.rifle",
+    "1.16": "land.infantry.manpads",
+    "2.0": "land.vehicle.mbt",
+    "2.1": "land.vehicle.ifv",
+    "2.3": "land.vehicle.spg",
+    "2.4": "land.vehicle.ugv",
+    "2.9": "land.vehicle.recon",
+    "2.10": "land.vehicle.radar",
+    "2.13": "land.vehicle.engineer",
+    "2.14": "land.vehicle.engineer",
+    "2.15": "land.vehicle.aaa",
+    "3.5": "air.uav.tactical",
+    "3.6": "air.helicopter.attack",
+    "3.7": "air.uav.loitering",
+    "3.8": "air.aircraft.transport",
+    "4.11": "land.installation.personnel_fort",
+    "4.12": "land.installation.vehicle_fort"
+  },
+  "sdk_map_note": "sdk_map 是 type/sub_type 到默认小类的单值映射；存在多对一（如 2/1 可为 ifv/apc/truck/amphibious，2/3 可为 spg/mlrs/towed/coastal）。导入时应先按 sdk_map 取默认，再用名称/role 或显式 subclass_id 细化；无法细化时使用该类 unknown。"
+}

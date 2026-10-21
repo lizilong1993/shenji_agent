@@ -1,0 +1,2597 @@
+{
+  "schema": "situation3d.rolecard-subclasses.v1",
+  "class_id": "land.vehicle",
+  "subclasses": [
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.mbt",
+      "class_id": "land.vehicle",
+      "label": "主战坦克",
+      "tags": [
+        "tank",
+        "tracked",
+        "armored"
+      ],
+      "reference_model": "ZTZ-99A",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": 0,
+        "basic_speed_kmh": 36,
+        "armor": 4,
+        "max_blood": 4,
+        "weapon_ids": [
+          36,
+          43,
+          84
+        ],
+        "observe_distance": {
+          "infantry": 10,
+          "vehicle": 25,
+          "uav": 1
+        }
+      },
+      "source": {
+        "refs": [
+          "wiki:Type_99_tank",
+          "zm:scenario_operators"
+        ],
+        "note": "99A：公路 80 km/h、越野 60 km/h、行程 500 km；庙算校准速度 36 km/h、armor 4、max_blood 4。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "armor",
+            "family": "地面机动"
+          },
+          "model": {
+            "asset": "type_ztz99a",
+            "asset_approximation": false,
+            "reference": "ZTZ-99A"
+          },
+          "dimensions": {
+            "length_m": 11.0,
+            "width_m": 3.4,
+            "height_m": 2.4
+          }
+        },
+        "motion": {
+          "max_speed_ms": 22.22,
+          "cruise_speed_ms": 13.89,
+          "accel_ms2": 1.48,
+          "decel_ms2": 2.96,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.5,
+              "urban": 0.33,
+              "soft": 0.25,
+              "water": 0.0,
+              "rock": 0.0
+            },
+            "max_gradient_deg": 30.0,
+            "max_side_slope_deg": 17.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 4,
+          "max_blood": 4,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.thermal.gunner",
+            "mount": "turret",
+            "count": 1
+          },
+          {
+            "ref": "sensor.radar.mmwave",
+            "mount": "turret",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.125mm.apfsds",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 42,
+            "ammo_default": 42,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.125mm.atgm",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 6,
+            "ammo_default": 6,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.12.7mm.hmg",
+            "mount": "commander",
+            "count": 1,
+            "ammo_max": 300,
+            "ammo_default": 300,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 2
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 3,
+          "cargo_t": 0.5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.vehicle",
+          "fuel_capacity_l": 1200,
+          "consumption_l_per_km": 3.5
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "engage_policy": "armor_first",
+          "reaction_time_s": 8
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.light_tank",
+      "class_id": "land.vehicle",
+      "label": "轻型坦克",
+      "tags": [
+        "tank",
+        "tracked",
+        "light"
+      ],
+      "reference_model": "ZTQ-15",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": 0,
+        "basic_speed_kmh": 36,
+        "armor": 2,
+        "max_blood": 3,
+        "weapon_ids": [
+          37,
+          43
+        ]
+      },
+      "source": {
+        "refs": [
+          "wiki:Type_15_tank"
+        ],
+        "note": "15 式：105mm、5 km 炮射导弹；公路速度按同吨位约 70 km/h。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "armor",
+            "family": "地面机动"
+          },
+          "model": {
+            "asset": "type_ztz99a",
+            "asset_approximation": true,
+            "reference": "ZTQ-15"
+          },
+          "dimensions": {
+            "length_m": 9.2,
+            "width_m": 3.3,
+            "height_m": 2.5
+          }
+        },
+        "motion": {
+          "max_speed_ms": 19.44,
+          "cruise_speed_ms": 12.5,
+          "accel_ms2": 1.3,
+          "decel_ms2": 2.6,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.5,
+              "urban": 0.33,
+              "soft": 0.25,
+              "water": 0.0,
+              "rock": 0.0
+            },
+            "max_gradient_deg": 30.0,
+            "max_side_slope_deg": 17.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 2,
+          "max_blood": 3,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.thermal.gunner",
+            "mount": "turret",
+            "count": 1
+          },
+          {
+            "ref": "sensor.radar.mmwave",
+            "mount": "turret",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.105mm.rifle",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 38,
+            "ammo_default": 38,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.105mm.atgm",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 4,
+            "ammo_default": 4,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.12.7mm.hmg",
+            "mount": "commander",
+            "count": 1,
+            "ammo_max": 300,
+            "ammo_default": 300,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 2
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 3,
+          "cargo_t": 0.3,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.vehicle",
+          "fuel_capacity_l": 1000,
+          "consumption_l_per_km": 3.0
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "engage_policy": "armor_first",
+          "reaction_time_s": 8
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.ifv",
+      "class_id": "land.vehicle",
+      "label": "步兵战车",
+      "tags": [
+        "ifv",
+        "tracked",
+        "armored"
+      ],
+      "reference_model": "ZBD-04A",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": 1,
+        "basic_speed_kmh": 36,
+        "armor": 3,
+        "max_blood": 3,
+        "weapon_ids": [
+          54,
+          56,
+          43
+        ],
+        "observe_distance": {
+          "infantry": 10,
+          "vehicle": 25
+        }
+      },
+      "source": {
+        "refs": [
+          "wiki:ZBD-04",
+          "zm:scenario_operators"
+        ],
+        "note": "04A：3 乘员+7 载员，100mm+30mm；公路速度约 65 km/h。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "light_vehicle",
+            "family": "地面机动"
+          },
+          "model": {
+            "asset": "type_ztd05",
+            "asset_approximation": true,
+            "reference": "ZBD-04A"
+          },
+          "dimensions": {
+            "length_m": 7.2,
+            "width_m": 3.4,
+            "height_m": 2.6
+          }
+        },
+        "motion": {
+          "max_speed_ms": 18.06,
+          "cruise_speed_ms": 11.11,
+          "accel_ms2": 1.2,
+          "decel_ms2": 2.4,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.5,
+              "urban": 0.33,
+              "soft": 0.25,
+              "water": 0.0,
+              "rock": 0.0
+            },
+            "max_gradient_deg": 30.0,
+            "max_side_slope_deg": 17.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 3,
+          "max_blood": 3,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.thermal.gunner",
+            "mount": "turret",
+            "count": 1
+          },
+          {
+            "ref": "sensor.radar.mmwave",
+            "mount": "turret",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.100mm.gun",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 30,
+            "ammo_default": 30,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.30mm.auto",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 500,
+            "ammo_default": 500,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.12.7mm.hmg",
+            "mount": "commander",
+            "count": 1,
+            "ammo_max": 300,
+            "ammo_default": 300,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 10,
+          "cargo_t": 0.8,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.vehicle",
+          "fuel_capacity_l": 800,
+          "consumption_l_per_km": 2.6
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "engage_policy": "armor_first",
+          "reaction_time_s": 8
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.apc",
+      "class_id": "land.vehicle",
+      "label": "装甲输送车",
+      "tags": [
+        "apc",
+        "wheeled",
+        "armored"
+      ],
+      "reference_model": "ZBL-08",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": 1,
+        "basic_speed_kmh": 36,
+        "armor": 2,
+        "max_blood": 2,
+        "weapon_ids": [
+          56,
+          43
+        ]
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "08 式轮式步战/输送车族，公路约 100 km/h；载员 8-10 人。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "light_vehicle",
+            "family": "地面机动"
+          },
+          "model": {
+            "asset": "type_ztd05",
+            "asset_approximation": true,
+            "reference": "ZBL-08"
+          },
+          "dimensions": {
+            "length_m": 8.0,
+            "width_m": 3.0,
+            "height_m": 2.3
+          }
+        },
+        "motion": {
+          "max_speed_ms": 27.78,
+          "cruise_speed_ms": 16.67,
+          "accel_ms2": 1.85,
+          "decel_ms2": 3.7,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 2,
+          "max_blood": 2,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.thermal.gunner",
+            "mount": "turret",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.30mm.auto",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 400,
+            "ammo_default": 400,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.12.7mm.hmg",
+            "mount": "commander",
+            "count": 1,
+            "ammo_max": 300,
+            "ammo_default": 300,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 11,
+          "cargo_t": 1.0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.vehicle",
+          "fuel_capacity_l": 700,
+          "consumption_l_per_km": 2.2
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "engage_policy": "defensive",
+          "reaction_time_s": 9
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.amphibious",
+      "class_id": "land.vehicle",
+      "label": "两栖突击车",
+      "tags": [
+        "amphibious",
+        "tracked",
+        "ifv"
+      ],
+      "reference_model": "ZBD-05",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": 1,
+        "basic_speed_kmh": 36,
+        "armor": 2,
+        "max_blood": 3,
+        "weapon_ids": [
+          56,
+          69,
+          43
+        ]
+      },
+      "source": {
+        "refs": [
+          "wiki:Type_05_amphibious",
+          "zm:scenario_operators"
+        ],
+        "note": "05 式：公路 65 km/h、水上 30 km/h、行程 500 km；ZTD-05 为 105mm 突击炮变型。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad",
+            "water"
+          ],
+          "symbol": {
+            "icon": "light_vehicle",
+            "family": "地面机动"
+          },
+          "model": {
+            "asset": "type_ztd05",
+            "asset_approximation": true,
+            "reference": "ZBD-05"
+          },
+          "dimensions": {
+            "length_m": 9.2,
+            "width_m": 3.4,
+            "height_m": 2.8
+          }
+        },
+        "motion": {
+          "max_speed_ms": 18.06,
+          "cruise_speed_ms": 11.11,
+          "accel_ms2": 1.2,
+          "decel_ms2": 2.4,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.5,
+              "urban": 0.33,
+              "soft": 0.25,
+              "water": 0.0,
+              "rock": 0.0
+            },
+            "max_gradient_deg": 30.0,
+            "max_side_slope_deg": 17.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": true,
+            "swim_depth_m": 4.0,
+            "swim_speed_ms": 8.33
+          }
+        },
+        "protection": {
+          "armor_class": 2,
+          "max_blood": 3,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.thermal.gunner",
+            "mount": "turret",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.30mm.auto",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 400,
+            "ammo_default": 400,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.atgm.team",
+            "mount": "turret",
+            "count": 2,
+            "ammo_max": 4,
+            "ammo_default": 4,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.12.7mm.hmg",
+            "mount": "commander",
+            "count": 1,
+            "ammo_max": 300,
+            "ammo_default": 300,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 10,
+          "cargo_t": 1.0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.vehicle",
+          "fuel_capacity_l": 900,
+          "consumption_l_per_km": 2.8
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "engage_policy": "assault",
+          "reaction_time_s": 8
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.recon",
+      "class_id": "land.vehicle",
+      "label": "侦察战车",
+      "tags": [
+        "recon",
+        "wheeled"
+      ],
+      "reference_model": "ZBL-08 recon",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": 9,
+        "basic_speed_kmh": 36,
+        "armor": 2,
+        "max_blood": 2,
+        "weapon_ids": [
+          43,
+          56
+        ]
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "侦察型战车：雷达 20 km、光电 12 km，武器仅自卫。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "light_vehicle",
+            "family": "地面机动"
+          },
+          "model": {
+            "asset": "type_ztd05",
+            "asset_approximation": true,
+            "reference": "ZBL-08 recon"
+          },
+          "dimensions": {
+            "length_m": 8.0,
+            "width_m": 3.0,
+            "height_m": 2.5
+          }
+        },
+        "motion": {
+          "max_speed_ms": 27.78,
+          "cruise_speed_ms": 16.67,
+          "accel_ms2": 1.85,
+          "decel_ms2": 3.7,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 2,
+          "max_blood": 2,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.recon",
+            "mount": "mast",
+            "count": 1
+          },
+          {
+            "ref": "sensor.eo.recon",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.12.7mm.hmg",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 300,
+            "ammo_default": 300,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.30mm.auto",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 200,
+            "ammo_default": 200,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 4,
+          "cargo_t": 0.5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.vehicle",
+          "fuel_capacity_l": 600,
+          "consumption_l_per_km": 2.0
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 8
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.spg",
+      "class_id": "land.vehicle",
+      "label": "自行榴弹炮",
+      "tags": [
+        "artillery",
+        "spg",
+        "tracked"
+      ],
+      "reference_model": "PLZ-05",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": 3,
+        "basic_speed_kmh": 36,
+        "armor": 2,
+        "max_blood": 3,
+        "weapon_ids": [
+          72
+        ],
+        "observe_distance": {
+          "infantry": 10,
+          "vehicle": 25
+        }
+      },
+      "source": {
+        "refs": [
+          "wiki:PLZ-05",
+          "zm:scenario_operators"
+        ],
+        "note": "PLZ-05：55 km/h，155mm，普通弹 40+ km、火箭增程 70 km。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "artillery",
+            "family": "地面火力"
+          },
+          "model": {
+            "asset": "type_plz05",
+            "asset_approximation": false,
+            "reference": "PLZ-05"
+          },
+          "dimensions": {
+            "length_m": 11.6,
+            "width_m": 3.4,
+            "height_m": 2.8
+          }
+        },
+        "motion": {
+          "max_speed_ms": 15.28,
+          "cruise_speed_ms": 9.72,
+          "accel_ms2": 1.02,
+          "decel_ms2": 2.04,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.5,
+              "urban": 0.33,
+              "soft": 0.25,
+              "water": 0.0,
+              "rock": 0.0
+            },
+            "max_gradient_deg": 30.0,
+            "max_side_slope_deg": 17.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 2,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.thermal.gunner",
+            "mount": "turret",
+            "count": 1
+          },
+          {
+            "ref": "sensor.radar.artillery",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.155mm.howitzer",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 30,
+            "ammo_default": 30,
+            "shoot_on_move": false
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 5,
+          "cargo_t": 1.0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.artillery",
+          "fuel_capacity_l": 1000,
+          "consumption_l_per_km": 3.2
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "indirect",
+          "reaction_time_s": 30
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.towed_artillery",
+      "class_id": "land.vehicle",
+      "label": "牵引火炮",
+      "tags": [
+        "artillery",
+        "towed"
+      ],
+      "reference_model": "PLL-01",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": 3,
+        "basic_speed_kmh": 36,
+        "armor": 0,
+        "max_blood": 2,
+        "weapon_ids": [
+          72
+        ]
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "牵引炮以牵引状态速度 60 km/h 表示，部署后视为静止。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "artillery",
+            "family": "地面火力"
+          },
+          "model": {
+            "asset": "type_m777",
+            "asset_approximation": true,
+            "reference": "PLL-01"
+          },
+          "dimensions": {
+            "length_m": 12.0,
+            "width_m": 2.5,
+            "height_m": 2.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 16.67,
+          "cruise_speed_ms": 11.11,
+          "accel_ms2": 1.11,
+          "decel_ms2": 2.22,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": true,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 2,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "crew",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.155mm.towed",
+            "mount": "towed",
+            "count": 1,
+            "ammo_max": 30,
+            "ammo_default": 30,
+            "shoot_on_move": false
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 8,
+          "cargo_t": 0.5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.artillery"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "indirect",
+          "reaction_time_s": 60
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.mlrs",
+      "class_id": "land.vehicle",
+      "label": "远程火箭炮",
+      "tags": [
+        "artillery",
+        "mlrs",
+        "wheeled"
+      ],
+      "reference_model": "PHL-03",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": 3,
+        "basic_speed_kmh": 36,
+        "armor": 1,
+        "max_blood": 3,
+        "weapon_ids": [
+          72
+        ]
+      },
+      "source": {
+        "refs": [
+          "wiki:PHL-03",
+          "zm:scenario_operators"
+        ],
+        "note": "PHL-03：12 管 300mm，射程 70-130 km；公路约 60 km/h。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "artillery",
+            "family": "地面火力"
+          },
+          "model": {
+            "asset": "type_phl03",
+            "asset_approximation": false,
+            "reference": "PHL-03"
+          },
+          "dimensions": {
+            "length_m": 12.0,
+            "width_m": 3.0,
+            "height_m": 3.2
+          }
+        },
+        "motion": {
+          "max_speed_ms": 16.67,
+          "cruise_speed_ms": 11.11,
+          "accel_ms2": 1.11,
+          "decel_ms2": 2.22,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 1,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.thermal.gunner",
+            "mount": "cab",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.300mm.mlrs",
+            "mount": "launcher",
+            "count": 12,
+            "ammo_max": 12,
+            "ammo_default": 12,
+            "shoot_on_move": false
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 4,
+          "cargo_t": 1.0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.artillery",
+          "fuel_capacity_l": 800,
+          "consumption_l_per_km": 3.0
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "indirect",
+          "reaction_time_s": 30
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.sam",
+      "class_id": "land.vehicle",
+      "label": "防空导弹车",
+      "tags": [
+        "sam",
+        "wheeled",
+        "air_defense"
+      ],
+      "reference_model": "HQ-9B TEL",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 36,
+        "armor": 1,
+        "max_blood": 3,
+        "weapon_ids": [
+          3
+        ]
+      },
+      "source": {
+        "refs": [
+          "wiki:HQ-9",
+          "zm:scenario_operators"
+        ],
+        "note": "HQ-9B 射程 260 km；雷达车 300 km；发射车公路 60 km/h。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "sam_battalion",
+            "family": "地面防空"
+          },
+          "model": {
+            "asset": "type_hq9",
+            "asset_approximation": false,
+            "reference": "HQ-9B TEL"
+          },
+          "dimensions": {
+            "length_m": 10.0,
+            "width_m": 3.0,
+            "height_m": 3.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 16.67,
+          "cruise_speed_ms": 11.11,
+          "accel_ms2": 1.11,
+          "decel_ms2": 2.22,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 1,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.sam",
+            "mount": "battery",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.hq9b",
+            "mount": "launcher",
+            "count": 4,
+            "ammo_max": 4,
+            "ammo_default": 4,
+            "shoot_on_move": false
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 4,
+          "cargo_t": 0.5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.air_defense",
+          "fuel_capacity_l": 800,
+          "consumption_l_per_km": 3.0
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "air_first",
+          "reaction_time_s": 15
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.aaa",
+      "class_id": "land.vehicle",
+      "label": "自行高炮",
+      "tags": [
+        "aaa",
+        "air_defense",
+        "tracked"
+      ],
+      "reference_model": "PGZ-09",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": 15,
+        "basic_speed_kmh": 36,
+        "armor": 2,
+        "max_blood": 3,
+        "weapon_ids": [
+          1
+        ]
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "35mm 自行高炮，射程约 4 km，雷达 20 km。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "sam_battalion",
+            "family": "地面防空"
+          },
+          "model": {
+            "asset": "type_hq9",
+            "asset_approximation": true,
+            "reference": "PGZ-09"
+          },
+          "dimensions": {
+            "length_m": 7.0,
+            "width_m": 3.2,
+            "height_m": 3.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 16.67,
+          "cruise_speed_ms": 11.11,
+          "accel_ms2": 1.11,
+          "decel_ms2": 2.22,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.5,
+              "urban": 0.33,
+              "soft": 0.25,
+              "water": 0.0,
+              "rock": 0.0
+            },
+            "max_gradient_deg": 30.0,
+            "max_side_slope_deg": 17.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 2,
+          "max_blood": 3,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.recon",
+            "mount": "turret",
+            "count": 1
+          },
+          {
+            "ref": "sensor.eo.vehicle",
+            "mount": "turret",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.35mm.aaa",
+            "mount": "turret",
+            "count": 2,
+            "ammo_max": 1000,
+            "ammo_default": 1000,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 3,
+          "cargo_t": 0.3,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.air_defense"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "air_first",
+          "reaction_time_s": 10
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.coastal_launcher",
+      "class_id": "land.vehicle",
+      "label": "岸舰导弹发射车",
+      "tags": [
+        "anti_ship",
+        "coastal",
+        "wheeled"
+      ],
+      "reference_model": "YJ-62 TEL",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": 3,
+        "basic_speed_kmh": 36,
+        "armor": 1,
+        "max_blood": 3,
+        "weapon_ids": [
+          73
+        ]
+      },
+      "source": {
+        "refs": [
+          "wiki:YJ-62"
+        ],
+        "note": "YJ-62 射程 280 km（出口型）/400 km（YJ-62A）；发射车公路 60 km/h。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "coastal_missile",
+            "family": "岸防兵力"
+          },
+          "model": {
+            "asset": "type_yj62",
+            "asset_approximation": false,
+            "reference": "YJ-62 TEL"
+          },
+          "dimensions": {
+            "length_m": 12.0,
+            "width_m": 3.0,
+            "height_m": 3.2
+          }
+        },
+        "motion": {
+          "max_speed_ms": 16.67,
+          "cruise_speed_ms": 11.11,
+          "accel_ms2": 1.11,
+          "decel_ms2": 2.22,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 1,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.coastal",
+            "mount": "battery",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.yj62",
+            "mount": "launcher",
+            "count": 6,
+            "ammo_max": 6,
+            "ammo_default": 6,
+            "shoot_on_move": false
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 6,
+          "cargo_t": 0.5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.anti_ship"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "surface_first",
+          "reaction_time_s": 30
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.truck",
+      "class_id": "land.vehicle",
+      "label": "运输车",
+      "tags": [
+        "logistics",
+        "truck",
+        "wheeled"
+      ],
+      "reference_model": "EQ240",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": 1,
+        "basic_speed_kmh": 36,
+        "armor": 1,
+        "max_blood": 1
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "用户示例中的 90 km/h 车辆按运输车卡表示；载重 5 t。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "truck",
+            "family": "地面保障"
+          },
+          "model": {
+            "asset": "type_eq240",
+            "asset_approximation": false,
+            "reference": "EQ240"
+          },
+          "dimensions": {
+            "length_m": 7.2,
+            "width_m": 2.4,
+            "height_m": 3.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 25.0,
+          "cruise_speed_ms": 16.67,
+          "accel_ms2": 1.67,
+          "decel_ms2": 3.34,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": true,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 1,
+          "max_blood": 1,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "cab",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.12.7mm.hmg",
+            "mount": "cab",
+            "count": 1,
+            "ammo_max": 200,
+            "ammo_default": 200,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 3,
+          "cargo_t": 5.0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.logistics",
+          "fuel_capacity_l": 600,
+          "consumption_l_per_km": 2.5
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 10
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.car",
+      "class_id": "land.vehicle",
+      "label": "轻型汽车",
+      "tags": [
+        "utility",
+        "car",
+        "wheeled"
+      ],
+      "reference_model": "BJ80",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": 1,
+        "basic_speed_kmh": 36,
+        "armor": 0,
+        "max_blood": 1
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "指挥/通勤用轻型汽车，无装甲。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "light_vehicle",
+            "family": "地面保障"
+          },
+          "model": {
+            "asset": "type_eq240",
+            "asset_approximation": true,
+            "reference": "BJ80"
+          },
+          "dimensions": {
+            "length_m": 4.8,
+            "width_m": 1.9,
+            "height_m": 1.8
+          }
+        },
+        "motion": {
+          "max_speed_ms": 27.78,
+          "cruise_speed_ms": 19.44,
+          "accel_ms2": 1.85,
+          "decel_ms2": 3.7,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 1,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "cab",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 4,
+          "cargo_t": 0.4,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.logistics",
+          "fuel_capacity_l": 80,
+          "consumption_l_per_km": 0.12
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 10
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.engineer",
+      "class_id": "land.vehicle",
+      "label": "工程车",
+      "tags": [
+        "engineer",
+        "wheeled"
+      ],
+      "reference_model": "EQ240 engineer",
+      "confidence": "low",
+      "sdk": {
+        "type": 2,
+        "sub_type": 14,
+        "basic_speed_kmh": 36,
+        "armor": 2,
+        "max_blood": 3
+      },
+      "source": {
+        "refs": [
+          "zm:scenario_operators"
+        ],
+        "note": "含扫雷/布雷/推土作业能力。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "engineer_vehicle",
+            "family": "地面保障"
+          },
+          "model": {
+            "asset": "type_eq240",
+            "asset_approximation": true,
+            "reference": "EQ240 engineer"
+          },
+          "dimensions": {
+            "length_m": 7.5,
+            "width_m": 2.5,
+            "height_m": 3.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 16.67,
+          "cruise_speed_ms": 11.11,
+          "accel_ms2": 1.11,
+          "decel_ms2": 2.22,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": true,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 2,
+          "max_blood": 3,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "cab",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 3,
+          "cargo_t": 2.0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.engineer"
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 12
+        },
+        "extensions": {
+          "engineering": {
+            "mine_clearing": true,
+            "mine_laying": true,
+            "roadblock": true
+          }
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.ugv",
+      "class_id": "land.vehicle",
+      "label": "无人战车",
+      "tags": [
+        "ugv",
+        "unmanned",
+        "tracked"
+      ],
+      "reference_model": "UGV",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": 4,
+        "basic_speed_kmh": 36,
+        "armor": 1,
+        "max_blood": 2,
+        "weapon_ids": [
+          56,
+          74
+        ]
+      },
+      "source": {
+        "refs": [
+          "zm:scenario_operators"
+        ],
+        "note": "庙算无人战车 type2/sub4，可载 30mm 炮与导弹。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "light_vehicle",
+            "family": "地面机动"
+          },
+          "model": {
+            "asset": "type_ztd05",
+            "asset_approximation": true,
+            "reference": "UGV"
+          },
+          "dimensions": {
+            "length_m": 3.5,
+            "width_m": 2.0,
+            "height_m": 1.8
+          }
+        },
+        "motion": {
+          "max_speed_ms": 10.0,
+          "cruise_speed_ms": 6.94,
+          "accel_ms2": 0.67,
+          "decel_ms2": 1.34,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.5,
+              "urban": 0.33,
+              "soft": 0.25,
+              "water": 0.0,
+              "rock": 0.0
+            },
+            "max_gradient_deg": 30.0,
+            "max_side_slope_deg": 17.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 1,
+          "max_blood": 2,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.eo.vehicle",
+            "mount": "mast",
+            "count": 1
+          },
+          {
+            "ref": "sensor.radar.mmwave",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.30mm.auto",
+            "mount": "turret",
+            "count": 1,
+            "ammo_max": 200,
+            "ammo_default": 200,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.atgm.team",
+            "mount": "turret",
+            "count": 2,
+            "ammo_max": 2,
+            "ammo_default": 2,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 0,
+          "cargo_t": 0.2,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.vehicle"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "recon_first",
+          "reaction_time_s": 6
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.radar",
+      "class_id": "land.vehicle",
+      "label": "炮兵校射雷达车",
+      "tags": [
+        "radar",
+        "artillery",
+        "wheeled"
+      ],
+      "reference_model": "SLC-2",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": 10,
+        "basic_speed_kmh": 36,
+        "armor": 2,
+        "max_blood": 3
+      },
+      "source": {
+        "refs": [
+          "zm:scenario_operators"
+        ],
+        "note": "庙算炮兵校射雷达 type2/sub10。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "generic_land",
+            "family": "地面火力"
+          },
+          "model": {
+            "asset": "type_eq240",
+            "asset_approximation": true,
+            "reference": "SLC-2"
+          },
+          "dimensions": {
+            "length_m": 8.0,
+            "width_m": 2.5,
+            "height_m": 3.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 16.67,
+          "cruise_speed_ms": 11.11,
+          "accel_ms2": 1.11,
+          "decel_ms2": 2.22,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 2,
+          "max_blood": 3,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.artillery",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 4,
+          "cargo_t": 0.3,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.artillery"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 10
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.command",
+      "class_id": "land.vehicle",
+      "label": "指挥车",
+      "tags": [
+        "command",
+        "wheeled"
+      ],
+      "reference_model": "command vehicle",
+      "confidence": "low",
+      "sdk": {
+        "type": 2,
+        "sub_type": 1,
+        "basic_speed_kmh": 36,
+        "armor": 1,
+        "max_blood": 2
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "营连指挥车，带通信中继。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "truck",
+            "family": "地面保障"
+          },
+          "model": {
+            "asset": "type_eq240",
+            "asset_approximation": true,
+            "reference": "command vehicle"
+          },
+          "dimensions": {
+            "length_m": 7.5,
+            "width_m": 2.5,
+            "height_m": 3.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 25.0,
+          "cruise_speed_ms": 16.67,
+          "accel_ms2": 1.67,
+          "decel_ms2": 3.34,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 1,
+          "max_blood": 2,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "cab",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.relay.command",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 5,
+          "cargo_t": 0.5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.logistics"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 8
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.vehicle.unknown",
+      "class_id": "land.vehicle",
+      "label": "车辆（未知小类）",
+      "tags": [
+        "unknown"
+      ],
+      "reference_model": null,
+      "confidence": "unknown",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 36,
+        "armor": 1,
+        "max_blood": 1
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "只确定到车辆大类时的保守卡：按轮式、轻装甲、无武器处理。"
+      },
+      "unknown_policy": {
+        "combat": "soft",
+        "engage": false,
+        "note": "能力未知，按最保守值约束"
+      },
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "generic_land",
+            "family": "地面机动"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 7.0,
+            "width_m": 2.5,
+            "height_m": 2.5
+          }
+        },
+        "motion": {
+          "max_speed_ms": 11.11,
+          "cruise_speed_ms": 8.33,
+          "accel_ms2": 0.74,
+          "decel_ms2": 1.48,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.2,
+              "urban": 0.33,
+              "soft": 0.1,
+              "water": 0.0,
+              "rock": 0.3
+            },
+            "max_gradient_deg": 20.0,
+            "max_side_slope_deg": 15.0,
+            "wading_depth_m": 0.6,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 1,
+          "max_blood": 1,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 2,
+          "cargo_t": 0.5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.vehicle"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 15
+        },
+        "extensions": {}
+      }
+    }
+  ]
+}

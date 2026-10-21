@@ -1,0 +1,1285 @@
+{
+  "schema": "situation3d.rolecard-subclasses.v1",
+  "class_id": "sea.surface",
+  "subclasses": [
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.surface.destroyer",
+      "class_id": "sea.surface",
+      "label": "驱逐舰",
+      "tags": [
+        "destroyer",
+        "aegis",
+        "flagship"
+      ],
+      "reference_model": "Type 052D",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 56,
+        "armor": 0,
+        "max_blood": 4
+      },
+      "source": {
+        "refs": [
+          "wiki:Type_052D_destroyer"
+        ],
+        "note": "052D：30 kn；64 单元 VLS；346A 雷达；可载 1 架直升机。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "sea",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "destroyer",
+            "family": "水面舰艇"
+          },
+          "model": {
+            "asset": "type_052c",
+            "asset_approximation": true,
+            "reference": "Type 052D"
+          },
+          "dimensions": {
+            "length_m": 157.0,
+            "width_m": 17.2,
+            "height_m": 30.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 15.43,
+          "cruise_speed_ms": 9.26,
+          "accel_ms2": 0.26,
+          "decel_ms2": 0.52,
+          "sea": {
+            "draft_m": 6.5,
+            "ukc_m": 0.5,
+            "beam_m": 17.2,
+            "length_m": 157.0,
+            "sea_state_max": 6
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 4,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 1.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.ship.aesa",
+            "mount": "mast",
+            "count": 1
+          },
+          {
+            "ref": "sensor.sonar.hull",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "sensor.esm.ship",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.hhq9.naval",
+            "mount": "vls",
+            "count": 32,
+            "ammo_max": 32,
+            "ammo_default": 32,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.yj18",
+            "mount": "vls",
+            "count": 16,
+            "ammo_max": 16,
+            "ammo_default": 16,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.130mm.naval",
+            "mount": "bow",
+            "count": 1,
+            "ammo_max": 300,
+            "ammo_default": 300,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.ciws",
+            "mount": "deck",
+            "count": 2,
+            "ammo_max": 2000,
+            "ammo_default": 2000,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.naval",
+            "mount": "mast",
+            "count": 1
+          },
+          {
+            "ref": "comm.satcom.naval",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 280,
+          "cargo_t": 200,
+          "vehicles": 0,
+          "deck_capacity": 1
+        },
+        "logistics": {
+          "supply_class": "naval.surface",
+          "fuel_capacity_l": 600000,
+          "consumption_l_per_km": 70
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "threat_first",
+          "reaction_time_s": 15
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.surface.frigate",
+      "class_id": "sea.surface",
+      "label": "护卫舰",
+      "tags": [
+        "frigate",
+        "escort"
+      ],
+      "reference_model": "Type 054A",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 50,
+        "armor": 0,
+        "max_blood": 3
+      },
+      "source": {
+        "refs": [
+          "wiki:Type_054A_frigate"
+        ],
+        "note": "054A：32 单元 HHQ-16；27 kn 为公开常用值。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "sea",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "frigate",
+            "family": "水面舰艇"
+          },
+          "model": {
+            "asset": "type_054a",
+            "asset_approximation": false,
+            "reference": "Type 054A"
+          },
+          "dimensions": {
+            "length_m": 134.0,
+            "width_m": 16.0,
+            "height_m": 28.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 13.89,
+          "cruise_speed_ms": 9.26,
+          "accel_ms2": 0.23,
+          "decel_ms2": 0.46,
+          "sea": {
+            "draft_m": 5.0,
+            "ukc_m": 0.5,
+            "beam_m": 16.0,
+            "length_m": 134.0,
+            "sea_state_max": 6
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 1.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.ship.382",
+            "mount": "mast",
+            "count": 1
+          },
+          {
+            "ref": "sensor.sonar.towed",
+            "mount": "stern",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.hq16",
+            "mount": "vls",
+            "count": 32,
+            "ammo_max": 32,
+            "ammo_default": 32,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.yj83",
+            "mount": "launcher",
+            "count": 8,
+            "ammo_max": 8,
+            "ammo_default": 8,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.76mm.naval",
+            "mount": "bow",
+            "count": 1,
+            "ammo_max": 200,
+            "ammo_default": 200,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.ciws",
+            "mount": "deck",
+            "count": 2,
+            "ammo_max": 2000,
+            "ammo_default": 2000,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.naval",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 190,
+          "cargo_t": 100,
+          "vehicles": 0,
+          "deck_capacity": 1
+        },
+        "logistics": {
+          "supply_class": "naval.surface",
+          "fuel_capacity_l": 400000,
+          "consumption_l_per_km": 55
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "threat_first",
+          "reaction_time_s": 15
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.surface.corvette",
+      "class_id": "sea.surface",
+      "label": "轻护卫舰/巡逻舰",
+      "tags": [
+        "corvette",
+        "patrol"
+      ],
+      "reference_model": "Type 056A",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 46,
+        "armor": 0,
+        "max_blood": 2
+      },
+      "source": {
+        "refs": [
+          "wiki:Type_056_corvette"
+        ],
+        "note": "056A：25 kn，1500 t，76mm+4 枚 YJ-83+8 联 HHQ-10。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "sea",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "corvette",
+            "family": "水面舰艇"
+          },
+          "model": {
+            "asset": "type_056a",
+            "asset_approximation": false,
+            "reference": "Type 056A"
+          },
+          "dimensions": {
+            "length_m": 90.0,
+            "width_m": 11.0,
+            "height_m": 20.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 12.86,
+          "cruise_speed_ms": 8.23,
+          "accel_ms2": 0.21,
+          "decel_ms2": 0.42,
+          "sea": {
+            "draft_m": 4.0,
+            "ukc_m": 0.5,
+            "beam_m": 11.0,
+            "length_m": 90.0,
+            "sea_state_max": 6
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 2,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.8,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.ship.361",
+            "mount": "mast",
+            "count": 1
+          },
+          {
+            "ref": "sensor.sonar.towed",
+            "mount": "stern",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.yj83",
+            "mount": "launcher",
+            "count": 4,
+            "ammo_max": 4,
+            "ammo_default": 4,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.hhq10",
+            "mount": "launcher",
+            "count": 8,
+            "ammo_max": 8,
+            "ammo_default": 8,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.76mm.naval",
+            "mount": "bow",
+            "count": 1,
+            "ammo_max": 150,
+            "ammo_default": 150,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.30mm.auto",
+            "mount": "deck",
+            "count": 2,
+            "ammo_max": 800,
+            "ammo_default": 800,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.asw.torpedo",
+            "mount": "stern",
+            "count": 2,
+            "ammo_max": 6,
+            "ammo_default": 6,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.naval",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 78,
+          "cargo_t": 30,
+          "vehicles": 0,
+          "deck_capacity": 1
+        },
+        "logistics": {
+          "supply_class": "naval.surface",
+          "fuel_capacity_l": 200000,
+          "consumption_l_per_km": 35
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "threat_first",
+          "reaction_time_s": 12
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.surface.missile_boat",
+      "class_id": "sea.surface",
+      "label": "导弹艇",
+      "tags": [
+        "missile_boat",
+        "fast_attack"
+      ],
+      "reference_model": "Type 022",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 70,
+        "armor": 0,
+        "max_blood": 1
+      },
+      "source": {
+        "refs": [
+          "wiki:Type_022_missile_boat"
+        ],
+        "note": "022 型：38 kn 为公开常用值；8 枚 YJ-83。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "sea",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "corvette",
+            "family": "水面舰艇"
+          },
+          "model": {
+            "asset": "type_056a",
+            "asset_approximation": true,
+            "reference": "Type 022"
+          },
+          "dimensions": {
+            "length_m": 42.6,
+            "width_m": 13.0,
+            "height_m": 10.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 19.55,
+          "cruise_speed_ms": 12.86,
+          "accel_ms2": 0.33,
+          "decel_ms2": 0.66,
+          "sea": {
+            "draft_m": 1.5,
+            "ukc_m": 0.5,
+            "beam_m": 13.0,
+            "length_m": 42.6,
+            "sea_state_max": 6
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 1,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.6,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.ship.nav",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.yj83",
+            "mount": "launcher",
+            "count": 8,
+            "ammo_max": 8,
+            "ammo_default": 8,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.30mm.auto",
+            "mount": "deck",
+            "count": 1,
+            "ammo_max": 400,
+            "ammo_default": 400,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.naval",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 12,
+          "cargo_t": 5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "naval.surface",
+          "fuel_capacity_l": 30000,
+          "consumption_l_per_km": 18
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "surface_first",
+          "reaction_time_s": 8
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.surface.landing_ship",
+      "class_id": "sea.surface",
+      "label": "两栖船坞运输舰",
+      "tags": [
+        "landing_ship",
+        "amphibious",
+        "transport"
+      ],
+      "reference_model": "Type 071",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 41,
+        "armor": 0,
+        "max_blood": 4
+      },
+      "source": {
+        "refs": [
+          "wiki:Type_071"
+        ],
+        "note": "071：600-800 名陆战队员、4 艘 726 气垫艇、4 架 Z-8；航速按 22 kn。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "sea",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "landing_ship",
+            "family": "两栖舰船"
+          },
+          "model": {
+            "asset": "type_071",
+            "asset_approximation": false,
+            "reference": "Type 071"
+          },
+          "dimensions": {
+            "length_m": 210.0,
+            "width_m": 28.0,
+            "height_m": 35.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 11.32,
+          "cruise_speed_ms": 9.26,
+          "accel_ms2": 0.19,
+          "decel_ms2": 0.38,
+          "sea": {
+            "draft_m": 7.0,
+            "ukc_m": 0.5,
+            "beam_m": 28.0,
+            "length_m": 210.0,
+            "sea_state_max": 6
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 4,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 1.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.ship.361",
+            "mount": "mast",
+            "count": 1
+          },
+          {
+            "ref": "sensor.sonar.hull",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.76mm.naval",
+            "mount": "bow",
+            "count": 1,
+            "ammo_max": 150,
+            "ammo_default": 150,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.30mm.auto",
+            "mount": "deck",
+            "count": 4,
+            "ammo_max": 800,
+            "ammo_default": 800,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.naval",
+            "mount": "mast",
+            "count": 1
+          },
+          {
+            "ref": "comm.satcom.naval",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 800,
+          "cargo_t": 800,
+          "vehicles": 20,
+          "lcac": 4,
+          "helicopters": 4
+        },
+        "logistics": {
+          "supply_class": "naval.surface",
+          "fuel_capacity_l": 700000,
+          "consumption_l_per_km": 75
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "defensive",
+          "reaction_time_s": 20
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.surface.transport_ship",
+      "class_id": "sea.surface",
+      "label": "运输船",
+      "tags": [
+        "transport",
+        "auxiliary"
+      ],
+      "reference_model": "Ro-Ro transport",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 37,
+        "armor": 0,
+        "max_blood": 3
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "民船动员/滚装运输船，无武器。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "sea",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "transport_ship",
+            "family": "水面舰艇"
+          },
+          "model": {
+            "asset": "type_071",
+            "asset_approximation": true,
+            "reference": "Ro-Ro transport"
+          },
+          "dimensions": {
+            "length_m": 200.0,
+            "width_m": 30.0,
+            "height_m": 35.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 10.29,
+          "cruise_speed_ms": 8.23,
+          "accel_ms2": 0.17,
+          "decel_ms2": 0.34,
+          "sea": {
+            "draft_m": 8.0,
+            "ukc_m": 0.5,
+            "beam_m": 30.0,
+            "length_m": 200.0,
+            "sea_state_max": 6
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 1.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.ship.nav",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 1000,
+          "cargo_t": 5000,
+          "vehicles": 50
+        },
+        "logistics": {
+          "supply_class": "naval.surface",
+          "fuel_capacity_l": 900000,
+          "consumption_l_per_km": 80
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 20
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.surface.replenishment",
+      "class_id": "sea.surface",
+      "label": "综合补给舰",
+      "tags": [
+        "replenishment",
+        "auxiliary"
+      ],
+      "reference_model": "Type 903",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 35,
+        "armor": 0,
+        "max_blood": 3
+      },
+      "source": {
+        "refs": [
+          "wiki:Type_903"
+        ],
+        "note": "903 型综合补给舰，可横向/纵向补给；航速按 19 kn。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "sea",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "replenishment",
+            "family": "辅助舰船"
+          },
+          "model": {
+            "asset": "type_903",
+            "asset_approximation": false,
+            "reference": "Type 903"
+          },
+          "dimensions": {
+            "length_m": 178.0,
+            "width_m": 24.6,
+            "height_m": 30.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 9.77,
+          "cruise_speed_ms": 7.72,
+          "accel_ms2": 0.16,
+          "decel_ms2": 0.32,
+          "sea": {
+            "draft_m": 8.7,
+            "ukc_m": 0.5,
+            "beam_m": 24.6,
+            "length_m": 178.0,
+            "sea_state_max": 6
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 1.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.ship.nav",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.datalink.naval",
+            "mount": "mast",
+            "count": 1
+          },
+          {
+            "ref": "comm.satcom.naval",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 200,
+          "cargo_t": 10500,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "naval.surface",
+          "fuel_capacity_l": 1200000,
+          "consumption_l_per_km": 85
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 20
+        },
+        "extensions": {
+          "can_refuel_others": true
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.surface.carrier",
+      "class_id": "sea.surface",
+      "label": "航空母舰",
+      "tags": [
+        "carrier",
+        "flagship"
+      ],
+      "reference_model": "Type 001A",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 57,
+        "armor": 0,
+        "max_blood": 5
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "滑跃起飞航母，载机约 30 架；31 kn 常用值。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "sea",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "generic_sea",
+            "family": "水面舰艇"
+          },
+          "model": {
+            "asset": "type_071",
+            "asset_approximation": true,
+            "reference": "Type 001A"
+          },
+          "dimensions": {
+            "length_m": 315.0,
+            "width_m": 75.0,
+            "height_m": 60.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 15.95,
+          "cruise_speed_ms": 10.29,
+          "accel_ms2": 0.27,
+          "decel_ms2": 0.54,
+          "sea": {
+            "draft_m": 10.0,
+            "ukc_m": 0.5,
+            "beam_m": 75.0,
+            "length_m": 315.0,
+            "sea_state_max": 6
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 5,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 1.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.ship.aesa",
+            "mount": "island",
+            "count": 1
+          },
+          {
+            "ref": "sensor.sonar.hull",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.ciws",
+            "mount": "deck",
+            "count": 3,
+            "ammo_max": 3000,
+            "ammo_default": 3000,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.naval",
+            "mount": "island",
+            "count": 1
+          },
+          {
+            "ref": "comm.satcom.naval",
+            "mount": "island",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 2000,
+          "cargo_t": 5000,
+          "vehicles": 0,
+          "aircraft": 30
+        },
+        "logistics": {
+          "supply_class": "naval.surface",
+          "fuel_capacity_l": 1500000,
+          "consumption_l_per_km": 120
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "defensive",
+          "reaction_time_s": 20
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.surface.auxiliary",
+      "class_id": "sea.surface",
+      "label": "辅助舰船",
+      "tags": [
+        "auxiliary",
+        "survey"
+      ],
+      "reference_model": "Auxiliary",
+      "confidence": "low",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 33,
+        "armor": 0,
+        "max_blood": 2
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "测量/侦察/勤务船等辅助舰船通称。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "sea",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "replenishment",
+            "family": "辅助舰船"
+          },
+          "model": {
+            "asset": "type_903",
+            "asset_approximation": true,
+            "reference": "Auxiliary"
+          },
+          "dimensions": {
+            "length_m": 120.0,
+            "width_m": 18.0,
+            "height_m": 22.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 9.26,
+          "cruise_speed_ms": 7.2,
+          "accel_ms2": 0.15,
+          "decel_ms2": 0.3,
+          "sea": {
+            "draft_m": 6.0,
+            "ukc_m": 0.5,
+            "beam_m": 18.0,
+            "length_m": 120.0,
+            "sea_state_max": 6
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 2,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.8,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.ship.nav",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.datalink.naval",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 200,
+          "cargo_t": 1000,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "naval.surface"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 20
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.surface.unknown",
+      "class_id": "sea.surface",
+      "label": "水面舰艇（未知小类）",
+      "tags": [
+        "unknown"
+      ],
+      "reference_model": null,
+      "confidence": "unknown",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 33,
+        "armor": 0,
+        "max_blood": 1
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "只确定到水面舰艇大类时的保守卡。"
+      },
+      "unknown_policy": {
+        "combat": "soft",
+        "engage": false,
+        "note": "能力未知，按非武装舰船处理"
+      },
+      "values": {
+        "identity": {
+          "primary_domain": "sea",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "generic_sea",
+            "family": "水面舰艇"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 100.0,
+            "width_m": 15.0,
+            "height_m": 20.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 9.26,
+          "cruise_speed_ms": 7.2,
+          "accel_ms2": 0.15,
+          "decel_ms2": 0.3,
+          "sea": {
+            "draft_m": 5.0,
+            "ukc_m": 0.5,
+            "beam_m": 15.0,
+            "length_m": 100.0,
+            "sea_state_max": 6
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 1,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.8,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.ship.nav",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.datalink.naval",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 50,
+          "cargo_t": 100,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "naval.surface"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 20
+        },
+        "extensions": {}
+      }
+    }
+  ]
+}

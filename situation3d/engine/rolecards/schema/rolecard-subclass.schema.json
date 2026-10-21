@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "situation3d.rolecard-subclass.v1",
+  "title": "Role card subclass (小类角色卡)",
+  "type": "object",
+  "required": ["schema", "subclass_id", "class_id", "label", "confidence", "sdk", "values"],
+  "properties": {
+    "schema": { "const": "situation3d.rolecard-subclass.v1" },
+    "subclass_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*([.-][a-z0-9_-]+)+$" },
+    "class_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*([.-][a-z0-9_-]+)+$" },
+    "label": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "reference_model": { "type": ["string", "null"] },
+    "confidence": { "enum": ["high", "medium", "low", "unknown", "legacy"] },
+    "sdk": {
+      "type": "object",
+      "properties": {
+        "type": { "type": ["integer", "null"] },
+        "sub_type": { "type": ["integer", "null"] },
+        "basic_speed_kmh": { "type": ["number", "null"] },
+        "armor": { "type": ["integer", "null"] },
+        "max_blood": { "type": ["integer", "null"] },
+        "weapon_ids": { "type": "array", "items": { "type": "integer" } },
+        "observe_distance": { "type": "object" }
+      }
+    },
+    "source": { "type": "object" },
+    "unknown_policy": { "type": ["object", "null"] },
+    "values": {
+      "type": "object",
+      "required": ["identity", "motion", "protection", "sensors", "weapons", "capacity"],
+      "properties": {
+        "identity": {
+          "type": "object",
+          "required": ["primary_domain", "symbol"],
+          "properties": {
+            "primary_domain": { "enum": ["land", "sea", "air", "subsurface", "installation"] },
+            "mobility_modes": { "type": "array", "items": { "type": "string" } },
+            "symbol": { "type": "object", "required": ["icon"] },
+            "model": { "type": ["object", "null"] },
+            "dimensions": { "type": "object" }
+          }
+        },
+        "motion": {
+          "type": "object",
+          "properties": {
+            "max_speed_ms": { "type": "number", "minimum": 0 },
+            "cruise_speed_ms": { "type": "number", "minimum": 0 },
+            "accel_ms2": { "type": "number", "minimum": 0 },
+            "decel_ms2": { "type": "number", "minimum": 0 },
+            "terrain": { "type": "object" },
+            "sea": { "type": "object" },
+            "air": { "type": "object" },
+            "immobile": { "type": "boolean" }
+          }
+        },
+        "protection": {
+          "type": "object",
+          "required": ["armor_class", "max_blood", "size_class"],
+          "properties": {
+            "armor_class": { "type": "integer", "minimum": 0, "maximum": 4 },
+            "max_blood": { "type": "integer", "minimum": 1 },
+            "size_class": { "enum": ["small", "medium", "large"] },
+            "signature": { "type": "object" },
+            "concealment": { "type": "object" }
+          }
+        },
+        "sensors": { "type": "array", "items": { "type": "object", "required": ["ref"] } },
+        "weapons": { "type": "array", "items": { "type": "object", "required": ["ref"] } },
+        "comms": { "type": "array", "items": { "type": "object", "required": ["ref"] } },
+        "capacity": { "type": "object" },
+        "logistics": { "type": "object" },
+        "behavior": { "type": "object" },
+        "extensions": { "type": "object" }
+      }
+    }
+  },
+  "additionalProperties": true
+}
