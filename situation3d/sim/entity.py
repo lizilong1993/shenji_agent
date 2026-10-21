@@ -172,6 +172,7 @@ class Entity(object):
     concealment: Optional[float] = None
     comms_range_m: float = 600.0
     last_fired_s: float = -1.0
+    role_card: Optional[dict] = None
 
     def to_rule_view(self, stacked: Optional[bool] = None) -> EntityRuleView:
         """Project to the read-only view consumed by ``rules``.

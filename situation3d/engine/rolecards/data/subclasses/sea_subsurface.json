@@ -1,0 +1,353 @@
+{
+  "schema": "situation3d.rolecard-subclasses.v1",
+  "class_id": "sea.subsurface",
+  "subclasses": [
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.subsurface.attack",
+      "class_id": "sea.subsurface",
+      "label": "攻击潜艇",
+      "tags": [
+        "submarine",
+        "attack"
+      ],
+      "reference_model": "Type 039B",
+      "confidence": "high",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 37,
+        "armor": 0,
+        "max_blood": 3
+      },
+      "source": {
+        "refs": [
+          "wiki:Type_039A"
+        ],
+        "note": "039 系列：S20 出口型 18 kn、潜深 300 m；039B 取 20 kn。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "subsurface",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "generic_sea",
+            "family": "水面舰艇"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": "Type 039B"
+          },
+          "dimensions": {
+            "length_m": 75.0,
+            "width_m": 8.0,
+            "height_m": 10.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 10.29,
+          "cruise_speed_ms": 6.17,
+          "accel_ms2": 0.17,
+          "decel_ms2": 0.34,
+          "sea": {
+            "draft_m": 7.0,
+            "ukc_m": 0.5,
+            "beam_m": 8.0,
+            "length_m": 75.0,
+            "sea_state_max": 5,
+            "max_operating_depth_m": 300.0
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 1.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.sonar.sub",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.torpedo.533",
+            "mount": "tubes",
+            "count": 6,
+            "ammo_max": 18,
+            "ammo_default": 18,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.yj18",
+            "mount": "tubes",
+            "count": 4,
+            "ammo_max": 6,
+            "ammo_default": 6,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 38,
+          "cargo_t": 10,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "naval.subsurface"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "surface_first",
+          "reaction_time_s": 20
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.subsurface.missile",
+      "class_id": "sea.subsurface",
+      "label": "弹道导弹潜艇",
+      "tags": [
+        "submarine",
+        "ssbn"
+      ],
+      "reference_model": "Type 094",
+      "confidence": "medium",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 37,
+        "armor": 0,
+        "max_blood": 4
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "094 型战略核潜艇，12 枚 JL-2；参数为演示估算。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "subsurface",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "generic_sea",
+            "family": "水面舰艇"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": "Type 094"
+          },
+          "dimensions": {
+            "length_m": 135.0,
+            "width_m": 13.0,
+            "height_m": 15.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 10.29,
+          "cruise_speed_ms": 6.17,
+          "accel_ms2": 0.17,
+          "decel_ms2": 0.34,
+          "sea": {
+            "draft_m": 7.0,
+            "ukc_m": 0.5,
+            "beam_m": 13.0,
+            "length_m": 135.0,
+            "sea_state_max": 5,
+            "max_operating_depth_m": 300.0
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 4,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 1.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.sonar.sub",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.jl2",
+            "mount": "vls",
+            "count": 12,
+            "ammo_max": 12,
+            "ammo_default": 12,
+            "shoot_on_move": false
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.satcom.naval",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 120,
+          "cargo_t": 10,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "naval.subsurface"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "strategic",
+          "reaction_time_s": 60
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "sea.subsurface.unknown",
+      "class_id": "sea.subsurface",
+      "label": "潜艇（未知小类）",
+      "tags": [
+        "unknown"
+      ],
+      "reference_model": null,
+      "confidence": "unknown",
+      "sdk": {
+        "type": 2,
+        "sub_type": null,
+        "basic_speed_kmh": 28,
+        "armor": 0,
+        "max_blood": 1
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "只确定到潜艇大类时的保守卡。"
+      },
+      "unknown_policy": {
+        "combat": "soft",
+        "engage": false,
+        "note": "能力未知，按非武装潜艇处理"
+      },
+      "values": {
+        "identity": {
+          "primary_domain": "subsurface",
+          "mobility_modes": [
+            "water"
+          ],
+          "symbol": {
+            "icon": "generic_sea",
+            "family": "水面舰艇"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 70.0,
+            "width_m": 8.0,
+            "height_m": 9.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 7.72,
+          "cruise_speed_ms": 5.14,
+          "accel_ms2": 0.15,
+          "decel_ms2": 0.3,
+          "sea": {
+            "draft_m": 6.0,
+            "ukc_m": 0.5,
+            "beam_m": 8.0,
+            "length_m": 70.0,
+            "sea_state_max": 4,
+            "max_operating_depth_m": 200.0
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 1,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.8,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.sonar.sub",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.vehicle",
+            "mount": "mast",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 30,
+          "cargo_t": 0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "naval.subsurface"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 30
+        },
+        "extensions": {}
+      }
+    }
+  ]
+}

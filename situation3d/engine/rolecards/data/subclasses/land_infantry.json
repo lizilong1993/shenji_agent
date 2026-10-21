@@ -1,0 +1,787 @@
+{
+  "schema": "situation3d.rolecard-subclasses.v1",
+  "class_id": "land.infantry",
+  "subclasses": [
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.infantry.rifle",
+      "class_id": "land.infantry",
+      "label": "步兵班",
+      "tags": [
+        "infantry",
+        "dismounted"
+      ],
+      "reference_model": null,
+      "confidence": "high",
+      "sdk": {
+        "type": 1,
+        "sub_type": 2,
+        "basic_speed_kmh": 5,
+        "armor": 0,
+        "max_blood": 3,
+        "weapon_ids": [
+          29,
+          35,
+          5
+        ],
+        "observe_distance": {
+          "infantry": 10,
+          "vehicle": 25,
+          "uav": 1
+        }
+      },
+      "source": {
+        "refs": [
+          "zm:scenario_operators",
+          "doc:observation_table"
+        ],
+        "note": "庙算：步兵小队 basic_speed=5 km/h，observe_distance 10/25/1；物理速度按轻装步兵 5.5 km/h。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "outpost",
+            "family": "防御阵地"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 15.0,
+            "width_m": 10.0,
+            "height_m": 1.8
+          }
+        },
+        "motion": {
+          "max_speed_ms": 1.53,
+          "cruise_speed_ms": 1.25,
+          "accel_ms2": 0.15,
+          "decel_ms2": 0.3,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.8,
+              "urban": 0.9,
+              "soft": 0.7,
+              "water": 0.0,
+              "rock": 0.6
+            },
+            "max_gradient_deg": 45.0,
+            "max_side_slope_deg": 35.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 3,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "personnel",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.rifle.58",
+            "mount": "personnel",
+            "count": 9,
+            "ammo_max": 2700,
+            "ammo_default": 2700,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.7.62mm.mg",
+            "mount": "squad",
+            "count": 1,
+            "ammo_max": 600,
+            "ammo_default": 600,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.squad",
+            "mount": "personnel",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 9,
+          "cargo_t": 0.3,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.infantry",
+          "fuel_capacity_l": 0,
+          "consumption_l_per_km": 0
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "engage_policy": "defensive",
+          "reaction_time_s": 10
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.infantry.recon",
+      "class_id": "land.infantry",
+      "label": "侦察分队",
+      "tags": [
+        "infantry",
+        "recon"
+      ],
+      "reference_model": null,
+      "confidence": "medium",
+      "sdk": {
+        "type": 1,
+        "sub_type": 2,
+        "basic_speed_kmh": 5,
+        "armor": 0,
+        "max_blood": 2,
+        "observe_distance": {
+          "infantry": 10,
+          "vehicle": 25,
+          "uav": 2
+        }
+      },
+      "source": {
+        "refs": [
+          "zm:scenario_operators"
+        ],
+        "note": "侦察分队按步兵小队派生，观察距离取上限 8 km。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "outpost",
+            "family": "防御阵地"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 12.0,
+            "width_m": 8.0,
+            "height_m": 1.8
+          }
+        },
+        "motion": {
+          "max_speed_ms": 1.53,
+          "cruise_speed_ms": 1.25,
+          "accel_ms2": 0.15,
+          "decel_ms2": 0.3,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.8,
+              "urban": 0.9,
+              "soft": 0.7,
+              "water": 0.0,
+              "rock": 0.6
+            },
+            "max_gradient_deg": 45.0,
+            "max_side_slope_deg": 35.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 2,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.recon",
+            "mount": "personnel",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.rifle.58",
+            "mount": "personnel",
+            "count": 6,
+            "ammo_max": 1800,
+            "ammo_default": 1800,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.squad",
+            "mount": "personnel",
+            "count": 1
+          },
+          {
+            "ref": "comm.hf.squad",
+            "mount": "squad",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 6,
+          "cargo_t": 0.2,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.infantry"
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 8
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.infantry.atgm",
+      "class_id": "land.infantry",
+      "label": "反坦克小组",
+      "tags": [
+        "infantry",
+        "atgm"
+      ],
+      "reference_model": null,
+      "confidence": "medium",
+      "sdk": {
+        "type": 1,
+        "sub_type": 2,
+        "basic_speed_kmh": 5,
+        "armor": 0,
+        "max_blood": 2,
+        "weapon_ids": [
+          35
+        ],
+        "observe_distance": {
+          "vehicle": 25
+        }
+      },
+      "source": {
+        "refs": [
+          "zm:weapons_0"
+        ],
+        "note": "庙算火箭筒/便携导弹射程 4 格≈0.8 km；物理值取 4 km。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "outpost",
+            "family": "防御阵地"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 8.0,
+            "width_m": 6.0,
+            "height_m": 1.5
+          }
+        },
+        "motion": {
+          "max_speed_ms": 1.39,
+          "cruise_speed_ms": 1.11,
+          "accel_ms2": 0.15,
+          "decel_ms2": 0.3,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.8,
+              "urban": 0.9,
+              "soft": 0.7,
+              "water": 0.0,
+              "rock": 0.6
+            },
+            "max_gradient_deg": 45.0,
+            "max_side_slope_deg": 35.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 2,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "personnel",
+            "count": 1
+          },
+          {
+            "ref": "sensor.thermal.gunner",
+            "mount": "tripod",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.atgm.team",
+            "mount": "tripod",
+            "count": 2,
+            "ammo_max": 6,
+            "ammo_default": 6,
+            "shoot_on_move": false
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.squad",
+            "mount": "personnel",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 4,
+          "cargo_t": 0.2,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.infantry"
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "engage_policy": "armor_first",
+          "reaction_time_s": 12
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.infantry.manpads",
+      "class_id": "land.infantry",
+      "label": "便携防空小组",
+      "tags": [
+        "infantry",
+        "manpads",
+        "sam"
+      ],
+      "reference_model": null,
+      "confidence": "medium",
+      "sdk": {
+        "type": 1,
+        "sub_type": 16,
+        "basic_speed_kmh": 5,
+        "armor": 0,
+        "max_blood": 2,
+        "weapon_ids": [
+          2
+        ],
+        "observe_distance": {
+          "air": 25
+        }
+      },
+      "source": {
+        "refs": [
+          "zm:scenario_operators",
+          "zm:weapons_0"
+        ],
+        "note": "庙算防空导弹排（type1/sub16），便携防空 20 格≈4 km；物理射程按 6 km 取值。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "outpost",
+            "family": "防御阵地"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 8.0,
+            "width_m": 6.0,
+            "height_m": 2.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 1.39,
+          "cruise_speed_ms": 1.11,
+          "accel_ms2": 0.15,
+          "decel_ms2": 0.3,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.8,
+              "urban": 0.9,
+              "soft": 0.7,
+              "water": 0.0,
+              "rock": 0.6
+            },
+            "max_gradient_deg": 45.0,
+            "max_side_slope_deg": 35.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 2,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.ir.manpads",
+            "mount": "tripod",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.manpads",
+            "mount": "tripod",
+            "count": 3,
+            "ammo_max": 3,
+            "ammo_default": 3,
+            "shoot_on_move": false
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.squad",
+            "mount": "personnel",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 3,
+          "cargo_t": 0.1,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.infantry"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "air_first",
+          "reaction_time_s": 8
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.infantry.engineer",
+      "class_id": "land.infantry",
+      "label": "工兵分队",
+      "tags": [
+        "infantry",
+        "engineer"
+      ],
+      "reference_model": null,
+      "confidence": "low",
+      "sdk": {
+        "type": 1,
+        "sub_type": 2,
+        "basic_speed_kmh": 5,
+        "armor": 0,
+        "max_blood": 3
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "工程作业能力为演示值。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "outpost",
+            "family": "防御阵地"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 15.0,
+            "width_m": 10.0,
+            "height_m": 1.8
+          }
+        },
+        "motion": {
+          "max_speed_ms": 1.39,
+          "cruise_speed_ms": 1.11,
+          "accel_ms2": 0.15,
+          "decel_ms2": 0.3,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.8,
+              "urban": 0.9,
+              "soft": 0.7,
+              "water": 0.0,
+              "rock": 0.6
+            },
+            "max_gradient_deg": 45.0,
+            "max_side_slope_deg": 35.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 3,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "personnel",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.rifle.58",
+            "mount": "personnel",
+            "count": 9,
+            "ammo_max": 2700,
+            "ammo_default": 2700,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.vhf.squad",
+            "mount": "personnel",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 9,
+          "cargo_t": 0.4,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.infantry"
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 10
+        },
+        "extensions": {
+          "engineering": {
+            "mine_clearing": true,
+            "roadblock": true
+          }
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "land.infantry.unknown",
+      "class_id": "land.infantry",
+      "label": "人员（未知小类）",
+      "tags": [
+        "unknown"
+      ],
+      "reference_model": null,
+      "confidence": "unknown",
+      "sdk": {
+        "type": 1,
+        "sub_type": null,
+        "basic_speed_kmh": 5,
+        "armor": 0,
+        "max_blood": 1
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "只确定到人员大类时的保守卡。"
+      },
+      "unknown_policy": {
+        "combat": "soft",
+        "engage": false,
+        "note": "能力未知，不主动交战"
+      },
+      "values": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "offroad"
+          ],
+          "symbol": {
+            "icon": "outpost",
+            "family": "防御阵地"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 10.0,
+            "width_m": 8.0,
+            "height_m": 1.8
+          }
+        },
+        "motion": {
+          "max_speed_ms": 1.39,
+          "cruise_speed_ms": 0.97,
+          "accel_ms2": 0.15,
+          "decel_ms2": 0.3,
+          "terrain": {
+            "factors": {
+              "open": 1.0,
+              "forest": 0.8,
+              "urban": 0.9,
+              "soft": 0.7,
+              "water": 0.0,
+              "rock": 0.6
+            },
+            "max_gradient_deg": 45.0,
+            "max_side_slope_deg": 35.0,
+            "wading_depth_m": 1.2,
+            "road_bound": false,
+            "amphibious": false
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 1,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.visual.squad",
+            "mount": "personnel",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.squad",
+            "mount": "personnel",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 6,
+          "cargo_t": 0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "ground.infantry"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 15
+        },
+        "extensions": {}
+      }
+    }
+  ]
+}

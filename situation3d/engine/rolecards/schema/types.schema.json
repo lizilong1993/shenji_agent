@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "situation3d.types.v2",
+  "title": "Role card type index (aliases + 庙算 mapping)",
+  "type": "object",
+  "required": ["schema", "classes", "aliases", "sdk_map"],
+  "properties": {
+    "schema": { "const": "situation3d.types.v2" },
+    "classes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["class_id", "label", "domain", "unknown_subclass", "subclasses"],
+        "properties": {
+          "class_id": { "type": "string" },
+          "label": { "type": "string" },
+          "domain": { "enum": ["land", "sea", "air", "subsurface", "installation"] },
+          "unknown_subclass": { "type": "string" },
+          "subclasses": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "aliases": {
+      "type": "object",
+      "description": "Legacy icon / explicit key -> subclass_id.",
+      "additionalProperties": { "type": "string" }
+    },
+    "sdk_map": {
+      "type": "object",
+      "description": "庙算 type.sub_type -> default subclass_id (many-to-one; refine by name/role).",
+      "additionalProperties": { "type": "string" }
+    },
+    "sdk_map_note": { "type": "string" }
+  },
+  "additionalProperties": true
+}

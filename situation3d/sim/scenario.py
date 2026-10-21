@@ -20,6 +20,15 @@ from rules.context import WeaponView
 from sim.entity import Entity, Pose
 from sim.world import World
 from sim import sensors as sensor_model
+from sim.rolecards_bridge import (
+    card_for_operator,
+    domain_from_card,
+    profile_from_card,
+    sensors_from_card,
+    unit_kind_from_card,
+    unit_type_from_card,
+    weapons_from_card,
+)
 from mobility.profile import profile_for
 
 DEFAULT_ANCHOR = (119.9, 23.1)
@@ -211,6 +220,7 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
     if direct_fire_model not in DIRECT_FIRE_MODELS:
         direct_fire_model = "crt"
     commander_interval_s = _as_float(engine.get("commander_interval_s"), 2.0)
+    use_role_cards = _as_bool(engine.get("use_role_cards"), False)
     world = World(env, _rule_grid_for(grid), dt_s=dt_s, seed=seed, plan_grid=grid,
                   detection_model=detection_model,
                   direct_fire_model=direct_fire_model,
@@ -230,25 +240,41 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             elif domain == "sub":
                 domain = "subsurface"
         lon, lat = grid.to_lonlat(int(op["cur_hex"]))
-        profile = profile_for(unit_type, domain)
+        card_id, card = card_for_operator(op, domain, infer=use_role_cards)
+        if card:
+            domain = domain_from_card(card) or domain
+            unit_type = unit_type_from_card(card_id)
+            profile = profile_from_card(card, key=card_id)
+        else:
+            profile = profile_for(unit_type, domain)
         armor = op.get("armor")
         armor = int(armor) if armor is not None else int(profile.armor_class)
-        weapons, ammo = _weapon_views(op)
-        sea_weapons = sea_air_weapons_for(str(op.get("name") or ""), domain)
-        for w in sea_weapons:
-            ammo.setdefault(w.key, int(w.ammo))
+        if card:
+            weapons, ammo = weapons_from_card(card)
+            sea_weapons = []
+            sensors = sensors_from_card(card)
+            default_blood = int((card.get("protection") or {}).get("max_blood") or 1)
+        else:
+            weapons, ammo = _weapon_views(op)
+            sea_weapons = sea_air_weapons_for(str(op.get("name") or ""), domain)
+            for w in sea_weapons:
+                ammo.setdefault(w.key, int(w.ammo))
+            sensors = sensor_model.sensors_for(str(op.get("name") or ""), domain)
+            default_blood = 1
         entity = Entity(
             uid=int(op["obj_id"]),
             name=str(op.get("name") or op["obj_id"]),
             affiliation=int(op.get("color") or 0),
             domain=domain,
-            profile_id=unit_type,
+            profile_id=card_id or unit_type,
+            profile=profile,
             pose=Pose(lon, lat, env.elevation(lon, lat),
                       heading_deg=_as_float(op.get("heading_deg"), 0.0)),
             unit_type=unit_type,
-            unit_kind=_unit_kind(op, unit_type),
-            blood=int(op.get("blood") or 1),
-            max_blood=int(op.get("max_blood") or op.get("blood") or 1),
+            unit_kind=(unit_kind_from_card(card_id) if card
+                       else _unit_kind(op, unit_type)),
+            blood=int(op.get("blood") or default_blood),
+            max_blood=int(op.get("max_blood") or op.get("blood") or default_blood),
             armor=armor,
             armor_profile={str(k): float(v) for k, v in (op.get("armor_profile") or {}).items()},
             size_class=str(op.get("size_class") or profile.size_class),
@@ -261,11 +287,12 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             ammo=ammo,
             weapons=weapons,
             sea_air_weapons=sea_weapons,
-            sensors=sensor_model.sensors_for(str(op.get("name") or ""), domain),
+            sensors=sensors,
             value=int(op.get("value") or 0),
             readiness=float(op.get("readiness") or 0.85),
             concealed=(int(op.get("move_state") or 0) == 4),
             marching=(int(op.get("move_state") or 0) == 1),
+            role_card=card,
         )
         world.add_entity(entity)
     # Units that start on water ride a friendly ship until it reaches land.

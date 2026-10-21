@@ -1,0 +1,1152 @@
+{
+  "schema": "situation3d.rolecard-subclasses.v1",
+  "class_id": "air.aircraft",
+  "subclasses": [
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.aircraft.fighter",
+      "class_id": "air.aircraft",
+      "label": "多用途战斗机",
+      "tags": [
+        "fighter",
+        "multirole"
+      ],
+      "reference_model": "J-16",
+      "confidence": "high",
+      "sdk": {
+        "type": 3,
+        "sub_type": null,
+        "basic_speed_kmh": 200,
+        "armor": 0,
+        "max_blood": 2
+      },
+      "source": {
+        "refs": [
+          "wiki:J-16"
+        ],
+        "note": "J-16：最大 2120 km/h、升限 17300 m、航程 3000 km、12 个挂点。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "fighter",
+            "family": "作战飞机"
+          },
+          "model": {
+            "asset": "type_j16",
+            "asset_approximation": false,
+            "reference": "J-16"
+          },
+          "dimensions": {
+            "length_m": 21.9,
+            "width_m": 14.7,
+            "height_m": 6.4
+          }
+        },
+        "motion": {
+          "max_speed_ms": 589.0,
+          "cruise_speed_ms": 250.0,
+          "accel_ms2": 3.93,
+          "decel_ms2": 7.86,
+          "air": {
+            "service_ceiling_m": 17300,
+            "min_clearance_m": 150.0,
+            "climb_rate_ms": 230,
+            "descent_rate_ms": 276.0,
+            "agl_m": 1000,
+            "runway_required_m": 1200
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 2,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.fighter.aesa",
+            "mount": "nose",
+            "count": 1
+          },
+          {
+            "ref": "sensor.ir.irst",
+            "mount": "nose",
+            "count": 1
+          },
+          {
+            "ref": "sensor.esm.air",
+            "mount": "tail",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.pl15",
+            "mount": "wing",
+            "count": 4,
+            "ammo_max": 4,
+            "ammo_default": 4,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.pl10",
+            "mount": "wingtip",
+            "count": 2,
+            "ammo_max": 2,
+            "ammo_default": 2,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.yj83k",
+            "mount": "wing",
+            "count": 2,
+            "ammo_max": 2,
+            "ammo_default": 2,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.gsh30",
+            "mount": "nose",
+            "count": 1,
+            "ammo_max": 150,
+            "ammo_default": 150,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.air",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.vhf.air",
+            "mount": "hull",
+            "count": 2
+          }
+        ],
+        "capacity": {
+          "personnel": 2,
+          "cargo_t": 0.5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air.strike",
+          "fuel_capacity_l": 11500,
+          "consumption_l_per_km": 3.8
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "air_first",
+          "reaction_time_s": 5
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.aircraft.stealth_fighter",
+      "class_id": "air.aircraft",
+      "label": "隐身战斗机",
+      "tags": [
+        "fighter",
+        "stealth"
+      ],
+      "reference_model": "J-20",
+      "confidence": "medium",
+      "sdk": {
+        "type": 3,
+        "sub_type": null,
+        "basic_speed_kmh": 200,
+        "armor": 0,
+        "max_blood": 2
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "J-20 参数为公开估计，雷达特征按隐身修正。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "fighter",
+            "family": "作战飞机"
+          },
+          "model": {
+            "asset": "type_j16",
+            "asset_approximation": true,
+            "reference": "J-20"
+          },
+          "dimensions": {
+            "length_m": 20.4,
+            "width_m": 13.0,
+            "height_m": 4.5
+          }
+        },
+        "motion": {
+          "max_speed_ms": 590.0,
+          "cruise_speed_ms": 260.0,
+          "accel_ms2": 3.93,
+          "decel_ms2": 7.86,
+          "air": {
+            "service_ceiling_m": 20000,
+            "min_clearance_m": 150.0,
+            "climb_rate_ms": 250,
+            "descent_rate_ms": 300.0,
+            "agl_m": 1200,
+            "runway_required_m": 1500
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 2,
+          "size_class": "large",
+          "signature": {
+            "radar": 0.35,
+            "ir": 0.8,
+            "sonar": 0.0,
+            "esm": 0.9
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.fighter.aesa",
+            "mount": "nose",
+            "count": 1
+          },
+          {
+            "ref": "sensor.ir.irst",
+            "mount": "nose",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.pl15",
+            "mount": "internal",
+            "count": 4,
+            "ammo_max": 4,
+            "ammo_default": 4,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.pl10",
+            "mount": "internal",
+            "count": 2,
+            "ammo_max": 2,
+            "ammo_default": 2,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.air",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.vhf.air",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 1,
+          "cargo_t": 0.2,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air.strike"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "air_first",
+          "reaction_time_s": 4
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.aircraft.strike",
+      "class_id": "air.aircraft",
+      "label": "战斗轰炸机",
+      "tags": [
+        "strike",
+        "fighter_bomber"
+      ],
+      "reference_model": "JH-7A",
+      "confidence": "medium",
+      "sdk": {
+        "type": 3,
+        "sub_type": null,
+        "basic_speed_kmh": 200,
+        "armor": 0,
+        "max_blood": 2
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "歼轰-7A 级，载弹约 9 t；参数为公开估计。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "fighter",
+            "family": "作战飞机"
+          },
+          "model": {
+            "asset": "type_j16",
+            "asset_approximation": true,
+            "reference": "JH-7A"
+          },
+          "dimensions": {
+            "length_m": 22.3,
+            "width_m": 12.7,
+            "height_m": 6.6
+          }
+        },
+        "motion": {
+          "max_speed_ms": 500.0,
+          "cruise_speed_ms": 240.0,
+          "accel_ms2": 3.33,
+          "decel_ms2": 6.66,
+          "air": {
+            "service_ceiling_m": 15000,
+            "min_clearance_m": 150.0,
+            "climb_rate_ms": 200,
+            "descent_rate_ms": 240.0,
+            "agl_m": 800,
+            "runway_required_m": 1400
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 2,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.fighter.aesa",
+            "mount": "nose",
+            "count": 1
+          },
+          {
+            "ref": "sensor.esm.air",
+            "mount": "tail",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.yj83k",
+            "mount": "wing",
+            "count": 4,
+            "ammo_max": 4,
+            "ammo_default": 4,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.kd88",
+            "mount": "wing",
+            "count": 2,
+            "ammo_max": 2,
+            "ammo_default": 2,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.gsh30",
+            "mount": "nose",
+            "count": 1,
+            "ammo_max": 150,
+            "ammo_default": 150,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.air",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.vhf.air",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 2,
+          "cargo_t": 0.5,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air.strike"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "surface_first",
+          "reaction_time_s": 6
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.aircraft.bomber",
+      "class_id": "air.aircraft",
+      "label": "轰炸机",
+      "tags": [
+        "bomber",
+        "strategic"
+      ],
+      "reference_model": "H-6K",
+      "confidence": "medium",
+      "sdk": {
+        "type": 3,
+        "sub_type": null,
+        "basic_speed_kmh": 200,
+        "armor": 0,
+        "max_blood": 3
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "轰-6K：巡航导弹载机；参数为公开估计。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "fighter",
+            "family": "作战飞机"
+          },
+          "model": {
+            "asset": "type_j16",
+            "asset_approximation": true,
+            "reference": "H-6K"
+          },
+          "dimensions": {
+            "length_m": 34.8,
+            "width_m": 33.0,
+            "height_m": 10.4
+          }
+        },
+        "motion": {
+          "max_speed_ms": 280.0,
+          "cruise_speed_ms": 250.0,
+          "accel_ms2": 1.87,
+          "decel_ms2": 3.74,
+          "air": {
+            "service_ceiling_m": 12000,
+            "min_clearance_m": 150.0,
+            "climb_rate_ms": 150,
+            "descent_rate_ms": 180.0,
+            "agl_m": 1000,
+            "runway_required_m": 2500
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.fighter.aesa",
+            "mount": "nose",
+            "count": 1
+          },
+          {
+            "ref": "sensor.esm.air",
+            "mount": "tail",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.cj20",
+            "mount": "wing",
+            "count": 6,
+            "ammo_max": 6,
+            "ammo_default": 6,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.air",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.satcom.air",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 4,
+          "cargo_t": 2.0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air.strike"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "strategic",
+          "reaction_time_s": 10
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.aircraft.aew",
+      "class_id": "air.aircraft",
+      "label": "预警机",
+      "tags": [
+        "aew",
+        "isr"
+      ],
+      "reference_model": "KJ-500",
+      "confidence": "high",
+      "sdk": {
+        "type": 3,
+        "sub_type": null,
+        "basic_speed_kmh": 200,
+        "armor": 0,
+        "max_blood": 2
+      },
+      "source": {
+        "refs": [
+          "wiki:KJ-500"
+        ],
+        "note": "KJ-500：550 km/h、航程 5700 km、续航 12 h、对战斗机探测 470 km。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "aew",
+            "family": "支援飞机"
+          },
+          "model": {
+            "asset": "type_kj2000",
+            "asset_approximation": true,
+            "reference": "KJ-500"
+          },
+          "dimensions": {
+            "length_m": 36.0,
+            "width_m": 38.0,
+            "height_m": 11.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 152.78,
+          "cruise_speed_ms": 138.89,
+          "accel_ms2": 1.02,
+          "decel_ms2": 2.04,
+          "air": {
+            "service_ceiling_m": 10100,
+            "min_clearance_m": 150.0,
+            "climb_rate_ms": 80,
+            "descent_rate_ms": 96.0,
+            "agl_m": 1000,
+            "runway_required_m": 1800
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 2,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.aew",
+            "mount": "radome",
+            "count": 1
+          },
+          {
+            "ref": "sensor.esm.aew",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.datalink.air",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.satcom.air",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 10,
+          "cargo_t": 1.0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air.isr",
+          "fuel_capacity_l": 30000,
+          "consumption_l_per_km": 6.0
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 8
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.aircraft.transport",
+      "class_id": "air.aircraft",
+      "label": "运输机",
+      "tags": [
+        "transport",
+        "airlift"
+      ],
+      "reference_model": "Y-20",
+      "confidence": "high",
+      "sdk": {
+        "type": 3,
+        "sub_type": 8,
+        "basic_speed_kmh": 200,
+        "armor": 0,
+        "max_blood": 3
+      },
+      "source": {
+        "refs": [
+          "wiki:Y-20"
+        ],
+        "note": "Y-20B：926 km/h、升限 13000 m、载重 66 t、航程 7800 km（载 2 辆 15 式）。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "generic_air",
+            "family": "支援飞机"
+          },
+          "model": {
+            "asset": "type_kj2000",
+            "asset_approximation": true,
+            "reference": "Y-20"
+          },
+          "dimensions": {
+            "length_m": 47.0,
+            "width_m": 50.0,
+            "height_m": 15.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 257.0,
+          "cruise_speed_ms": 175.0,
+          "accel_ms2": 1.71,
+          "decel_ms2": 3.42,
+          "air": {
+            "service_ceiling_m": 13000,
+            "min_clearance_m": 150.0,
+            "climb_rate_ms": 60,
+            "descent_rate_ms": 72.0,
+            "agl_m": 1000,
+            "runway_required_m": 2000
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.weather",
+            "mount": "nose",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.air",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.satcom.air",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 300,
+          "cargo_t": 66,
+          "vehicles": 2
+        },
+        "logistics": {
+          "supply_class": "air.airlift",
+          "fuel_capacity_l": 90000,
+          "consumption_l_per_km": 8.0
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 15
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.aircraft.tanker",
+      "class_id": "air.aircraft",
+      "label": "加油机",
+      "tags": [
+        "tanker",
+        "support"
+      ],
+      "reference_model": "YY-20",
+      "confidence": "medium",
+      "sdk": {
+        "type": 3,
+        "sub_type": null,
+        "basic_speed_kmh": 200,
+        "armor": 0,
+        "max_blood": 3
+      },
+      "source": {
+        "refs": [
+          "wiki:Y-20"
+        ],
+        "note": "YY-20 加油机，可输油约 90 t。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "generic_air",
+            "family": "支援飞机"
+          },
+          "model": {
+            "asset": "type_kj2000",
+            "asset_approximation": true,
+            "reference": "YY-20"
+          },
+          "dimensions": {
+            "length_m": 49.0,
+            "width_m": 50.0,
+            "height_m": 15.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 257.0,
+          "cruise_speed_ms": 175.0,
+          "accel_ms2": 1.71,
+          "decel_ms2": 3.42,
+          "air": {
+            "service_ceiling_m": 13000,
+            "min_clearance_m": 150.0,
+            "climb_rate_ms": 60,
+            "descent_rate_ms": 72.0,
+            "agl_m": 1000,
+            "runway_required_m": 2200
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 3,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.weather",
+            "mount": "nose",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.air",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.satcom.air",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 20,
+          "cargo_t": 90,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air.airlift"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 15
+        },
+        "extensions": {
+          "can_refuel_others": true
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.aircraft.patrol",
+      "class_id": "air.aircraft",
+      "label": "反潜巡逻机",
+      "tags": [
+        "patrol",
+        "asw"
+      ],
+      "reference_model": "KQ-200",
+      "confidence": "medium",
+      "sdk": {
+        "type": 3,
+        "sub_type": null,
+        "basic_speed_kmh": 200,
+        "armor": 0,
+        "max_blood": 2
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "KQ-200 级反潜巡逻机，参数为公开估计。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "generic_air",
+            "family": "支援飞机"
+          },
+          "model": {
+            "asset": "type_kj2000",
+            "asset_approximation": true,
+            "reference": "KQ-200"
+          },
+          "dimensions": {
+            "length_m": 34.0,
+            "width_m": 38.0,
+            "height_m": 11.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 169.44,
+          "cruise_speed_ms": 138.89,
+          "accel_ms2": 1.13,
+          "decel_ms2": 2.26,
+          "air": {
+            "service_ceiling_m": 8000,
+            "min_clearance_m": 150.0,
+            "climb_rate_ms": 60,
+            "descent_rate_ms": 72.0,
+            "agl_m": 300,
+            "runway_required_m": 1600
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 2,
+          "size_class": "large",
+          "signature": {
+            "radar": 1.3,
+            "ir": 1.3,
+            "sonar": 0.0,
+            "esm": 1.0
+          },
+          "concealment": {
+            "stationary": 0.3,
+            "moving": 0.1
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.patrol",
+            "mount": "belly",
+            "count": 1
+          },
+          {
+            "ref": "sensor.sonobuoy",
+            "mount": "belly",
+            "count": 1
+          },
+          {
+            "ref": "sensor.esm.air",
+            "mount": "tail",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.asw.torpedo",
+            "mount": "bay",
+            "count": 2,
+            "ammo_max": 2,
+            "ammo_default": 2,
+            "shoot_on_move": true
+          },
+          {
+            "ref": "weapon.yj83k",
+            "mount": "wing",
+            "count": 2,
+            "ammo_max": 2,
+            "ammo_default": 2,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.air",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.satcom.air",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 10,
+          "cargo_t": 1.0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air.asw"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "subsurface_first",
+          "reaction_time_s": 10
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.aircraft.unknown",
+      "class_id": "air.aircraft",
+      "label": "飞机（未知小类）",
+      "tags": [
+        "unknown"
+      ],
+      "reference_model": null,
+      "confidence": "unknown",
+      "sdk": {
+        "type": 3,
+        "sub_type": null,
+        "basic_speed_kmh": 200,
+        "armor": 0,
+        "max_blood": 1
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "只确定到飞机大类时的保守卡。"
+      },
+      "unknown_policy": {
+        "combat": "soft",
+        "engage": false,
+        "note": "能力未知，按非武装飞机处理"
+      },
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "generic_air",
+            "family": "通用"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 25.0,
+            "width_m": 25.0,
+            "height_m": 7.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 200.0,
+          "cruise_speed_ms": 160.0,
+          "accel_ms2": 1.33,
+          "decel_ms2": 2.66,
+          "air": {
+            "service_ceiling_m": 10000,
+            "min_clearance_m": 150.0,
+            "climb_rate_ms": 50,
+            "descent_rate_ms": 60.0,
+            "agl_m": 800,
+            "runway_required_m": 1500
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 1,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.radar.weather",
+            "mount": "nose",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.vhf.air",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 2,
+          "cargo_t": 0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 15
+        },
+        "extensions": {}
+      }
+    }
+  ]
+}
