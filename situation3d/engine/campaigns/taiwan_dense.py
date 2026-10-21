@@ -797,6 +797,49 @@ def _objective_list(frames: Sequence[dict]) -> List[dict]:
     return out
 
 
+def _auto_plots() -> List[dict]:
+    """System plots driven by the case timeline and current situation."""
+    def area_box(aid):
+        w, s, e, n = AREA_META[aid]["bbox"]
+        return [[round(w, 6), round(s, 6)], [round(e, 6), round(s, 6)],
+                [round(e, 6), round(n, 6)], [round(w, 6), round(n, 6)]]
+
+    return [
+        {"id": "AP-CORRIDOR", "type": "mobility_corridor", "layer": "plot.mobility",
+         "from_tick": 360, "to_tick": 840, "label": "合成转运走廊",
+         "hostility": "friendly",
+         "points": [[120.090000, 22.960000], [120.160000, 22.975000]]},
+        {"id": "AP-D-ZONE", "type": "recon_area", "layer": "plot.intel",
+         "from_tick": 0, "to_tick": 1441, "label": "D区岸海衔接",
+         "hostility": "friendly", "dynamic": "objective_progress",
+         "objective_id": "TRN001", "points": area_box("D")},
+        {"id": "AP-E-ZONE", "type": "recon_area", "layer": "plot.intel",
+         "from_tick": 0, "to_tick": 1441, "label": "E区岸上任务",
+         "hostility": "friendly", "dynamic": "objective_progress",
+         "objective_id": "TRN002", "points": area_box("E")},
+        {"id": "AP-F-ZONE", "type": "recon_area", "layer": "plot.intel",
+         "from_tick": 0, "to_tick": 1441, "label": "F区保障",
+         "hostility": "friendly", "dynamic": "objective_progress",
+         "objective_id": "TRN003", "points": area_box("F")},
+        {"id": "AP-AEW-RED", "type": "fire_range", "layer": "plot.fire",
+         "from_tick": 0, "to_tick": 1441, "label": "空警-500 观测扇区",
+         "hostility": "friendly", "dynamic": "aew_observation",
+         "actor": "TRA003", "range_km": 90.0, "half_angle_deg": 30.0,
+         "points": [[120.000000, 22.900000], [120.100000, 23.000000],
+                    [119.950000, 22.950000]]},
+        {"id": "AP-AEW-BLUE", "type": "fire_range", "layer": "plot.fire",
+         "from_tick": 0, "to_tick": 1441, "label": "E-2D 观测扇区",
+         "hostility": "friendly", "dynamic": "aew_observation",
+         "actor": "TBA003", "range_km": 90.0, "half_angle_deg": 30.0,
+         "points": [[120.000000, 22.900000], [120.100000, 23.000000],
+                    [119.950000, 22.950000]]},
+        {"id": "AP-CONTACT", "type": "boundary", "layer": "plot.intel",
+         "from_tick": 0, "to_tick": 1441, "label": "红蓝接触方向",
+         "hostility": "enemy", "dynamic": "closest_groups",
+         "points": [[120.050000, 22.930000], [120.200000, 22.980000]]},
+    ]
+
+
 def build_case(seed: int = 20261020) -> Tuple[dict, dict]:
     print("[campaign] load roads", flush=True)
     net = roads.load(THEATRE)
@@ -963,6 +1006,7 @@ def build_case(seed: int = 20261020) -> Tuple[dict, dict]:
         "path_manifest": route_manifest,
         "road_constrained": True,
         "events": events,
+        "auto_plots": _auto_plots(),
         "objectives": objectives,
         "outcome": outcome,
         "motion_extra": motion_extra,

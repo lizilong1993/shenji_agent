@@ -1639,6 +1639,8 @@
       color: spec.color || null,
       hostility: spec.hostility === 'enemy' ? 'enemy' : 'friendly',
       label: spec.label || null,
+      // System-maintained cases (auto plots) are not user-editable.
+      system: !!spec.system,
       // 分界线两侧的番号：**按实例**传入，不放在类型定义里（见 FIX-4 的说明）。
       sideLabels: spec.sideLabels || null,
       entities: [],
@@ -2047,7 +2049,7 @@
                  primitives: (byId[id].primitives || []).length,
                  marks: byId[id].markCount || 0,
                  // 系统生成（目标轨迹）：面板据此只给"定位"，不给删改开关
-                 system: !!(CATALOGUE[byId[id].type] && CATALOGUE[byId[id].type].system),
+                 system: !!(byId[id].system || (CATALOGUE[byId[id].type] && CATALOGUE[byId[id].type].system)),
                  heights: byId[id].heights ? byId[id].heights.length : 0 };
       });
       return {
