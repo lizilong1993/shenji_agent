@@ -73,6 +73,13 @@ PLATFORMS = {
     "artillery":       ("10", "130300"),   # Land Unit / Field Artillery
     "fighter":         ("01", "110104"),   # Air / Fixed Wing / Fighter
     "aew":             ("01", "110116"),   # Air / Fixed Wing / AEW
+    # 以下是 2026-10-21 补齐的兵种：原先直升机借用战斗机、登陆舰借用补给舰、
+    # 无人机借用预警机、运输队/哨所借用装甲，图标与平台语义不符。
+    "helicopter":      ("01", "110300"),   # Air / Rotary Wing
+    "uav":             ("01", "110200"),   # Air / Unmanned
+    "landing_ship":    ("30", "120900"),   # Sea Surface / Landing Ship
+    "transport":       ("10", "120300"),   # Land Unit / Transport
+    "outpost":         ("10", "130000"),   # Land Unit / Installation
 }
 
 # blue force = Friend, red force = Hostile. Colour comes from the SIDC itself
@@ -116,7 +123,41 @@ ICON_PARTS = {
     "armor": "tank",
     "artillery": "field-gun",
     "fighter": "jet-fighter",
-    "aew": "radar-dish",
+    "helicopter": "helicopter",
+    "uav": "delivery-drone",
+    "transport": "truck",
+    "outpost": "bunker",
+    "aew": None,
+    "landing_ship": None,
+    # aew / landing_ship 用自绘图形（见 CUSTOM_PARTS）：game-icons 没有
+    # "带雷达罩的预警机"，也没有登陆舰；原先 aew 用 "radar-dish" 画出来是一根
+    # 雷达天线，被用户当成"雷达图标"（2026-10-21 实测反馈）。
+}
+
+# 自绘图形（512×512 坐标系，与 game-icons 一致）。用于 game-icons 无对应件的平台。
+CUSTOM_PARTS = {
+    # 预警机：俯视飞机轮廓 + 背部圆盘雷达罩（环形，避免与机身糊成一块）。
+    "aew": (
+        '<path fill-rule="evenodd" d="'
+        'M256 40 C270 90 274 150 274 230 L274 390 C274 435 267 465 256 478 '
+        'C245 465 238 435 238 390 L238 230 C238 150 242 90 256 40 Z '
+        'M256 196 L468 296 L468 326 L278 288 L278 208 Z '
+        'M256 196 L44 296 L44 326 L234 288 L234 208 Z '
+        'M256 392 L356 446 L356 468 L268 442 Z '
+        'M256 392 L156 446 L156 468 L244 442 Z"/>'
+        '<path fill-rule="evenodd" d="'
+        'M256 150 m-92 0 a92 92 0 1 0 184 0 a92 92 0 1 0 -184 0 '
+        'M256 150 m-58 0 a58 58 0 1 0 116 0 a58 58 0 1 0 -116 0"/>'
+    ),
+    # 登陆舰：侧视舰体 + 舰艏跳板 + 上层建筑，一眼区别于补给舰。
+    "landing_ship": (
+        '<path d="M56 300 L452 300 L438 372 Q432 418 380 420 L120 420 '
+        'Q76 418 64 372 Z"/>'
+        '<path d="M452 300 L512 226 L518 250 L470 322 Z"/>'
+        '<path d="M168 216 L286 216 L286 300 L168 300 Z"/>'
+        '<path d="M226 168 L240 168 L240 216 L226 216 Z"/>'
+        '<path d="M196 186 L214 186 L214 200 L196 200 Z"/>'
+    ),
 }
 
 GAME_ICONS_TARBALL = "/tmp/iconprobe/gi.tgz"   # tools/fetch_icons.py 会下到这里
@@ -145,11 +186,16 @@ def load_icon_bodies():
     icons = data.get("icons", {})
     bodies, missing = {}, []
     for platform, key in ICON_PARTS.items():
+        if key is None:
+            continue
         node = icons.get(key)
         if not node:
             missing.append("%s(%s)" % (platform, key))
             continue
         bodies[platform] = node["body"]
+    # 自绘图形优先（aew / landing_ship）
+    for platform, body in CUSTOM_PARTS.items():
+        bodies[platform] = body
     if missing:
         raise SystemExit("[gen] game-icons 里找不到：%s" % ", ".join(missing))
     return bodies

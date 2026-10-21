@@ -26,6 +26,8 @@
     ['destroyer', '驱逐舰'], ['frigate', '护卫舰'], ['replenishment', '补给舰'],
     ['corvette', '巡逻舰'], ['coastal_missile', '岸舰导弹'], ['sam_battalion', '防空导弹'],
     ['armor', '装甲分队'], ['artillery', '炮兵分队'], ['fighter', '战斗机'], ['aew', '预警机'],
+    ['helicopter', '直升机'], ['uav', '无人机'], ['landing_ship', '登陆舰'],
+    ['transport', '运输队'], ['outpost', '哨所阵地'],
   ];
 
   const DEFAULT_ICON_BY_DOMAIN = { sea: 'destroyer', land: 'armor', air: 'fighter' };
