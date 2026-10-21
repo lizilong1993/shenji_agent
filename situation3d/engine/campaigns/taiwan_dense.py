@@ -30,6 +30,7 @@ CASE_DESC = "多域合成目标在安平真实路网上的转运、衔接与保�
 THEATRE = "taiwan_strait"
 TICK_SECONDS = 30
 TICK_COUNT = 1440
+TERMINAL_TICK = 1000  # 战役完成/保障恢复后结束，不再固定播到 12 小时
 START_UTC = "2026-09-15T00:00:00Z"
 GEO_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                        "data", "geo", THEATRE, "anping")
@@ -53,8 +54,8 @@ STAGES = [
     ("S1", "多域活动增强", 120, 360),
     ("S2", "转运关系显现", 360, 600),
     ("S3", "岸海衔接", 600, 840),
-    ("S4", "岸上活动与保障受限", 840, 1200),
-    ("S5", "稳态评估", 1200, 1441),
+    ("S4", "岸上活动与保障受限", 840, 1000),
+    ("S5", "稳态评估", 1000, 1441),
 ]
 
 VEHICLE_CLASSES = {
@@ -689,9 +690,9 @@ def _events(objectives: Sequence[dict]) -> List[dict]:
         22.963, 120.204, "维修任务完成，受影响车辆恢复",
         before={"TRV005": {"mobility_factor": 0.4}},
         after={"TRV005": {"mobility_factor": 0.8}}, cause=["E08", "E09"])
-    add("E11", 1300, "objective_progress", "rule", "campaign.objectives",
+    add("E11", 1000, "objective_progress", "rule", "campaign.objectives",
         ["TRV017", "TRN002"], 22.966, 120.181, "节点任务进度更新", cause=["E07d"])
-    add("E12", 1440, "termination", "rule", "campaign.outcome",
+    add("E12", 1000, "termination", "rule", "campaign.outcome",
         ["TRN001", "TRN002", "TRN003"], 22.967, 120.182, "时限达到，独立计算结果",
         cause=["E11"])
     return ev
@@ -709,6 +710,7 @@ def _outcome(objectives: Sequence[dict]) -> dict:
     else:
         result = "partial"
     return {
+        "terminal_tick": TERMINAL_TICK,
         "script_expected": "abstract_transfer_complete",
         "engine": {
             "status": "rule_v1", "result": result,
@@ -987,6 +989,7 @@ def build_case(seed: int = 20261020) -> Tuple[dict, dict]:
         "provenance_note": "合成目标与虚构参数；真实地理仅作背景，不涉及现实部署。",
         "tick_seconds": float(TICK_SECONDS),
         "tick_count": TICK_COUNT,
+        "terminal_tick": TERMINAL_TICK,
         "start_time_utc": START_UTC,
         "camera": {"lon": 120.170, "lat": 22.972, "height": 12000.0,
                    "heading": 0.0, "pitch": -60.0},

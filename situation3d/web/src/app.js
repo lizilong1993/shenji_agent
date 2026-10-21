@@ -5949,6 +5949,14 @@ window.Follow = {
   debug: followDebug,
 };
 
+/** Last usable frame: data may declare a terminal tick before the 12 h array end. */
+function timelineMaxTick() {
+  if (!state.data || !state.data.frames) return 0;
+  var last = state.data.frames.length - 1;
+  var term = state.data.terminal_tick;
+  return (term === undefined || term === null) ? last : Math.min(last, Math.max(0, Number(term)));
+}
+
 function renderTransport() {
   if (!state.data || !state.data.frames) {
     dom.timeline.max = '0';
@@ -5959,9 +5967,10 @@ function renderTransport() {
   }
   const frames = state.data.frames;
   const frame = frames[Math.min(state.tick, frames.length - 1)];
-  dom.timeline.max = String(frames.length - 1);
-  dom.timeline.value = String(state.tick);
-  dom.tickLabel.textContent = state.tick + ' / ' + (frames.length - 1);
+  var maxTick = timelineMaxTick();
+  dom.timeline.max = String(maxTick);
+  dom.timeline.value = String(Math.min(state.tick, maxTick));
+  dom.tickLabel.textContent = Math.min(state.tick, maxTick) + ' / ' + maxTick;
 
   const start = new Date(state.data.start_time_utc);
   const t = new Date(start.getTime() + frame.t_seconds * 1000);
@@ -5970,7 +5979,7 @@ function renderTransport() {
 
 function setTick(tick) {
   if (!state.data || !state.data.frames) { state.tick = 0; state.tickFloat = 0; return; }
-  const max = state.data.frames.length - 1;
+  const max = timelineMaxTick();
   state.tick = Math.max(0, Math.min(max, Math.round(tick)));
   state.tickFloat = state.tick;
   // 立刻把 CZML 时钟对到该帧：?tick / 时间轴 / 步进后紧接着的 selectTarget
@@ -5998,7 +6007,7 @@ function loop(nowMs) {
 
   if (state.playing && state.data) {
     state.tickFloat += dt * state.ticksPerSecond;
-    const max = state.data.frames.length - 1;
+    const max = timelineMaxTick();
     if (state.tickFloat >= max) {
       state.tickFloat = max;
       setPlaying(false);
