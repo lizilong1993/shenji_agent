@@ -2217,8 +2217,8 @@ function createTargetEntities() {
         // 完整历史（第 0 帧 → 当前帧）。窗口只影响掩码/取证读数，不影响绘制。
         return rec ? rec.trail : [];
       }, false),
-      width: 2,
-      material: color.withAlpha(0.25),
+      width: 1.5,
+      material: color.withAlpha(0.12),
       clampToGround: false,
     };
 
