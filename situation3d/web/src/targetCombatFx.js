@@ -243,6 +243,76 @@
     return destroyed[id] ? 3 : 0;
   }
 
+
+  // ------------------------------------------------------------------
+  // 模型关节（nodeTransformations）：旋翼 / 雷达 / 发射筒
+  //
+  // 这些节点在 GLB 里已有名字（自建型号与 Z-10 的旋翼盘），直接用
+  // NodeTransformationProperty 驱动；不新增节点。旋转轴用 Cesium 局部系：
+  // 模型前向 -X、上 +Z、右 +Y。节点原点多在模型原点，故 translation 做
+  // pivot 补偿 t = p - R*p，避免绕世界原点甩出去。
+  // ------------------------------------------------------------------
+  var RIGS = {
+    z10: {
+      parts: [
+        { node: 'Object_9', axis: 'Z', pivot: [-0.005, 0, 0.755], speed: 9.0 },
+        { node: 'Object_10', axis: 'Y', pivot: [6.624, 0.463, 0.674], speed: 22.0 },
+      ],
+    },
+    hq16: {
+      parts: [{ node: 'hq16_radar', axis: 'Z', pivot: [6.5, 0, 3.0], speed: 0.9 }],
+    },
+    yj62: {
+      parts: [
+        { node: 'yj62_tube0', axis: 'Y', pivot: [3.0, -1.35, 3.35], lift: true },
+        { node: 'yj62_tube1', axis: 'Y', pivot: [3.0, 0, 3.35], lift: true },
+        { node: 'yj62_tube2', axis: 'Y', pivot: [3.0, 1.35, 3.35], lift: true },
+      ],
+    },
+  };
+  var rigAngles = { z10: 0, hq16: 0, yj62: 0 };
+
+  function rigKey(def) {
+    var text = ((def && def.model) || '') + ' ' + ((def && def.platform_class) || '');
+    if (/直-?10|z-?10/i.test(text)) return 'z10';
+    if (/红旗-?16|hq-?16|ly-?80/i.test(text)) return 'hq16';
+    if (/鹰击-?62|yj-?62/i.test(text)) return 'yj62';
+    return null;
+  }
+
+  function axisOf(name) {
+    return name === 'X' ? Cesium.Cartesian3.UNIT_X
+      : (name === 'Y' ? Cesium.Cartesian3.UNIT_Y : Cesium.Cartesian3.UNIT_Z);
+  }
+
+  function pivotTranslation(pivot, q) {
+    var r = Cesium.Matrix3.fromQuaternion(q, new Cesium.Matrix3());
+    var rp = Cesium.Matrix3.multiplyByVector(r, Cesium.Cartesian3.fromElements(pivot[0], pivot[1], pivot[2]), new Cesium.Cartesian3());
+    return new Cesium.Cartesian3(pivot[0] - rp.x, pivot[1] - rp.y, pivot[2] - rp.z);
+  }
+
+  /** 由 app.js 的 createTargetEntities 调用；没有关节返回 undefined。 */
+  function nodeTransformations(def) {
+    var key = rigKey(def);
+    if (!key || !RIGS[key]) return undefined;
+    var out = {};
+    RIGS[key].parts.forEach(function (part) {
+      var axis = axisOf(part.axis);
+      out[part.node] = new Cesium.NodeTransformationProperty({
+        rotation: new Cesium.CallbackProperty(function () {
+          var a = part.lift ? -rigAngles.yj62 : rigAngles[key];
+          return Cesium.Quaternion.fromAxisAngle(axis, a, new Cesium.Quaternion());
+        }, false),
+        translation: new Cesium.CallbackProperty(function () {
+          var a = part.lift ? -rigAngles.yj62 : rigAngles[key];
+          var q = Cesium.Quaternion.fromAxisAngle(axis, a, new Cesium.Quaternion());
+          return pivotTranslation(part.pivot, q);
+        }, false),
+      });
+    });
+    return out;
+  }
+
   // ------------------------------------------------------------------
   // 帧循环
   // ------------------------------------------------------------------
@@ -259,7 +329,13 @@
       for (var t = lastTick + 1; t <= tick; t++) processTick(t);
       lastTick = tick;
     }
-    if (ctx.api.playing && ctx.api.playing()) scanAngle += Math.max(0, dt || 0) * 1.1;
+    if (ctx.api.playing && ctx.api.playing()) {
+      var d = Math.max(0, dt || 0);
+      scanAngle += d * 1.1;
+      rigAngles.z10 = (rigAngles.z10 + d * 9.0) % (Math.PI * 2);
+      rigAngles.hq16 = (rigAngles.hq16 + d * 0.9) % (Math.PI * 2);
+      rigAngles.yj62 = Math.max(0, rigAngles.yj62 - d * 0.18);
+    }
     updateProjectiles();
     updateTransients();
     updateDamageStates(tick);
@@ -384,6 +460,8 @@
   // 开火 / 命中 / 击毁
   // ------------------------------------------------------------------
   function onFire(ev) {
+    var shooterDef = defById[(ev.actors && ev.actors[0]) || ev.shooter_id];
+    if (shooterDef && rigKey(shooterDef) === 'yj62') rigAngles.yj62 = 0.22;
     if (ctx.api.isVisible && !ctx.api.isVisible(defById[(ev.actors && ev.actors[0]) || ev.shooter_id] || {})) return;
     var shooter = (ev.actors && ev.actors[0]) || ev.shooter_id;
     if (!shooter) return;
@@ -771,6 +849,7 @@
       smoke: Object.keys(smoke).length,
       scan: scan ? { id: scan.id, show: scan.entity.show, range: scan.range } : null,
       destroyed: Object.keys(destroyed),
+      rig: { z10: rigAngles.z10, hq16: rigAngles.hq16, yj62: rigAngles.yj62 },
       smokeInfo: Object.keys(smoke).map(function (id) {
         var sm = sample(id);
         return { id: id, level: smokeState[id], lon: sm && sm.lon, lat: sm && sm.lat, alt: sm && sm.alt };
@@ -781,6 +860,7 @@
   return {
     init: init,
     frame: frame,
+    nodeTransformations: nodeTransformations,
     dispose: dispose,
     debug: debug,
   };

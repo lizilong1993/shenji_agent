@@ -88,12 +88,10 @@
     var formClass = formClassOf(def);
     var wheels = (window.EntityLod && window.EntityLod.wheelNodes)
       ? window.EntityLod.wheelNodes(formClass) : [];
-    if (!wheels.length) return undefined;
-
-    if (!wheelStates[def.id]) {
+    var out = {};
+    if (wheels.length && !wheelStates[def.id]) {
       wheelStates[def.id] = { angle: 0, radius: wheels[0].radius || 0.6 };
     }
-    var out = {};
     wheels.forEach(function (w) {
       var q = new Cesium.Quaternion();
       var axis = w.axis === 'X' ? Cesium.Cartesian3.UNIT_X
@@ -105,7 +103,11 @@
         }, false),
       });
     });
-    return out;
+    if (window.TargetCombatFx && TargetCombatFx.nodeTransformations) {
+      var extra = TargetCombatFx.nodeTransformations(def);
+      if (extra) Object.keys(extra).forEach(function (k) { out[k] = extra[k]; });
+    }
+    return Object.keys(out).length ? out : undefined;
   }
 
   function updateWheels(dt) {
