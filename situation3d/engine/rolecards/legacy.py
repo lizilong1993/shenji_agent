@@ -203,6 +203,56 @@ def project_legacy(card: dict, registry: RoleCardRegistry,
     }
 
 
+def _display_speed(speed_ms: float, domain: str) -> str:
+    if not speed_ms:
+        return "0"
+    if domain == "land":
+        return "%.0f km/h" % (speed_ms * 3.6)
+    return "%.0f kn" % (speed_ms / KNOT_TO_MS)
+
+
+def _card_summary(cls: dict, sub: dict, card: dict,
+                  registry: RoleCardRegistry) -> Dict[str, Any]:
+    """Compact, browser-friendly projection for the target detail panel.
+
+    The dataset already carries the full card; this block avoids shipping the
+    equipment catalogue to the browser just to render labels and ranges.
+    """
+    motion = card.get("motion") or {}
+    protection = card.get("protection") or {}
+    identity = card.get("identity") or {}
+    domain = identity.get("primary_domain") or cls.get("domain") or ""
+    sensors = []
+    for item in card.get("sensors") or []:
+        spec = registry.equipment.get("sensors", {}).get(item.get("ref")) or {}
+        if spec:
+            sensors.append({"label": spec.get("label"), "kind": spec.get("kind"),
+                            "range_km": spec.get("range_km")})
+    weapons = []
+    for item in card.get("weapons") or []:
+        spec = registry.equipment.get("weapons", {}).get(item.get("ref")) or {}
+        if spec:
+            weapons.append({"label": spec.get("label"), "category": spec.get("category"),
+                            "range_km": spec.get("range_km"),
+                            "ammo_max": item.get("ammo_max")})
+    return {
+        "class_label": cls.get("label"),
+        "subclass_label": sub.get("label"),
+        "confidence": "legacy",
+        "unknown": sub.get("confidence") == "unknown",
+        "max_speed_ms": motion.get("max_speed_ms"),
+        "cruise_speed_ms": motion.get("cruise_speed_ms"),
+        "max_speed_display": _display_speed(float(motion.get("max_speed_ms") or 0.0), domain),
+        "cruise_speed_display": _display_speed(float(motion.get("cruise_speed_ms") or 0.0), domain),
+        "armor_class": protection.get("armor_class"),
+        "max_blood": protection.get("max_blood"),
+        "size_class": protection.get("size_class"),
+        "sensors": sensors,
+        "weapons": weapons,
+        "capacity": dict(card.get("capacity") or {}),
+    }
+
+
 def card_from_legacy(target: Any, registry: Optional[RoleCardRegistry] = None,
                      include_effective: bool = True) -> Dict[str, Any]:
     """Build a frozen role-card snapshot for an existing target."""
@@ -256,6 +306,7 @@ def card_from_legacy(target: Any, registry: Optional[RoleCardRegistry] = None,
         "overrides": overrides,
         "legacy": legacy,
         "projection": project_legacy(effective, registry, legacy),
+        "summary": _card_summary(cls, registry.subclasses[subclass_id], effective, registry),
     }
     if include_effective:
         snapshot["effective"] = effective

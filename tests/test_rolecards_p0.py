@@ -238,6 +238,9 @@ class RoleCardP0Test(unittest.TestCase):
                 self.assertEqual(card["class_id"], self.registry.class_of(
                     card["subclass_id"])["class_id"])
                 self.assertIn("effective", card)
+                self.assertIn("summary", card)
+                self.assertTrue(card["summary"]["class_label"])
+                self.assertTrue(card["summary"]["subclass_label"])
                 self.assertEqual(card["confidence"], "legacy")
 
     def test_dense_dataset_entries_include_role_card(self):
