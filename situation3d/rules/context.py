@@ -72,6 +72,12 @@ class RuleEntityView(Protocol):
     ammo: Dict[str, int]
     weapons: List[WeaponView]
     observe_distance: Dict[str, int]
+    heading_deg: float
+    size_class: str
+    concealment: Optional[float]
+    comms_range_m: float
+    last_fired_s: float
+    armor_profile: Dict[str, float]
 
     def ammo_count(self, key: str) -> int: ...
 
@@ -81,9 +87,12 @@ class RuleContext(Protocol):
 
     now_s: float
     rng: random.Random
+    direct_fire_model: str
+    detection_model: str
 
     # spatial inputs
     def distance_m(self, a: RuleEntityView, b: RuleEntityView) -> float: ...
+    def bearing_deg(self, a: RuleEntityView, b: RuleEntityView) -> float: ...
     def rule_distance(self, a: RuleEntityView, b: RuleEntityView) -> int: ...
     def rule_cell(self, e: RuleEntityView) -> Tuple[int, int]: ...
     def elevation_delta_m(self, a: RuleEntityView, b: RuleEntityView) -> float: ...

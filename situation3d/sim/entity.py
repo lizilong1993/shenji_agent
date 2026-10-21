@@ -112,6 +112,12 @@ class EntityRuleView(object):
     sea_air_weapons: List[object]
     sensors: List[object]
     observe_distance: Dict[str, int]
+    heading_deg: float = 0.0
+    size_class: str = "medium"
+    concealment: Optional[float] = None
+    comms_range_m: float = 600.0
+    last_fired_s: float = -1.0
+    armor_profile: Dict[str, float] = field(default_factory=dict)
 
     def ammo_count(self, key: str) -> int:
         return int(self.ammo.get(key, 0))
@@ -160,6 +166,12 @@ class Entity(object):
     passengers: List[int] = field(default_factory=list)
     in_fort: Optional[int] = None
     alive: bool = True
+    # Appended after all original fields so existing positional
+    # construction of Entity keeps its meaning.
+    armor_profile: Dict[str, float] = field(default_factory=dict)
+    concealment: Optional[float] = None
+    comms_range_m: float = 600.0
+    last_fired_s: float = -1.0
 
     def to_rule_view(self, stacked: Optional[bool] = None) -> EntityRuleView:
         """Project to the read-only view consumed by ``rules``.
@@ -191,4 +203,10 @@ class Entity(object):
             sea_air_weapons=list(self.sea_air_weapons),
             sensors=list(self.sensors),
             observe_distance=dict(self.observe_distance),
+            heading_deg=float(self.pose.heading_deg),
+            size_class=str(self.size_class),
+            concealment=self.concealment,
+            comms_range_m=float(self.comms_range_m),
+            last_fired_s=float(self.last_fired_s),
+            armor_profile=dict(self.armor_profile),
         )

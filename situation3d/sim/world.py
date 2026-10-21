@@ -22,6 +22,8 @@ from rules import combat, engagement
 from sim.context import WorldRuleContext
 from sim.entity import Entity, Pose
 from sim.motion import integrate
+from sim import spotting as spotting_model
+from sim.tactics import TacticalController
 
 
 def _is_ground(entity) -> bool:
@@ -30,7 +32,13 @@ def _is_ground(entity) -> bool:
 
 class World(object):
     def __init__(self, env, rule_grid: RuleGrid, dt_s: float = 1.0,
-                 seed: int = 20261021, plan_grid=None):
+                 seed: int = 20261021, plan_grid=None,
+                 detection_model: str = "table",
+                 direct_fire_model: str = "crt",
+                 enable_radio_share: bool = False,
+                 enable_tactics: bool = False,
+                 commander=None,
+                 commander_interval_s: float = 2.0):
         self.env = env
         self.rule_grid = rule_grid
         self.dt_s = float(dt_s)
@@ -56,6 +64,26 @@ class World(object):
         self._friendly_cache: Dict[int, int] = {}
         self._count_cache: Dict[Tuple[Tuple[int, int], int], int] = {}
         self.winner: Optional[str] = None
+        self.detection_model = str(detection_model)
+        self.direct_fire_model = str(direct_fire_model)
+        self.enable_radio_share = bool(enable_radio_share)
+        self.detection_shadow = None
+        self.tactics = TacticalController() if enable_tactics else None
+        self.commander = None
+        self.commander_interval_s = float(commander_interval_s)
+        self._commander_next_s = 0.0
+        self._order_source: Dict[int, str] = {}
+        self._commander_control: Dict[int, float] = {}
+        self._commander_owned: set = set()
+        if commander is not None:
+            self.set_commander(commander, commander_interval_s)
+
+    # -- commander ----------------------------------------------------------
+    def set_commander(self, model, interval_s: Optional[float] = None) -> None:
+        from sim.commander import CommanderRegistry
+        self.commander = CommanderRegistry(model, interval_s or self.commander_interval_s)
+        self.commander_interval_s = self.commander.interval_s
+        self._commander_next_s = self.time_s
 
     # -- entities -----------------------------------------------------------
     def add_entity(self, entity: Entity) -> Entity:
@@ -125,18 +153,31 @@ class World(object):
         return entity.to_rule_view(stacked=self.stacked(entity))
 
     # -- orders -------------------------------------------------------------
-    def order(self, uid: int, action: dict) -> None:
-        self.orders[int(uid)] = dict(action)
+    def order(self, uid: int, action: dict, source: str = "manual") -> None:
+        uid = int(uid)
+        self.orders[uid] = dict(action)
+        self._order_source[uid] = str(source)
+        if source == "manual":
+            self._commander_owned.discard(uid)
+            self._commander_control.pop(uid, None)
 
     def _apply_orders(self) -> None:
         for uid in sorted(self.orders):
             entity = self.entities.get(uid)
             if entity is None or not entity.alive or entity.on_board:
+                self.orders.pop(uid, None)
+                self._order_source.pop(uid, None)
                 continue
             action = self.orders[uid]
             kind = action.get("type")
             if kind == "move_to":
-                entity.goal = (float(action["lon"]), float(action["lat"]))
+                goal = (float(action["lon"]), float(action["lat"]))
+                if (entity.route is not None and entity.goal is not None
+                        and haversine_m(entity.goal, goal) < 1.0):
+                    self.orders.pop(uid, None)
+                    self._order_source.pop(uid, None)
+                    continue
+                entity.goal = goal
                 route = self.planner.plan(entity.profile, (entity.pose.lon, entity.pose.lat),
                                           entity.goal)
                 if route is not None:
@@ -144,17 +185,22 @@ class World(object):
                     entity.route_s = 0.0
                     entity.moving = True
                 else:
+                    entity.goal = None
                     self.emit("move_failed", [uid], "no route to objective")
                 self.orders.pop(uid, None)
+                self._order_source.pop(uid, None)
             elif kind == "stop":
                 entity.route = None
                 entity.goal = None
                 entity.velocity_ms = 0.0
                 entity.moving = False
                 self.orders.pop(uid, None)
+                self._order_source.pop(uid, None)
             elif kind == "fire":
-                # keep as a standing order; engagement reads it
-                pass
+                target = self.entities.get(int(action.get("target", -1)))
+                if target is None or not target.alive:
+                    self.orders.pop(uid, None)
+                    self._order_source.pop(uid, None)
 
     # -- timers -------------------------------------------------------------
     def _tick_timers(self, dt: float) -> None:
@@ -178,6 +224,9 @@ class World(object):
 
     def mark_fired(self, uid: int, key: str, cooldown_s: float) -> None:
         self.cooldowns[(int(uid), key)] = float(cooldown_s)
+        entity = self.entities.get(int(uid))
+        if entity is not None:
+            entity.last_fired_s = self.time_s
 
     def consume_ammo(self, uid: int, key: str, n: int = 1) -> bool:
         e = self.entities[int(uid)]
@@ -203,7 +252,7 @@ class World(object):
             e.suppressed_s = max(e.suppressed_s, float(seconds))
 
     # -- sensors ------------------------------------------------------------
-    def _update_sensors(self, ctx: WorldRuleContext) -> None:
+    def _compute_table_seen(self, ctx: WorldRuleContext, full: bool = False) -> Dict[int, set]:
         for dead_uid in [uid for uid, e in self.entities.items() if not e.alive]:
             self.seen.pop(dead_uid, None)
         entities = [e for e in self.sorted_entities() if e.alive and not e.on_board]
@@ -212,17 +261,24 @@ class World(object):
         table = __import__("rules.detection", fromlist=["observation_doc"]).observation_doc()["table"]
         # For large forces, scan observers round-robin (full picture every
         # ``slice_count`` seconds) so the per-tick sensor cost stays bounded.
-        slice_count = 1 if len(entities) <= 50 else 5
+        slice_count = 1 if full or len(entities) <= 50 else 5
         observers = entities
         if slice_count > 1:
             observers = [e for i, e in enumerate(entities)
                          if i % slice_count == self._scan_slice]
             self._scan_slice = (self._scan_slice + 1) % slice_count
-        if self._scan_slice == 0:
+        if slice_count == 1:
+            self._scan_slice = 0
             self._detect_cache.clear()
+        elif self._scan_slice == 0:
+            self._detect_cache.clear()
+        result: Dict[int, set] = dict(self.seen)
+        for uid, entity in self.entities.items():
+            if not entity.alive or entity.on_board:
+                result.pop(uid, None)
         for observer in observers:
             seen = set()
-            self.seen[observer.uid] = seen
+            result[observer.uid] = seen
             o_kind = kind_of[observer.uid]
             max_cells = int(table.get(o_kind, {}).get("vehicle", 0))
             if observer.sensors:
@@ -246,12 +302,145 @@ class World(object):
                     self._detect_cache[key] = (co, ct, visible)
                 if visible:
                     seen.add(target.uid)
+        return result
+
+    def _compute_spotting_seen(self, ctx: WorldRuleContext) -> Dict[int, set]:
+        return spotting_model.compute_seen(self, ctx)
+
+    def _update_sensors(self, ctx: WorldRuleContext) -> None:
+        model = self.detection_model
+        self.detection_shadow_error = None
+        if model == "spotting":
+            entities = [e for e in self.entities.values() if e.alive and not e.on_board]
+            needs_table = any(e.domain not in ("land", "amphibious") for e in entities)
+            table_seen = self._compute_table_seen(ctx) if needs_table else {}
+            try:
+                spotting_seen = self._compute_spotting_seen(ctx)
+                seen = spotting_model.merge_seen(table_seen, spotting_seen, self)
+            except Exception as exc:
+                self.detection_shadow_error = str(exc)
+                seen = table_seen
+        elif model == "shadow":
+            table_seen = self._compute_table_seen(ctx, full=True)
+            try:
+                spotting_seen = self._compute_spotting_seen(ctx)
+            except Exception as exc:
+                self.detection_shadow_error = str(exc)
+                spotting_seen = table_seen
+            self.detection_shadow = spotting_model.shadow_diff(table_seen, spotting_seen)
+            seen = table_seen
+        else:
+            seen = self._compute_table_seen(ctx)
+        if self.enable_radio_share or model == "spotting":
+            seen = spotting_model.radio_share(self, seen)
+        self.seen = seen
 
     def detected_by(self, side: int, target_uid: int) -> bool:
         for uid, seen in self.seen.items():
             if target_uid in seen and self.entities[uid].affiliation == side:
                 return True
         return False
+
+    # -- commander ----------------------------------------------------------
+    def _commander_state(self, side: int) -> dict:
+        from geo.geodesy import haversine_m, initial_bearing_deg
+        objectives = []
+        for cell, obj in sorted(self.objectives.items()):
+            lon, lat = self.rule_grid.cell_center_lonlat(*cell)
+            objectives.append({"lon": lon, "lat": lat,
+                               "owner": obj.get("owner", -1)})
+        units = []
+        for entity in self.sorted_entities(side):
+            if not entity.alive or entity.on_board:
+                continue
+            nearest = min(objectives, key=lambda o: haversine_m(
+                (entity.pose.lon, entity.pose.lat), (o["lon"], o["lat"]))) if objectives else None
+            units.append({
+                "uid": entity.uid, "affiliation": entity.affiliation,
+                "name": entity.name, "domain": entity.domain,
+                "blood": entity.blood,
+                "max_blood": entity.max_blood,
+                "lon": entity.pose.lon, "lat": entity.pose.lat,
+                "in_cover": self.env.landcover(entity.pose.lon, entity.pose.lat)
+                            in ("forest", "urban"),
+                "objective": nearest,
+            })
+        contacts = set()
+        for uid, seen in self.seen.items():
+            observer = self.entities.get(uid)
+            if (observer is not None and observer.affiliation == side
+                    and not observer.on_board):
+                contacts.update(seen)
+        enemies = []
+        for uid in sorted(contacts):
+            target = self.entities.get(uid)
+            if target is None or not target.alive or target.affiliation == side:
+                continue
+            nearest_unit = min(units, key=lambda u: haversine_m(
+                (target.pose.lon, target.pose.lat), (u["lon"], u["lat"]))) if units else None
+            distance = haversine_m(
+                (target.pose.lon, target.pose.lat),
+                ((nearest_unit["lon"], nearest_unit["lat"]) if nearest_unit
+                 else (target.pose.lon, target.pose.lat)))
+            bearing = initial_bearing_deg(
+                ((nearest_unit["lon"], nearest_unit["lat"]) if nearest_unit
+                 else (target.pose.lon, target.pose.lat)),
+                (target.pose.lon, target.pose.lat))
+            enemies.append({"uid": uid, "domain": target.domain,
+                            "distance_m": round(distance, 1),
+                            "bearing": round(bearing, 1)})
+        return {"side": side, "time_s": round(self.time_s, 3),
+                "units": units, "enemies": enemies,
+                "objectives": objectives}
+
+    def _apply_commander_orders(self, ctx: WorldRuleContext) -> None:
+        if self.commander is None or self.time_s < self._commander_next_s:
+            return
+        now = self.time_s
+        for uid in list(self.commander.orders):
+            if self.commander.active(uid, now) is None:
+                if uid in self._commander_owned:
+                    self.orders.pop(uid, None)
+                    self._order_source.pop(uid, None)
+                    entity = self.entities.get(uid)
+                    if entity is not None:
+                        entity.route = None
+                        entity.goal = None
+                        entity.velocity_ms = 0.0
+                        entity.moving = False
+                    self._commander_owned.discard(uid)
+                    self._commander_control.pop(uid, None)
+        self._commander_next_s = now + self.commander.interval_s
+        for side in (0, 1):
+            state = self._commander_state(side)
+            for order in self.commander.decide(state, now):
+                entity = self.entities.get(int(order.uid))
+                if entity is None or not entity.alive or entity.on_board:
+                    continue
+                if entity.affiliation != side:
+                    continue
+                if self._order_source.get(entity.uid) == "manual":
+                    continue
+                self._commander_owned.add(entity.uid)
+                self._commander_control[entity.uid] = now + max(
+                    1.0, float(order.expires_s))
+                if order.posture == "hold":
+                    self.order(entity.uid, {"type": "stop"}, source="commander")
+                elif order.lon is not None and order.lat is not None:
+                    self.order(entity.uid, {"type": "move_to",
+                                            "lon": float(order.lon),
+                                            "lat": float(order.lat)},
+                               source="commander")
+                elif order.target_uid is not None:
+                    target = self.entities.get(int(order.target_uid))
+                    if target is not None and target.alive:
+                        if ((entity.domain in ("land", "amphibious"))
+                                != (target.domain in ("land", "amphibious"))):
+                            continue
+                        self.order(entity.uid, {"type": "move_to",
+                                                "lon": target.pose.lon,
+                                                "lat": target.pose.lat},
+                                   source="commander")
 
     # -- engagement ---------------------------------------------------------
     def _engage(self, ctx: WorldRuleContext) -> None:
@@ -299,23 +488,44 @@ class World(object):
             if target.affiliation == attacker.affiliation:
                 continue
             if _is_ground(attacker) and _is_ground(target):
-                dist = self.rule_grid.distance(self.rule_cell(attacker), self.rule_cell(target))
-                max_range = 0
-                for w in attacker.weapons:
-                    for table in (w.tables or {}).values():
-                        max_range = max(max_range, table.att_max)
-                if max_range and dist > max_range:
-                    continue
-                candidates.append((dist, -target.value, target))
+                if self.direct_fire_model == "physics":
+                    from rules import physics_direct_fire
+                    distance_m = ctx.distance_m(ctx.view(attacker), ctx.view(target))
+                    max_range_m = 0.0
+                    for w in attacker.weapons:
+                        profile = physics_direct_fire.profile_for_weapon(w)
+                        if profile is not None:
+                            max_range_m = max(max_range_m, physics_direct_fire._num(
+                                profile.get("max_range_m"), 3000.0))
+                    if max_range_m and distance_m > max_range_m:
+                        continue
+                    candidates.append((distance_m, -target.value, target))
+                else:
+                    dist = self.rule_grid.distance(self.rule_cell(attacker), self.rule_cell(target))
+                    max_range = 0
+                    for w in attacker.weapons:
+                        for table in (w.tables or {}).values():
+                            max_range = max(max_range, table.att_max)
+                    if max_range and dist > max_range:
+                        continue
+                    candidates.append((dist, -target.value, target))
             else:
                 candidates.append((0, -target.value, target))
         candidates.sort(key=lambda c: (c[0], c[1]))
         for _, _, target in candidates[:5]:
             if _is_ground(attacker) and _is_ground(target):
-                if combat.select_weapon(ctx.view(attacker), ctx.view(target), ctx) is None:
-                    continue
-                event_key = (ctx.rule_distance(ctx.view(attacker), ctx.view(target)),
-                             -target.value)
+                if self.direct_fire_model == "physics":
+                    from rules import physics_direct_fire
+                    if not physics_direct_fire.can_engage(
+                            ctx.view(attacker), ctx.view(target), ctx):
+                        continue
+                    event_key = (ctx.distance_m(ctx.view(attacker), ctx.view(target)),
+                                 -target.value)
+                else:
+                    if combat.select_weapon(ctx.view(attacker), ctx.view(target), ctx) is None:
+                        continue
+                    event_key = (ctx.rule_distance(ctx.view(attacker), ctx.view(target)),
+                                 -target.value)
             else:
                 kinds = engagement.allowed_kinds(attacker.domain, target.domain)
                 if not kinds:
@@ -416,6 +626,7 @@ class World(object):
         for (cell, _), members in sorted(grouped.items(), key=lambda kv: str(kv[0])):
             for extra in members[4:]:
                 extra.route = None
+                extra.goal = None
                 extra.velocity_ms = 0.0
                 extra.moving = False
                 self.emit("stack_blocked", [extra.uid],
@@ -480,12 +691,18 @@ class World(object):
                     if route is not None:
                         e.route = route
                         e.route_s = 0.0
+                    else:
+                        e.goal = None
         self._sync_passengers()
         self._refresh_cell_cache()
         self._enforce_stacking()
         self._refresh_cell_cache()
         ctx.refresh()
         self._update_sensors(ctx)
+        if self.tactics is not None:
+            self.tactics.update(self, ctx)
+        if self.commander is not None:
+            self._apply_commander_orders(ctx)
         self._engage(ctx)
         self._update_objectives()
         self._logistics(dt)

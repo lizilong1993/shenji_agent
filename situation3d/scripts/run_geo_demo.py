@@ -97,6 +97,13 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=20261021)
     ap.add_argument("--dt", type=float, default=1.0)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--detection-model",
+                    choices=("table", "spotting", "shadow"))
+    ap.add_argument("--direct-fire-model",
+                    choices=("crt", "physics", "shadow"))
+    ap.add_argument("--tactics", action="store_true")
+    ap.add_argument("--radio-share", action="store_true")
+    ap.add_argument("--commander", action="store_true")
     args = ap.parse_args()
 
     if args.case:
@@ -109,10 +116,36 @@ def main() -> int:
         basic = json.loads(open(args.map, encoding="utf-8").read())
         raw_objs = scenario.get("cities") or []
 
+    if (args.detection_model or args.direct_fire_model
+            or args.tactics or args.radio_share or args.commander):
+        engine = scenario.get("engine")
+        if not isinstance(engine, dict):
+            engine = {}
+            scenario["engine"] = engine
+        if args.detection_model:
+            engine["detection_model"] = args.detection_model
+        if args.direct_fire_model:
+            engine["direct_fire_model"] = args.direct_fire_model
+        if args.tactics:
+            engine["enable_tactics"] = True
+        if args.radio_share:
+            engine["enable_radio_share"] = True
+        if args.commander:
+            engine["enable_commander"] = True
     world = build_world(scenario, basic, seed=args.seed, dt_s=args.dt)
     objectives = []
     if raw_objs and "lon" in raw_objs[0]:
-        objectives = raw_objs  # already geo
+        for obj in raw_objs:
+            lon = float(obj["lon"])
+            lat = float(obj["lat"])
+            flag = obj.get("flag", obj.get("owner", -1))
+            owner = flag if flag in (0, 1) else -1
+            cell = world.rule_grid.cell_of(lon, lat)
+            world.add_objective(cell, value=int(obj.get("value") or 0),
+                                name=str(obj.get("name") or ""), owner=owner)
+            objectives.append({"lon": lon, "lat": lat, "owner": owner,
+                               "value": int(obj.get("value") or 0),
+                               "name": str(obj.get("name") or "")})
     else:
         grid = world.env.grid
         for obj in raw_objs:
@@ -156,6 +189,10 @@ def main() -> int:
         json.dump(observation(world), fh, ensure_ascii=False, indent=1)
     summary = {
         "ticks": args.ticks,
+        "detection_model": world.detection_model,
+        "direct_fire_model": world.direct_fire_model,
+        "detection_shadow": (None if world.detection_shadow is None else {
+            k: v for k, v in world.detection_shadow.items() if k != "samples"}),
         "elapsed_s": round(elapsed, 2),
         "step_ms_p50": round(statistics.median(step_ms), 2),
         "step_ms_p95": round(sorted(step_ms)[int(len(step_ms) * 0.95)], 2),

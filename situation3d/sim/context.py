@@ -45,6 +45,8 @@ class WorldRuleContext(object):
         self.now_s = world.time_s
         self.rng = rng or world.rng
         self.jam = 0.0
+        self.direct_fire_model = getattr(world, "direct_fire_model", "crt")
+        self.detection_model = getattr(world, "detection_model", "table")
         self._elev_doc = _elevation_doc()
         self._views: Dict[int, EntityRuleView] = {}
         self._grades: Dict[int, int] = {}
@@ -66,6 +68,12 @@ class WorldRuleContext(object):
     def distance_m(self, a, b) -> float:
         ea, eb = self._entity(a), self._entity(b)
         return haversine_m((ea.pose.lon, ea.pose.lat), (eb.pose.lon, eb.pose.lat))
+
+    def bearing_deg(self, a, b) -> float:
+        from geo.geodesy import initial_bearing_deg
+        ea, eb = self._entity(a), self._entity(b)
+        return initial_bearing_deg((ea.pose.lon, ea.pose.lat),
+                                   (eb.pose.lon, eb.pose.lat))
 
     def rule_distance(self, a, b) -> int:
         return self.world.rule_distance(self._entity(a), self._entity(b))
@@ -122,6 +130,16 @@ class WorldRuleContext(object):
 
     # -- state -------------------------------------------------------------
     def can_detect(self, observer, target) -> bool:
+        if self.detection_model == "spotting":
+            from sim import spotting
+            obs = self._entity(observer)
+            tgt = self._entity(target)
+            if (obs.domain in ("land", "amphibious")
+                    and tgt.domain in ("land", "amphibious")):
+                return spotting.can_spot(
+                    obs, tgt, self.env, self.now_s,
+                    float(getattr(self.rule_grid, "cell_m", 200.0)),
+                    line_of_sight=lambda a, b: self.line_of_sight(a, b))
         return detection.can_observe(self.view(self._entity(observer)),
                                      self.view(self._entity(target)), self)
 

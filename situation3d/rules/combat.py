@@ -13,6 +13,7 @@ Pipeline per shot:
 
 from __future__ import annotations
 
+import random
 from typing import List, Optional, Tuple
 
 from rules.context import Cover, RuleContext, RuleEntityView, WeaponView
@@ -87,10 +88,40 @@ def resolve_direct_fire(attacker: RuleEntityView, target: RuleEntityView,
         return None
     if ctx.target_kind(target) not in ("infantry", "vehicle"):
         return None
+    model = getattr(ctx, "direct_fire_model", "crt")
+    physics_direct_fire = None
+    if model in ("physics", "shadow"):
+        from rules import physics_direct_fire as _physics
+        physics_direct_fire = _physics
+    if model == "physics":
+        physical = None
+        try:
+            physical = physics_direct_fire.resolve_physics_direct_fire(
+                attacker, target, ctx)
+        except Exception:
+            physical = None
+        if physical is not None:
+            return physical
+        # A unit with ballistic data but no physical firing solution is out of
+        # physical range; do not silently fall back to the CRT table.
+        if physics_direct_fire.has_profile(attacker):
+            return None
     picked = select_weapon(attacker, target, ctx)
     if picked is None:
         return None
     weapon, table = picked
+    shadow_event = None
+    if model == "shadow" and physics_direct_fire.has_profile(attacker):
+        # Counterfactual on the pre-shot state, using a copy of the RNG state so
+        # the shadow never advances the gameplay stream.
+        shadow_rng = random.Random()
+        shadow_rng.setstate(ctx.rng.getstate())
+        try:
+            shadow_event = physics_direct_fire.resolve_physics_direct_fire(
+                attacker, target, ctx, dry_run=True, weapon=weapon,
+                rng=shadow_rng)
+        except Exception as exc:
+            shadow_event = {"error": str(exc)}
     distance = ctx.rule_distance(attacker, target)
     base = table.level_at(distance)
     idx = base if base is not None else 0
@@ -140,7 +171,7 @@ def resolve_direct_fire(attacker: RuleEntityView, target: RuleEntityView,
     if suppressed:
         ctx.apply_suppression(target.uid, 60.0)
 
-    return {
+    event = {
         "type": "direct_fire",
         "actors": [attacker.uid, target.uid],
         "weapon": weapon.key,
@@ -156,6 +187,11 @@ def resolve_direct_fire(attacker: RuleEntityView, target: RuleEntityView,
         "suppressed": suppressed,
         "target_blood": getattr(target, "blood", 0),
     }
+    if model == "shadow":
+        event["model"] = "shadow"
+    if shadow_event is not None:
+        event["shadow_physics"] = shadow_event
+    return event
 
 
 def best_target(attacker: RuleEntityView, entities: List[RuleEntityView],
