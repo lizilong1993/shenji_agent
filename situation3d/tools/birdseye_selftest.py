@@ -230,6 +230,29 @@ PROBE = r"""
     return { selected: !!rec.selected, target: selId, ringShown: !!td.selectionShown };
   })();
 
+  // 主 3D 图每个目标 icon 底部都应有一条血条。
+  out.mainHp = (function () {
+    var n = 0, shown = 0, missing = [];
+    Object.keys(state.targets).forEach(function (id) {
+      var r = state.targets[id];
+      if (!r.hpBar) { missing.push(id); return; }
+      n++;
+      if (r.hpBar.show) shown++;
+    });
+    var r = state.targets[selId];
+    var st = TargetStatus.at(data, selId, state.tick);
+    var exp = TargetStatus.barUri(st.hp, st.status, 30, 4);
+    var img = (r && r.hpBar && r.hpBar.billboard.image)
+      ? String(r.hpBar.billboard.image.getValue()) : '';
+    return { bars: n, shown: shown, missing: missing, selectedBarMatches: img === exp };
+  })();
+  out.targetHeadHp = (function () {
+    var b = document.querySelector('.ts-head .ts-hp b');
+    var wrap = document.querySelector('.ts-head .ts-hp');
+    if (!b || !wrap) return null;
+    return { width: b.style.width, opacity: getComputedStyle(wrap).opacity };
+  })();
+
   out.viewContainsAll = false;
   out.viewMarginDeg = Infinity;
   if (out.tickEnd.viewRect && out.tickEnd.extent) {
@@ -461,6 +484,15 @@ def main() -> int:
           "%s" % d.get("selectSync"))
     check("selection ring shown", bool((d.get("selectSync") or {}).get("ringShown")),
           "%s" % d.get("selectSync"))
+    mh = d.get("mainHp") or {}
+    check("main map has HP bar per target",
+          mh.get("bars") == d.get("targetCount") and mh.get("shown") == d.get("targetCount"),
+          "mainHp=%s" % mh)
+    check("main map selected HP bar matches status", bool(mh.get("selectedBarMatches")),
+          "mainHp=%s" % mh)
+    th = d.get("targetHeadHp")
+    check("targetTS header has HP bar", bool(th and th.get("width")),
+          "targetHeadHp=%s" % th)
     check("hide/show keeps all target entities", d.get("reshowCount") == d.get("targetCount"),
           "reshow=%s expected=%s" % (d.get("reshowCount"), d.get("targetCount")))
 

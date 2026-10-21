@@ -587,6 +587,26 @@ select {
 
 .ts-head { display: flex; gap: 10px; align-items: center; }
 .ts-head .ts-sym { width: 34px; height: 34px; flex: 0 0 auto; }
+/* 目标TS栏头图也要带血条（所有目标 icon 一致的规范）。 */
+.ts-sym-wrap { display: flex; flex-direction: column; align-items: center; width: 34px; flex: 0 0 auto; }
+.ts-hp {
+  width: 34px;
+  height: 4px;
+  margin-top: -2px;
+  box-sizing: border-box;
+  background: #e4e9f0;
+  border: 1px solid #6b7688;
+  border-radius: 1px;
+  overflow: hidden;
+}
+.ts-hp > b { display: block; height: 100%; width: 100%; background: #2E9E5B; }
+.ts-hp.os-s1 > b { background: #D9A514; }
+.ts-hp.os-s2 > b { background: #E2662A; }
+.ts-hp.os-s3 { background: #3f4652; }
+.ts-hp.os-s3 > b { background: #4B5563; }
+.ts-hp.os-s1 { opacity: .8; }
+.ts-hp.os-s2 { opacity: .55; }
+.ts-hp.os-s3 { opacity: .3; }
 .ts-id { display: flex; flex-direction: column; min-width: 0; }
 .ts-id b { font-size: 13px; }
 .ts-id > span { font-size: 11.5px; color: var(--text); }
@@ -683,6 +703,10 @@ select {
 .os-unit.os-s2 .os-hp > b { background: #E2662A; }
 .os-unit.os-s3 .os-hp { background: #3f4652; }
 .os-unit.os-s3 .os-hp > b { background: #4B5563; }
+/* 透明度作为颜色/长度之外的第三条单调线索（正常 1.0 → 损毁 0.3）。 */
+.os-unit.os-s1 .os-hp { opacity: .8; }
+.os-unit.os-s2 .os-hp { opacity: .55; }
+.os-unit.os-s3 .os-hp { opacity: .3; }
 /* 损毁：图标压暗 + 叉形遮罩；血条为空槽。仍保留轮廓，避免"整个目标消失"。 */
 .os-unit.os-s3 .os-icon { opacity: .45; filter: grayscale(1); }
 

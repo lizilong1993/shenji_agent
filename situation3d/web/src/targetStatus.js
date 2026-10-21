@@ -63,6 +63,9 @@
 
   var THRESHOLDS = { severe: 35, damaged: 70 };
 
+  // 血条透明度：正常 1.0 -> 损毁 0.3。颜色/长度之外再给一条单调的视觉线索。
+  var OPACITY = { 0: 1.0, 1: 0.8, 2: 0.55, 3: 0.3 };
+
   var TIERS = [
     { code: 0, key: 'normal', label: '正常', color: '#2E9E5B' },
     { code: 1, key: 'damaged', label: '受损', color: '#D9A514' },
@@ -300,6 +303,7 @@
   var markCache = Object.create(null);
 
   function colorOf(status) { return TIERS[Math.max(0, Math.min(3, status | 0))].color; }
+  function opacityFor(status) { return OPACITY[Math.max(0, Math.min(3, status | 0))] || 1.0; }
 
   function barUri(hp, status, w, h, colorStatus) {
     status = Math.max(0, Math.min(3, status | 0));
@@ -316,7 +320,8 @@
     // 损毁档用深色空槽，与整体TS面板的 `.os-unit.os-s3 .os-hp` 一致；
     // 血条"整条变黑且没有填充"本身就是损毁的第二个视觉信号。
     var track = cs === 3 ? '#3F4652' : '#E4E9F0';
-    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">'
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h +
+      '" opacity="' + opacityFor(status) + '">'
       + '<rect x="0.5" y="0.5" width="' + (w - 1) + '" height="' + (h - 1) +
         '" rx="1" fill="' + track + '" stroke="#6B7688" stroke-width="1"/>'
       + (fillW > 0
@@ -436,6 +441,7 @@
     THRESHOLDS: THRESHOLDS,
     tier: tier,
     colorOf: colorOf,
+    opacityFor: opacityFor,
     statusOf: statusOf,
     at: at,
     counts: counts,

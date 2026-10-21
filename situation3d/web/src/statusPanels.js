@@ -364,14 +364,21 @@
       return;
     }
 
+    var dmg = data ? statusAt(data, def.id, tick) : null;
+    var tsHp = dmg ? dmg.hp : 100;
+    var tsStatus = dmg ? dmg.status : 0;
+
     var html = '<div class="ts-head">'
+      + '<span class="ts-sym-wrap">'
       + '<img class="ts-sym" src=' + JSON.stringify(Symbology.symbolUri(def.icon, def.affiliation, { domain: def.domain })) + ' alt="">'
+      + '<span class="ts-hp os-s' + tsStatus + '"><b style="width:'
+      + Math.max(6, Math.min(100, Math.round(tsHp))) + '%"></b></span>'
+      + '</span>'
       + '<div class="ts-id"><b>' + esc(def.id) + '</b>'
       + '<span>' + esc(def.name) + '</span></div></div>';
 
     // ---- 1. 目标状态信息：这一帧的读数 ----
     var st = frameState || {};
-    var dmg = data ? statusAt(data, def.id, tick) : null;
     html += '<div class="ts-sec">'
       + '<h4>目标状态信息</h4>';
     if (frameState) {

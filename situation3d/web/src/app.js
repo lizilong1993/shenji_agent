@@ -2276,6 +2276,26 @@ function createTargetEntities() {
       },
     });
 
+    // 血条：所有出现目标 icon 的地方都要带血条（用户 2026-10-21 要求）。
+    // 主 3D 图里图标 34px、center 锚定，血条 TOP 锚定在 +19px（17 半高 + 2 间距）。
+    // 透明度在 TargetStatus.barUri 里按档位编码。
+    const hpBar = viewer.entities.add({
+      id: "hp-" + def.id,
+      position: new Cesium.CallbackProperty(function () {
+        const s = positionFor(def.id, state.tick);
+        if (!s) return undefined;
+        return Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
+      }, false),
+      billboard: {
+        image: window.TargetStatus ? TargetStatus.barUri(100, 0, 30, 4) : undefined,
+        width: 30,
+        height: 4,
+        verticalOrigin: Cesium.VerticalOrigin.TOP,
+        pixelOffset: new Cesium.Cartesian2(0, 19),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    });
+
     // 历史轨迹 = 上面的实线 polyline（全程）；计划轨迹 = 上面的 predict 实体
     // （虚线 + 终点箭头）。两者都由「历史轨迹」图层统一管理。
     state.targets[def.id] = {
@@ -2283,6 +2303,7 @@ function createTargetEntities() {
       entity: entity,
       predict: predict,
       sensorEntity: sensorEntity,
+      hpBar: hpBar,
       trail: [],
       lastTick: -1,
     };
@@ -2906,6 +2927,21 @@ function syncEntities() {
     applyTargetBillboardAnchor(rec.entity, useModel);
     if (rec.entity.model) rec.entity.model.show = visible && useModel;
     rec.sensorEntity.show = visible && state.filters.sensors === true;
+
+    // 主 3D 图标底部血条：与整体TS/鸟瞰图同一 TargetStatus 口径。
+    // 只在档位或 0.1% 血量变化时换图，避免每帧重建 SVG。
+    if (rec.hpBar) {
+      const hpSt = (window.TargetStatus && state.data)
+        ? TargetStatus.at(state.data, id, state.tick) : null;
+      const hpKey = hpSt ? (hpSt.status + "|" + Math.round(hpSt.hp * 10)) : "none";
+      if (rec.hpKey !== hpKey) {
+        rec.hpKey = hpKey;
+        rec.hpBar.billboard.image = hpSt
+          ? TargetStatus.barUri(hpSt.hp, hpSt.status, 30, 4)
+          : undefined;
+      }
+      rec.hpBar.show = visible;
+    }
 
     // 航迹单调累积。回退时不是简单清空，而是从第 0 帧重建，
     // 否则在暂停状态拖动时间轴会导致航迹永久消失。
