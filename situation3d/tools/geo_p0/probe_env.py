@@ -71,16 +71,38 @@ def cell_index(basic):
     return out
 
 
+_SEE_CACHE = {}
+
+
+def pair_visible(a, b, mode=1):
+    """LOS per the map's precomputed see matrix (interior cells only)."""
+    if "see" not in _SEE_CACHE:
+        _, _, see = load_map_bits()
+        _SEE_CACHE["see"] = see
+    see = _SEE_CACHE["see"]
+    ra, ca = divmod(int(a), 100)
+    rb, cb = divmod(int(b), 100)
+    if len(see.shape) == 5:
+        return bool(see[mode, ra, ca, rb, cb])
+    return True
+
+
 def find_pair(cells, d_min, d_max, elev_grade_delta=0, cond=0):
-    """Find two open cells with given hex distance and elevation difference."""
+    """Find two open, mutually visible interior cells with the given metrics."""
+    rows = max(cells[p][0] for p in cells) + 1
+    cols = max(cells[p][1] for p in cells) + 1
     by_pos = sorted(cells)
     for a in by_pos:
         ra, ca, ea, conda = cells[a]
-        if conda != cond:
+        if conda != cond or not (4 <= ra < rows - 4 and 4 <= ca < cols - 4):
             continue
         for b in by_pos:
             rb, cb, eb, condb = cells[b]
             if condb != cond or a == b:
+                continue
+            if not (4 <= rb < rows - 4 and 4 <= cb < cols - 4):
+                continue
+            if not pair_visible(a, b):
                 continue
             d = hex_distance(a, b)
             if not (d_min <= d <= d_max):
@@ -101,16 +123,16 @@ def make_op(template, oid, color, hexpos, weapons, name="重型坦克", type_=2,
         "sub_type": sub_type, "armor": armor, "blood": blood,
         "max_blood": blood, "cur_hex": hexpos,
         "carry_weapon_ids": list(weapons),
-        "remain_bullet_nums": {str(w): 99 for w in weapons},
+        "remain_bullet_nums": {"0": 999, "100": 999, "101": 999, "102": 999},
         "C2": 999, "C3": 999,
-        "observe_distance": {"1": 60, "2": 60, "3": 60},
+        "observe_distance": [60] * 20,
         "move_state": 0, "cur_pos": 0.0, "speed": 0.0,
         "move_to_stop_remain_time": 0.0, "can_to_move": 0, "stop": 1,
         "move_path": [], "keep": 0, "keep_remain_time": 0,
         "on_board": 0, "car": 0, "launcher": None,
         "passenger_ids": [], "launch_ids": [], "lose_control": 0,
         "see_enemy_bop_ids": [], "weapon_cool_time": 0.0,
-        "weapon_unfold_time": 0.0, "weapon_unfold_state": 0,
+        "weapon_unfold_time": 0.0, "weapon_unfold_state": 1,
         "target_state": 0, "change_state_remain_time": 0.0,
     })
     return op
@@ -139,6 +161,19 @@ def build_env(ops, scenario_id=990001, tick=1.0, max_time=600):
     return env, state
 
 
+def end_deployment(env, state):
+    """Both agents must send action 333 to leave the deployment stage."""
+    action = [
+        {"actor": SEAT_RED, "type": 333},
+        {"actor": SEAT_BLUE, "type": 333},
+    ]
+    state, done = env.step(action)
+    stage = (state.get(-1) or {}).get("time", {}).get("stage")
+    if stage != 2:
+        print("WARN: deployment did not end, stage=%s" % stage)
+    return state, done
+
+
 def shoot_rounds(env, state, red_id, blue_id, weapon_id, rounds, tick=1.0,
                  step_limit=2000):
     """Fire up to ``rounds`` shots, respecting any cooldown, collecting judge_info."""
@@ -149,7 +184,7 @@ def shoot_rounds(env, state, red_id, blue_id, weapon_id, rounds, tick=1.0,
                    "target_obj_id": blue_id, "weapon_id": weapon_id}]
         state, done = env.step(action)
         step += 1
-        for ji in state[1].get("judge_info", []):
+        for ji in (state.get(-1) or {}).get("judge_info", []):
             if ji.get("wp_id") == weapon_id:
                 ji["_step"] = step
                 shots.append(ji)
@@ -166,8 +201,9 @@ def exp_smoke(args):
     red = make_op(tpl, 1001, RED, a, [36])
     blue = make_op(tpl, 2001, BLUE, b, [36])
     env, state = build_env([red, blue], max_time=200)
+    state, _ = end_deployment(env, state)
     state, shots = shoot_rounds(env, state, 1001, 2001, 36, args.rounds)
-    print("steps", state[1]["time"], "shots", len(shots))
+    print("steps", state[-1]["time"], "shots", len(shots))
     for s in shots[:5]:
         print(json.dumps(s, ensure_ascii=False))
     env.reset()
@@ -184,8 +220,11 @@ def exp_tartype(args):
         (1, "步兵小队", 1), (1, "步兵小队", 2), (1, "步兵小队", 3), (1, "步兵小队", 4),
     ]:
         red = make_op(tpl, 1001, RED, a, [36])
-        blue = make_op(tpl, 2001, BLUE, b, [36], name=tgt_name, type_=tgt_type, blood=blood)
+        blue = make_op(tpl, 2001, BLUE, b, [29] if tgt_type == 1 else [36],
+                       name=tgt_name, type_=tgt_type, blood=blood,
+                       sub_type=2 if tgt_type == 1 else 0, armor=0 if tgt_type == 1 else 4)
         env, state = build_env([red, blue], max_time=120)
+        state, _ = end_deployment(env, state)
         state, shots = shoot_rounds(env, state, 1001, 2001, 36, 1)
         if shots:
             s = shots[0]
@@ -220,6 +259,7 @@ def exp_elevation(args):
             red = make_op(tpl, 1001, RED, a, [36])
             blue = make_op(tpl, 2001, BLUE, b, [36])
             env, state = build_env([red, blue], max_time=120)
+            state, _ = end_deployment(env, state)
             _, shots = shoot_rounds(env, state, 1001, 2001, 36, 1)
             if shots:
                 s = shots[0]
@@ -236,6 +276,7 @@ def exp_dice(args):
     red = make_op(tpl, 1001, RED, a, [36])
     blue = make_op(tpl, 2001, BLUE, b, [36])
     env, state = build_env([red, blue], max_time=20000)
+    state, _ = end_deployment(env, state)
     _, shots = shoot_rounds(env, state, 1001, 2001, 36, args.rounds, step_limit=40000)
     r1 = Counter(int(s["random1"]) for s in shots if "random1" in s)
     r2 = Counter(int(s["random2"]) for s in shots if "random2" in s)
@@ -257,13 +298,14 @@ def exp_tick(args):
         red = make_op(tpl, 1001, RED, a, [36])
         blue = make_op(tpl, 2001, BLUE, b, [36])
         env, state = build_env([red, blue], tick=tick, max_time=100)
+        state, _ = end_deployment(env, state)
         # shoot once on the first step; report when judge_info appears and cur_step values
         action = [{"actor": SEAT_RED, "obj_id": 1001, "type": 2,
                    "target_obj_id": 2001, "weapon_id": 36}]
         for i in range(1, 6):
             state, done = env.step(action)
-            time = state[1]["time"]
-            ji = state[1].get("judge_info", [])
+            time = state[-1]["time"]
+            ji = state[-1].get("judge_info", [])
             print("tick", tick, "call", i, "time", time, "judge", [(j["cur_step"], j["distance"]) for j in ji])
         env.reset()
 

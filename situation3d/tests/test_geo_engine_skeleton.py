@@ -22,6 +22,7 @@ from compat.legacy import (  # noqa: E402
 )
 from geo.geodesy import haversine_m  # noqa: E402
 from geo.rule_grid import RuleGrid  # noqa: E402
+from rules.elevation import elevation_modifier, load_elevation  # noqa: E402
 from rules.weapons import (  # noqa: E402
     TAR_TYPE_AIR,
     TAR_TYPE_PERSONNEL,
@@ -162,10 +163,12 @@ class TestAuthoritativeWeapons(unittest.TestCase):
             self.assertEqual(
                 attack_level_for(self.tables, 36, "vehicle", 0, distance),
                 expected)
-        # TarType=1 is personnel, indexed by ObjBlood (blood=1 -> constant 2).
-        table = self.tables.table(36, TAR_TYPE_PERSONNEL, 1)
-        self.assertEqual(table.att_max, 10)
-        self.assertEqual(table.values[:11], (2,) * 11)
+        # TarType=1 is personnel, indexed by the attacker's vehicle/squad
+        # count (ObjBlood): 2/3/5/7/9 for stacks 1..5.
+        for stack, expected in [(1, 2), (2, 3), (3, 5), (4, 7), (5, 9)]:
+            table = self.tables.table(36, TAR_TYPE_PERSONNEL, stack)
+            self.assertEqual(table.att_max, 10)
+            self.assertEqual(table.values[:11], (expected,) * 11)
 
     def test_vehicle_table_not_truncated(self):
         table = self.tables.table(36, TAR_TYPE_VEHICLE, 0)
@@ -197,6 +200,33 @@ class TestAuthoritativeWeapons(unittest.TestCase):
         # Weapon 36 has no air table at all.
         with self.assertRaises(WeaponDataError):
             self.tables.table(36, TAR_TYPE_AIR, 0)
+
+
+class TestElevationModifier(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.doc = load_elevation()
+
+    def test_matches_probe_points(self):
+        # Values observed in probe_env: attacker lower, ele_grade=20 m.
+        self.assertEqual(elevation_modifier(self.doc, False, 2, 1), -2)
+        self.assertEqual(elevation_modifier(self.doc, False, 2, 5), -1)
+        self.assertEqual(elevation_modifier(self.doc, False, 1, 8), 0)
+        self.assertEqual(elevation_modifier(self.doc, False, 3, 1), -3)
+        self.assertEqual(elevation_modifier(self.doc, False, 4, 10), -1)
+
+    def test_no_bonus_when_attacker_not_lower(self):
+        self.assertEqual(elevation_modifier(self.doc, True, 8, 1), 0)
+
+    def test_personnel_table_last_column_zero(self):
+        for row in self.doc["peo"]:
+            self.assertEqual(row[11], 0)
+
+    def test_clamped(self):
+        self.assertEqual(elevation_modifier(self.doc, False, 99, 3),
+                         elevation_modifier(self.doc, False, 8, 3))
+        self.assertEqual(elevation_modifier(self.doc, False, 2, 99),
+                         elevation_modifier(self.doc, False, 2, 12))
 
 
 class TestWorldSkeleton(unittest.TestCase):

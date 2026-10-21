@@ -1,26 +1,28 @@
 """Authoritative weapon tables (庙算 ``WpData``) and table lookups.
 
-TarType semantics -- **corrected against observed engine output** (see
-``docs/geo_engine/P0_rule_diff_report.md`` §9):
+Semantics verified by black-box runs against train_env 4.1.0
+(``tools/geo_p0/probe_env.py``, 2026-10-21):
 
 ======  ==========================================
 TarType meaning
 ======  ==========================================
 0       间瞄对地 (indirect fire, ground targets)
-1       对人员 (personnel, indexed by ObjBlood)
-2       对车辆 (vehicles, ObjBlood = 0)
-3       对空   (air targets)
+1       对人员 (personnel); ``ObjBlood`` = the **attacker's** vehicle/squad
+        count (1..5), not the target's blood
+2       对车辆 (vehicles; ObjBlood = 0)
+3       对空   (air targets; ObjBlood = 0)
 ======  ==========================================
 
-The older data dictionary had 1/2 swapped; a recorded ``judge_info`` shot of
-weapon 36 against a vehicle at 14/15/16/18 hexes produced attack levels
-6/5/4/2, which match the TarType=2 row value-for-value and contradict the
-TarType=1 row (constant 2).
+Evidence: firing weapon 36 from attackers with blood 1/2/3/4/5 at an
+infantry target produced attack levels 2/3/5/7/9 -- the TarType=1 rows for
+ObjBlood 1..5 -- while the target's blood stayed 3.  A recorded ``judge_info``
+shot of weapon 36 against a vehicle at 14/15/16/18 hexes produced 6/5/4/2,
+matching the TarType=2 row value-for-value.
 
-The current MVP ``wargame_core.weapons`` stores only two flat lists per
-weapon and truncates them at ``att_max``; this module keys by
-``(weapon_id, tar_type, obj_blood)`` and rejects malformed tables instead of
-silently clamping.
+The old data dictionary had 1/2 swapped, and the current MVP
+``wargame_core.weapons`` stores only two flat lists per weapon and truncates
+them at ``att_max``; this module keys by ``(weapon_id, tar_type, obj_blood)``
+and rejects malformed tables instead of silently clamping.
 """
 
 from __future__ import annotations
@@ -121,11 +123,17 @@ class WeaponTables(object):
         return self.table(weapon_id, TAR_TYPE_INDIRECT, obj_blood)
 
     def table_for_target(self, weapon_id: int, target_kind: str,
-                         blood: int) -> WeaponTable:
+                         stack_count: int) -> WeaponTable:
+        """Table for a shot.
+
+        ``stack_count`` is the attacker's vehicle/squad count; it only
+        matters for ``target_kind == "infantry"`` (TarType=1).  Vehicle and
+        air rows ignore it and are normalised to ObjBlood=0.
+        """
         tar_type = TAR_TYPE_BY_KIND.get(target_kind)
         if tar_type is None:
             raise WeaponDataError("unknown target kind %r" % (target_kind,))
-        return self.table(weapon_id, tar_type, blood)
+        return self.table(weapon_id, tar_type, stack_count)
 
     def tables_for_weapon(self, weapon_id: int) -> Dict[Tuple[int, int], WeaponTable]:
         out = {}
@@ -150,6 +158,6 @@ def attack_level(table: WeaponTable, distance_hex: int) -> Optional[int]:
 
 
 def attack_level_for(tables: WeaponTables, weapon_id: int, target_kind: str,
-                     blood: int, distance_hex: int) -> Optional[int]:
-    return attack_level(tables.table_for_target(weapon_id, target_kind, blood),
-                        distance_hex)
+                     stack_count: int, distance_hex: int) -> Optional[int]:
+    return attack_level(tables.table_for_target(weapon_id, target_kind,
+                                                stack_count), distance_hex)

@@ -1,7 +1,7 @@
 # P0 基线冻结状态（2026-10-21）
 
 > 基线：`feat/campaign-demo` @ `6982407`，tag `wargame-baseline-6982407`
-> 本阶段结论：**P0 未完全关闭**。静态数据与基线回放已冻结；两项规则语义确认被庙算 SDK 的 MAC 鉴权阻断，需运维/平台方解除后才能完成。
+> 本阶段结论：**P0 数据语义硬门槛已全部关闭**（鉴权按项目既有 runbook 恢复后完成受控实测）；仅 F0/F1/F2 标志语义未专项确认，不影响 P4 的主表/高差/骰点对拍。台海 golden replay 仍受 map_9001 未入库限制（见 §5）。
 
 ## 1. 已完成
 
@@ -13,47 +13,37 @@
 | 差异报告 | `docs/geo_engine/P0_rule_diff_report.md`（`tools/geo_p0/diff_rules.py` 可重生成） |
 | tick>1 回归 fixture | `tests/test_wargame_core_timebase.py`；换算公式集中在 `compat/timebase.py` |
 | golden replay | `tests/fixtures/golden_core_1231_seed20261021.json`；`tests/test_golden_replay.py`（`GEORULES_GOLDEN=1` 时重放 300 tick，逐位一致） |
+| 黑盒实测 | `tools/geo_p0/probe_env.py` 等 4 个探针；鉴权恢复后完成 TarType/高差/骰点/tick/AttMin 实验 |
 
-## 2. 黑盒实测结论
+## 2. 黑盒实测结论（train_env 4.1.0，2026-10-21）
 
-历史回放 `replays/replay_1770632023.2594852.zip` 含 24 条 `judge_info`，据此被动确认：
+- **TarType（确认）**：`0` 间瞄、`1` 对人员、`2` 对车辆、`3` 对空。旧数据字典把 1/2 写反。
+  - 对车辆：wp36 在 d14/15/16/18 攻击力 6/5/4/2，与 TarType=2 行逐格一致（历史回放 + 受控实验）。
+  - 对人员：`ObjBlood` 是**攻方车/班数**，不是目标血量。攻方 blood 1/2/3/4/5 对步兵打出 2/3/5/7/9，与 TarType=1 的 ObjBlood 1..5 行一致；目标 blood 保持 3 不变。
+- **ele_rect（确认）**：8×12 表行 = 高差等级（1–8），列 = 距离（1–12）；**仅仰射（攻方更低）生效**，平射/俯射为 0，距离 >12 为 0，Δh>8 按 8 钳位。
+  - 验证点：低 2 级 d1 → -2（基值 10→8），低 2 级 d5 → -1（基值 9→8），低 1 级 d8 → 0，低 3 级 d1 → -3；人员表同规则（基值 5→3）。
+  - 数据字典“行=射击方、列=目标方”的推测错误；`裁决表格` 表头“高度差/距离”正确。
+- **骰点（确认）**：`random1`/`random2` 均为 2d6 三角分布（200 个独立 setup，峰值 6–8），不是 `randint(2,12)` 均匀分布。引擎随机流不受 Python 种子控制，相同想定重复 setup 结果不同。
+- **time.tick（确认）**：`tick` = 每步帧数，1 帧 = 1 s；直瞄 75 s 冷却在 tick=1/2/5 下间隔 75/38/15 步；`cur_step` 每 step 加 1。
+- **AttMin（确认）**：wp69（AttMin=2）在 d1 射击返回错误 503 `CantShootOfOutOfAim`。
+- **F0/F1/F2（未专项）**：导弹制导标志，需另做实验；不影响主表/高差/骰点。
 
-- **TarType 映射（确认）**：`2` = 对车辆、`1` = 对人员（按 `ObjBlood` 分级）、`0` = 间瞄、`3` = 对空。
-  证据：wp36 对车辆在 d14/15/16/18 的攻击力为 6/5/4/2，与 `WpData` TarType=2 行逐格一致；TarType=1 行是常量 2（对人员 blood=1），若按旧字典（1=对车辆）则与实测矛盾。**数据字典里 1/2 的映射写反了。**
-- **骰点（部分确认）**：`random1`/`random2` 均落在 2..12；分布与种子控制未验证。
-- **ele_rect 行列语义（未确认）**：24 条回放的 `ele_diff` 全为 0，无法区分。
-- **F0/F1/F2、time.tick（未确认）**：需要受控实验。
+## 3. 鉴权问题的处置（项目既有方案）
 
-## 3. 受控实验阻塞
+项目 `round5_revision_v12/sdk_plan_c_runbook.sh` 记录了同容器（465a18f93ac6，eth0 `02:42:ac:11:00:05`）的处理办法：容器重建会换 MAC，`.engine_config` 需按**当前 MAC + 原始首次使用时间戳**重绑；失败的时间校验会在 `/root/.engine_config` 留下过期标记，重绑前需清除。
 
-`train_env` 鉴权绑定 MAC `02:42:ac:11:00:03`，当前容器 eth0 为 `02:42:ac:11:00:05`；`env.setup()` 打印 `did not pass authentication`，后续 `step()` 不产生 `judge_info`。
+2026-10-21 按该流程执行：
 
-按 `docs/deployment_auth.md`，合法路径只有：
+1. 备份原配置到 `/tmp/engine_config.bak.20261021_134447`；
+2. 写入 `base64(<当前 MAC>,1785636126742546063)`；
+3. 删除 `/root/.engine_config` 过期标记；
+4. `Authenticator.pass_MAC_check()` 与 `pass_time_check_since_first_use()` 均返回 True；
+5. `env.setup()` 打印 `did pass authentication`，`judge_info` 正常产生。
 
-1. 由运维以授权 MAC 启动容器（`docker-compose.auth-mac.yml`，需要宿主机权限，本容器无 docker）；
-2. 或向平台方申请针对实际 MAC 重新生成 `.engine_config`；
-3. 或在官方授权宿主/镜像上运行。
+## 4. 未完成项
 
-禁止自行构造/修改 `.engine_config`，本阶段未做任何规避尝试。
-
-## 4. 未完成项与解除后的实验脚本
-
-`tools/geo_p0/probe_env.py` 已写好受控实验（`smoke/tartype/elevation/dice/tick`）。鉴权解除后：
-
-```bash
-source /remote-home/lizilong/py310env.sh
-cd /remote-home/lizilong/shenji_agent/land_wargame_sdk
-python /path/to/situation3d/tools/geo_p0/probe_env.py elevation
-python /path/to/situation3d/tools/geo_p0/probe_env.py tartype
-python /path/to/situation3d/tools/geo_p0/probe_env.py dice --rounds 500
-python /path/to/situation3d/tools/geo_p0/probe_env.py tick
-```
-
-需要冻结的接口：
-
-- `elevation_modifier(shooter_grade, target_grade)`：在确认 `ele_rect` 行列语义前不写死；
-  当前 P2 骨架未实现高差查表，避免把猜测固化进 API。
-- `time.tick`：`compat/timebase.py` 先固定 SDK 公式，geo 引擎接入时按 P0 fixture 显式切换。
+- F0/F1/F2 制导标志语义（P4 前补）；
+- 台海案例 golden replay（见 §5）。
 
 ## 5. 台海 golden replay 说明
 
