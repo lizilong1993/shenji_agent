@@ -34,6 +34,10 @@
   const MILSYMBOL_EXPECTED = '3.0.4';
   const ASSET_BASE = './assets/symbols/';
   let useAssets = true;
+  // manifest 里有资产的图标集合。目录（engine/symbology.py 或 base.json）可能出现
+  // **没有对应资产**的键（例如别的分支加过的图标），那种键不能算"已知"，
+  // 否则 billboard 会指向 404 的 SVG，页面上是空白且不报错。
+  let assetIconSet = null;
   let assetManifest = null;
 
   // 与 engine/symbology.py 的 AFFILIATIONS 保持一致；这里的值只在数据集
@@ -222,6 +226,8 @@
 
   function isKnownIcon(icon) {
     if (!icon) return false;
+    // 用静态资产时**必须有资产**才算已知：只存在于目录里的键会渲染成空图。
+    if (useAssets && assetIconSet) return assetIconSet.has(icon);
     if (Object.prototype.hasOwnProperty.call(ICONS, icon)) return true;
     return Object.prototype.hasOwnProperty.call(GLYPHS, icon);
   }
@@ -378,6 +384,11 @@
       .then(function (m) {
         assetManifest = m;
         useAssets = true;
+        assetIconSet = new Set();
+        Object.keys((m && m.symbols) || {}).forEach(function (k) {
+          var mm = /^(.+)_(red|blue)(?:_sel)?$/.exec(k);
+          if (mm) assetIconSet.add(mm[1]);
+        });
         // 版本对不上说明产物不是当前 milsymbol 生成的，仍可用但要留痕。
         if (m && m.milsymbol && m.milsymbol !== MILSYMBOL_EXPECTED) {
           console.warn('[symbology] 符号资产由 milsymbol ' + m.milsymbol +
@@ -402,6 +413,7 @@
   /** 手动切换资产/兜底模式（verifyAssets 会自己调；测试与诊断也用它）。 */
   function setAssetMode(on) {
     useAssets = !!on;
+    if (!useAssets) assetIconSet = null;
     cache.clear();
   }
 
