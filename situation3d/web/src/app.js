@@ -1523,6 +1523,7 @@ function teardownScene() {
   if (!viewer) return;
   detachFollow('TS已切换');
   clearTargetSelection();
+  if (window.TargetCombatFx) TargetCombatFx.dispose();
   if (window.TargetFx) TargetFx.dispose();
   if (window.TargetMotion) TargetMotion.dispose(viewer);
   viewer.entities.removeAll();
@@ -2320,6 +2321,9 @@ function targetFxApi() {
     clockTime: function () { return viewer ? viewer.clock.currentTime : null; },
     playing: function () { return !!state.playing; },
     cameraHeight: cameraHeightMeters,
+    tick: function () { return state.tick; },
+    tickFloat: function () { return state.tickFloat; },
+    selected: function () { return state.selected; },
   };
 }
 
@@ -2334,6 +2338,10 @@ function attachMotionAndFx(data) {
   if (window.TargetFx) {
     try { TargetFx.init(viewer, data, targetFxApi()); }
     catch (e) { console.warn('[fx] 初始化失败：', e); }
+  }
+  if (window.TargetCombatFx) {
+    try { TargetCombatFx.init(viewer, data, targetFxApi()); }
+    catch (e) { console.warn("[combat-fx] 初始化失败：", e); }
   }
   if (window.TargetMotion) {
     TargetMotion.load(viewer, data).then(function (st) {
@@ -5927,6 +5935,7 @@ function loop(nowMs) {
   // 时刻插值；特效在同一帧读取同一个时钟。
   if (window.TargetMotion) TargetMotion.syncClock(state.tickFloat);
   if (window.TargetFx) TargetFx.frame(dt);
+  if (window.TargetCombatFx) TargetCombatFx.frame(dt);
 
   if (RenderGovernor.take()) syncEntities();
   // 标签避让按时间节流（不受 RenderGovernor 的脏标记影响：相机微动也要重排）。
@@ -6815,6 +6824,81 @@ function applyTargetOverrides() {
     if (ov.model !== undefined) t.model = ov.model;
   });
 }
+/**
+ * Left/right panel chrome: collapse buttons and drag-to-resize handles.
+ * Widths live in CSS variables on #workspace, so responsive rules remain the
+ * baseline and a user drag only overrides that one dimension at runtime.
+ */
+function bindPanelChrome() {
+  var ws = document.getElementById('workspace');
+  if (!ws) return;
+  var left = document.getElementById('panelLeft');
+  var right = document.getElementById('panelRight');
+  var toggleL = document.getElementById('toggleLeftPanel');
+  var toggleR = document.getElementById('toggleRightPanel');
+  if (!left || !right || !toggleL || !toggleR) return;
+
+  function setWidth(side, px) {
+    px = Math.max(180, Math.min(620, Math.round(px)));
+    ws.style.setProperty(side === 'left' ? '--panel-left-w' : '--panel-right-w', px + 'px');
+  }
+  function syncToggles() {
+    var lc = ws.classList.contains('left-collapsed');
+    var rc = ws.classList.contains('right-collapsed');
+    toggleL.textContent = lc ? '›' : '‹';
+    toggleR.textContent = rc ? '‹' : '›';
+    toggleL.title = lc ? '展开左栏' : '收起左栏';
+    toggleR.title = rc ? '展开右栏' : '收起右栏';
+  }
+  function resizeViewer() {
+    if (viewer) setTimeout(function () { try { viewer.resize(); } catch (e) {} }, 200);
+  }
+  toggleL.addEventListener('click', function () {
+    ws.classList.toggle('left-collapsed');
+    syncToggles(); resizeViewer();
+  });
+  toggleR.addEventListener('click', function () {
+    ws.classList.toggle('right-collapsed');
+    syncToggles(); resizeViewer();
+  });
+
+  var drag = null;
+  function onDown(e) {
+    var side = this.getAttribute('data-resize');
+    if (!side || (side === 'left' && ws.classList.contains('left-collapsed')) ||
+        (side === 'right' && ws.classList.contains('right-collapsed'))) return;
+    e.preventDefault();
+    drag = { side: side, x: e.clientX,
+             w: (side === 'left' ? left : right).getBoundingClientRect().width };
+    ws.classList.add('resizing');
+    this.classList.add('dragging');
+    // Listen on window: the pointer leaves the 6 px handle almost immediately.
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+    window.addEventListener('mouseup', onUp, { once: true });
+  }
+  function onMove(e) {
+    if (!drag) return;
+    var dx = e.clientX - drag.x;
+    setWidth(drag.side, drag.side === 'left' ? drag.w + dx : drag.w - dx);
+  }
+  function onUp() {
+    if (!drag) return;
+    drag = null;
+    ws.classList.remove('resizing');
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('mousemove', onMove);
+    document.querySelectorAll('.panel-resizer').forEach(function (n) { n.classList.remove('dragging'); });
+    resizeViewer();
+  }
+  document.querySelectorAll('.panel-resizer').forEach(function (n) {
+    n.addEventListener('pointerdown', onDown);
+    n.addEventListener('mousedown', onDown);
+  });
+  syncToggles();
+}
+
 function bindUI() {
   const bindCheck = function (id, handler) {
     const node = document.getElementById(id);
@@ -7149,6 +7233,7 @@ function bindUI() {
   captureLayerDefaults();
 
   bindPicking();
+  bindPanelChrome();
   bindPlotPanel();
   bindFollowInput();
 

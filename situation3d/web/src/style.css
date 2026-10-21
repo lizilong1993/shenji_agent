@@ -1598,3 +1598,67 @@ select {
 
 /* 作战阶段（.rl-phase）的配色在 .region-level 那一节里定义——横幅移除后这里不再有
    第二份 .lb-phase 规则。 */
+
+
+/* ---- panel chrome: collapsible / resizable / responsive ---- */
+#scenarioName { display: none !important; } /* 代码仍更新，不在顶栏占位 */
+.layer-cmds { display: none !important; }  /* 按钮代码保留，仅隐藏 */
+
+.workspace { position: relative; --panel-left-w: 268px; --panel-right-w: 380px; }
+.panel { min-width: 0; }
+.panel-left  { flex: 0 0 auto; width: var(--panel-left-w); position: relative; }
+.panel-right { flex: 0 0 auto; width: var(--panel-right-w); position: relative; }
+.panel-resizer {
+  position: absolute; top: 0; bottom: 0; width: 6px; z-index: 9;
+  cursor: col-resize; background: transparent;
+}
+.panel-resizer:hover, .panel-resizer.dragging { background: rgba(79, 140, 255, .28); }
+.panel-resizer-right { right: -3px; }
+.panel-resizer-left  { left: -3px; }
+.panel-toggle {
+  position: absolute; top: 50%; z-index: 12; width: 20px; height: 46px;
+  transform: translateY(-50%); border: 1px solid var(--border); border-radius: 5px;
+  background: var(--panel); color: var(--text); font-size: 15px; line-height: 1;
+  cursor: pointer; padding: 0; box-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
+.panel-toggle:hover { background: var(--panel-alt); }
+.panel-toggle-left  { left: calc(var(--panel-left-w) - 10px); }
+.panel-toggle-right { right: calc(var(--panel-right-w) - 10px); }
+.workspace.left-collapsed  { --panel-left-w: 0px; }
+.workspace.right-collapsed { --panel-right-w: 0px; }
+.workspace.left-collapsed .panel-left,
+.workspace.right-collapsed .panel-right {
+  padding: 0; border: 0; overflow: hidden; min-width: 0; max-width: 0;
+}
+.workspace.left-collapsed .panel-left > *,
+.workspace.right-collapsed .panel-right > * { display: none; }
+.workspace.left-collapsed .panel-toggle-left  { left: 0; }
+.workspace.right-collapsed .panel-toggle-right { right: 0; }
+.workspace.left-collapsed .panel-resizer,
+.workspace.right-collapsed .panel-resizer { display: none; }
+.panel-left, .panel-right { transition: flex-basis .18s ease; }
+.workspace.resizing .panel-left,
+.workspace.resizing .panel-right { transition: none; }
+
+@media (min-width: 1800px) {
+  .workspace { --panel-left-w: 320px; --panel-right-w: 460px; }
+}
+@media (max-width: 1280px) {
+  .workspace { --panel-left-w: 230px; --panel-right-w: 320px; }
+}
+@media (max-width: 1000px) {
+  .workspace { --panel-left-w: 210px; --panel-right-w: 280px; }
+  .topbar { gap: 8px; padding: 0 10px; }
+  .brand strong { font-size: 14px; }
+}
+@media (max-width: 760px) {
+  .workspace { flex-direction: column; overflow: auto; }
+  .panel-left, .panel-right {
+    flex: 0 0 auto; width: 100%; max-height: 34vh;
+    border: 1px solid var(--border); border-left: 0; border-right: 0;
+  }
+  .globe-wrap { flex: 1 1 auto; min-height: 56vh; }
+  .panel-toggle, .panel-resizer { display: none; }
+  .topbar { height: auto; min-height: 48px; flex-wrap: wrap; padding: 6px 10px; }
+  .topbar-actions { margin-left: 0; flex-wrap: wrap; }
+}
