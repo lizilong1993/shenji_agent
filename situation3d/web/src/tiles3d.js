@@ -50,9 +50,10 @@
     // v2：修复 b3dm glTF 轴向（Y-up）并调大 geometricError。
     // v3：并入 GBA 全量卫星解译轮廓（GBA.Polygon，CC BY-NC，仅内部使用），
     //     14 个 AOI 建模栋数 +82%（含 100% 有效高度），详见调研报告第 9 节。
+    // v4：去重阈值放宽（保留依附建筑）+ GBA 高度尖刺防护（h>150 回退），210,535 栋。
     'tiles3d.tw_coastal': {
       label: '台湾沿海城市建筑白膜',
-      url: './tiles3d/tw_coastal_v3/tileset.json',
+      url: './tiles3d/tw_coastal_v4/tileset.json',
     },
   };
 

@@ -3739,6 +3739,12 @@ function refreshRelations(force) {
   var spos = positionFor(sid, state.tick);
   if (!sdef || !spos) return;
   var fid = relAttr(sdef, 'formation_id');
+  // Dense cases (80 targets) turn the relation layer into a hairball: one
+  // selected target can produce ~79 lines and 34 distance labels, rebuilt
+  // every tick. Keep only the closest hostile relations in that case; old
+  // cases are untouched.
+  var dense = !!(state.data && (state.data.campaign_contract_version ||
+    ((state.data.targets || []).length > 50)));
   var eng = [], inf = [];
   Object.keys(state.targets).forEach(function (id) {
     if (id === sid) return;
@@ -3748,16 +3754,20 @@ function refreshRelations(force) {
     // 友方：同编队（formation_id 一致）或同阵营。
     // **同编队关系是数据集明确声明的 → 实测、实线、绿色。**
     if (fid && relAttr(def, 'formation_id') === fid) {
-      relAddLine(spos, pos, false, relColor('own', false),
-                 relText('own', 'measured', sdef, def, relKm(spos, pos)));
-      relView.own++;
+      if (!dense) {
+        relAddLine(spos, pos, false, relColor('own', false),
+                   relText('own', 'measured', sdef, def, relKm(spos, pos)));
+        relView.own++;
+      }
       relView.peers.push(id);
       return;
     }
     if (def.affiliation === sdef.affiliation) {
-      relAddLine(spos, pos, false, relColor('own', false),
-                 relText('own', 'measured', sdef, def, relKm(spos, pos)));
-      relView.own++;
+      if (!dense) {
+        relAddLine(spos, pos, false, relColor('own', false),
+                   relText('own', 'measured', sdef, def, relKm(spos, pos)));
+        relView.own++;
+      }
       return;
     }
     var km = relKm(spos, pos);
@@ -3768,6 +3778,12 @@ function refreshRelations(force) {
   relView.criterion = useInf ? 'influence' : 'engage';
   relView.hostileInf = inf.length;
   var drawn = useInf ? inf : eng;
+  if (dense) {
+    // Closest hostile contacts are the ones worth drawing; the rest are
+    // available in the target panel / inference data but not as screen lines.
+    drawn = drawn.slice().sort(function (a, b) { return a.km - b.km; }).slice(0, 6);
+  }
+  relView.dense = dense;
   // 敌方：距离阈值推出来的关系是**推理**（数据集没有声明交火），虚线 + 浅一档的颜色。
   drawn.forEach(function (o) {
     var def = state.targets[o.id].def;
@@ -6007,21 +6023,21 @@ function registerLayerProviders() {
   // 不做逐 AOI 显隐：Cesium3DTileset 不支持对子 tileset 单独 show，按 AOI 拆 15 个
   // tileset 实例的复杂度不值得，先给定位入口。
   const TW_COASTAL_AOIS = [
-    { key: 'keelung',        label: '基隆',          buildings: 3466,  bbox: [121.700, 25.105, 121.780, 25.175] },
-    { key: 'taipei_port',    label: '台北港（八里）', buildings: 827,   bbox: [121.330, 25.125, 121.420, 25.200] },
-    { key: 'taoyuan_coast',  label: '桃园海岸',      buildings: 2520,  bbox: [121.080, 25.010, 121.220, 25.120] },
-    { key: 'hsinchu',        label: '新竹',          buildings: 7880,  bbox: [120.940, 24.770, 121.030, 24.850] },
-    { key: 'taichung_port',  label: '台中港',        buildings: 6477,  bbox: [120.480, 24.230, 120.620, 24.320] },
-    { key: 'changhua',       label: '彰化（鹿港）',   buildings: 8122,  bbox: [120.340, 24.020, 120.490, 24.120] },
-    { key: 'mailiao',        label: '麦寮',          buildings: 1684,  bbox: [120.160, 23.740, 120.280, 23.830] },
-    { key: 'budai',          label: '布袋',          buildings: 231,   bbox: [120.110, 23.340, 120.230, 23.430] },
-    { key: 'anping',         label: '安平（台南）',   buildings: 16395, bbox: [120.130, 22.960, 120.230, 23.040] },
-    { key: 'kaohsiung',      label: '高雄港／左营',   buildings: 15266, bbox: [120.240, 22.540, 120.400, 22.680] },
-    { key: 'fangliao',       label: '枋寮',          buildings: 824,   bbox: [120.540, 22.320, 120.640, 22.400] },
-    { key: 'suao',           label: '苏澳',          buildings: 4141,  bbox: [121.810, 24.540, 121.910, 24.640] },
-    { key: 'hualien',        label: '花莲',          buildings: 44420, bbox: [121.560, 23.930, 121.660, 24.030] },
-    { key: 'taitung',        label: '台东（富冈）',   buildings: 1714,  bbox: [121.110, 22.740, 121.210, 22.840] },
-    { key: 'penghu',         label: '澎湖（马公）',   buildings: 818,   bbox: [119.520, 23.520, 119.630, 23.610] },
+    { key: 'keelung',        label: '基隆',          buildings: 9302,  bbox: [121.700, 25.105, 121.780, 25.175] },
+    { key: 'taipei_port',    label: '台北港（八里）', buildings: 2321,   bbox: [121.330, 25.125, 121.420, 25.200] },
+    { key: 'taoyuan_coast',  label: '桃园海岸',      buildings: 11718,  bbox: [121.080, 25.010, 121.220, 25.120] },
+    { key: 'hsinchu',        label: '新竹',          buildings: 16252,  bbox: [120.940, 24.770, 121.030, 24.850] },
+    { key: 'taichung_port',  label: '台中港',        buildings: 17076,  bbox: [120.480, 24.230, 120.620, 24.320] },
+    { key: 'changhua',       label: '彰化（鹿港）',   buildings: 19638,  bbox: [120.340, 24.020, 120.490, 24.120] },
+    { key: 'mailiao',        label: '麦寮',          buildings: 7529,  bbox: [120.160, 23.740, 120.280, 23.830] },
+    { key: 'budai',          label: '布袋',          buildings: 3388,   bbox: [120.110, 23.340, 120.230, 23.430] },
+    { key: 'anping',         label: '安平（台南）',   buildings: 23269, bbox: [120.130, 22.960, 120.230, 23.040] },
+    { key: 'kaohsiung',      label: '高雄港／左营',   buildings: 31109, bbox: [120.240, 22.540, 120.400, 22.680] },
+    { key: 'fangliao',       label: '枋寮',          buildings: 2345,   bbox: [120.540, 22.320, 120.640, 22.400] },
+    { key: 'suao',           label: '苏澳',          buildings: 8181,  bbox: [121.810, 24.540, 121.910, 24.640] },
+    { key: 'hualien',        label: '花莲',          buildings: 47411, bbox: [121.560, 23.930, 121.660, 24.030] },
+    { key: 'taitung',        label: '台东（富冈）',   buildings: 5285,  bbox: [121.110, 22.740, 121.210, 22.840] },
+    { key: 'penghu',         label: '澎湖（马公）',   buildings: 5711,   bbox: [119.520, 23.520, 119.630, 23.610] },
   ];
   LayerRegistry.setProvider('tiles3d.tw_coastal', function () {
     const on = !!(window.Local3D && Local3D.enabled && Local3D.enabled('tiles3d.tw_coastal'));
