@@ -137,6 +137,7 @@
     indexEvents();
     resetAll();
     lastTick = apiTick();
+    buildProxyGuns();
     rebuildState(lastTick);
   }
 
@@ -166,7 +167,9 @@
         (smoke[id].ents || []).forEach(function (ent) { ctx.viewer.entities.remove(ent); });
       });
       if (scan && scan.entity) ctx.viewer.entities.remove(scan.entity);
+      Object.keys(proxyEnts).forEach(function (id) { ctx.viewer.entities.remove(proxyEnts[id].entity); });
     }
+    proxyEnts = {};
     transients = [];
     projectiles = [];
     smoke = {};
@@ -192,6 +195,8 @@
       (smoke[id].ents || []).forEach(function (ent) { ctx.viewer.entities.remove(ent); });
     });
     if (scan && scan.entity) ctx.viewer.entities.remove(scan.entity);
+    Object.keys(proxyEnts).forEach(function (id) { ctx.viewer.entities.remove(proxyEnts[id].entity); });
+    proxyEnts = {};
     transients = [];
     projectiles = [];
     smoke = {};
@@ -325,6 +330,89 @@
     return out;
   }
 
+
+  // ------------------------------------------------------------------
+  // 代理炮塔（覆盖合批网格里的原炮位）
+  // 只在 052C/054A/99A 上启用；代理是独立 Entity，不修改原模型。
+  // ------------------------------------------------------------------
+  var PROXY = {
+    ship052c: { model: './assets/models/type_052c_gunfx.glb', offset: [-49.2, 0.38, 6.0], muzzle: [-55.6, 0.38, 7.35] },
+    ship054a: { model: './assets/models/type_054a_gunfx.glb', offset: [-46.34, 0, 6.95], muzzle: [-50.4, 0, 8.05] },
+    tank99a: { model: './assets/models/type_99a_gunfx.glb', offset: [0.2, 0, 1.3], muzzle: [-6.4, 0, 2.35] },
+  };
+  var proxyEnts = {};
+  var proxyRecoil = { ship052c: 0, ship054a: 0, tank99a: 0 };
+
+  function proxyKey(def) {
+    var text = ((def && def.model) || '') + ' ' + ((def && def.platform_class) || '');
+    if (/052d|052c|luyang/i.test(text)) return 'ship052c';
+    if (/054a/i.test(text)) return 'ship054a';
+    if (/99a|ztz-?99/i.test(text)) return 'tank99a';
+    return null;
+  }
+
+  function rotatedOffset(rec, off, result) {
+    var time = ctx.viewer.clock.currentTime;
+    var q = null;
+    try { q = rec.orientation && rec.orientation.getValue(time); } catch (err) {}
+    Cesium.Cartesian3.fromElements(off[0], off[1], off[2], scratchOff);
+    if (q) {
+      Cesium.Matrix3.fromQuaternion(q, scratchRot);
+      Cesium.Matrix3.multiplyByVector(scratchRot, scratchOff, scratchOff);
+    }
+    return Cesium.Cartesian3.clone(scratchOff, result);
+  }
+
+  function buildProxyGuns() {
+    (data.targets || []).forEach(function (d) {
+      var key = proxyKey(d);
+      if (!key || !PROXY[key]) return;
+      var rec = e(d.id);
+      if (!rec) return;
+      var cfg = PROXY[key];
+      var ent = ctx.viewer.entities.add({
+        id: 'fxgun-' + d.id,
+        show: false,
+        position: new Cesium.CallbackProperty(function () {
+          var p = rec.position && rec.position.getValue(ctx.viewer.clock.currentTime);
+          if (!p) return undefined;
+          var off = rotatedOffset(rec, cfg.offset, new Cesium.Cartesian3());
+          return Cesium.Cartesian3.add(p, off, new Cesium.Cartesian3());
+        }, false),
+        orientation: new Cesium.CallbackProperty(function () {
+          try { return rec.orientation && rec.orientation.getValue(ctx.viewer.clock.currentTime); } catch (err) { return undefined; }
+        }, false),
+        model: {
+          uri: cfg.model,
+          scale: 1,
+          minimumPixelSize: 0,
+          nodeTransformations: {
+            fx_barrel: new Cesium.NodeTransformationProperty({
+              translation: new Cesium.CallbackProperty(function () {
+                return new Cesium.Cartesian3(0, -proxyRecoil[key], 0);
+              }, false),
+            }),
+          },
+        },
+      });
+      proxyEnts[d.id] = { entity: ent, key: key, def: d };
+    });
+  }
+
+  function updateProxyGuns() {
+    var now = ctx.viewer.clock.currentTime;
+    var camH = ctx.api.cameraHeight ? ctx.api.cameraHeight() : 0;
+    Object.keys(proxyEnts).forEach(function (id) {
+      var px = proxyEnts[id];
+      var rec = e(id);
+      var show = false;
+      if (rec && camH <= 3200 && rec.model && rec.model.show) {
+        try { show = !!rec.model.show.getValue(now); } catch (err) { show = false; }
+      }
+      px.entity.show = show;
+    });
+  }
+
   // ------------------------------------------------------------------
   // 帧循环
   // ------------------------------------------------------------------
@@ -348,9 +436,11 @@
       rigAngles.hq16 = (rigAngles.hq16 + d * 0.9) % (Math.PI * 2);
       rigAngles.yj62 = Math.max(0, rigAngles.yj62 - d * 0.18);
       rigAngles.m1a2 = Math.max(0, rigAngles.m1a2 - d * 0.9);
+      Object.keys(proxyRecoil).forEach(function (k) { proxyRecoil[k] = Math.max(0, proxyRecoil[k] - d * 1.4); });
     }
     updateProjectiles();
     updateTransients();
+    updateProxyGuns();
     updateDamageStates(tick);
     updateSmoke(tick);
     updateScan(tick);
@@ -430,6 +520,14 @@
 
   function muzzlePosition(id, def) {
     var rec = e(id);
+    var pk = proxyKey(def || {});
+    if (pk && PROXY[pk] && rec) {
+      var pp = rec.position && rec.position.getValue(ctx.viewer.clock.currentTime);
+      if (pp) {
+        var mo = rotatedOffset(rec, PROXY[pk].muzzle, new Cesium.Cartesian3());
+        return Cesium.Cartesian3.add(pp, mo, new Cesium.Cartesian3());
+      }
+    }
     if (!rec) return null;
     var time = ctx.viewer.clock.currentTime;
     var pos = null;
@@ -475,6 +573,8 @@
   function onFire(ev) {
     var shooterDef = defById[(ev.actors && ev.actors[0]) || ev.shooter_id];
     if (shooterDef) {
+      var pk = proxyKey(shooterDef);
+      if (pk) proxyRecoil[pk] = 0.45;
       var rk = rigKey(shooterDef);
       if (rk === 'yj62') rigAngles.yj62 = 0.22;
       else if (rk === 'm1a2') rigAngles.m1a2 = 0.35;
@@ -867,6 +967,7 @@
       scan: scan ? { id: scan.id, show: scan.entity.show, range: scan.range } : null,
       destroyed: Object.keys(destroyed),
       rig: { z10: rigAngles.z10, hq16: rigAngles.hq16, yj62: rigAngles.yj62 },
+      proxy: Object.keys(proxyEnts).map(function (id) { return { id: id, show: proxyEnts[id].entity.show, key: proxyEnts[id].key }; }),
       smokeInfo: Object.keys(smoke).map(function (id) {
         var sm = sample(id);
         return { id: id, level: smokeState[id], lon: sm && sm.lon, lat: sm && sm.lat, alt: sm && sm.alt };
