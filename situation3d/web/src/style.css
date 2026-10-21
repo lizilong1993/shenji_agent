@@ -583,6 +583,7 @@ select {
 .tpr-model { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
 .tpr-view { position: relative; height: 150px; margin: 0 10px;
   border-radius: 3px; background: #0d1520; overflow: hidden; }
+.tpr-view.hidden { display: none; }
 .tpr-view-note { position: absolute; inset: 0; display: flex; align-items: center;
   justify-content: center; color: #9db0c6; font-size: 11px; }
 .tpr-state { display: flex; align-items: center; gap: 7px; padding: 6px 10px 2px; }

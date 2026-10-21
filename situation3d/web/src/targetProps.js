@@ -321,12 +321,16 @@
     var def = rec.def;
     var url = root.EntityLod ? EntityLod.modelUrlFor(def) : null;
     if (!url) {
-      // 没有 GLB 的目标不创建第二个 WebGL 上下文：只显示提示，零 GPU 开销。
+      // 没有 GLB 的目标：整个 3D 视口不显示（用户 2026-10-21 要求），
+      // 也不创建第二个 WebGL 上下文，只保留属性字段。
       if (viewer) destroyPreview();
       attemptedFor = currentId;
-      showNoModel('该目标暂无三维模型');
+      setViewVisible(false);
       return;
     }
+    // 视口可能是上一目标（无模型）时隐藏的：先显示再建 Viewer，
+    // 否则 Cesium 拿到的容器是 0×0。
+    setViewVisible(true);
     if (!ensureViewer()) { showNoModel('预览视图不可用'); return; }
     attemptedFor = currentId;
     removePreviewEntities();
@@ -525,13 +529,17 @@
 
     var L = modelLength(rec.def);
     var dist = Math.max(9, L * 1.55) * zoom;
-    // 相机 = 目标 + 右舷*dist + 上方*dist*0.16（略高于水面/地面的侧视）。
+    // 相机 = 目标 + 右舷*dist + 上方*dist*0.16；
+    // 视点 = 目标上方 dist*0.11 —— 模型落在视口中下部（约 70% 高度），
+    // 下方留给水面/地面参照盘，而不是死居中（用户 2026-10-21 要求）。
     C.Cartesian3.multiplyByScalar(scratchR, dist, scratchP);
     C.Cartesian3.multiplyByScalar(scratchU, dist * 0.16, scratchD);
     C.Cartesian3.add(pose.pos, scratchP, scratchP);
     C.Cartesian3.add(scratchP, scratchD, scratchP);
 
-    C.Cartesian3.subtract(pose.pos, scratchP, scratchD);
+    var look = C.Cartesian3.multiplyByScalar(scratchU, dist * 0.11, new C.Cartesian3());
+    C.Cartesian3.add(pose.pos, look, look);
+    C.Cartesian3.subtract(look, scratchP, scratchD);
     C.Cartesian3.normalize(scratchD, scratchD);
     var up = C.Cartesian3.clone(scratchU, new C.Cartesian3());
     viewer.camera.setView({
@@ -696,6 +704,7 @@
   function showNoModel(msg) {
     var host = $('tprView');
     if (!host) return;
+    setViewVisible(true);
     host.classList.add('tpr-view-empty');
     var node = host.querySelector('.tpr-view-note');
     if (!node) {
@@ -712,6 +721,12 @@
     host.classList.remove('tpr-view-empty');
     var node = host.querySelector('.tpr-view-note');
     if (node) node.remove();
+  }
+
+  /** 无模型目标隐藏整个 3D 视口（含黑底与提示），面板只留属性字段。 */
+  function setViewVisible(v) {
+    var host = $('tprView');
+    if (host) host.classList.toggle('hidden', !v);
   }
 
   // ------------------------------------------------------------------
@@ -911,6 +926,16 @@
         ? Object.keys(pvModel.nodeTransformations) : [],
       proxy: !!proxyEnt, ground: !!groundEnt,
     };
+    var viewEl = $('tprView');
+    out.viewVisible = !!(viewEl && !viewEl.classList.contains('hidden'));
+    if (viewer && previewEnt && mainPos) {
+      var w = C.SceneTransforms.worldToWindowCoordinates(viewer.scene, mainPos);
+      var cv = viewer.scene.canvas;
+      out.modelScreen = w ? {
+        x: +(w.x / Math.max(1, cv.clientWidth)).toFixed(3),
+        y: +(w.y / Math.max(1, cv.clientHeight)).toFixed(3),
+      } : null;
+    }
     out.posDelta = (mainPos && pvPos) ? C.Cartesian3.distance(mainPos, pvPos) : null;
     out.orientDot = (mainQ && pvQ)
       ? Math.abs(mainQ.x * pvQ.x + mainQ.y * pvQ.y + mainQ.z * pvQ.z + mainQ.w * pvQ.w) : null;
