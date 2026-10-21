@@ -82,6 +82,7 @@ class EnvPackEnvironment(object):
         self.layers = self.manifest.get("layers") or {}
         self.grid = LegacyHexGrid.from_grid_meta(self.manifest["grid"])
         self._terrain = self._load_json("terrain")
+        self._bathymetry = self._load_json("bathymetry")
         self._landcover = self._load_json("landcover") or []
         self._water = self._load_json("water") or []
         self._buildings = self._load_json("buildings") or []
@@ -162,6 +163,30 @@ class EnvPackEnvironment(object):
              + t["values"][y1][x1] * tx * ty)
         return float(v)
 
+    @staticmethod
+    def _grid_value(grid, lon: float, lat: float):
+        """Bilinear sample of a regular lon/lat grid (None when off-grid)."""
+        if not grid:
+            return None
+        fx = (lon - grid["lon0"]) / max(1e-12, grid["lon1"] - grid["lon0"])
+        fy = (lat - grid["lat0"]) / max(1e-12, grid["lat1"] - grid["lat0"])
+        if fx < 0 or fy < 0 or fx > 1 or fy > 1:
+            return None
+        x0, y0 = int(fx * (grid["cols"] - 1)), int(fy * (grid["rows"] - 1))
+        x0 = min(x0, grid["cols"] - 2) if grid["cols"] > 1 else 0
+        y0 = min(y0, grid["rows"] - 2) if grid["rows"] > 1 else 0
+        x1 = min(x0 + 1, grid["cols"] - 1)
+        y1 = min(y0 + 1, grid["rows"] - 1)
+        tx = fx * (grid["cols"] - 1) - x0
+        ty = fy * (grid["rows"] - 1) - y0
+        v = grid["values"]
+        corners = (v[y0][x0], v[y0][x1], v[y1][x0], v[y1][x1])
+        if any(c is None for c in corners):
+            return None
+        top = corners[0] * (1 - tx) + corners[1] * tx
+        bottom = corners[2] * (1 - tx) + corners[3] * tx
+        return top * (1 - ty) + bottom * ty
+
     def slope_deg(self, lon: float, lat: float, bearing_deg: float = 0.0) -> float:
         br = math.radians(bearing_deg)
         d = max(50.0, self.grid.cell_m)
@@ -229,6 +254,10 @@ class EnvPackEnvironment(object):
             value = self._basic_env.water_depth(lon, lat)
         else:
             value = None
+        if value is not None:
+            sound = self._grid_value(self._bathymetry, lon, lat)
+            if sound is not None and sound < 0.0:
+                value = round(-float(sound), 1)
         self._water_cache[key] = value
         return value
 

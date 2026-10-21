@@ -28,7 +28,7 @@ class EnvPack(object):
 
     def _validate(self) -> None:
         m = self.manifest
-        if m.get("schema") != "msgeo.envpack.v1":
+        if m.get("schema") not in ("msgeo.envpack.v1", "msgeo.envpack.v2"):
             raise EnvPackError("unsupported schema %r" % (m.get("schema"),))
         for key in ("theatre", "bbox", "tile_size_m", "layers"):
             if key not in m:

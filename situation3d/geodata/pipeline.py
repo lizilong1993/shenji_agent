@@ -27,6 +27,8 @@ from typing import Optional
 from geodata.cache import CacheCorrupt, CacheStore, OfflineCacheMiss
 from geodata.dem import DemSource, OnlineDemError
 from geodata.osm import OnlineSourceError, OsmSource
+from geodata.bathymetry import GebcoSource, OnlineBathymetryError
+from geodata.height_fallback import HeightFallback
 from geo.geodesy import haversine_m
 
 
@@ -119,17 +121,55 @@ def _road_graph(features: dict):
     return {"nodes": nodes, "edges": edges}
 
 
+CHUNK_DEG = 5000.0 / 111320.0
+
+
+def _write_chunks(out: str, layer: str, items) -> dict:
+    """Split polygons into 5 km cells and return the chunk index."""
+    if not items:
+        return {"cell_deg": round(CHUNK_DEG, 6), "chunks": {}}
+    cells = {}
+    for item in items:
+        ring = item.get("ring") or []
+        if len(ring) < 3:
+            continue
+        lon = sum(p[0] for p in ring) / len(ring)
+        lat = sum(p[1] for p in ring) / len(ring)
+        key = (int(math.floor(lon / CHUNK_DEG)), int(math.floor(lat / CHUNK_DEG)))
+        cells.setdefault(key, []).append(item)
+    index = {}
+    for (ix, iy), chunk in sorted(cells.items()):
+        name = "%d_%d.json" % (ix, iy)
+        rel = "%s/chunks/%s" % (layer, name)
+        _write_json(os.path.join(out, rel), chunk)
+        index["%d_%d" % (ix, iy)] = {"path": rel, "count": len(chunk)}
+    return {"cell_deg": round(CHUNK_DEG, 6), "chunks": index}
+
+
 def _write_json(path: str, obj) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(obj, fh, ensure_ascii=False)
 
 
+def _source_provenance(source) -> str:
+    """Map a source to a manifest provenance label.
+
+    Sources that parsed their primary input (network or local PBF) expose
+    ``fetched_network = True``; replayed caches are labelled offline.
+    A ``provenance_label`` names the data product, e.g. copernicus-glo30.
+    """
+    if not getattr(source, "fetched_network", False):
+        return "offline-cache"
+    return getattr(source, "provenance_label", None) or "online"
+
+
 def build_envpack(out: str, basic: dict, grid, theatre: str = "demo",
                   mode: str = "auto", cache_dir: Optional[str] = None,
                   resolution_m: float = 200.0, dem_zoom: int = 10,
                   use_osm: bool = True, use_dem: bool = True,
-                  osm_source=None, dem_source=None,
+                  use_bathymetry: bool = True, height_geojson=None,
+                  osm_source=None, dem_source=None, bathymetry_source=None,
                   bbox=None) -> dict:
     if resolution_m <= 0:
         raise ValueError("resolution_m must be positive")
@@ -137,13 +177,14 @@ def build_envpack(out: str, basic: dict, grid, theatre: str = "demo",
     bbox = bbox or _bbox_from_basic(basic, grid)
     os.makedirs(out, exist_ok=True)
 
-    provenance = {"mode": mode, "osm": "none", "dem": "none", "fallback": False}
+    provenance = {"mode": mode, "osm": "none", "dem": "none",
+                  "bathymetry": "none", "fallback": False}
     features = {"roads": [], "water": [], "buildings": [], "landuse": []}
     if use_osm:
         source = osm_source or OsmSource(cache)
         try:
             features = source.features(bbox)
-            provenance["osm"] = "online" if getattr(source, "fetched_network", False) else "offline-cache"
+            provenance["osm"] = _source_provenance(source)
         except (OfflineCacheMiss, OnlineSourceError, CacheCorrupt) as exc:
             provenance["osm"] = "fallback-basic (%s)" % type(exc).__name__
             provenance["fallback"] = True
@@ -154,13 +195,34 @@ def build_envpack(out: str, basic: dict, grid, theatre: str = "demo",
             dem = dem_source or DemSource(cache, zoom=dem_zoom)
             step_deg = float(resolution_m) / 111320.0
             terrain = dem.sample_grid(bbox, step_deg)
-            provenance["dem"] = "online" if getattr(dem, "fetched_network", False) else "offline-cache"
+            provenance["dem"] = _source_provenance(dem)
         except (OfflineCacheMiss, OnlineDemError, CacheCorrupt):
             terrain = None
     if terrain is None:
         terrain = _fallback_grid(basic, grid, bbox, resolution_m)
         provenance["dem"] = "fallback-basic"
         provenance["fallback"] = True
+
+    bathymetry = None
+    if use_bathymetry:
+        try:
+            bath = bathymetry_source or GebcoSource(cache)
+            step_deg = float(resolution_m) / 111320.0
+            bathymetry = bath.sample_grid(bbox, step_deg)
+            provenance["bathymetry"] = _source_provenance(bath)
+        except (OfflineCacheMiss, OnlineBathymetryError, CacheCorrupt):
+            bathymetry = None
+            provenance["bathymetry"] = "none"
+
+    if height_geojson:
+        try:
+            stats = HeightFallback(height_geojson).fill(features["buildings"])
+            provenance["building_heights"] = {
+                "source": os.path.basename(height_geojson),
+                "filled": stats["filled"], "spikes": stats["spikes"],
+                "total": stats["total"]}
+        except (OSError, ValueError) as exc:
+            provenance["building_heights"] = "failed: %s" % type(exc).__name__
 
     roads = _road_graph(features)
     if not roads["edges"]:
@@ -173,8 +235,15 @@ def build_envpack(out: str, basic: dict, grid, theatre: str = "demo",
     _write_json(os.path.join(out, "terrain", "grid.json"), terrain)
     _write_json(os.path.join(out, "landcover", "polygons.json"),
                 features.get("landuse") or [])
+    chunks = {
+        "landcover": _write_chunks(out, "landcover", features.get("landuse") or []),
+        "water": _write_chunks(out, "water", features.get("water") or []),
+        "buildings": _write_chunks(out, "buildings", features.get("buildings") or []),
+    }
     _write_json(os.path.join(out, "water", "polygons.json"),
                 features.get("water") or [])
+    if bathymetry is not None:
+        _write_json(os.path.join(out, "water", "depth.json"), bathymetry)
     _write_json(os.path.join(out, "buildings", "buildings.json"),
                 features.get("buildings") or [])
     _write_json(os.path.join(out, "roads", "graph.json"), roads)
@@ -182,7 +251,7 @@ def build_envpack(out: str, basic: dict, grid, theatre: str = "demo",
         json.dump(basic, fh, ensure_ascii=False)
 
     manifest = {
-        "schema": "msgeo.envpack.v1",
+        "schema": "msgeo.envpack.v2",
         "theatre": theatre,
         "mode": mode,
         "built": __import__("datetime").date.today().isoformat(),
@@ -197,11 +266,18 @@ def build_envpack(out: str, basic: dict, grid, theatre: str = "demo",
             "terrain": {"format": "grid-json", "path": "terrain/grid.json",
                         "source": provenance["dem"], "resolution_m": resolution_m},
             "landcover": {"format": "polygons-json", "path": "landcover/polygons.json",
-                          "source": provenance["osm"]},
+                          "source": provenance["osm"],
+                          "chunked": chunks["landcover"]},
             "water": {"format": "polygons-json", "path": "water/polygons.json",
-                      "source": provenance["osm"], "depth_m": 20.0},
+                      "source": provenance["osm"], "depth_m": 20.0,
+                      "chunked": chunks["water"],
+                      **({"depth_grid": "water/depth.json"} if bathymetry is not None else {})},
+            **({"bathymetry": {"format": "grid-json", "path": "water/depth.json",
+                                "source": provenance["bathymetry"]}}
+               if bathymetry is not None else {}),
             "buildings": {"format": "polygons-json", "path": "buildings/buildings.json",
-                          "source": provenance["osm"]},
+                          "source": provenance["osm"],
+                          "chunked": chunks["buildings"]},
             "roads": {"format": "graph-json", "path": "roads/graph.json",
                       "source": provenance.get("roads", provenance["osm"])},
         },

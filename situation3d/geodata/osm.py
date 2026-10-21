@@ -99,15 +99,16 @@ def _closed(coords: List[List[float]]) -> bool:
     return len(coords) >= 4 and coords[0][0] == coords[-1][0] and coords[0][1] == coords[-1][1]
 
 
-def _height(tags: dict) -> float:
+def _height(tags: dict):
+    """Return ``(height_m, source)`` from OSM tags."""
     try:
         if tags.get("height"):
-            return float(str(tags["height"]).replace("m", "").strip())
+            return float(str(tags["height"]).replace("m", "").strip()), "tag"
         if tags.get("building:levels"):
-            return float(tags["building:levels"]) * 3.0
+            return float(tags["building:levels"]) * 3.0, "levels"
     except ValueError:
         pass
-    return 6.0
+    return 6.0, "default"
 
 
 LANDUSE_MAP = {
@@ -140,8 +141,10 @@ def normalize(raw: dict) -> Dict[str, list]:
                 "name": tags.get("name"),
             })
         elif "building" in tags and _closed(coords):
+            height, height_source = _height(tags)
             features["buildings"].append({
-                "ring": coords, "height_m": _height(tags),
+                "ring": coords, "height_m": height,
+                "height_source": height_source,
                 "name": tags.get("name"), "levels": tags.get("building:levels"),
             })
         elif ("natural" in tags or "waterway" in tags or "landuse" in tags) and _closed(coords):

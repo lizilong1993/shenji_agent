@@ -31,6 +31,7 @@ if SITUATION3D not in sys.path:
     sys.path.insert(0, SITUATION3D)
 
 from compat.legacy import LegacyHexGrid  # noqa: E402
+from geodata.cache import CacheStore  # noqa: E402
 from geodata.pipeline import build_envpack  # noqa: E402
 
 
@@ -48,6 +49,14 @@ def main(argv=None) -> int:
     ap.add_argument("--dem-zoom", type=int, default=10)
     ap.add_argument("--no-osm", action="store_true")
     ap.add_argument("--no-dem", action="store_true")
+    ap.add_argument("--no-bath", action="store_true",
+                    help="skip GEBCO bathymetry sampling")
+    ap.add_argument("--osm-pbf", default=None,
+                    help="local .osm.pbf extract; replaces Overpass")
+    ap.add_argument("--dem-source", choices=("terrarium", "copernicus"),
+                    default="terrarium")
+    ap.add_argument("--height-geojson", default=None,
+                    help="polygon GeoJSON with height/h for building fallback")
     args = ap.parse_args(argv)
 
     with open(args.basic, encoding="utf-8") as fh:
@@ -57,11 +66,23 @@ def main(argv=None) -> int:
               file=sys.stderr)
         return 2
     grid = LegacyHexGrid.from_map_doc(basic)
+    cache = CacheStore(args.cache or os.path.join(args.out, "_cache"),
+                       mode=args.mode)
+    osm_source = None
+    if args.osm_pbf:
+        from geodata.osm_pbf import PbfOsmSource
+        osm_source = PbfOsmSource(cache, args.osm_pbf)
+    dem_source = None
+    if args.dem_source == "copernicus":
+        from geodata.dem_copernicus import CopernicusDemSource
+        dem_source = CopernicusDemSource(cache)
     manifest = build_envpack(
         args.out, basic, grid, theatre=args.theatre, mode=args.mode,
         cache_dir=args.cache, resolution_m=args.resolution_m,
         dem_zoom=args.dem_zoom, use_osm=not args.no_osm,
-        use_dem=not args.no_dem, bbox=args.bbox)
+        use_dem=not args.no_dem, use_bathymetry=not args.no_bath,
+        height_geojson=args.height_geojson,
+        osm_source=osm_source, dem_source=dem_source, bbox=args.bbox)
     print(json.dumps({"out": args.out, "mode": args.mode,
                       "provenance": manifest["provenance"],
                       "bbox": manifest["bbox"]}, ensure_ascii=False, indent=1))
