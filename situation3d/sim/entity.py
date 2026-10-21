@@ -8,7 +8,7 @@ only fixes the data contract so rules and adapters can be written against it.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from geo.geodesy import haversine_m, initial_bearing_deg, interpolate
 
@@ -109,6 +109,8 @@ class EntityRuleView(object):
     value: int
     ammo: Dict[str, int]
     weapons: List[object]
+    sea_air_weapons: List[object]
+    sensors: List[object]
     observe_distance: Dict[str, int]
 
     def ammo_count(self, key: str) -> int:
@@ -129,11 +131,15 @@ class Entity(object):
     vertical_ms: float = 0.0
     route: Optional[Route] = None
     route_s: float = 0.0
+    goal: Optional[Tuple[float, float]] = None
+    profile: Optional[object] = None
     blood: int = 1
     max_blood: int = 1
     armor: int = 0
     ammo: Dict[str, int] = field(default_factory=dict)
     weapons: List[object] = field(default_factory=list)
+    sea_air_weapons: List[object] = field(default_factory=list)
+    sensors: List[object] = field(default_factory=list)
     observe_distance: Dict[str, int] = field(default_factory=dict)
     fuel: float = 1.0
     suppressed: bool = False
@@ -181,5 +187,7 @@ class Entity(object):
             value=self.value,
             ammo=dict(self.ammo),
             weapons=list(self.weapons),
+            sea_air_weapons=list(self.sea_air_weapons),
+            sensors=list(self.sensors),
             observe_distance=dict(self.observe_distance),
         )

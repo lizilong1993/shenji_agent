@@ -141,6 +141,24 @@ class HexGrid(object):
     def distance(a: Tuple[int, int], b: Tuple[int, int]) -> int:
         return cube_distance(a, b)
 
+    def line(self, a: Tuple[int, int], b: Tuple[int, int]):
+        """Cells on the centre-to-centre line, inclusive (cube lerp)."""
+        ax, ay, az = offset_to_cube(*a)
+        bx, by, bz = offset_to_cube(*b)
+        n = cube_distance(a, b)
+        if n == 0:
+            return [a]
+        out = []
+        for i in range(n + 1):
+            t = i / float(n)
+            x, y, z = cube_round(ax + (bx - ax) * t,
+                                 ay + (by - ay) * t,
+                                 az + (bz - az) * t)
+            cell = cube_to_offset(x, y, z)
+            if not out or out[-1] != cell:
+                out.append(cell)
+        return out
+
     def distance_m(self, a: Tuple[int, int], b: Tuple[int, int]) -> float:
         ax, ay = self.cell_center_m(*a)
         bx, by = self.cell_center_m(*b)
