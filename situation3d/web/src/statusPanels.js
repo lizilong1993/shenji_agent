@@ -9,11 +9,12 @@
  * 状态语义（2026-10-21 起）
  * ------------------------
  * 指标从"告警等级"改为**战损四档**（正常 / 受损 / 严重受损 / 损毁），
- * 与鸟瞰图共用 `targetStatus.js` 的同一份血量估计与阈值——两边只做渲染，
+ * 与鸟瞰图共用 `targetStatus.js` 的同一份相对战损估计与阈值——两边只做渲染，
  * 不再各自定义档位，避免"面板绿、地图黄"的分叉。
  *
- * 数据里没有真实血量字段；血量是 `targetStatus.js` 按高告警持续时长累计的
- * **战损估计**，规则与速率写在该模块顶部并可经 `TargetStatus.debug()` 读出。
+ * 数据里没有真实血量字段；血量是 `targetStatus.js` 按整段案例的交战暴露排序、
+ * 再随暴露进度展开的**案内相对战损估计**，规则写在该模块顶部并可经
+ * `TargetStatus.debug()` 逐目标读出（暴露量、排名、最终档位）。
  *
  * 图标本体仍是 `Symbology.symbolUri` 的阵营原色军标；状态靠**紧贴图标底部的
  * 血条 + 损毁叉形遮罩**表达（见 style.css 的 `.os-unit.s*`），兵种与阵营始终可辨。
@@ -156,7 +157,7 @@
         ? '0%'
         : Math.max(6, Math.min(100, Math.round(st.hp))) + '%';   // 存活档至少留一丝颜色
       rec.unit.title = tid + ' · ' + tier.label
-        + ' · 血量估计 ' + Math.round(st.hp) + '%'
+        + ' · 相对战损 ' + Math.round(st.hp) + '%'
         + (st.alertLabel ? ' · 告警 ' + st.alertLabel : '');
     });
 
@@ -220,7 +221,7 @@
       + TIERS.map(function (t, i) {
           return '<span><i class="os-sw ' + t.cls + '"></i>' + esc(t.label) + '</span>';
         }).join('')
-      + '<span class="os-legend-note">血条=战损估计</span>'
+      + '<span class="os-legend-note">相对战损</span>'
       + '</div>';
 
     return side('red', '红方') + side('blue', '蓝方') + legend;
@@ -382,7 +383,7 @@
         + kv('已航程', typeof st.travelled_m === 'number'
             ? (st.travelled_m / 1000).toFixed(1) + ' km' : '—')
         + kv('状态', st.reached_end ? '已到达终点' : '航渡中')
-        + (dmg ? kv('战损', dmg.label + '（血量估计 ' + Math.round(dmg.hp) + '%）',
+        + (dmg ? kv('战损', dmg.label + '（相对血量 ' + Math.round(dmg.hp) + '%）',
                     'ts-dmg os-s' + dmg.status) : '')
         + kv('阵营', AFFIL_ZH[def.affiliation] || def.affiliation || '—')
         + kv('域', DOMAIN_ZH[def.domain] || def.domain || '—')

@@ -12,16 +12,24 @@
  * 航向等运动量，`inference_frames[].targets[]` 只有威胁分与告警等级
  * （engine/inference.py 的 ALERT_CODES：0 正常 / 1 注意 / 2 警告 / 3 严重）。
  *
- * 因此这里的血量是**战损估计**，不是仿真出的实测值：目标初始 100 HP，
- * 处于高告警（>=2）的每一帧按固定速率累计损伤：
+ * 因此这里的血量是**案内相对战损估计**，不是仿真出的实测值。规则（全部可取证）：
  *
- *     alert 2（警告） -> 0.10 HP / 帧（30 s）
- *     alert 3（严重） -> 0.30 HP / 帧（30 s）
+ *   1. 交战暴露 E = Σ 每帧权重；alert 2 -> 1，alert 3 -> 3，其余 0。
+ *   2. 按整段案例的 E_total 排序分配最终档位（占比按编成总数）：
+ *        前 6%   -> 损毁（最终 0 HP）
+ *        随后 10% -> 严重受损（最终 30..5 HP）
+ *        再后 22% -> 受损（最终 68..40 HP）
+ *        其余    -> 正常（100 HP）
+ *      （少于 5 个目标时只分 1 个严重/1 个受损，不强行制造损毁；见 `_assignFinal`。）
+ *   3. 时间展开：HP 随当前暴露按 E(t) / (0.8 * E_total) 线性下降，
+ *      到 80% 暴露时落位到最终档；损毁目标在此时刻归零并保持。
  *
- * 速率、阈值都写在本文件顶部，且 `debug()` 可原样读出，评审时可以逐条核对。
- * 它是**单调的估计**：一旦为 0 在该时刻之后保持损毁；回拖时间轴会按那一时刻
- * 从头重算（显示当时更高的血量），前推到损毁之后仍为损毁。
- * 若将来引擎产出真实战损，只需把 `_apply` 改为读数据字段，两个界面无需改动。
+ * 为什么用"案内相对"而不是绝对速率：不同案例的交战强度差 10 倍以上
+ * （台海 31 目标约 7 千个高告警帧，密集投送 80 目标约 11 万个），绝对速率
+ * 要么让低强度案例没有损毁，要么让高强度案例"全军覆没"。排序分配保证任何
+ * 案例都能读出四档差异，同时严格按"暴露越多、战损越重"排序。
+ *
+ * 若将来引擎产出真实战损，只需替换 `_assignFinal`/`at` 的取值，两个界面无需改动。
  *
  * 四档（与需求一致）
  * ------------------
@@ -30,20 +38,25 @@
  *   2 严重受损   0 < HP <= 35
  *   3 损毁       HP == 0
  *
- * 视觉约定（图标本体不改，状态只由血条与损毁遮罩表达）
- * ------------------------------------------------------
+ * 视觉约定（图标本体不改）
+ * ------------------------
  *   - 血条**紧贴图标底部**，颜色与长度表达档位；
  *   - 损毁档血条为空槽、图标压暗并叠加白色 X（深红描边）遮罩；
  *   - 不在图标周围画状态环/角标（2026-10-21 用户要求），阵营色与兵种图形
- *     始终保留，类型与敌我仍然可辨。
+ *     始终保留；损毁遮罩是唯一覆盖图标本体的状态标识。
  */
 'use strict';
 
 (function (global) {
-  // 每帧损伤速率（HP / frame）。帧长 30 s，见 engine/scenario.py TICK_SECONDS。
-  var RATE = { 2: 0.10, 3: 0.30 };
+  // 每帧交战权重：告警 2/3 才计入暴露。
+  var WEIGHTS = { 2: 1, 3: 3 };
 
-  // 状态阈值：hp 小于等于该值进入该档。损毁单独按 hp <= 0 判定。
+  // 最终档位占比（按整段案例的暴露排序）。
+  var BANDS = { destroyed: 0.06, severe: 0.10, damaged: 0.22 };
+
+  // 血量随暴露进度落位到最终档的位置：80% 暴露时到达最终值。
+  var SETTLE_AT = 0.8;
+
   var THRESHOLDS = { severe: 35, damaged: 70 };
 
   var TIERS = [
@@ -55,15 +68,18 @@
 
   function tier(code) { return TIERS[Math.max(0, Math.min(3, code | 0))]; }
 
-  // 计算缓存：case + 推理数组 + 帧数任一变化即重建；tick 只做增量推进。
+  // 计算缓存：case + 推理数组 + 目标数组 + 帧数任一变化即重建。
   var cache = {
     caseId: null,
     infRef: null,
     targetsRef: null,
     framesLen: 0,
     tick: 0,
-    hp: {},
+    exposure: {},        // 当前累计暴露 E(t)
+    totalExposure: {},   // 整段案例暴露 E_total
+    finalHp: {},         // 最终档位 HP
     destroyedAt: {},
+    ranks: {},           // 暴露排名（1 = 最高）
   };
 
   function _reset(data) {
@@ -72,10 +88,78 @@
     cache.targetsRef = data.targets || null;
     cache.framesLen = (data.frames || []).length;
     cache.tick = 0;
-    cache.hp = {};
+    cache.exposure = {};
+    cache.totalExposure = {};
+    cache.finalHp = {};
     cache.destroyedAt = {};
-    (data.targets || []).forEach(function (t) {
-      cache.hp[t.id] = 100;
+    cache.ranks = {};
+
+    var ids = (data.targets || []).map(function (t) { return t.id; });
+    ids.forEach(function (id) {
+      cache.exposure[id] = 0;
+      cache.totalExposure[id] = 0;
+      cache.finalHp[id] = 100;
+    });
+
+    // 一次扫描算出 E_total（不逐帧存数组：80 目标 × 1441 帧只是 11 万次加法）。
+    var inf = cache.infRef;
+    if (inf && inf.length) {
+      for (var t = 1; t < inf.length; t++) {
+        var fr = inf[t];
+        if (!fr || !fr.targets) continue;
+        for (var i = 0; i < ids.length; i++) {
+          var e = fr.targets[ids[i]];
+          if (e) cache.totalExposure[ids[i]] += (WEIGHTS[e.alert | 0] || 0);
+        }
+      }
+    }
+    _assignFinal(ids);
+  }
+
+  /** 按 E_total 排序分配最终档位与 HP。 */
+  function _assignFinal(ids) {
+    var active = ids.filter(function (id) { return cache.totalExposure[id] > 0; });
+    active.sort(function (a, b) {
+      return (cache.totalExposure[b] - cache.totalExposure[a]) || (a < b ? -1 : 1);
+    });
+    active.forEach(function (id, i) { cache.ranks[id] = i + 1; });
+
+    // 占比按**编成总数**算（不是按"有暴露的目标数"）：
+    //   台海 31 个目标中只有 15 个真正进过高告警，若按 15 算，前 6% 只有 0 个、
+    //   严重档只剩 1 个，四档分布会塌缩。编成口径给出 1 损毁 / 3 严重 / 6 受损，
+    //   其余（含从未暴露的）正常。
+    var n = active.length;
+    var roster = ids.length;
+    var dN = 0, sN = 0, mN = 0;
+    if (roster >= 5) {
+      dN = Math.max(1, Math.floor(roster * BANDS.destroyed));
+      sN = Math.max(1, Math.floor(roster * BANDS.severe));
+      mN = Math.max(1, Math.floor(roster * BANDS.damaged));
+    } else {
+      sN = n > 1 ? 1 : 0;
+      mN = n > 2 ? 1 : 0;
+    }
+    // 暴露目标太少时，按比例压缩三个 band，并至少给有暴露的目标留一个正常档。
+    if (n > 0 && dN + sN + mN >= n) {
+      var cap = Math.max(1, n - 1);
+      var total = dN + sN + mN;
+      dN = Math.floor(dN * cap / total);
+      sN = Math.max(0, Math.floor(sN * cap / total));
+      mN = Math.max(0, cap - dN - sN);
+    }
+
+    active.forEach(function (id, i) {
+      if (i < dN) {
+        cache.finalHp[id] = 0;
+      } else if (i < dN + sN) {
+        var k = i - dN;
+        cache.finalHp[id] = sN <= 1 ? 30 : 30 - (25 * k / (sN - 1));
+      } else if (i < dN + sN + mN) {
+        var j = i - dN - sN;
+        cache.finalHp[id] = mN <= 1 ? 68 : 68 - (28 * j / (mN - 1));
+      } else {
+        cache.finalHp[id] = 100;
+      }
     });
   }
 
@@ -89,39 +173,45 @@
     }
   }
 
-  /** 把第 t 帧的告警累计进血量。只有 >=2 的告警才造成损伤。 */
   function _apply(t) {
     var inf = cache.infRef;
-    if (!inf || !inf.length || t >= inf.length) return;   // 推理帧之后不臆造损伤
+    if (!inf || !inf.length || t >= inf.length) return;
     var fr = inf[t];
     if (!fr || !fr.targets) return;
-    var ids = Object.keys(cache.hp);
+    var ids = Object.keys(cache.exposure);
     for (var i = 0; i < ids.length; i++) {
       var id = ids[i];
-      var hp = cache.hp[id];
-      if (hp <= 0) continue;
-      var entry = fr.targets[id];
-      if (!entry) continue;
-      var rate = RATE[entry.alert | 0];
-      if (!rate) continue;
-      // 每步量化到 0.1：不量化时二进制浮点会留下 ~1e-13 的正残差，
-      // 出现"显示 0%、状态仍是严重受损"的第三种状态，正好违背"损毁与低血量可区分"。
-      hp = Math.max(0, Math.round((hp - rate) * 10) / 10);
-      cache.hp[id] = hp;
-      if (hp === 0) cache.destroyedAt[id] = t;
+      var e = fr.targets[id];
+      var w = e ? (WEIGHTS[e.alert | 0] || 0) : 0;
+      if (!w) continue;
+      cache.exposure[id] += w;
     }
   }
 
   function _advance(tick) {
+    var prevTick = cache.tick;
     if (tick < cache.tick) {
-      // 回拖：从头重算。1441 帧 × 数十目标对浏览器只是毫秒级开销。
+      // 回拖：从第 0 帧重算暴露。1441 帧 × 数十目标只是毫秒级开销。
       cache.tick = 0;
       cache.destroyedAt = {};
-      Object.keys(cache.hp).forEach(function (id) { cache.hp[id] = 100; });
+      Object.keys(cache.exposure).forEach(function (id) { cache.exposure[id] = 0; });
     }
-    // 从第 1 帧开始累计：第 0 帧是案例初始状态，视为尚未交战、不扣血。
+    // 从第 1 帧开始累计：第 0 帧是案例初始状态，视为尚未交战。
     for (var t = cache.tick + 1; t <= tick; t++) _apply(t);
     cache.tick = tick;
+
+    // 同一帧的多次查询（鸟瞰图/面板/计数各一次）不再重复扫损毁帧。
+    if (tick === prevTick) return;
+
+    // 记下首次达到损毁条件的帧（供调试/提示；渲染不依赖它）。
+    Object.keys(cache.exposure).forEach(function (id) {
+      if (cache.destroyedAt[id] !== undefined) return;
+      var total = cache.totalExposure[id] || 0;
+      if (cache.finalHp[id] === 0 && total > 0 &&
+          cache.exposure[id] >= SETTLE_AT * total) {
+        cache.destroyedAt[id] = tick;
+      }
+    });
   }
 
   function statusOf(hp) {
@@ -135,28 +225,46 @@
    * 某目标在某帧的战损估计。
    *
    * @returns {{hp:number, status:number, label:string, destroyedAt:number|null,
-   *            alert:number|null, alertLabel:string}}
+   *            alert:number|null, alertLabel:string, exposure:number, finalHp:number}}
    */
   function at(data, id, tick) {
     if (!data || !data.targets) {
-      return { hp: 100, status: 0, label: TIERS[0].label, destroyedAt: null, alert: null, alertLabel: '' };
+      return {
+        hp: 100, status: 0, label: TIERS[0].label, destroyedAt: null,
+        alert: null, alertLabel: '', exposure: 0, finalHp: 100,
+      };
     }
     _ensure(data);
     var max = Math.max(0, (data.frames || []).length - 1);
     var t = Math.max(0, Math.min(max, tick | 0));
     _advance(t);
-    var hp = (cache.hp[id] === undefined) ? 100 : cache.hp[id];
+
+    var total = cache.totalExposure[id] || 0;
+    var final = (cache.finalHp[id] === undefined) ? 100 : cache.finalHp[id];
+    var hp = 100;
+    if (total > 0 && final < 100) {
+      var progress = Math.min(1, (cache.exposure[id] || 0) / (SETTLE_AT * total));
+      hp = 100 - (100 - final) * progress;
+    }
+    hp = Math.round(hp * 10) / 10;
+    if (final === 0 && total > 0 &&
+        (cache.exposure[id] || 0) >= SETTLE_AT * total) {
+      hp = 0;
+    }
     var st = statusOf(hp);
+
     var inf = cache.infRef;
     var entry = (inf && inf.length) ? (inf[Math.min(t, inf.length - 1)] || {}).targets : null;
     var e = entry ? entry[id] : null;
     return {
-      hp: Math.round(hp * 10) / 10,
+      hp: hp,
       status: st,
       label: TIERS[st].label,
       destroyedAt: cache.destroyedAt[id] === undefined ? null : cache.destroyedAt[id],
       alert: e ? (typeof e.alert === 'number' ? e.alert : null) : null,
       alertLabel: e && e.alert_label ? e.alert_label : '',
+      exposure: cache.exposure[id] || 0,
+      finalHp: final,
     };
   }
 
@@ -241,13 +349,19 @@
         per[t.id] = {
           hp: r.hp, status: r.status, label: r.label,
           destroyedAt: r.destroyedAt, alert: r.alert,
+          exposure: r.exposure, totalExposure: cache.totalExposure[t.id] || 0,
+          finalHp: r.finalHp, rank: cache.ranks[t.id] || null,
         };
       });
     }
     return {
-      rule: 'hp -= {2: 0.10, 3: 0.30} per tick with alert >= 2',
+      rule: 'relative damage by case-wide exposure: E += {alert2:1, alert3:3}; ' +
+            'top 6% destroyed, next 10% severe, next 22% damaged; ' +
+            'HP settles at 80% exposure',
+      bands: BANDS,
+      weights: WEIGHTS,
+      settleAt: SETTLE_AT,
       thresholds: THRESHOLDS,
-      rate: RATE,
       caseId: cache.caseId,
       tick: cache.tick,
       hasInference: !!cache.infRef,
@@ -258,7 +372,8 @@
 
   global.TargetStatus = {
     TIERS: TIERS,
-    RATE: RATE,
+    WEIGHTS: WEIGHTS,
+    BANDS: BANDS,
     THRESHOLDS: THRESHOLDS,
     tier: tier,
     colorOf: colorOf,
