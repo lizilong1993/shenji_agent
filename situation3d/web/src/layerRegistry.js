@@ -296,7 +296,7 @@
     { id: 'layerLabels', kind: 'target', z: 20, label: '目标标牌',
       group: '目标图层', default: true },
     // 「历史轨迹」图层同时管理历史实线与计划虚线（虚线 + 终点箭头）。
-    { id: 'layerTracks', kind: 'target', z: 30, label: '历史轨迹（含计划）',
+    { id: 'layerTracks', kind: 'target', z: 30, label: '历史轨迹',
       group: '目标图层', default: true },
   // B4 选中掩码：外环全图 + 内环挖空「选中目标 + 它的轨迹范围」。
   // handler 在 app.js 的映射表里（state.layers.focusMask → updateFocusMask）。

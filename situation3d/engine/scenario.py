@@ -145,9 +145,9 @@ def _hotspot(name: str, bbox: Sequence[float], note: str, kind: str) -> dict:
     w, s, e, n = bbox
     return {
         "name": name,
-        "bbox": [round(w, 3), round(s, 3), round(e, 3), round(n, 3)],
-        "center": [round((s + n) / 2.0, 4), round((w + e) / 2.0, 4)],
-        "span_deg": [round(e - w, 3), round(n - s, 3)],
+        "bbox": [round(w, 6), round(s, 6), round(e, 6), round(n, 6)],
+        "center": [round((s + n) / 2.0, 6), round((w + e) / 2.0, 6)],
+        "span_deg": [round(e - w, 6), round(n - s, 6)],
         "note": note,
         "kind": kind,
     }

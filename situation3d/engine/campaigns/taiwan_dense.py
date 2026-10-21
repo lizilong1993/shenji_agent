@@ -123,6 +123,7 @@ class Entity:
     edges: List[dict] = field(default_factory=list)
     route_id: str = ""
     alt_m: float = 0.0
+    model: str = ""
     cum: List[float] = field(default_factory=list)
     target: object = None
 
@@ -340,8 +341,10 @@ def _vehicle_entities(net: roads.Roads, rng: random.Random,
     # Carriers: four synthetic transfer platforms offshore, slow loops.
     for i in range(4):
         base_lat = 22.962 + i * 0.004
-        path = [(base_lat, 120.132), (base_lat + 0.004, 120.128),
-                (base_lat + 0.006, 120.133), (base_lat + 0.002, 120.137)]
+        # Keep transfer platforms in open water west of the Anping coastline;
+        # the earlier 120.13x loop sat over the fish-pond belt.
+        path = [(base_lat, 120.095), (base_lat + 0.004, 120.091),
+                (base_lat + 0.006, 120.096), (base_lat + 0.002, 120.099)]
         path = path + [path[0]]
         cum, total = _cum_path(path)
         e = Entity(
@@ -349,6 +352,7 @@ def _vehicle_entities(net: roads.Roads, rng: random.Random,
             group="TRS", area="B", role="转运载体", cls="transport_ship",
             path=path, length_m=total, speed_mps=geo.knots_to_mps(7.0),
             loop=True, mode="sea", task="转运平台待机",
+            model="071 型船坞登陆舰",
         )
         e.cum = cum  # type: ignore[attr-defined]
         carriers[e.id] = e
@@ -356,14 +360,14 @@ def _vehicle_entities(net: roads.Roads, rng: random.Random,
 
     # Red escorts and blue surface group.
     ship_specs = [
-        ("TRS005", "red", "frigate", "054A 型护卫舰", 22.945, 120.120, 10.0),
-        ("TRS006", "red", "corvette", "056A 型轻型护卫舰", 22.930, 120.128, 12.0),
-        ("TBS001", "blue", "frigate", "成功级护卫舰", 22.955, 120.108, 10.0),
-        ("TBS002", "blue", "frigate", "成功级护卫舰", 22.940, 120.115, 11.0),
-        ("TBS003", "blue", "corvette", "沱江级巡逻舰", 22.925, 120.120, 14.0),
-        ("TBS004", "blue", "corvette", "沱江级巡逻舰", 22.972, 120.115, 13.0),
-        ("TBS005", "blue", "frigate", "成功级护卫舰", 22.985, 120.120, 9.0),
-        ("TBS006", "blue", "corvette", "沱江级巡逻舰", 22.998, 120.126, 12.0),
+        ("TRS005", "red", "frigate", "054A 型护卫舰", 22.945, 120.085, 10.0),
+        ("TRS006", "red", "corvette", "056A 型轻型护卫舰", 22.930, 120.093, 12.0),
+        ("TBS001", "blue", "frigate", "成功级护卫舰", 22.955, 120.075, 10.0),
+        ("TBS002", "blue", "frigate", "成功级护卫舰", 22.940, 120.082, 11.0),
+        ("TBS003", "blue", "corvette", "沱江级巡逻舰", 22.925, 120.088, 14.0),
+        ("TBS004", "blue", "corvette", "沱江级巡逻舰", 22.972, 120.082, 13.0),
+        ("TBS005", "blue", "frigate", "成功级护卫舰", 22.985, 120.086, 9.0),
+        ("TBS006", "blue", "corvette", "沱江级巡逻舰", 22.998, 120.092, 12.0),
     ]
     for sid, aff, cls, model, lat, lon, kn in ship_specs:
         path = [(lat, lon), (lat + 0.006, lon - 0.004),
@@ -373,7 +377,7 @@ def _vehicle_entities(net: roads.Roads, rng: random.Random,
         e = Entity(id=sid, kind="vessel", affiliation=aff, group="TBS",
                    area="B", role="海上巡逻", cls=cls, path=path, length_m=total,
                    speed_mps=geo.knots_to_mps(kn), loop=True, mode="sea",
-                   task="海上活动")
+                   task="海上活动", model=model)
         e.cum = cum  # type: ignore[attr-defined]
         ents.append(e)
 
@@ -387,16 +391,20 @@ def _vehicle_entities(net: roads.Roads, rng: random.Random,
                 ("aew", "E-2D", "空中警戒", 6200.0)]):
             air_specs.append((aff, prefix + "%03d" % (j + 1), cls, model, role, alt))
     for aff, aid, cls, model, role, alt in air_specs:
-        lat = 22.955 + (0.008 if aff == "red" else 0.000)
-        lon = 120.105 + (0.010 if cls == "aew" else 0.0)
-        path = [(lat, lon), (lat + 0.018, lon + 0.020),
-                (lat + 0.004, lon + 0.040), (lat - 0.012, lon + 0.018)]
+        # Real-sized patrol circuits (~40-60 km legs), not a 3 km local loop.
+        # Red orbits over the northern strait, blue over the southern approach.
+        if aff == "red":
+            base = [(22.92, 119.92), (23.18, 120.02), (23.02, 120.30), (22.76, 120.08)]
+        else:
+            base = [(22.62, 120.00), (22.90, 120.14), (22.72, 120.40), (22.48, 120.12)]
+        j = int(aid[-3:]) - 1
+        path = [(la + 0.010 * (j % 2), lo + 0.010 * (j // 2)) for la, lo in base]
         path = path + [path[0]]
         cum, total = _cum_path(path)
         e = Entity(id=aid, kind="aircraft", affiliation=aff, group="TRA" if aff == "red" else "TBA",
                    area="B", role=role, cls=cls, path=path, length_m=total,
                    speed_mps=geo.knots_to_mps(330.0), loop=True, mode="air",
-                   alt_m=alt, task="空中活动")
+                   alt_m=alt, task="空中活动", model=model)
         e.cum = cum  # type: ignore[attr-defined]
         ents.append(e)
 
@@ -447,14 +455,14 @@ def _entity_target(e: Entity):
     from ..scenario import Target
     if e.kind == "vehicle":
         p = VEHICLE_CLASSES[e.cls]
-        name = "%s %s" % ("红方" if e.affiliation == "red" else "蓝方", p["label"])
+        name = p["model"]
         attrs = {
             "编组": e.group, "任务": e.task, "合成对象": "是",
             "车辆尺寸": "%.1f×%.1f×%.1f m" % (p["length_m"], p["width_m"], p["height_m"]),
             "数据来源": "demo_profile",
         }
         return Target(
-            target_id=e.id, name=name, platform_class=p["label"], domain="land",
+            target_id=e.id, name=name, platform_class=p["model"], domain="land",
             affiliation=e.affiliation, waypoints=[],
             speed_kn=round(geo.kmh_to_knots(p["speed_kmh"]), 1),
             role=e.role, model=p["model"], icon=p.get("legacy_icon", p["icon"]),
@@ -462,13 +470,12 @@ def _entity_target(e: Entity):
             engage_km=p["engage_km"], road_bound=True, attributes=attrs,
         )
     if e.kind == "vessel":
-        model = "071 型船坞登陆舰" if e.cls == "transport_ship" else (
-            "054A 型护卫舰" if e.cls == "frigate" else "056A 型轻型护卫舰")
+        model = e.model or ("071 型船坞登陆舰" if e.cls == "transport_ship" else
+                            ("054A 型护卫舰" if e.cls == "frigate" else "056A 型轻型护卫舰"))
         return Target(
             target_id=e.id,
-            name=("红方转运平台" if e.cls == "transport_ship" else
-                  ("红方" if e.affiliation == "red" else "蓝方") + "水面平台"),
-            platform_class=("转运平台" if e.cls == "transport_ship" else "水面平台"),
+            name=model,
+            platform_class=model,
             domain="sea", affiliation=e.affiliation, waypoints=[],
             speed_kn=round(e.speed_mps * 1.943844, 1),
             role="编队指挥" if e.cls == "transport_ship" else "近海巡逻",
@@ -477,12 +484,11 @@ def _entity_target(e: Entity):
             sensor_range_km=80.0, influence_km=40.0, engage_km=20.0,
             loop=True, attributes={"合成对象": "是", "任务": e.task},
         )
-    model = "歼-16" if e.cls == "fighter" and e.affiliation == "red" else (
-        "F-16C" if e.cls == "fighter" else ("空警-500" if e.affiliation == "red" else "E-2D"))
+    model = e.model or ("歼-16" if e.cls == "fighter" else "空警-500")
     return Target(
         target_id=e.id,
-        name=("红方" if e.affiliation == "red" else "蓝方") + ("战斗机" if e.cls == "fighter" else "预警机"),
-        platform_class="战斗机" if e.cls == "fighter" else "预警机",
+        name=model,
+        platform_class=model,
         domain="air", affiliation=e.affiliation, waypoints=[],
         speed_kn=330.0, altitude_m=e.alt_m,
         role="空中掩护" if e.cls == "fighter" else "空中警戒",
@@ -791,6 +797,49 @@ def _objective_list(frames: Sequence[dict]) -> List[dict]:
     return out
 
 
+def _auto_plots() -> List[dict]:
+    """System plots driven by the case timeline and current situation."""
+    def area_box(aid):
+        w, s, e, n = AREA_META[aid]["bbox"]
+        return [[round(w, 6), round(s, 6)], [round(e, 6), round(s, 6)],
+                [round(e, 6), round(n, 6)], [round(w, 6), round(n, 6)]]
+
+    return [
+        {"id": "AP-CORRIDOR", "type": "mobility_corridor", "layer": "plot.mobility",
+         "from_tick": 360, "to_tick": 840, "label": "合成转运走廊",
+         "hostility": "friendly",
+         "points": [[120.090000, 22.960000], [120.160000, 22.975000]]},
+        {"id": "AP-D-ZONE", "type": "recon_area", "layer": "plot.intel",
+         "from_tick": 0, "to_tick": 1441, "label": "D区岸海衔接",
+         "hostility": "friendly", "dynamic": "objective_progress",
+         "objective_id": "TRN001", "points": area_box("D")},
+        {"id": "AP-E-ZONE", "type": "recon_area", "layer": "plot.intel",
+         "from_tick": 0, "to_tick": 1441, "label": "E区岸上任务",
+         "hostility": "friendly", "dynamic": "objective_progress",
+         "objective_id": "TRN002", "points": area_box("E")},
+        {"id": "AP-F-ZONE", "type": "recon_area", "layer": "plot.intel",
+         "from_tick": 0, "to_tick": 1441, "label": "F区保障",
+         "hostility": "friendly", "dynamic": "objective_progress",
+         "objective_id": "TRN003", "points": area_box("F")},
+        {"id": "AP-AEW-RED", "type": "fire_range", "layer": "plot.fire",
+         "from_tick": 0, "to_tick": 1441, "label": "空警-500 观测扇区",
+         "hostility": "friendly", "dynamic": "aew_observation",
+         "actor": "TRA003", "range_km": 90.0, "half_angle_deg": 30.0,
+         "points": [[120.000000, 22.900000], [120.100000, 23.000000],
+                    [119.950000, 22.950000]]},
+        {"id": "AP-AEW-BLUE", "type": "fire_range", "layer": "plot.fire",
+         "from_tick": 0, "to_tick": 1441, "label": "E-2D 观测扇区",
+         "hostility": "friendly", "dynamic": "aew_observation",
+         "actor": "TBA003", "range_km": 90.0, "half_angle_deg": 30.0,
+         "points": [[120.000000, 22.900000], [120.100000, 23.000000],
+                    [119.950000, 22.950000]]},
+        {"id": "AP-CONTACT", "type": "boundary", "layer": "plot.intel",
+         "from_tick": 0, "to_tick": 1441, "label": "红蓝接触方向",
+         "hostility": "enemy", "dynamic": "closest_groups",
+         "points": [[120.050000, 22.930000], [120.200000, 22.980000]]},
+    ]
+
+
 def build_case(seed: int = 20261020) -> Tuple[dict, dict]:
     print("[campaign] load roads", flush=True)
     net = roads.load(THEATRE)
@@ -957,6 +1006,7 @@ def build_case(seed: int = 20261020) -> Tuple[dict, dict]:
         "path_manifest": route_manifest,
         "road_constrained": True,
         "events": events,
+        "auto_plots": _auto_plots(),
         "objectives": objectives,
         "outcome": outcome,
         "motion_extra": motion_extra,

@@ -87,7 +87,7 @@ const state = {
   tick: 0,
   tickFloat: 0,
   playing: false,
-  ticksPerSecond: 30,
+  ticksPerSecond: 1,
   targets: {},              // id -> { def, entity, trail: [], lastTick, sensorEntity }
   layers: { targets: true, targetsRed: true, targetsBlue: true,
             tracks: true, routes: true, hotspots: true, labels: true,
@@ -485,7 +485,7 @@ function levelColor(level) {
 
 function fmtDeg(v, pos, neg) {
   if (v === null || v === undefined || !isFinite(v)) return '—';
-  return Math.abs(v).toFixed(4) + '°' + (v >= 0 ? pos : neg);
+  return Math.abs(v).toFixed(6) + '°' + (v >= 0 ? pos : neg);
 }
 
 // --------------------------------------------------------------------------
@@ -1460,6 +1460,7 @@ function applySituationData(data, caseId) {
       clearTargetSelection();
       setTick(0);
       updateInferenceUi();
+      applyAutoPlots(data);
 
       setTransportEnabled(true);
       if (dom.followTarget) {
@@ -2964,6 +2965,10 @@ function syncEntities() {
     // 计划轨迹与历史轨迹同属「历史轨迹」图层；只给选中目标画，避免满屏虚线。
     refreshPredictEntity(id);
   });
+  // Auto plots must follow every tick even when the tick was set by a deep
+  // link or a jump that bypasses setTick(); this is a cheap no-op when nothing
+  // changed because updateAutoPlots only rebuilds dynamic items on tick change.
+  updateAutoPlots(state.tick);
   // 掩码遮的是"整图减去选中目标与轨迹"：选中、时间、图层任一变化都要重画。
   updateFocusMask();
 
@@ -3535,10 +3540,10 @@ function selectHotspot(index, fly) {
 
   dom.geoRegion.textContent = hs.name;
   dom.geoLon.textContent = fmtDeg(hs.center[1], 'E', 'W') +
-    '（' + hs.bbox[0].toFixed(2) + ' – ' + hs.bbox[2].toFixed(2) + '）';
+    '（' + hs.bbox[0].toFixed(6) + ' – ' + hs.bbox[2].toFixed(6) + '）';
   dom.geoLat.textContent = fmtDeg(hs.center[0], 'N', 'S') +
-    '（' + hs.bbox[1].toFixed(2) + ' – ' + hs.bbox[3].toFixed(2) + '）';
-  dom.geoSpan.textContent = hs.span_deg[0].toFixed(2) + '° × ' + hs.span_deg[1].toFixed(2) + '°';
+    '（' + hs.bbox[1].toFixed(6) + ' – ' + hs.bbox[3].toFixed(6) + '）';
+  dom.geoSpan.textContent = hs.span_deg[0].toFixed(6) + '° × ' + hs.span_deg[1].toFixed(6) + '°';
 
   const inf = inferenceAt(state.tick);
   if (inf && inf.regions[index]) {
@@ -3611,7 +3616,7 @@ function updateGeoReadout() {
     const hs = state.data.hotspots[idx];
     const b = hs.bbox;
     dom.geoRegion.textContent = hs.name;
-    dom.geoSpan.textContent = (b[2] - b[0]).toFixed(2) + '° × ' + (b[3] - b[1]).toFixed(2) + '°';
+    dom.geoSpan.textContent = (b[2] - b[0]).toFixed(6) + '° × ' + (b[3] - b[1]).toFixed(6) + '°';
     const inf = inferenceAt(state.tick);
     if (inf && inf.regions[idx]) {
       const r = inf.regions[idx];
@@ -3991,7 +3996,7 @@ function registerRelationsLayer() {
   if (LayerRegistry.def && LayerRegistry.def(REL_LAYER_ID)) return;
   LayerRegistry.register({
     id: REL_LAYER_ID, kind: 'plot', z: 45, default: true,
-    label: '\u5173\u8054\u5173\u7cfb\u7ebf', group: 'TS\u56fe\u5c42',
+    label: '\u76ee\u6807\u5173\u7cfb', group: 'TS\u56fe\u5c42',
     handler: function (id, want) { setRelationsVisible(want); },
   });
 }
@@ -4000,11 +4005,111 @@ function registerRelationsLayer() {
  * 点击目标后：清掉当前场景里的标绘（用户手绘 + 预览），把视觉让给关系线。
  * 标绘**记录**不删（图层/要素列表还在），只是隐藏；取消选中时恢复。
  */
+/**
+ * Case auto-plots: data-driven system plots that appear/disappear by tick and
+ * update from the current frame/inference. They use the existing Plotting/layer
+ * panel, so there is no new UI surface. Manual plots remain independent.
+ */
+var autoPlotState = { data: null, ids: [], visible: {}, lastDynamic: -1 };
+
+function autoPlotDest(lon, lat, bearingDeg, km) {
+  var R = 6371.0;
+  var brg = bearingDeg * Math.PI / 180;
+  var la1 = lat * Math.PI / 180, lo1 = lon * Math.PI / 180;
+  var d = km / R;
+  var la2 = Math.asin(Math.sin(la1) * Math.cos(d) +
+                      Math.cos(la1) * Math.sin(d) * Math.cos(brg));
+  var lo2 = lo1 + Math.atan2(Math.sin(brg) * Math.sin(d) * Math.cos(la1),
+                             Math.cos(d) - Math.sin(la1) * Math.sin(la2));
+  return [lo2 * 180 / Math.PI, la2 * 180 / Math.PI];
+}
+
+function autoPlotDetach() {
+  if (!window.Plotting) return;
+  autoPlotState.ids.forEach(function (id) {
+    try { Plotting.remove(id); } catch (e) { /* already gone */ }
+  });
+  autoPlotState = { data: null, ids: [], visible: {}, lastDynamic: -1 };
+}
+
+function applyAutoPlots(data) {
+  autoPlotDetach();
+  if (!window.Plotting || !data || !Array.isArray(data.auto_plots)) return;
+  autoPlotState.data = data.auto_plots;
+  data.auto_plots.forEach(function (spec) {
+    try {
+      Plotting.add({
+        id: spec.id, type: spec.type, layer: spec.layer,
+        points: spec.points, label: spec.label,
+        hostility: spec.hostility, system: true,
+      });
+      autoPlotState.ids.push(spec.id);
+    } catch (e) {
+      console.warn('[autoPlot] add failed', spec && spec.id, e);
+    }
+  });
+  updateAutoPlots(state.tick || 0);
+}
+
+function updateAutoPlots(tick) {
+  if (!autoPlotState.data || !window.Plotting) return;
+  var t = Math.max(0, Math.round(tick || 0));
+  autoPlotState.data.forEach(function (spec) {
+    var a = spec.from_tick == null ? 0 : Number(spec.from_tick);
+    var b = spec.to_tick == null ? 1e9 : Number(spec.to_tick);
+    var vis = t >= a && t < b;
+    if (autoPlotState.visible[spec.id] !== vis) {
+      try { Plotting.setVisible(spec.id, vis); } catch (e) { /* gone */ }
+      autoPlotState.visible[spec.id] = vis;
+    }
+    if (!vis || !spec.dynamic) return;
+    if (t === autoPlotState.lastDynamic) return;
+    try {
+      if (spec.dynamic === 'aew_observation') {
+        var p = positionFor(spec.actor, t);
+        if (!p) return;
+        var brg = Number(p.heading) || 0;
+        var half = Number(spec.half_angle_deg) || 30;
+        var range = Number(spec.range_km) || 80;
+        Plotting.update(spec.id, { points: [
+          [p.lon, p.lat],
+          autoPlotDest(p.lon, p.lat, brg, range),
+          autoPlotDest(p.lon, p.lat, brg - half, range),
+        ] });
+      } else if (spec.dynamic === 'closest_groups') {
+        var inf = inferenceAt(t);
+        if (!inf || !inf.groups) return;
+        var red = null, blue = null;
+        inf.groups.forEach(function (g) {
+          if (g.domain !== 'land') return;
+          if (g.affiliation === 'red') red = g;
+          if (g.affiliation === 'blue') blue = g;
+        });
+        if (!red || !blue) return;
+        Plotting.update(spec.id, { points: [
+          [red.centroid[1], red.centroid[0]],
+          [blue.centroid[1], blue.centroid[0]],
+        ] });
+      } else if (spec.dynamic === 'objective_progress') {
+        var fr = state.data.frames[Math.min(t, state.data.frames.length - 1)];
+        var prog = fr && fr.objectives && fr.objectives[spec.objective_id];
+        if (prog == null) return;
+        Plotting.update(spec.id, { label: spec.label + ' ' + Math.round(prog * 100) + '%' });
+      }
+    } catch (e) {
+      console.warn('[autoPlot] update failed', spec.id, e);
+    }
+  });
+  autoPlotState.lastDynamic = t;
+}
+
 function setPlottingHidden(hidden) {
   if (!window.Plotting || !Plotting.debug) return;
   var items = Plotting.debug().items || [];
   for (var i = 0; i < items.length; i++) {
     var id = items[i].id;
+    // Auto plots are situation overlays; selecting a target must not hide them.
+    if (items[i].system) continue;
     if (hidden) {
       if (items[i].visible !== false) Plotting.setVisible(id, false);
     } else if (items[i].visible === false) {
@@ -5809,6 +5914,7 @@ function loop(nowMs) {
     const next = Math.floor(state.tickFloat);
     if (next !== state.tick) {
       state.tick = next;
+      updateAutoPlots(state.tick);
       renderTargetCounts();
       renderTransport();
       updateInferenceUi();
@@ -6384,6 +6490,10 @@ function syncPlotLayers() {
   if (!window.LayerRegistry || !window.Plotting) return null;
   var used = {};
   Plotting.debug().items.forEach(function (it) { used[it.layer] = true; });
+  // Keep every declared plot category registered, even when it currently has
+  // no item: the user expects 【TS图层】→【标绘】 to list 自动/手动 plot entries
+  // as manageable rows instead of the whole group disappearing.
+  Plotting.categories().forEach(function (c) { used[c.layer] = true; });
   var usedIds = Object.keys(used).sort();
   var registered = LayerRegistry.list('plot').filter(function (l) { return l.group === '标绘'; })
     .map(function (l) { return l.id; }).sort();

@@ -96,8 +96,8 @@
     if (!v) return null;
     var c = v.camera.positionCartographic;
     return {
-      lon: +(Cesium.Math.toDegrees(c.longitude)).toFixed(4),
-      lat: +(Cesium.Math.toDegrees(c.latitude)).toFixed(4),
+      lon: +(Cesium.Math.toDegrees(c.longitude)).toFixed(6),
+      lat: +(Cesium.Math.toDegrees(c.latitude)).toFixed(6),
       heightKm: +(c.height / 1000).toFixed(2),
       imageryLayers: v.imageryLayers ? v.imageryLayers.length : null,
       globeShow: v.scene.globe.show,
