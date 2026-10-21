@@ -1,0 +1,1139 @@
+{
+  "schema": "situation3d.equipment.v2",
+  "weapons": {
+    "weapon.125mm.apfsds": {
+      "label": "125mm 尾翼稳定脱壳穿甲弹",
+      "category": "cannon",
+      "tar_types": [
+        "vehicle",
+        "installation"
+      ],
+      "range_km": 2.5,
+      "shoot_on_move": true,
+      "cooldown_s": 10,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 36
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.125mm.atgm": {
+      "label": "125mm 炮射导弹",
+      "category": "atgm",
+      "tar_types": [
+        "vehicle"
+      ],
+      "range_km": 5.0,
+      "shoot_on_move": true,
+      "cooldown_s": 30,
+      "guidance": "laser_beam",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 84
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.105mm.rifle": {
+      "label": "105mm 线膛炮",
+      "category": "cannon",
+      "tar_types": [
+        "vehicle",
+        "installation"
+      ],
+      "range_km": 3.0,
+      "shoot_on_move": true,
+      "cooldown_s": 10,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 37
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.105mm.atgm": {
+      "label": "105mm 炮射导弹",
+      "category": "atgm",
+      "tar_types": [
+        "vehicle"
+      ],
+      "range_km": 5.0,
+      "shoot_on_move": true,
+      "cooldown_s": 30,
+      "guidance": "laser_beam",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 84
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.100mm.gun": {
+      "label": "100mm 低压线膛炮",
+      "category": "cannon",
+      "tar_types": [
+        "personnel",
+        "vehicle",
+        "installation"
+      ],
+      "range_km": 4.0,
+      "shoot_on_move": true,
+      "cooldown_s": 10,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 54
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.35mm.aaa": {
+      "label": "35mm 双管高炮",
+      "category": "autocannon",
+      "tar_types": [
+        "air",
+        "personnel",
+        "vehicle"
+      ],
+      "range_km": 4.0,
+      "shoot_on_move": true,
+      "cooldown_s": 2,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 1
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.30mm.auto": {
+      "label": "30mm 自动炮",
+      "category": "autocannon",
+      "tar_types": [
+        "personnel",
+        "vehicle",
+        "air"
+      ],
+      "range_km": 2.0,
+      "shoot_on_move": true,
+      "cooldown_s": 10,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 56
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.12.7mm.hmg": {
+      "label": "12.7mm 重机枪",
+      "category": "machine_gun",
+      "tar_types": [
+        "personnel",
+        "vehicle",
+        "air"
+      ],
+      "range_km": 1.5,
+      "shoot_on_move": true,
+      "cooldown_s": 5,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 43
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.7.62mm.mg": {
+      "label": "7.62mm 机枪",
+      "category": "machine_gun",
+      "tar_types": [
+        "personnel"
+      ],
+      "range_km": 0.8,
+      "shoot_on_move": true,
+      "cooldown_s": 5,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 1,
+        "wpdata_id": 29
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.rifle.58": {
+      "label": "5.8mm 班用枪族",
+      "category": "small_arms",
+      "tar_types": [
+        "personnel"
+      ],
+      "range_km": 0.5,
+      "shoot_on_move": true,
+      "cooldown_s": 3,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 1,
+        "wpdata_id": 29
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.atgm.team": {
+      "label": "便携反坦克导弹",
+      "category": "atgm",
+      "tar_types": [
+        "vehicle"
+      ],
+      "range_km": 4.0,
+      "shoot_on_move": true,
+      "cooldown_s": 30,
+      "guidance": "laser_beam",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 35
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.manpads": {
+      "label": "便携防空导弹",
+      "category": "manpads",
+      "tar_types": [
+        "air"
+      ],
+      "range_km": 6.0,
+      "shoot_on_move": true,
+      "cooldown_s": 30,
+      "guidance": "ir",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 2
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.155mm.howitzer": {
+      "label": "155mm 自行榴弹炮",
+      "category": "howitzer",
+      "tar_types": [
+        "ground_area"
+      ],
+      "range_km": 53.0,
+      "shoot_on_move": false,
+      "cooldown_s": 8,
+      "guidance": "inertial_gnss",
+      "sdk": {
+        "tar_type": 0,
+        "wpdata_id": 72
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.155mm.towed": {
+      "label": "155mm 牵引榴弹炮",
+      "category": "howitzer",
+      "tar_types": [
+        "ground_area"
+      ],
+      "range_km": 40.0,
+      "shoot_on_move": false,
+      "cooldown_s": 10,
+      "guidance": "inertial_gnss",
+      "sdk": {
+        "tar_type": 0,
+        "wpdata_id": 72
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.300mm.mlrs": {
+      "label": "300mm 远程火箭炮",
+      "category": "mlrs",
+      "tar_types": [
+        "ground_area"
+      ],
+      "range_km": 130.0,
+      "shoot_on_move": false,
+      "cooldown_s": 60,
+      "guidance": "inertial_gnss",
+      "sdk": {
+        "tar_type": 0,
+        "wpdata_id": 72
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.hq9b": {
+      "label": "红旗-9B 远程防空导弹",
+      "category": "sam",
+      "tar_types": [
+        "air"
+      ],
+      "range_km": 260.0,
+      "shoot_on_move": true,
+      "cooldown_s": 20,
+      "guidance": "command_arh",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 3
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.hq16": {
+      "label": "红旗-16 中程防空导弹",
+      "category": "sam",
+      "tar_types": [
+        "air"
+      ],
+      "range_km": 70.0,
+      "shoot_on_move": true,
+      "cooldown_s": 15,
+      "guidance": "semi_active",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 3
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.hhq10": {
+      "label": "红旗-10 近程防空导弹",
+      "category": "sam",
+      "tar_types": [
+        "air"
+      ],
+      "range_km": 9.0,
+      "shoot_on_move": true,
+      "cooldown_s": 10,
+      "guidance": "ir",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 3
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.hhq9.naval": {
+      "label": "海红旗-9 舰空导弹",
+      "category": "vls_sam",
+      "tar_types": [
+        "air"
+      ],
+      "range_km": 200.0,
+      "shoot_on_move": true,
+      "cooldown_s": 15,
+      "guidance": "command_arh",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 3
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.yj18": {
+      "label": "鹰击-18 反舰导弹",
+      "category": "anti_ship_missile",
+      "tar_types": [
+        "surface"
+      ],
+      "range_km": 540.0,
+      "shoot_on_move": true,
+      "cooldown_s": 60,
+      "guidance": "inertial_arh",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 73
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.yj83": {
+      "label": "鹰击-83 反舰导弹",
+      "category": "anti_ship_missile",
+      "tar_types": [
+        "surface"
+      ],
+      "range_km": 180.0,
+      "shoot_on_move": true,
+      "cooldown_s": 60,
+      "guidance": "inertial_arh",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 73
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.yj62": {
+      "label": "鹰击-62 岸舰导弹",
+      "category": "anti_ship_missile",
+      "tar_types": [
+        "surface"
+      ],
+      "range_km": 280.0,
+      "shoot_on_move": true,
+      "cooldown_s": 120,
+      "guidance": "inertial_gnss_arh",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 73
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.130mm.naval": {
+      "label": "130mm 舰炮",
+      "category": "naval_gun",
+      "tar_types": [
+        "surface",
+        "ground_area"
+      ],
+      "range_km": 30.0,
+      "shoot_on_move": true,
+      "cooldown_s": 8,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 37
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.76mm.naval": {
+      "label": "76mm 舰炮",
+      "category": "naval_gun",
+      "tar_types": [
+        "surface",
+        "air"
+      ],
+      "range_km": 15.0,
+      "shoot_on_move": true,
+      "cooldown_s": 6,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 37
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.ciws": {
+      "label": "近防炮",
+      "category": "ciws",
+      "tar_types": [
+        "air",
+        "surface"
+      ],
+      "range_km": 3.0,
+      "shoot_on_move": true,
+      "cooldown_s": 3,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 1
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.torpedo.533": {
+      "label": "533mm 鱼雷",
+      "category": "torpedo",
+      "tar_types": [
+        "surface",
+        "subsurface"
+      ],
+      "range_km": 50.0,
+      "shoot_on_move": true,
+      "cooldown_s": 120,
+      "guidance": "wire",
+      "sdk": {
+        "tar_type": null,
+        "wpdata_id": null
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.jl2": {
+      "label": "巨浪-2 潜射弹道导弹",
+      "category": "ballistic_missile",
+      "tar_types": [
+        "ground_area"
+      ],
+      "range_km": 7000.0,
+      "shoot_on_move": false,
+      "cooldown_s": 600,
+      "guidance": "inertial_stellar",
+      "sdk": {
+        "tar_type": 0,
+        "wpdata_id": 73
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.pl15": {
+      "label": "霹雳-15 空空导弹",
+      "category": "air_to_air",
+      "tar_types": [
+        "air"
+      ],
+      "range_km": 200.0,
+      "shoot_on_move": true,
+      "cooldown_s": 20,
+      "guidance": "arh",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 3
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.pl10": {
+      "label": "霹雳-10 格斗导弹",
+      "category": "air_to_air",
+      "tar_types": [
+        "air"
+      ],
+      "range_km": 20.0,
+      "shoot_on_move": true,
+      "cooldown_s": 15,
+      "guidance": "ir",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 3
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.yj83k": {
+      "label": "鹰击-83K 空舰导弹",
+      "category": "air_to_surface",
+      "tar_types": [
+        "surface"
+      ],
+      "range_km": 180.0,
+      "shoot_on_move": true,
+      "cooldown_s": 60,
+      "guidance": "inertial_arh",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 73
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.kd88": {
+      "label": "空地-88 空地导弹",
+      "category": "air_to_surface",
+      "tar_types": [
+        "ground_area"
+      ],
+      "range_km": 200.0,
+      "shoot_on_move": true,
+      "cooldown_s": 60,
+      "guidance": "inertial_gnss",
+      "sdk": {
+        "tar_type": 0,
+        "wpdata_id": 73
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.cj20": {
+      "label": "长剑-20 巡航导弹",
+      "category": "cruise_missile",
+      "tar_types": [
+        "ground_area"
+      ],
+      "range_km": 2000.0,
+      "shoot_on_move": true,
+      "cooldown_s": 120,
+      "guidance": "inertial_gnss",
+      "sdk": {
+        "tar_type": 0,
+        "wpdata_id": 73
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.gsh30": {
+      "label": "30mm 航空机炮",
+      "category": "cannon",
+      "tar_types": [
+        "air",
+        "personnel"
+      ],
+      "range_km": 1.0,
+      "shoot_on_move": true,
+      "cooldown_s": 3,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 56
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.akd10": {
+      "label": "AKD-10 空地导弹",
+      "category": "atgm",
+      "tar_types": [
+        "vehicle",
+        "installation"
+      ],
+      "range_km": 10.0,
+      "shoot_on_move": true,
+      "cooldown_s": 30,
+      "guidance": "laser",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 73
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.ty90": {
+      "label": "天燕-90 直升机空空导弹",
+      "category": "air_to_air",
+      "tar_types": [
+        "air"
+      ],
+      "range_km": 6.0,
+      "shoot_on_move": true,
+      "cooldown_s": 20,
+      "guidance": "ir",
+      "sdk": {
+        "tar_type": 3,
+        "wpdata_id": 3
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.23mm.chain": {
+      "label": "23mm 链式机炮",
+      "category": "cannon",
+      "tar_types": [
+        "personnel",
+        "vehicle"
+      ],
+      "range_km": 2.0,
+      "shoot_on_move": true,
+      "cooldown_s": 4,
+      "guidance": "direct",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 56
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.hellfire": {
+      "label": "AGM-114 海尔法导弹",
+      "category": "atgm",
+      "tar_types": [
+        "vehicle",
+        "installation"
+      ],
+      "range_km": 8.0,
+      "shoot_on_move": true,
+      "cooldown_s": 30,
+      "guidance": "laser",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 73
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.ar1": {
+      "label": "AR-1 空地导弹",
+      "category": "air_to_surface",
+      "tar_types": [
+        "vehicle",
+        "installation"
+      ],
+      "range_km": 8.0,
+      "shoot_on_move": true,
+      "cooldown_s": 30,
+      "guidance": "laser",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 73
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.loitering.warhead": {
+      "label": "巡飞弹战斗部",
+      "category": "loitering_warhead",
+      "tar_types": [
+        "personnel",
+        "vehicle",
+        "installation"
+      ],
+      "range_km": 0.1,
+      "shoot_on_move": true,
+      "cooldown_s": 0,
+      "guidance": "self",
+      "sdk": {
+        "tar_type": 2,
+        "wpdata_id": 76
+      },
+      "source": "mixed",
+      "note": ""
+    },
+    "weapon.asw.torpedo": {
+      "label": "反潜鱼雷",
+      "category": "torpedo",
+      "tar_types": [
+        "subsurface"
+      ],
+      "range_km": 50.0,
+      "shoot_on_move": true,
+      "cooldown_s": 120,
+      "guidance": "acoustic",
+      "sdk": {
+        "tar_type": null,
+        "wpdata_id": null
+      },
+      "source": "mixed",
+      "note": ""
+    }
+  },
+  "sensors": {
+    "sensor.visual.squad": {
+      "label": "班组目视观察",
+      "kind": "visual",
+      "range_km": 5.0,
+      "quality": 0.7,
+      "passive": true,
+      "channels": [
+        "ground",
+        "air"
+      ]
+    },
+    "sensor.visual.recon": {
+      "label": "侦察组目视/望远镜",
+      "kind": "visual",
+      "range_km": 8.0,
+      "quality": 0.75,
+      "passive": true,
+      "channels": [
+        "ground"
+      ]
+    },
+    "sensor.ir.manpads": {
+      "label": "便携防空光电/红外",
+      "kind": "ir",
+      "range_km": 8.0,
+      "quality": 0.7,
+      "passive": true,
+      "channels": [
+        "air"
+      ]
+    },
+    "sensor.thermal.gunner": {
+      "label": "炮长热像仪",
+      "kind": "ir",
+      "range_km": 5.0,
+      "quality": 0.85,
+      "passive": true,
+      "channels": [
+        "ground"
+      ]
+    },
+    "sensor.radar.mmwave": {
+      "label": "车载毫米波雷达",
+      "kind": "radar",
+      "range_km": 3.0,
+      "quality": 0.8,
+      "passive": false,
+      "channels": [
+        "ground"
+      ]
+    },
+    "sensor.eo.vehicle": {
+      "label": "车长周视光电",
+      "kind": "ir",
+      "range_km": 4.0,
+      "quality": 0.8,
+      "passive": true,
+      "channels": [
+        "ground",
+        "air"
+      ]
+    },
+    "sensor.radar.recon": {
+      "label": "侦察车雷达",
+      "kind": "radar",
+      "range_km": 20.0,
+      "quality": 0.75,
+      "passive": false,
+      "channels": [
+        "ground",
+        "air"
+      ]
+    },
+    "sensor.eo.recon": {
+      "label": "侦察车光电",
+      "kind": "ir",
+      "range_km": 12.0,
+      "quality": 0.85,
+      "passive": true,
+      "channels": [
+        "ground"
+      ]
+    },
+    "sensor.radar.artillery": {
+      "label": "炮兵侦察/校射雷达",
+      "kind": "radar",
+      "range_km": 30.0,
+      "quality": 0.8,
+      "passive": false,
+      "channels": [
+        "ground"
+      ]
+    },
+    "sensor.radar.sam": {
+      "label": "HT-233 制导雷达",
+      "kind": "radar",
+      "range_km": 300.0,
+      "quality": 1.0,
+      "passive": false,
+      "channels": [
+        "air"
+      ]
+    },
+    "sensor.radar.coastal": {
+      "label": "岸基超视距雷达",
+      "kind": "radar",
+      "range_km": 200.0,
+      "quality": 0.9,
+      "passive": false,
+      "channels": [
+        "surface",
+        "air"
+      ]
+    },
+    "sensor.radar.ship.aesa": {
+      "label": "346A 相控阵雷达",
+      "kind": "radar",
+      "range_km": 400.0,
+      "quality": 1.0,
+      "passive": false,
+      "channels": [
+        "air",
+        "surface"
+      ]
+    },
+    "sensor.radar.ship.382": {
+      "label": "382 型三坐标雷达",
+      "kind": "radar",
+      "range_km": 250.0,
+      "quality": 0.9,
+      "passive": false,
+      "channels": [
+        "air",
+        "surface"
+      ]
+    },
+    "sensor.radar.ship.361": {
+      "label": "361 型对海/对空雷达",
+      "kind": "radar",
+      "range_km": 120.0,
+      "quality": 0.8,
+      "passive": false,
+      "channels": [
+        "air",
+        "surface"
+      ]
+    },
+    "sensor.radar.ship.nav": {
+      "label": "导航雷达",
+      "kind": "radar",
+      "range_km": 60.0,
+      "quality": 0.7,
+      "passive": false,
+      "channels": [
+        "surface"
+      ]
+    },
+    "sensor.sonar.hull": {
+      "label": "舰壳声呐",
+      "kind": "sonar",
+      "range_km": 40.0,
+      "quality": 0.8,
+      "passive": false,
+      "channels": [
+        "subsurface"
+      ]
+    },
+    "sensor.sonar.towed": {
+      "label": "拖曳阵列声呐",
+      "kind": "sonar",
+      "range_km": 60.0,
+      "quality": 0.9,
+      "passive": true,
+      "channels": [
+        "subsurface"
+      ]
+    },
+    "sensor.esm.ship": {
+      "label": "舰载电子侦察",
+      "kind": "esm",
+      "range_km": 500.0,
+      "quality": 1.0,
+      "passive": true,
+      "channels": [
+        "air",
+        "surface"
+      ]
+    },
+    "sensor.sonar.sub": {
+      "label": "潜艇综合声呐",
+      "kind": "sonar",
+      "range_km": 60.0,
+      "quality": 0.9,
+      "passive": true,
+      "channels": [
+        "surface",
+        "subsurface"
+      ]
+    },
+    "sensor.radar.fighter.aesa": {
+      "label": "机载有源相控阵雷达",
+      "kind": "radar",
+      "range_km": 200.0,
+      "quality": 1.0,
+      "passive": false,
+      "channels": [
+        "air",
+        "surface"
+      ]
+    },
+    "sensor.ir.irst": {
+      "label": "机载红外搜索跟踪",
+      "kind": "ir",
+      "range_km": 50.0,
+      "quality": 0.85,
+      "passive": true,
+      "channels": [
+        "air"
+      ]
+    },
+    "sensor.esm.air": {
+      "label": "机载电子侦察",
+      "kind": "esm",
+      "range_km": 300.0,
+      "quality": 1.0,
+      "passive": true,
+      "channels": [
+        "air",
+        "surface"
+      ]
+    },
+    "sensor.radar.aew": {
+      "label": "预警机三面阵雷达",
+      "kind": "radar",
+      "range_km": 470.0,
+      "quality": 1.0,
+      "passive": false,
+      "channels": [
+        "air",
+        "surface"
+      ]
+    },
+    "sensor.esm.aew": {
+      "label": "预警机电子侦察",
+      "kind": "esm",
+      "range_km": 400.0,
+      "quality": 1.0,
+      "passive": true,
+      "channels": [
+        "air",
+        "surface"
+      ]
+    },
+    "sensor.radar.helo": {
+      "label": "直升机毫米波雷达",
+      "kind": "radar",
+      "range_km": 8.0,
+      "quality": 0.8,
+      "passive": false,
+      "channels": [
+        "ground",
+        "air"
+      ]
+    },
+    "sensor.eo.helo": {
+      "label": "直升机光电转塔",
+      "kind": "ir",
+      "range_km": 15.0,
+      "quality": 0.85,
+      "passive": true,
+      "channels": [
+        "ground"
+      ]
+    },
+    "sensor.eo.uav": {
+      "label": "无人机光电吊舱",
+      "kind": "ir",
+      "range_km": 80.0,
+      "quality": 0.9,
+      "passive": true,
+      "channels": [
+        "ground",
+        "surface"
+      ]
+    },
+    "sensor.sar.uav": {
+      "label": "无人机合成孔径雷达",
+      "kind": "radar",
+      "range_km": 80.0,
+      "quality": 0.9,
+      "passive": false,
+      "channels": [
+        "ground",
+        "surface"
+      ]
+    },
+    "sensor.eo.uav.tactical": {
+      "label": "战术无人机光电",
+      "kind": "ir",
+      "range_km": 50.0,
+      "quality": 0.8,
+      "passive": true,
+      "channels": [
+        "ground"
+      ]
+    },
+    "sensor.radar.patrol": {
+      "label": "反潜巡逻机搜索雷达",
+      "kind": "radar",
+      "range_km": 200.0,
+      "quality": 0.9,
+      "passive": false,
+      "channels": [
+        "surface",
+        "subsurface"
+      ]
+    },
+    "sensor.radar.weather": {
+      "label": "机载气象/导航雷达",
+      "kind": "radar",
+      "range_km": 50.0,
+      "quality": 0.6,
+      "passive": false,
+      "channels": [
+        "air",
+        "ground"
+      ]
+    },
+    "sensor.sonobuoy": {
+      "label": "声呐浮标",
+      "kind": "sonar",
+      "range_km": 30.0,
+      "quality": 0.9,
+      "passive": true,
+      "channels": [
+        "subsurface"
+      ]
+    }
+  },
+  "comms": {
+    "comm.vhf.squad": {
+      "label": "班组超短波电台",
+      "range_km": 5.0,
+      "relay": false,
+      "jam_resist": 0.2,
+      "encrypted": true
+    },
+    "comm.hf.squad": {
+      "label": "班组短波电台",
+      "range_km": 50.0,
+      "relay": false,
+      "jam_resist": 0.25,
+      "encrypted": true
+    },
+    "comm.vhf.vehicle": {
+      "label": "车载超短波电台",
+      "range_km": 30.0,
+      "relay": false,
+      "jam_resist": 0.3,
+      "encrypted": true
+    },
+    "comm.hf.vehicle": {
+      "label": "车载短波电台",
+      "range_km": 300.0,
+      "relay": false,
+      "jam_resist": 0.35,
+      "encrypted": true
+    },
+    "comm.datalink.vehicle": {
+      "label": "车际数据链",
+      "range_km": 50.0,
+      "relay": true,
+      "jam_resist": 0.4,
+      "encrypted": true
+    },
+    "comm.relay.command": {
+      "label": "指挥车通信中继",
+      "range_km": 50.0,
+      "relay": true,
+      "jam_resist": 0.45,
+      "encrypted": true
+    },
+    "comm.datalink.naval": {
+      "label": "海军战术数据链",
+      "range_km": 500.0,
+      "relay": true,
+      "jam_resist": 0.5,
+      "encrypted": true
+    },
+    "comm.satcom.naval": {
+      "label": "舰载卫星通信",
+      "range_km": 2000.0,
+      "relay": true,
+      "jam_resist": 0.45,
+      "encrypted": true
+    },
+    "comm.datalink.air": {
+      "label": "机载战术数据链",
+      "range_km": 400.0,
+      "relay": true,
+      "jam_resist": 0.5,
+      "encrypted": true
+    },
+    "comm.vhf.air": {
+      "label": "机载超短波电台",
+      "range_km": 300.0,
+      "relay": false,
+      "jam_resist": 0.35,
+      "encrypted": true
+    },
+    "comm.satcom.air": {
+      "label": "机载卫星通信",
+      "range_km": 2000.0,
+      "relay": true,
+      "jam_resist": 0.45,
+      "encrypted": true
+    },
+    "comm.vhf.helo": {
+      "label": "直升机超短波电台",
+      "range_km": 100.0,
+      "relay": false,
+      "jam_resist": 0.3,
+      "encrypted": true
+    },
+    "comm.satcom.uav": {
+      "label": "无人机卫星链路",
+      "range_km": 2000.0,
+      "relay": true,
+      "jam_resist": 0.4,
+      "encrypted": true
+    }
+  }
+}

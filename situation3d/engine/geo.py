@@ -84,8 +84,12 @@ def kmh_to_knots(kmh: float) -> float:
 
     Ground units are specified in km/h because that is how they are quoted in
     open sources, while the frame schema stores a single canonical speed unit.
+
+    ``1 kn = 1.852 km/h``. The previous implementation divided by 3600 as well,
+    turning 45 km/h into 0.0067 kn and freezing every caller (R04/R05/B03 and
+    the dense-transfer target definitions).
     """
-    return kmh * 1000.0 / NM_IN_M / 3600.0
+    return kmh * 1000.0 / NM_IN_M
 
 
 def sample_polyline(points: Sequence[Coord], distance_m: float) -> Tuple[Coord, float]:
