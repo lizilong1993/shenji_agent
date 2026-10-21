@@ -151,12 +151,12 @@
         var rep = items[0];
         return '<div class="os-row">'
           + '<span class="os-fam">'
-          + '<img class="os-fam-ico" src="' + Symbology.symbolUri(rep.icon, aff, {}) + '" alt="">'
+          + '<img class="os-fam-ico" src="' + Symbology.symbolUri(rep.icon, aff, { domain: rep.domain }) + '" alt="">'
           + esc(f) + '</span>'
           + '<span class="os-icons">'
           + items.map(function (t) {
               return '<img class="os-icon os-tier-0" data-target="' + esc(t.id) + '"'
-                + ' src="' + Symbology.symbolUri(t.icon, aff, {}) + '" alt="' + esc(t.id) + '">';
+                + ' src="' + Symbology.symbolUri(t.icon, aff, { domain: t.domain }) + '" alt="' + esc(t.id) + '">';
             }).join('')
           + '</span>'
           + '<span class="os-count">共 <b>' + items.length + '</b> 单位</span>'
@@ -317,7 +317,7 @@
     }
 
     var html = '<div class="ts-head">'
-      + '<img class="ts-sym" src=' + JSON.stringify(Symbology.symbolUri(def.icon, def.affiliation, {})) + ' alt="">'
+      + '<img class="ts-sym" src=' + JSON.stringify(Symbology.symbolUri(def.icon, def.affiliation, { domain: def.domain })) + ' alt="">'
       + '<div class="ts-id"><b>' + esc(def.id) + '</b>'
       + '<span>' + esc(def.name) + '</span></div></div>';
 

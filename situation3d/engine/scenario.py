@@ -287,8 +287,9 @@ class Target:
             "role": self.role,
             "model": self.model,
             "model_note": self.model_note,
-            "icon": self.icon,
-            "icon_label": symbology.describe(self.icon)["label"],
+            # 未知/未登记图标按域回退到大类（sea/land/air），不输出空符号。
+            "icon": symbology.resolve_icon(self.icon, self.domain),
+            "icon_label": symbology.describe(self.icon, self.domain)["label"],
             "sensor_name": self.sensor_name,
             "sensor_range_km": self.sensor_range_km,
             "influence_km": self.influence_km,
