@@ -181,7 +181,7 @@
         "type": 2,
         "sub_type": 0,
         "basic_speed_kmh": 36,
-        "armor": 3,
+        "armor": 2,
         "max_blood": 3,
         "weapon_ids": [
           37,
@@ -239,7 +239,7 @@
           }
         },
         "protection": {
-          "armor_class": 3,
+          "armor_class": 2,
           "max_blood": 3,
           "size_class": "medium",
           "signature": {
