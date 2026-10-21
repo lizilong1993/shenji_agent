@@ -123,12 +123,14 @@
       label: '天地图影像', group: '底图', checkbox: 'modelTianditu',
       exclusives: [],
     },
+    // 【2026-10-21 改：默认关】用户要求：初始化只加载「天地图影像 + 天地图注记」，
+    // 热点/城区/离线高倍段都改为默认不加载。打开后行为不变（仍按相机高度自动挂/卸）。
     {
-      id: 'hotspot.imagery', kind: 'imagery', z: 30, default: true,
+      id: 'hotspot.imagery', kind: 'imagery', z: 30, default: false,
       label: '热点区域高清影像', group: '底图', checkbox: 'modelHotspotImagery',
     },
     {
-      id: 'urban.imagery', kind: 'imagery', z: 40, default: true,
+      id: 'urban.imagery', kind: 'imagery', z: 40, default: false,
       label: '城区高清影像（米级）', group: '底图', checkbox: 'modelUrbanImagery',
     },
     // 离线底图的**高倍段**（z14+），矩形来自 manifest 的逐层实测覆盖（见
@@ -140,7 +142,7 @@
     //     会把它盖住；
     //   * 放在 z=50 之上也不行——会盖住半透明的建筑高度覆盖层与注记的层次关系。
     {
-      id: 'imagery.offline_detail', kind: 'imagery', z: 45, default: true,
+      id: 'imagery.offline_detail', kind: 'imagery', z: 45, default: false,
       label: '离线高清底图（z14+）', group: '底图', checkbox: 'modelOfflineDetail',
       exclusives: [],
     },
