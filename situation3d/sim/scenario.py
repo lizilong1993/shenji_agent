@@ -20,6 +20,7 @@ from rules.context import WeaponView
 from sim.entity import Entity, Pose
 from sim.world import World
 from sim import sensors as sensor_model
+from mobility.profile import profile_for
 
 DEFAULT_ANCHOR = (119.9, 23.1)
 
@@ -164,6 +165,7 @@ def _weapon_views(op: dict) -> Tuple[list, dict]:
         kind = "indirect" if wid in INDIRECT_IDS else "direct"
         key = str(wid)
         views.append(WeaponView(key=key, weapon_id=wid, name=key, kind=kind,
+                                shoot_on_move=wid in (36, 37, 54),
                                 cooldown_s=75.0, ammo=10, tables=wtab))
         ammo[key] = 10
     return views, ammo
@@ -177,7 +179,16 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
     for op in scenario.get("operators") or []:
         unit_type = _unit_type(op)
         domain = _domain(str(op.get("name") or ""), int(op.get("type") or 2), unit_type)
+        if op.get("domain"):
+            domain = str(op["domain"])
+            if domain == "sea":
+                domain = "surface"
+            elif domain == "sub":
+                domain = "subsurface"
         lon, lat = grid.to_lonlat(int(op["cur_hex"]))
+        profile = profile_for(unit_type, domain)
+        armor = op.get("armor")
+        armor = int(armor) if armor is not None else int(profile.armor_class)
         weapons, ammo = _weapon_views(op)
         sea_weapons = sea_air_weapons_for(str(op.get("name") or ""), domain)
         for w in sea_weapons:
@@ -193,7 +204,11 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             unit_kind=_unit_kind(op, unit_type),
             blood=int(op.get("blood") or 1),
             max_blood=int(op.get("max_blood") or op.get("blood") or 1),
-            armor=int(op.get("armor") or 0),
+            armor=armor,
+            size_class=str(op.get("size_class") or profile.size_class),
+            depth=str(op.get("depth") or "surface"),
+            emitting=bool(op.get("emitting", True)),
+            observe_distance={str(k): int(v) for k, v in (op.get("observe_distance") or {}).items()},
             ammo=ammo,
             weapons=weapons,
             sea_air_weapons=sea_weapons,

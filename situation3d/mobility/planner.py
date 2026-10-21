@@ -61,9 +61,8 @@ class GridPlanner(object):
                 return self._build_route(prof, start, goal, came, cell, mode)
             row, col = cell
             cx, cy = self.grid.cell_center_lonlat(row, col)
-            for dr, dc in DIRECTIONS:
-                nb = (row + dr, col + dc)
-                if not self.grid.in_bounds(nb) or nb in closed:
+            for nb in self.grid.neighbors(cell):
+                if nb in closed:
                     continue
                 nlon, nlat = self.grid.cell_center_lonlat(*nb)
                 alt = self._alt(prof, nlon, nlat)

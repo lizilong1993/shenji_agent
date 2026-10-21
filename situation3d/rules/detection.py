@@ -40,6 +40,12 @@ def observe_range(observer: RuleEntityView, target: RuleEntityView,
                   ctx: RuleContext) -> int:
     table = observation_doc()["table"]
     base = int(table.get(_kind(observer), {}).get(_kind(target), 0))
+    override = getattr(observer, "observe_distance", None) or {}
+    if override:
+        try:
+            base = max([base] + [int(v) for v in override.values()])
+        except (TypeError, ValueError):
+            pass
     if base <= 0:
         return 0
     if target.concealed:
@@ -58,8 +64,8 @@ def can_observe(observer: RuleEntityView, target: RuleEntityView,
         return False
     # Sea/air domains are covered by the radar/IR/sonar/ESM model, not the
     # land observation table.
-    if (observer.domain != "land" or target.domain != "land"
-            or observer.domain == "air" or target.domain == "air"):
+    if (observer.domain not in ("land", "amphibious")
+            or target.domain not in ("land", "amphibious")):
         return ctx.sensor_detect(observer, target)
     # Cheap rejection before terrain/cover work: the table base range is an
     # upper bound, so anything farther cannot be observed.

@@ -63,7 +63,8 @@ SEA_AIR_PROFILES: Dict[str, SeaAirWeapon] = {
 
 
 def _norm(domain: str) -> str:
-    return {"surface": "sea", "subsurface": "sub"}.get(domain, domain)
+    return {"surface": "sea", "subsurface": "sub",
+            "amphibious": "land"}.get(domain, domain)
 
 
 def allowed_kinds(attacker_domain: str, target_domain: str) -> List[str]:

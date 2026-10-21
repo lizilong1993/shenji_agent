@@ -24,6 +24,10 @@ from sim.entity import Entity, Pose
 from sim.motion import integrate
 
 
+def _is_ground(entity) -> bool:
+    return getattr(entity, "domain", "land") in ("land", "amphibious")
+
+
 class World(object):
     def __init__(self, env, rule_grid: RuleGrid, dt_s: float = 1.0,
                  seed: int = 20261021, plan_grid=None):
@@ -50,6 +54,7 @@ class World(object):
         self._scan_slice = 0
         self._stack_cache: Dict[int, bool] = {}
         self._friendly_cache: Dict[int, int] = {}
+        self._count_cache: Dict[Tuple[Tuple[int, int], int], int] = {}
         self.winner: Optional[str] = None
 
     # -- entities -----------------------------------------------------------
@@ -83,21 +88,22 @@ class World(object):
         counts: Dict[Tuple[Tuple[int, int], int], int] = {}
         any_counts: Dict[Tuple[int, int], int] = {}
         for e in self.sorted_entities():
-            if not e.alive:
+            if not e.alive or e.on_board:
                 continue
             cell = self.rule_grid.cell_of(e.pose.lon, e.pose.lat)
             self._cell_cache[e.uid] = cell
-            if e.domain == "land":
+            if _is_ground(e):
                 counts[(cell, e.affiliation)] = counts.get((cell, e.affiliation), 0) + 1
                 any_counts[cell] = any_counts.get(cell, 0) + 1
         self._stack_cache = {}
         self._friendly_cache = {}
+        self._count_cache = counts
         for e in self.sorted_entities():
             cell = self._cell_cache.get(e.uid)
             if cell is None:
                 continue
             self._friendly_cache[e.uid] = counts.get((cell, e.affiliation), 0)
-            self._stack_cache[e.uid] = e.domain == "land" and any_counts.get(cell, 0) > 1
+            self._stack_cache[e.uid] = _is_ground(e) and any_counts.get(cell, 0) > 1
 
     def entities_in_cell(self, cell: Tuple[int, int],
                          side: Optional[int] = None) -> List[Entity]:
@@ -105,7 +111,7 @@ class World(object):
                 if e.alive and not e.on_board and self.rule_cell(e) == cell]
 
     def stacked(self, entity: Entity) -> bool:
-        if entity.domain != "land":
+        if not _is_ground(entity):
             return False
         return self._stack_cache.get(entity.uid, False)
 
@@ -188,10 +194,7 @@ class World(object):
             return
         e.blood = max(0, e.blood - int(damage))
         if e.blood <= 0:
-            e.alive = False
-            e.route = None
-            e.velocity_ms = 0.0
-            self.emit("destroyed", [e.uid], "%s 被摧毁" % e.name)
+            self._on_destroyed(e)
 
     def apply_suppression(self, uid: int, seconds: float) -> None:
         e = self.entities[int(uid)]
@@ -201,6 +204,8 @@ class World(object):
 
     # -- sensors ------------------------------------------------------------
     def _update_sensors(self, ctx: WorldRuleContext) -> None:
+        for dead_uid in [uid for uid, e in self.entities.items() if not e.alive]:
+            self.seen.pop(dead_uid, None)
         entities = [e for e in self.sorted_entities() if e.alive and not e.on_board]
         cells = self._cell_cache
         kind_of = {e.uid: ctx.view(e).unit_kind for e in entities}
@@ -213,8 +218,11 @@ class World(object):
             observers = [e for i, e in enumerate(entities)
                          if i % slice_count == self._scan_slice]
             self._scan_slice = (self._scan_slice + 1) % slice_count
+        if self._scan_slice == 0:
+            self._detect_cache.clear()
         for observer in observers:
-            seen = self.seen.setdefault(observer.uid, set())
+            seen = set()
+            self.seen[observer.uid] = seen
             o_kind = kind_of[observer.uid]
             max_cells = int(table.get(o_kind, {}).get("vehicle", 0))
             if observer.sensors:
@@ -259,21 +267,26 @@ class World(object):
                 candidate = self.entities.get(int(order.get("target", -1)))
                 if candidate is not None and candidate.alive:
                     target = candidate
+            if target is not None and not ctx.can_detect(ctx.view(attacker), ctx.view(target)):
+                target = None
             if target is None:
-                if attacker.velocity_ms > 0.1 and attacker.unit_type not in ("vehicle",):
-                    continue
                 target = self._best_target(attacker, ctx)
             if target is None:
                 continue
-            if attacker.domain == "land" and target.domain == "land":
+            if _is_ground(attacker) and _is_ground(target):
+                if attacker.marching:
+                    continue
+                if attacker.velocity_ms > 0.1 and not any(
+                        getattr(w, "shoot_on_move", False) for w in attacker.weapons):
+                    continue
                 event = combat.resolve_direct_fire(ctx.view(attacker), ctx.view(target), ctx)
             else:
                 event = engagement.resolve_sea_air(ctx.view(attacker), ctx.view(target), ctx)
             if event is not None:
                 event["tick_s"] = round(self.time_s, 1)
+                event["target_blood"] = target.blood
+                event["location_geo"] = {"lon": target.pose.lon, "lat": target.pose.lat}
                 self._append(event)
-                if not target.alive:
-                    self._destroy(target)
 
     def _best_target(self, attacker: Entity, ctx: WorldRuleContext) -> Optional[Entity]:
         best = None
@@ -285,7 +298,7 @@ class World(object):
                 continue
             if target.affiliation == attacker.affiliation:
                 continue
-            if attacker.domain == "land" and target.domain == "land":
+            if _is_ground(attacker) and _is_ground(target):
                 dist = self.rule_grid.distance(self.rule_cell(attacker), self.rule_cell(target))
                 max_range = 0
                 for w in attacker.weapons:
@@ -298,7 +311,7 @@ class World(object):
                 candidates.append((0, -target.value, target))
         candidates.sort(key=lambda c: (c[0], c[1]))
         for _, _, target in candidates[:5]:
-            if attacker.domain == "land" and target.domain == "land":
+            if _is_ground(attacker) and _is_ground(target):
                 if combat.select_weapon(ctx.view(attacker), ctx.view(target), ctx) is None:
                     continue
                 event_key = (ctx.rule_distance(ctx.view(attacker), ctx.view(target)),
@@ -319,16 +332,29 @@ class World(object):
                 best = target
         return best
 
-    def _destroy(self, entity: Entity) -> None:
-        if entity.alive:
-            entity.alive = False
-            self.emit("destroyed", [entity.uid], "%s 被摧毁" % entity.name)
-            for pid in list(entity.passengers):
-                passenger = self.entities.get(pid)
-                if passenger is not None and passenger.alive:
-                    passenger.on_board = False
-                    passenger.carrier = None
-                    self.apply_damage(pid, passenger.blood + 1)
+    def _on_destroyed(self, entity: Entity) -> None:
+        if getattr(entity, "_destroyed", False):
+            return
+        entity._destroyed = True
+        entity.alive = False
+        entity.route = None
+        entity.velocity_ms = 0.0
+        self.emit("destroyed", [entity.uid], "%s 被摧毁" % entity.name)
+        for pid in list(entity.passengers):
+            passenger = self.entities.get(pid)
+            if passenger is not None and passenger.alive:
+                passenger.on_board = False
+                passenger.carrier = None
+                self.apply_damage(pid, passenger.blood + 1)
+        entity.passengers = []
+
+    def _can_enter_cell(self, entity: Entity, lon: float, lat: float) -> bool:
+        if not _is_ground(entity):
+            return True
+        cell = self.rule_grid.cell_of(lon, lat)
+        if cell == self._cell_cache.get(entity.uid):
+            return True
+        return self._count_cache.get((cell, entity.affiliation), 0) < 4
 
     # -- embark / disembark -------------------------------------------------
     def _sync_passengers(self) -> None:
@@ -403,12 +429,12 @@ class World(object):
     def _update_objectives(self) -> None:
         for cell, obj in self.objectives.items():
             owners = {e.affiliation for e in self.entities_in_cell(cell)
-                      if e.alive and e.domain == "land"}
+                      if e.alive and _is_ground(e)}
             if len(owners) != 1:
                 continue
             owner = next(iter(owners))
             neighbours = set(self.rule_grid.neighbors(cell))
-            enemy_near = any(e.alive and e.domain == "land" and e.affiliation != owner
+            enemy_near = any(e.alive and _is_ground(e) and e.affiliation != owner
                              and (self.rule_cell(e) == cell or self.rule_cell(e) in neighbours)
                              for e in self.entities.values())
             if not enemy_near and obj["owner"] != owner:
@@ -447,7 +473,8 @@ class World(object):
         self._apply_orders()
         for e in self.sorted_entities():
             if e.alive and not e.on_board:
-                reason = integrate(e, dt, self.env)
+                reason = integrate(e, dt, self.env,
+                                   cell_check=lambda lon, lat, ent=e: self._can_enter_cell(ent, lon, lat))
                 if reason == "blocked" and e.goal is not None:
                     route = self.planner.plan(e.profile, (e.pose.lon, e.pose.lat), e.goal)
                     if route is not None:

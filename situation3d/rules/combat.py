@@ -56,6 +56,8 @@ def select_weapon(attacker: RuleEntityView, target: RuleEntityView,
     for weapon in getattr(attacker, "weapons", []) or []:
         if weapon.kind != "direct":
             continue
+        if attacker.moving and not getattr(weapon, "shoot_on_move", False):
+            continue
         if attacker.ammo_count(weapon.key) <= 0:
             continue
         if not ctx.weapon_ready(attacker.uid, weapon.key):
@@ -93,30 +95,39 @@ def resolve_direct_fire(attacker: RuleEntityView, target: RuleEntityView,
     base = table.level_at(distance)
     idx = base if base is not None else 0
     elev = ctx.elevation_modifier(attacker, target)
-    cover = target_cover(ctx, target)
-    level = idx + elev - cover
+    level = idx + elev  # terrain cover is applied once, in the correction table
 
-    shooter_state = "suppressed" if attacker.suppressed else (
-        "moving" if attacker.moving else "normal")
-    terrain = "urban" if ctx.cover_at(target) == Cover.URBAN else (
-        "forest" if ctx.cover_at(target) in (Cover.FOREST, Cover.BUILDING) else "open")
-    target_state = "concealed" if target.concealed else (
-        "marching" if target.marching else ("moving" if target.moving else "normal"))
+    mod = 0
+    if attacker.suppressed:
+        mod -= 1
+    if attacker.moving:
+        mod -= 1
+    if ctx.cover_at(target) == Cover.URBAN:
+        mod -= 1
+    elif ctx.cover_at(target) in (Cover.FOREST, Cover.BUILDING):
+        mod -= 2
+    if target.concealed:
+        mod -= 2
+    if target.moving:
+        mod -= 2
+    if target.stacked:
+        mod += 2
+    if target.marching:
+        mod += 4
 
     random1 = ctx.rng.randint(1, 6) + ctx.rng.randint(1, 6)
     random2 = ctx.rng.randint(1, 6) + ctx.rng.randint(1, 6)
 
     if ctx.target_kind(target) == "infantry":
         result, raw = crt().personnel_result(level, random1)
-        rect = crt().personnel_correction(random2, shooter_state, terrain, target_state)
+        rect = crt().personnel_correction(random2, mod)
         damage = raw + rect if result == "damage" else 0
         if result == "damage" and damage < 0:
             damage = -1
         suppressed = result == "suppressed"
     else:
         raw = crt().vehicle_raw(ctx.stack_count(attacker), level, random1)
-        rect = crt().vehicle_correction(random2, target.armor, shooter_state,
-                                        terrain, target_state)
+        rect = crt().vehicle_correction(random2, target.armor, mod)
         damage = raw + rect
         if damage < 0:
             damage = -1

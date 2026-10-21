@@ -44,9 +44,13 @@ def passable(profile: PlatformProfile, lon: float, lat: float, env,
             return depth <= profile.swim_depth_m
         return _land_ok(profile, lon, lat, env, cover)
 
-    # land
-    if depth is not None and depth > profile.wading_depth_m:
-        return False
+    # land: shallow water may be waded even though its landcover is "water"
+    if depth is not None:
+        if depth > profile.wading_depth_m:
+            return False
+        if env.slope_deg(lon, lat) > profile.max_gradient_deg:
+            return False
+        return True
     return _land_ok(profile, lon, lat, env, cover)
 
 
@@ -69,6 +73,13 @@ def speed_factor(profile: PlatformProfile, lon: float, lat: float, env,
     if profile.domain in ("surface", "subsurface"):
         return 1.0
     cover = env.landcover(lon, lat)
+    depth = env.water_depth(lon, lat)
+    if depth is not None:
+        if profile.domain == "amphibious":
+            return 0.5 if depth <= profile.swim_depth_m else 0.0
+        if depth <= profile.wading_depth_m:
+            return 0.35
+        return 0.0
     f = profile.terrain_factor(cover)
     if f <= 0.0:
         return 0.0

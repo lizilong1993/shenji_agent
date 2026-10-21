@@ -39,7 +39,9 @@ def elevation_modifier(doc: dict, attacker_higher: bool,
         return 0
     if delta_grade <= 0 or distance_hex <= 0:
         return 0
+    if distance_hex > MAX_DISTANCE:
+        return 0
     row = min(int(delta_grade), MAX_GRADE) - 1
-    col = min(int(distance_hex), MAX_DISTANCE) - 1
+    col = int(distance_hex) - 1
     table = doc["peo"] if target_kind == "infantry" else doc["car"]
     return int(table[row][col])

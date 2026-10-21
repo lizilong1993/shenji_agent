@@ -78,14 +78,8 @@ class CRT(object):
         return int(v) if isinstance(v, int) else 0
 
     def vehicle_correction(self, random2: int, armor_class: int,
-                           shooter_state: str = "normal",
-                           target_terrain: str = "open",
-                           target_state: str = "normal") -> int:
-        mod = 0
-        mod += VEHICLE_SHOOTER_MODS.get(shooter_state, 0)
-        mod += VEHICLE_TERRAIN_MODS.get(target_terrain, 0)
-        mod += VEHICLE_TARGET_MODS.get(target_state, 0)
-        band = self._band_for(int(random2) + mod)
+                           mod: int = 0) -> int:
+        band = self._band_for(int(random2) + int(mod))
         if band is None:
             return 0
         col = ARMOR_COLUMNS.get(int(armor_class), 7)
@@ -116,14 +110,8 @@ class CRT(object):
             return ("damage", v) if v > 0 else ("none", 0)
         return "none", 0
 
-    def personnel_correction(self, random2: int, shooter_state: str = "normal",
-                             target_terrain: str = "open",
-                             target_state: str = "normal") -> int:
-        mod = 0
-        mod += VEHICLE_SHOOTER_MODS.get(shooter_state, 0)
-        mod += {"urban": -1, "forest": -2, "fort": -1}.get(target_terrain, 0)
-        mod += {"concealed": -2, "moving": -2, "stacked": 2, "marching": 4}.get(target_state, 0)
-        value = int(random2) + mod
+    def personnel_correction(self, random2: int, mod: int = 0) -> int:
+        value = int(random2) + int(mod)
         if value <= 0:
             return -1
         if value <= 7:

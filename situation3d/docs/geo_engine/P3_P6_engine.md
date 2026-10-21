@@ -62,18 +62,18 @@ ticks 300: p50 9.6 ms / p95 43 ms；直瞄射击 6–13 次，毁伤 1–2
 台海案例（33 单位，map_9001，dt=30 s，1440 tick = 12 h）：
 
 ```text
-ticks 1440, elapsed 26 s, p50 16.8 ms / p95 29.6 ms
-sea_air_fire 276, destroyed 9, alive 24/33
-CZML 25 packets, observation 12 KB
+ticks 1440, elapsed 20.8 s, p50 12.1 ms / p95 31.7 ms
+sea_air_fire 326, destroyed 12, alive 21/33
+CZML 22 packets, observation 12 KB
 ```
 
-300 实体基准（60×60 格）：`p50 15 ms / p95 134 ms`；500 实体：`p50 34 ms / p95 649 ms`。P50 远低于 100 ms，P95 未达标，峰值出现在齐射/传感器扫描 tick；后续用 NumPy 空间索引/批量 LOS 优化（计划 §4.13 的优化顺序）。
+300 实体基准（60×60 格）：`p50 52 ms / p95 207 ms`；100 实体：`p50 8 ms / p95 17 ms`；500 实体：`p50 34 ms / p95 649 ms`（修复前后量级相近）。P50 低于 100 ms，P95 未达标，峰值出现在齐射/传感器扫描 tick；后续用 NumPy 空间索引/批量 LOS 优化（计划 §4.13 的优化顺序）。
 
 ## 5. 测试
 
 - `tests/test_geo_engine_core.py`（21 项）：环境、通行、规划、运动、CRT、直瞄事件、堆叠、夺控、观测过滤、CZML、envpack、旧动作、300 tick fuzz 不变量。
 - `tests/test_geo_engine_skeleton.py`（21 项）、`test_wargame_core_timebase.py`（4 项）、golden 回放（2 + 3 项）。
-- 全量 `unittest discover`：101 项（含 golden 回放时 100 项执行 + 1 项可选 TW 重放）。
+- 全量 `unittest discover`：108 项（含 golden 回放时 107 项执行 + 1 项可选 TW 重放）。
 
 ## 6. 已知限制（后续工作）
 

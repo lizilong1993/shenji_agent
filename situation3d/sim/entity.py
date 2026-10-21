@@ -127,6 +127,7 @@ class Entity(object):
     pose: Pose
     unit_type: str = "vehicle"       # infantry|vehicle|artillery|aa|...
     unit_kind: str = "vehicle"       # infantry|vehicle|recon|aa|helicopter|...
+    size_class: str = "medium"
     velocity_ms: float = 0.0
     vertical_ms: float = 0.0
     route: Optional[Route] = None

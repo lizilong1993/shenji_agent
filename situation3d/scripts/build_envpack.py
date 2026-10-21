@@ -78,7 +78,8 @@ def main(argv=None) -> int:
         "origin": {"lon": grid.center_lon, "lat": grid.center_lat, "alt": 0.0},
         "tile_size_m": args.tile_m,
         "layers": {
-            "terrain": {"source": "basic.json (fallback)", "resolution_m": grid.cell_m},
+            "terrain": {"source": "basic.json (fallback)", "resolution_m": grid.cell_m,
+                        "format": "json", "tile_pattern": "{tx}_{ty}.json"},
             "landcover": {"source": "basic.json cond", "classes":
                           ["open", "forest", "urban", "soft", "water", "rock"]},
             "water": {"source": "basic.json cond==4", "depth": "synthetic 20 m"},

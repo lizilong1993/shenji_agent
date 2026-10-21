@@ -13,8 +13,19 @@ from env.service import LandCover
 from geo.geodesy import haversine_m
 from rules import detection
 from rules.context import Cover, RuleContext, RuleEntityView
-from rules.elevation import elevation_modifier, load_elevation
+from rules.elevation import elevation_modifier
 from sim.entity import Entity, EntityRuleView
+
+
+_ELEV_DOC = None
+
+
+def _elevation_doc():
+    global _ELEV_DOC
+    if _ELEV_DOC is None:
+        from rules.elevation import load_elevation
+        _ELEV_DOC = load_elevation()
+    return _ELEV_DOC
 
 
 def _cover(env, e: Entity) -> Cover:
@@ -34,7 +45,7 @@ class WorldRuleContext(object):
         self.now_s = world.time_s
         self.rng = rng or world.rng
         self.jam = 0.0
-        self._elev_doc = load_elevation()
+        self._elev_doc = _elevation_doc()
         self._views: Dict[int, EntityRuleView] = {}
         self._grades: Dict[int, int] = {}
 
@@ -78,9 +89,10 @@ class WorldRuleContext(object):
 
     def line_of_sight(self, a, b) -> bool:
         ea, eb = self._entity(a), self._entity(b)
-        if ea.domain == "land" and eb.domain == "land":
-            return self.env.cell_line_of_sight(self.world.rule_cell(ea),
-                                               self.world.rule_cell(eb))
+        if ea.domain in ("land", "amphibious") and eb.domain in ("land", "amphibious"):
+            ca = self.env.grid.cell_of(ea.pose.lon, ea.pose.lat)
+            cb = self.env.grid.cell_of(eb.pose.lon, eb.pose.lat)
+            return self.env.cell_line_of_sight(ca, cb)
         ha = ea.pose.alt_m + 2.0
         hb = eb.pose.alt_m + 1.5
         return self.env.line_of_sight((ea.pose.lon, ea.pose.lat), ha,

@@ -50,6 +50,9 @@ class EnvPack(object):
         return self.root / name
 
     def tile_path(self, layer: str, z: int, x: int, y: int) -> Path:
+        meta = self.manifest.get("layers", {}).get(layer, {})
+        if meta.get("format") == "json":
+            return self.root / layer / ("%d_%d.json" % (x, y))
         return self.root / layer / str(z) / str(x) / ("%s.tif" % y)
 
     @property

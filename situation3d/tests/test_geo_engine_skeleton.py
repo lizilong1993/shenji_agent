@@ -143,9 +143,10 @@ class TestLegacyAdapter(unittest.TestCase):
         legacy = LegacyHexGrid.from_grid_meta(self.GRID_META)
         self.assertEqual(rule.cell_m, 200.0)
         self.assertEqual(legacy.cell_m, 1500.0)
-        # Same lon/lat must map to different row/col on the two grids.
+        # Same lon/lat maps to different cell indices on the two grids.
         lon, lat = legacy.to_lonlat(3030)
-        self.assertNotEqual(rule.cell_of(lon, lat), legacy.from_lonlat(lon, lat))
+        legacy_cell = divmod(legacy.from_lonlat(lon, lat), 100)
+        self.assertNotEqual(rule.cell_of(lon, lat), legacy_cell)
 
 
 class TestAuthoritativeWeapons(unittest.TestCase):
@@ -222,11 +223,11 @@ class TestElevationModifier(unittest.TestCase):
         for row in self.doc["peo"]:
             self.assertEqual(row[11], 0)
 
-    def test_clamped(self):
+    def test_clamped_and_out_of_range(self):
         self.assertEqual(elevation_modifier(self.doc, False, 99, 3),
                          elevation_modifier(self.doc, False, 8, 3))
-        self.assertEqual(elevation_modifier(self.doc, False, 2, 99),
-                         elevation_modifier(self.doc, False, 2, 12))
+        self.assertEqual(elevation_modifier(self.doc, False, 8, 13), 0)
+        self.assertEqual(elevation_modifier(self.doc, False, 8, 12), -1)
 
 
 class TestWorldSkeleton(unittest.TestCase):

@@ -73,10 +73,10 @@ def scenario(ops, cities=()):
             "time": {"cur_step": 0, "tick": 1.0, "max_time": 3600}}
 
 
-def make_env(basic=None):
+def make_env(basic=None, water_depth=20.0):
     basic = basic or make_basic()
     grid = LegacyHexGrid.from_grid_meta(basic["grid"])
-    return MapGridEnvironment(basic, grid), grid
+    return MapGridEnvironment(basic, grid, default_water_depth_m=water_depth), grid
 
 
 class TestEnvironment(unittest.TestCase):
@@ -101,6 +101,16 @@ class TestEnvironment(unittest.TestCase):
         b2 = grid2.cell_center_lonlat(10, 9)
         self.assertFalse(env2.line_of_sight(a2, env2.elevation(*a2) + 0.5,
                                             b2, env2.elevation(*b2) + 0.5))
+
+    def test_shallow_water_wading(self):
+        env, grid = make_env(make_basic(water_cols=(5,)), water_depth=1.0)
+        lon, lat = grid.cell_center_lonlat(10, 5)
+        self.assertTrue(passable(PROFILES["tracked"], lon, lat, env))
+        self.assertAlmostEqual(speed_factor(PROFILES["tracked"], lon, lat, env), 0.35)
+        deep, grid2 = make_env(make_basic(water_cols=(5,)), water_depth=2.0)
+        lon2, lat2 = grid2.cell_center_lonlat(10, 5)
+        self.assertFalse(passable(PROFILES["tracked"], lon2, lat2, deep))
+        self.assertTrue(passable(PROFILES["amphibious"], lon2, lat2, deep))
 
     def test_slope(self):
         env, grid = make_env(make_basic(slope=5.0))
@@ -194,6 +204,12 @@ class TestCRT(unittest.TestCase):
         self.assertEqual(self.crt.vehicle_correction(11, 4), 1)
         self.assertEqual(self.crt.vehicle_correction(12, 4), 2)
 
+    def test_correction_accepts_combined_modifier(self):
+        self.assertEqual(self.crt.vehicle_correction(7, 4, 0), 0)
+        self.assertEqual(self.crt.vehicle_correction(7, 4, -2), -1)
+        self.assertEqual(self.crt.personnel_correction(7, 0), 0)
+        self.assertEqual(self.crt.personnel_correction(7, -7), -1)
+
     def test_personnel_suppression(self):
         self.assertEqual(self.crt.personnel_result(1, 2), ("suppressed", 0))
 
@@ -214,15 +230,25 @@ class TestWorldAndRules(unittest.TestCase):
         self.assertEqual(ev["distance"], 1)
         self.assertEqual(ev["att_level"], 10)
         self.assertIn(ev["random1"], range(2, 13))
+        expected_raw = CRT(load_crt()).vehicle_raw(3, 10, ev["random1"])
+        self.assertEqual(ev["ori_damage"], expected_raw)
+        self.assertEqual(ev["damage"], max(-1, expected_raw + ev["rect_damage"]))
 
     def test_stacking_limit(self):
         basic = make_basic()
-        ops = [operator(i, 0, 1010, blood=3) for i in range(1, 7)]
+        ops = [operator(i, 0, 1010 + i, blood=3) for i in range(1, 7)]
         world = build_world(scenario(ops), basic, seed=1)
-        for _ in range(2):
+        goal = world.env.grid.cell_center_lonlat(10, 10)
+        for uid in range(1, 7):
+            world.order(uid, {"type": "move_to", "lon": goal[0], "lat": goal[1]})
+        for _ in range(80):
             world.step()
-        blocked = [e for e in world.events if e["type"] == "stack_blocked"]
-        self.assertTrue(blocked)
+        cells = {}
+        for e in world.entities.values():
+            if e.alive:
+                cells.setdefault(world.rule_cell(e), 0)
+                cells[world.rule_cell(e)] += 1
+        self.assertLessEqual(max(cells.values()), 4)
 
     def test_objective_capture(self):
         basic = make_basic()
@@ -251,6 +277,82 @@ class TestWorldAndRules(unittest.TestCase):
         world2.step()
         red2 = observation(world2, seat=0)
         self.assertNotIn(3, {e["id"] for e in red2["entities"]})
+
+    def test_campaign_grid_los_uses_env_grid(self):
+        basic = make_basic(urban_cols=(5,))
+        basic["grid"]["width_m"] = 1500.0
+        grid = LegacyHexGrid.from_grid_meta(basic["grid"])
+        env = MapGridEnvironment(basic, grid)
+        from sim.context import WorldRuleContext
+        from sim.world import World
+        from geo.rule_grid import RuleGrid
+        world = World(env, RuleGrid(grid.center_lon, grid.center_lat, grid.cols, grid.cols),
+                      plan_grid=grid)
+        a = Entity(1, "A", 0, "land", "tracked",
+                   Pose(*grid.cell_center_lonlat(10, 2)))
+        b = Entity(2, "B", 1, "land", "tracked",
+                   Pose(*grid.cell_center_lonlat(10, 9)))
+        world.add_entity(a)
+        world.add_entity(b)
+        ctx = WorldRuleContext(world)
+        ca = grid.cell_of(a.pose.lon, a.pose.lat)
+        cb = grid.cell_of(b.pose.lon, b.pose.lat)
+        self.assertEqual(ctx.line_of_sight(ctx.view(a), ctx.view(b)),
+                         env.cell_line_of_sight(ca, cb))
+        self.assertFalse(env.cell_line_of_sight(ca, cb))
+
+    def test_forest_cover_applied_only_in_correction(self):
+        basic = make_basic(forest_cols=(11,))
+        world = build_world(scenario([operator(1, 0, 1010),
+                                      operator(2, 1, 1011, blood=5)]), basic, seed=7)
+        for _ in range(3):
+            world.step()
+        fires = [e for e in world.events if e["type"] == "direct_fire"]
+        self.assertTrue(fires)
+        self.assertEqual(fires[0]["att_level"], 10)  # no attack-level cover double count
+
+    def test_deterministic_events(self):
+        basic = make_basic()
+        sc = scenario([operator(1, 0, 1010), operator(2, 1, 1011, blood=5)])
+        a = build_world(sc, basic, seed=99)
+        b = build_world(sc, basic, seed=99)
+        for _ in range(5):
+            ea = a.step()
+            eb = b.step()
+            self.assertEqual([(e["type"], e.get("actors"), e.get("damage")) for e in ea],
+                             [(e["type"], e.get("actors"), e.get("damage")) for e in eb])
+
+    def test_amphibious_unit_fights_as_ground(self):
+        op = operator(1, 0, 1010)
+        op["name"] = "两栖战车"
+        world = build_world(scenario([op, operator(2, 1, 1011, blood=5)]), make_basic(), seed=5)
+        self.assertEqual(world.entities[1].domain, "amphibious")
+        for _ in range(2):
+            world.step()
+        self.assertTrue(any(e["type"] == "direct_fire" for e in world.events))
+
+    def test_carrier_loss_kills_passengers(self):
+        basic = make_basic(water_cols=(10,))
+        ops = [operator(1, 0, 1009, name="登陆舰"),
+               operator(2, 0, 1010, name="步兵小队", type_=1, sub_type=2, armor=0)]
+        # Put the landing ship and passenger on the same water cell.
+        world = build_world(scenario(ops), basic, seed=1)
+        self.assertTrue(world.entities[2].on_board)
+        world.apply_damage(1, 99)
+        self.assertFalse(world.entities[1].alive)
+        self.assertFalse(world.entities[2].alive)
+
+    def test_seen_is_refreshed(self):
+        basic = make_basic()
+        world = build_world(scenario([operator(1, 0, 1010),
+                                      operator(2, 1, 1011, blood=5)]), basic, seed=1)
+        world.step()
+        self.assertIn(2, world.seen[1])
+        far = world.env.grid.cell_center_lonlat(23, 23)
+        world.entities[2].pose = Pose(far[0], far[1], world.env.elevation(*far))
+        world.entities[2].concealed = True
+        world.step()
+        self.assertNotIn(2, world.seen.get(1, set()))
 
     def test_envpack_manifest(self):
         import tempfile
@@ -291,6 +393,10 @@ class TestWorldAndRules(unittest.TestCase):
             pack = EnvPack.load(out)
             self.assertEqual(pack.manifest["theatre"], "test")
             self.assertTrue(os.path.isdir(os.path.join(out, "terrain")))
+            tiles = os.listdir(os.path.join(out, "terrain"))
+            self.assertTrue(tiles)
+            tx, ty = [int(x) for x in tiles[0].replace(".json", "").split("_")]
+            self.assertTrue(pack.tile_path("terrain", 0, tx, ty).is_file())
 
     def test_legacy_move_and_fire_actions(self):
         basic = make_basic()
@@ -311,8 +417,12 @@ class TestWorldAndRules(unittest.TestCase):
     def test_czml_packets(self):
         basic = make_basic()
         world = build_world(scenario([operator(1, 0, 1010)]), basic, seed=1)
-        doc = world_to_czml(world)
+        doc = world_to_czml(world, "2026-10-21T00:00:00Z")
         self.assertEqual(doc["packets"][0]["id"], "document")
+        self.assertIn("/", doc["packets"][0]["clock"]["interval"])
+        self.assertTrue(doc["packets"][0]["clock"]["interval"].startswith("2026-10-21T00:00:00Z"))
+        ent = [p for p in doc["packets"] if p["id"] == "entity-1"][0]
+        self.assertEqual(ent["position"]["epoch"], "2026-10-21T00:00:00Z")
         self.assertTrue(any(p["id"] == "entity-1" for p in doc["packets"]))
         # A planned route adds a polyline packet field.
         e = world.entities[1]

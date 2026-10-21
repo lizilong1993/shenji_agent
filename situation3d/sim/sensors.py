@@ -44,6 +44,10 @@ def signature_factor(kind: str, target) -> float:
 
 
 def sensors_for(name: str, domain: str) -> List[Sensor]:
+    if domain == "amphibious":
+        return []
+    if "岸舰" in name:
+        return [Sensor("radar", 200.0, 0.9)]
     if domain == "surface":
         if "驱逐舰" in name:
             return [Sensor("radar", 320.0), Sensor("sonar", 40.0, 0.9),

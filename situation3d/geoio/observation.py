@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from geo.geodesy import haversine_m
 from rules import combat, engagement
 from sim.context import WorldRuleContext
 
@@ -57,6 +58,16 @@ def _valid_actions(world, ctx: WorldRuleContext, entity) -> list:
     actions = [{"type": "stop"}]
     if not entity.alive:
         return actions
+    if not entity.on_board:
+        ranked = []
+        for cell, obj in world.objectives.items():
+            if obj["owner"] == entity.affiliation:
+                continue
+            lon, lat = world.rule_grid.cell_center_lonlat(*cell)
+            ranked.append((haversine_m((entity.pose.lon, entity.pose.lat), (lon, lat)), lon, lat))
+        ranked.sort()
+        for _, lon, lat in ranked[:3]:
+            actions.append({"type": "move_to", "target": {"lon": lon, "lat": lat}})
     for target in world.sorted_entities():
         if target.uid == entity.uid or not target.alive:
             continue
