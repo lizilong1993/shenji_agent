@@ -73,7 +73,7 @@ CZML 22 packets, observation 12 KB
 
 - `tests/test_geo_engine_core.py`（21 项）：环境、通行、规划、运动、CRT、直瞄事件、堆叠、夺控、观测过滤、CZML、envpack、旧动作、300 tick fuzz 不变量。
 - `tests/test_geo_engine_skeleton.py`（21 项）、`test_wargame_core_timebase.py`（4 项）、golden 回放（2 + 3 项）。
-- 全量 `unittest discover`：108 项（含 golden 回放时 107 项执行 + 1 项可选 TW 重放）。
+- 全量 `unittest discover`：125 项（含 golden 回放时 124 项执行 + 1 项可选 TW 重放）。
 
 ## 6. 已知限制（后续工作）
 

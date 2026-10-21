@@ -63,14 +63,14 @@ sim/world.step
 - 推荐 **openjev `qwen3.5-4b-nli-v5` + SGLang**（MIT 权重；外置 `sglang_openjev` 包；支持 `/classify`
   与 Decisions gateway）。显存：4B bf16 约 8–10 GB；0.8B 可 CPU/小显卡；2B 折中。
 - 若只做离线演示：transformers `AutoModelForSequenceClassification` 直接加载 0.8B/4B 子目录。
-- 服务与引擎解耦：引擎只发 HTTP，超时即回退启发式；仿真步长不应等待模型（建议每 2–5 s 决策一次，
+- 服务与引擎解耦：引擎只发 HTTP；`JevPolicy` 捕获超时/HTTP 错误/未知标签并回退启发式，仿真步长不等待模型（建议每 2–5 s 决策一次，
   或只在态势变化/新目标出现时触发）。
 
 ### 3.3 候选与提示设计
 
 - 每个实体限制 4–6 个候选（射击优先，移动最多 2 个目标点），避免一次请求几十个选项导致 token/延迟膨胀。
 - 状态文本只放已探测实体（observation 已做席位过滤），不要把全量真值或不可信聊天塞进 prompt；
-  对状态字段做白名单拼接，降低注入面。
+  对状态字段做控制字符清洗与长度截断（`_sanitize`），降低注入面；不可信文本仍不应进入状态。
 - 选项 label 用“unit 101 fire target 205 with 36”这类结构化短句；评估时记录选择概率与置信度。
 - 需要训练的候选：目标选择、武器选择、驻守/推进、编队任务；不需要 JEV 做路径、碰撞、裁决。
 
