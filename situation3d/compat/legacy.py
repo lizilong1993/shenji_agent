@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 
 from geo.rule_grid import HexGrid, decode, encode
+from sim.entity import Pose
 
 REQUIRED_GRID_KEYS = ("center_lon", "center_lat", "cols", "rows", "width_m")
 
@@ -31,13 +32,15 @@ class LegacyHexGrid(HexGrid):
         return self.cell_center_lonlat(row, col)
 
     def from_lonlat(self, lon: float, lat: float) -> int:
+        """Inverse mapping, clamped to the map like ``hexmap.lonlat_to_pos``."""
         row, col = self.cell_of(lon, lat)
+        row = max(0, min(self.rows - 1, row))
+        col = max(0, min(self.cols - 1, col))
         return encode(row, col)
 
-    def to_pose(self, pos: int, alt_m: float = 0.0) -> dict:
+    def to_pose(self, pos: int, alt_m: float = 0.0) -> Pose:
         lon, lat = self.to_lonlat(pos)
-        return {"lon": lon, "lat": lat, "alt_m": alt_m,
-                "heading_deg": 0.0, "pitch_deg": 0.0, "roll_deg": 0.0}
+        return Pose(lon=lon, lat=lat, alt_m=alt_m)
 
     @classmethod
     def from_grid_meta(cls, grid: dict) -> "LegacyHexGrid":
@@ -76,8 +79,14 @@ def legacy_scenario_positions(scenario: dict,
 
 def move_path_to_lonlat(move_path: List[int],
                         grid: LegacyHexGrid) -> List[Tuple[float, float]]:
-    """Old ``move_path`` (hex ids) -> centre coordinates for Route building."""
+    """Old ``move_path`` (hex ids) -> centre coordinates (display/debug)."""
     return [grid.to_lonlat(int(p)) for p in move_path]
+
+
+def move_path_to_poses(move_path: List[int],
+                       grid: LegacyHexGrid) -> List[Pose]:
+    """Old ``move_path`` -> ``Pose`` list ready for ``Route`` construction."""
+    return [grid.to_pose(int(p)) for p in move_path]
 
 
 def legacy_observation_fields(pos: int, grid: LegacyHexGrid,

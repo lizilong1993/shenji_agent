@@ -8,6 +8,7 @@ adjudication logic independently testable and comparable to 庙算 data
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Dict, List, Optional, Protocol, Tuple
@@ -67,6 +68,8 @@ class RuleEntityView(Protocol):
     readiness: float
     value: int
     ammo: Dict[str, int]
+    weapons: List[WeaponView]
+    observe_distance: Dict[str, int]
 
     def ammo_count(self, key: str) -> int: ...
 
@@ -75,10 +78,12 @@ class RuleContext(Protocol):
     """Every spatial/state input the rules are allowed to see."""
 
     now_s: float
+    rng: random.Random
 
     # spatial inputs
     def distance_m(self, a: RuleEntityView, b: RuleEntityView) -> float: ...
     def rule_distance(self, a: RuleEntityView, b: RuleEntityView) -> int: ...
+    def rule_cell(self, e: RuleEntityView) -> Tuple[int, int]: ...
     def elevation_delta_m(self, a: RuleEntityView, b: RuleEntityView) -> float: ...
     def elevation_grade(self, e: RuleEntityView) -> int: ...
     def ele_grade(self) -> float: ...

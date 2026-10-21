@@ -29,6 +29,8 @@ PROFILE_TO_NAME = {
     "artillery": "重型炮",
 }
 
+TAR_TYPE_PERSONNEL = 1
+
 
 def load(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
@@ -49,23 +51,39 @@ def values_list(values, att_max):
     return [values.get(str(i), 0) for i in range(att_max + 1)]
 
 
-def compare_series(label, current, authoritative):
+def compare_series(label, current, authoritative, max_range=None):
+    if authoritative is None:
+        return f"| {label} | 无权威表 | - | - |"
     n = min(len(current), len(authoritative))
     diffs = [(i, current[i], authoritative[i])
              for i in range(n) if current[i] != authoritative[i]]
     missing = len(authoritative) - len(current)
     extra = len(current) - len(authoritative)
     if not diffs and missing == 0:
-        return f"| {label} | 一致 | - | - |"
+        return f"| {label} | 一致 | - | 无行为差异 |"
     parts = []
     if missing > 0:
         parts.append(f"截断 {missing} 项（表长 {len(current)} vs {len(authoritative)}）")
     if extra > 0:
-        parts.append(f"多出 {extra} 项")
+        parts.append(f"当前表多填充 {extra} 项")
     if diffs:
         sample = "，".join(f"d{i}: {c}→{a}" for i, c, a in diffs[:6])
         parts.append(f"{len(diffs)} 处数值差异（{sample}{'…' if len(diffs) > 6 else ''}）")
-    return f"| {label} | 不一致 | {'；'.join(parts)} | - |"
+    impact = _impact_note(current, authoritative, max_range)
+    return f"| {label} | 不一致 | {'；'.join(parts)} | {impact} |"
+
+
+def _impact_note(current, authoritative, max_range):
+    """Whether the difference is reachable in the baseline implementation."""
+    if max_range is None:
+        return "-"
+    current_max = min(int(max_range), len(current) - 1)
+    n = min(len(current), len(authoritative))
+    if any(current[i] != authoritative[i] for i in range(0, min(current_max, n - 1) + 1)):
+        return "**射程内数值不同，影响行为**"
+    if len(authoritative) - 1 > current_max:
+        return "射程内一致；%d 格以外被截断" % current_max
+    return "表尾差异，射程内不可达（无行为影响）"
 
 
 def main():
@@ -110,7 +128,8 @@ def main():
                 auth = {"att_max": r["att_max"],
                         "values": values_list(r["values"], r["att_max"])}
                 lines.append(compare_series(f"{key}（{name}，间瞄）",
-                                            p.vs_vehicle, auth["values"]))
+                                            p.vs_vehicle, auth["values"],
+                                            max_range=p.max_range))
                 continue
             lines.append(f"| {key}（{name}） | 无权威行 | - | - |")
             continue
@@ -121,7 +140,8 @@ def main():
         if auth_values is None:
             lines.append(f"| {key}（{name}） | 见专门表 | - | 权威行注明见《步兵轻武器对车辆攻击等级表》 |")
             continue
-        lines.append(compare_series(f"{key}（{name}）", p.vs_vehicle, auth_values))
+        lines.append(compare_series(f"{key}（{name}）", p.vs_vehicle, auth_values,
+                                    max_range=p.max_range))
 
     lines.append("")
     lines.append("## 2. 武器对人员表（当前实现只取 blood=1）")
@@ -132,12 +152,27 @@ def main():
         if key in ("aa_gun",):
             continue
         p = profiles[key]
-        row = personnel.get((name, 1)) or personnel.get((name + "（对地）", 1))
+        row = (personnel.get((name, 1))
+               or personnel.get((name, 0))
+               or personnel.get((name + "（对地）", 1)))
         if row is None:
+            # 裁决表格 lacks some personnel rows that WpData has (e.g. 重型炮
+            # TarType=1 ObjBlood=0); fall back to the master table.
+            wp = [r for r in wpdata
+                  if r["name"] == name and r["tar_type"] == TAR_TYPE_PERSONNEL
+                  and r["obj_blood"] in (1, 0)]
+            if wp:
+                r = sorted(wp, key=lambda x: x["obj_blood"])[-1]
+                auth_values = values_list(r["values"], r["att_max"])
+                lines.append(compare_series(f"{key}（{name}）", p.vs_personnel,
+                                            auth_values,
+                                            max_range=min(p.max_range, r["att_max"])))
+                continue
             lines.append(f"| {key}（{name}） | 无权威行 | - | 权威对人员表无此武器 |")
             continue
         auth_values = values_list(row["values"], row["att_max"])
-        lines.append(compare_series(f"{key}（{name}）", p.vs_personnel, auth_values))
+        lines.append(compare_series(f"{key}（{name}）", p.vs_personnel, auth_values,
+                                    max_range=min(p.max_range, row["att_max"])))
 
     lines.append("")
     lines.append("## 3. 防空武器（aa_gun）")
@@ -203,9 +238,9 @@ def main():
     lines.append("")
     lines.append("| 项 | 现状 | 权威 | 差异 |")
     lines.append("|---|---|---|---|")
-    lines.append("| 基础观察表 | 10/25/25，无人机 2/2/0/0 | docs.md 表同值 | 一致 |")
-    lines.append("| 侦察车/防空等特种观察距离 | 无 | 来自想定 `observe_distance` 数组，非公开表 | "
-                 "当前实现未使用逐单位观察距离 |")
+    lines.append("| 基础观察表 | 10/25/25；无人机对地 2，对空/无人机不可观察 | docs.md 表同值 | 一致 |")
+    lines.append("| 侦察车/防空等特种观察距离 | `scenario._rich_unit` 把 `observe_distance` 合入 visual sensor，但 `detection.can_observe` 只读固定表 | "
+                 "来自想定 `observe_distance` 数组，非公开表 | 逐单位观察距离未进入裁决 |")
     lines.append("| 掩蔽减半的高地例外 | 对所有目标类型生效 | 仅车辆目标（docs.md 观察规则第2条） | "
                  "对人员目标错误地免除了减半 |")
     lines.append("| 地形遮蔽减半 | 居民地/丛林减半 | 同一格内且通视 | 一致 |")
@@ -217,7 +252,7 @@ def main():
     lines.append("| 项 | 现状 | 权威 |")
     lines.append("|---|---|---|")
     lines.append("| 战斗结果 | `score = att + (roll-7) - armor` 阈值映射 | 2d6 CRT + 装甲/地形/状态修正表（`crt.json`） |")
-    lines.append("| 骰数 | 直瞄统一 2d6 | 攻击 2d6；战损修正对人员 1d6、对车辆 2d6 |")
+    lines.append("| 骰数 | `rng.randint(2, 12)` 均匀分布（非 2d6 三角分布） | 攻击 2d6；战损修正对人员 1d6、对车辆 2d6 |")
     lines.append("| 冷却/转换 | 无冷却、每 tick 可开火 | 直瞄冷却 75 s、同格 25 s、机动↔停止 75 s、展开/锁定 75 s |")
     lines.append("| 压制 | 固定 2 tick | 按规则持续秒数 |")
     lines.append("| 夺控 | 5 tick 保持 | 目标格 + 6 邻格无敌方地面单位，无等待 |")
@@ -253,6 +288,18 @@ def main():
                  "当前容器 `02:42:ac:11:00:05`，`env.setup()` 打印 `did not pass authentication`。"
                  "按 `docs/deployment_auth.md`，只能由运维以授权 MAC 启动容器，"
                  "或向平台方申请重新生成 `.engine_config`，禁止自行构造配置。")
+    lines.append("")
+
+    lines.append("## 10. 权威源之间的冲突（P4 前必须定优先级）")
+    lines.append("")
+    lines.append("| 项 | 来源 A | 来源 B | 冲突 |")
+    lines.append("|---|---|---|---|")
+    lines.append("| 速射炮 (56, TarType=1) 射程 | `weapons_0.xlsx` AttMax=5 | `WpData` AttMax=10 | 有 |")
+    lines.append("| 便携导弹 (71, TarType=3) 射程 | `weapons_0.xlsx` AttMax=5 | `WpData` AttMax=10 | 有 |")
+    lines.append("| 车载轻武器 对人员 blood=2/3/4 距离 9–10 | `裁决表格` 2/3/4 | `WpData` 1/2/3 | 有 |")
+    lines.append("")
+    lines.append("`rules/weapons.py` 当前以 `WpData` 为主表；`weapons_0` 仅作射程清单交叉校验。"
+                 "该优先级是工程选择，不是平台官方声明，P4 对拍前需书面确认。")
     lines.append("")
 
     print("\n".join(lines))

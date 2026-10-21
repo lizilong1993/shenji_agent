@@ -46,14 +46,31 @@ class World(object):
         return out
 
     def stacked(self, entity: Entity) -> bool:
-        """True when another friendly ground unit shares the rule cell."""
+        """Combat ``stacked`` flag: another ground unit shares the rule cell.
+
+        Baseline ``scenario._mark_stacking`` counts every ground unit in the
+        cell, regardless of side; the +2 attack modifier uses that flag.  The
+        "at most 4 friendly ground units" movement limit is a different
+        concept -- see :meth:`friendly_ground_count`.
+        """
         if entity.domain != "land":
             return False
         cell = self.rule_cell(entity)
-        for other in self.entities_in_cell(cell, side=entity.affiliation):
+        for other in self.entities_in_cell(cell):
             if other.uid != entity.uid and other.domain == "land":
                 return True
         return False
+
+    def friendly_ground_count(self, entity: Entity) -> int:
+        """Friendly ground units in the same rule cell (stacking limit ≤4)."""
+        if entity.domain != "land":
+            return 0
+        return len(self.entities_in_cell(self.rule_cell(entity),
+                                         side=entity.affiliation))
+
+    def rule_view(self, entity: Entity):
+        """Rule-layer view with the stacking flag computed for the current tick."""
+        return entity.to_rule_view(stacked=self.stacked(entity))
 
     def rule_distance(self, a: Entity, b: Entity) -> int:
         return self.rule_grid.distance(self.rule_cell(a), self.rule_cell(b))

@@ -15,7 +15,11 @@ SITUATION3D = os.path.dirname(HERE)
 if SITUATION3D not in sys.path:
     sys.path.insert(0, SITUATION3D)
 
-from compat.legacy import LegacyHexGrid, legacy_scenario_positions  # noqa: E402
+from compat.legacy import (  # noqa: E402
+    LegacyHexGrid,
+    legacy_scenario_positions,
+    move_path_to_poses,
+)
 from geo.geodesy import haversine_m  # noqa: E402
 from geo.rule_grid import RuleGrid  # noqa: E402
 from rules.weapons import (  # noqa: E402
@@ -27,7 +31,7 @@ from rules.weapons import (  # noqa: E402
     attack_level,
     attack_level_for,
 )
-from sim.entity import Entity, Pose  # noqa: E402
+from sim.entity import Entity, Pose, Route  # noqa: E402
 from sim.world import World  # noqa: E402
 from env.service import FlatEnvironment  # noqa: E402
 
@@ -41,10 +45,15 @@ class TestRuleGrid(unittest.TestCase):
         self.assertEqual(self.grid.cell_m, 200.0)
         a = self.grid.cell_center_lonlat(5, 5)
         b = self.grid.cell_center_lonlat(5, 6)
-        self.assertAlmostEqual(haversine_m(a, b), 200.0, delta=1.0)
+        # Grid-space check is exact; the geodesic value has ~0.4% error from
+        # the map builder's 111320/110540 m-per-degree convention.
+        ax, ay = self.grid.cell_center_m(5, 5)
+        bx, by = self.grid.cell_center_m(5, 6)
+        self.assertAlmostEqual(((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5, 200.0)
+        self.assertAlmostEqual(haversine_m(a, b), 200.0, delta=2.0)
         # Every hex neighbour centre is 200 m away (odd-r stagger included).
         c = self.grid.cell_center_lonlat(6, 5)
-        self.assertAlmostEqual(haversine_m(a, c), 200.0, delta=1.0)
+        self.assertAlmostEqual(haversine_m(a, c), 200.0, delta=2.0)
 
     def test_cell_roundtrip_within_one_metre(self):
         for cell in [(0, 0), (1, 1), (10, 20), (29, 39), (15, 0)]:
@@ -66,10 +75,23 @@ class TestRuleGrid(unittest.TestCase):
         self.assertGreater(haversine_m(a, b), 340.0)
 
     def test_neighbors(self):
-        nbs = self.grid.neighbors((5, 5))
-        self.assertEqual(len(nbs), 6)
-        for nb in nbs:
-            self.assertEqual(self.grid.distance((5, 5), nb), 1)
+        for cell in [(5, 5), (4, 4)]:  # odd and even rows use different offsets
+            nbs = self.grid.neighbors(cell)
+            self.assertEqual(len(nbs), 6)
+            for nb in nbs:
+                self.assertEqual(self.grid.distance(cell, nb), 1)
+
+    def test_from_grid_meta(self):
+        grid = RuleGrid.from_grid_meta({
+            "center_lon": 119.9, "center_lat": 23.1,
+            "cols": 40, "rows": 30, "width_m": 200.0,
+        })
+        self.assertEqual((grid.cols, grid.rows, grid.cell_m), (40, 30, 200.0))
+        with self.assertRaises(ValueError):
+            RuleGrid.from_grid_meta({
+                "center_lon": 119.9, "center_lat": 23.1,
+                "cols": 40, "rows": 30, "width_m": 1500.0,
+            })
 
     def test_covering_bbox(self):
         g = RuleGrid.covering_bbox(119.5, 22.8, 120.1, 23.4)
@@ -92,6 +114,13 @@ class TestLegacyAdapter(unittest.TestCase):
         for pos in (1010, 2020, 3030, 5967):
             lon, lat = grid.to_lonlat(pos)
             self.assertEqual(grid.from_lonlat(lon, lat), pos)
+
+    def test_legacy_clamps_out_of_bounds(self):
+        grid = LegacyHexGrid.from_grid_meta(self.GRID_META)
+        pos = grid.from_lonlat(200.0, 60.0)  # far outside the grid
+        row, col = divmod(pos, 100)
+        self.assertTrue(0 <= row < grid.rows)
+        self.assertTrue(0 <= col < grid.cols)
 
     def test_missing_grid_metadata_is_rejected(self):
         with self.assertRaises(ValueError):
@@ -155,9 +184,19 @@ class TestAuthoritativeWeapons(unittest.TestCase):
         self.assertIsNone(attack_level(table, 19))
         self.assertIsNone(attack_level(table, -1))
 
+    def test_vehicle_blood_is_normalised_to_zero(self):
+        self.assertEqual(self.tables.table(36, TAR_TYPE_VEHICLE, 3),
+                         self.tables.table(36, TAR_TYPE_VEHICLE, 0))
+
+    def test_indirect_table(self):
+        table = self.tables.indirect_table(72)
+        self.assertEqual(table.att_max, 20)
+        self.assertEqual(len(table.values), 21)
+
     def test_missing_combination_raises(self):
+        # Weapon 36 has no air table at all.
         with self.assertRaises(WeaponDataError):
-            self.tables.table(36, TAR_TYPE_VEHICLE, 3)
+            self.tables.table(36, TAR_TYPE_AIR, 0)
 
 
 class TestWorldSkeleton(unittest.TestCase):
@@ -170,16 +209,91 @@ class TestWorldSkeleton(unittest.TestCase):
         c = Entity(3, "C", 1, "land", "mbt", Pose(lon, lat))
         for e in (a, b, c):
             world.add_entity(e)
+        # Combat stacked flag counts any ground unit in the cell (baseline
+        # scenario._mark_stacking behaviour).
         self.assertTrue(world.stacked(a))
-        self.assertFalse(world.stacked(c))
+        self.assertTrue(world.stacked(c))
+        self.assertEqual(world.friendly_ground_count(a), 2)
+        self.assertEqual(world.friendly_ground_count(c), 1)
         self.assertEqual(world.rule_distance(a, c), 0)
         self.assertEqual(len(world.entities_in_cell(world.rule_cell(a))), 3)
+
+    def test_rule_view_is_attribute_based(self):
+        grid = RuleGrid(119.9, 23.1, cols=20, rows=20)
+        world = World(FlatEnvironment(), grid)
+        lon, lat = grid.cell_center_lonlat(5, 5)
+        a = Entity(1, "A", 0, "land", "mbt", Pose(lon, lat), ammo={"gun": 3})
+        b = Entity(2, "B", 0, "land", "mbt", Pose(lon, lat))
+        for e in (a, b):
+            world.add_entity(e)
+        view = world.rule_view(a)
+        self.assertEqual(view.uid, 1)
+        self.assertEqual(view.ammo_count("gun"), 3)
+        self.assertEqual(view.ammo_count("missing"), 0)
+        self.assertTrue(view.stacked)
+        self.assertEqual(view.observe_distance, {})
+        self.assertEqual(view.weapons, [])
 
     def test_step_advances_time(self):
         grid = RuleGrid(119.9, 23.1, cols=10, rows=10)
         world = World(FlatEnvironment(), grid, dt_s=1.0)
         self.assertEqual(world.step(), [])
         self.assertAlmostEqual(world.time_s, 1.0)
+
+
+class TestRoute(unittest.TestCase):
+    def test_pose_at_uses_true_bearing(self):
+        route = Route(
+            points=[Pose(120.0, 24.0), Pose(120.01, 24.01)],
+            speed_limits=[10.0], modes=["road"])
+        pose = route.pose_at(route.total_m / 2.0)
+        # atan2(dlon, dlat) would give 45 deg; the true bearing is ~42.4 deg.
+        self.assertAlmostEqual(pose.heading_deg, 42.4, delta=0.5)
+        self.assertGreater(pose.lat, 24.0)
+        self.assertGreater(pose.lon, 120.0)
+
+    def test_legacy_move_path_builds_route(self):
+        grid = LegacyHexGrid.from_grid_meta(TestLegacyAdapter.GRID_META)
+        poses = move_path_to_poses([3030, 3031, 3032], grid)
+        route = Route(points=poses, speed_limits=[8.0, 8.0],
+                      modes=["road", "road"])
+        self.assertGreater(route.total_m, 0.0)
+        self.assertEqual(route.speed_at(0.0), 8.0)
+
+
+class TestRulesDependencyIsolation(unittest.TestCase):
+    def test_rules_does_not_import_spatial_layers(self):
+        import ast
+        rules_dir = os.path.join(SITUATION3D, "rules")
+        forbidden = {"geo", "sim", "env", "mobility", "compat"}
+        for name in sorted(os.listdir(rules_dir)):
+            if not name.endswith(".py"):
+                continue
+            with open(os.path.join(rules_dir, name), encoding="utf-8") as fh:
+                source = fh.read()
+            tree = ast.parse(source, filename=name)
+            for node in ast.walk(tree):
+                roots = []
+                if isinstance(node, ast.Import):
+                    roots = [alias.name.split(".")[0] for alias in node.names]
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    roots = [node.module.split(".")[0]]
+                for root in roots:
+                    self.assertNotIn(root, forbidden,
+                                     "%s imports forbidden layer %r" % (name, root))
+
+
+class TestTruncatedTableRejected(unittest.TestCase):
+    def test_missing_distances_raise(self):
+        doc = {"rows": [{
+            "combo_id": 1, "name": "截断炮", "weapon_id": "999",
+            "tar_type": 2, "obj_blood": 0, "att_min": 0, "att_max": 5,
+            "values": {"0": 9, "1": 8, "2": 7},
+        }]}
+        tables = WeaponTables(doc)
+        self.assertTrue(tables.validate_all())
+        with self.assertRaises(WeaponDataError):
+            tables.table(999, TAR_TYPE_VEHICLE, 0)
 
 
 def load_wpdata_json():

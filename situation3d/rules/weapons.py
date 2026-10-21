@@ -57,13 +57,18 @@ def load_wpdata(path: Optional[str] = None) -> dict:
 def _row_table(row: dict) -> WeaponTable:
     att_min = int(row["att_min"])
     att_max = int(row["att_max"])
-    values = [int(row["values"].get(str(d), 0)) for d in range(att_max + 1)]
-    expected = att_max - 0 + 1
-    if len(values) != expected:
+    if att_min < 0 or att_max < att_min:
         raise WeaponDataError(
-            "table length mismatch for %s tar=%s blood=%s: %d != %d" % (
+            "bad range for %s: att_min=%s att_max=%s" % (
+                row.get("name"), att_min, att_max))
+    raw = row.get("values") or {}
+    missing = [d for d in range(0, att_max + 1) if str(d) not in raw]
+    if missing:
+        raise WeaponDataError(
+            "table truncated for %s tar=%s blood=%s: missing distances %s" % (
                 row.get("name"), row.get("tar_type"), row.get("obj_blood"),
-                len(values), expected))
+                missing[:8]))
+    values = [int(raw[str(d)]) for d in range(0, att_max + 1)]
     return WeaponTable(att_min=att_min, att_max=att_max, values=tuple(values))
 
 
@@ -100,12 +105,20 @@ class WeaponTables(object):
 
     def row(self, weapon_id: int, tar_type: int, obj_blood: int) -> dict:
         key = (int(weapon_id), int(tar_type), int(obj_blood))
+        if key not in self._by_key and int(tar_type) in (TAR_TYPE_VEHICLE, TAR_TYPE_AIR):
+            # WpData stores vehicle/air rows with ObjBlood=0; callers must not
+            # have to know that.  Personnel/indirect keep the caller's blood.
+            key = (int(weapon_id), int(tar_type), 0)
         if key not in self._by_key:
             raise WeaponDataError("no WpData row for %s" % (key,))
         return self._by_key[key]
 
     def table(self, weapon_id: int, tar_type: int, obj_blood: int) -> WeaponTable:
         return _row_table(self.row(weapon_id, tar_type, obj_blood))
+
+    def indirect_table(self, weapon_id: int, obj_blood: int = 0) -> WeaponTable:
+        """Indirect-fire (TarType=0) table for artillery (ids 72/88/89)."""
+        return self.table(weapon_id, TAR_TYPE_INDIRECT, obj_blood)
 
     def table_for_target(self, weapon_id: int, target_kind: str,
                          blood: int) -> WeaponTable:

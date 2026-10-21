@@ -7,11 +7,10 @@ only fixes the data contract so rules and adapters can be written against it.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from geo.geodesy import haversine_m, interpolate
+from geo.geodesy import haversine_m, initial_bearing_deg, interpolate
 
 
 @dataclass
@@ -73,8 +72,10 @@ class Route(object):
         a, b = self.points[i], self.points[i + 1]
         lon, lat = interpolate(a.as_tuple(), b.as_tuple(), f)
         alt = a.alt_m + (b.alt_m - a.alt_m) * f
-        heading = math.degrees(
-            math.atan2(b.lon - a.lon, b.lat - a.lat)) % 360.0 if a.lat != b.lat or a.lon != b.lon else a.heading_deg
+        if a.lon != b.lon or a.lat != b.lat:
+            heading = initial_bearing_deg(a.as_tuple(), b.as_tuple())
+        else:
+            heading = a.heading_deg
         return Pose(lon=lon, lat=lat, alt_m=alt, heading_deg=heading)
 
     def speed_at(self, s: float) -> float:
@@ -84,6 +85,34 @@ class Route(object):
     def mode_at(self, s: float) -> str:
         i, _ = self._segment(s)
         return self.modes[i]
+
+
+@dataclass(frozen=True)
+class EntityRuleView(object):
+    """Frozen projection implementing ``rules.context.RuleEntityView``."""
+    uid: int
+    name: str
+    affiliation: int
+    domain: str
+    unit_type: str
+    unit_kind: str
+    alive: bool
+    armor: int
+    blood: int
+    max_blood: int
+    concealed: bool
+    moving: bool
+    stacked: bool
+    marching: bool
+    suppressed: bool
+    readiness: float
+    value: int
+    ammo: Dict[str, int]
+    weapons: List[object]
+    observe_distance: Dict[str, int]
+
+    def ammo_count(self, key: str) -> int:
+        return int(self.ammo.get(key, 0))
 
 
 @dataclass
@@ -104,6 +133,8 @@ class Entity(object):
     max_blood: int = 1
     armor: int = 0
     ammo: Dict[str, int] = field(default_factory=dict)
+    weapons: List[object] = field(default_factory=list)
+    observe_distance: Dict[str, int] = field(default_factory=dict)
     fuel: float = 1.0
     suppressed: bool = False
     suppressed_s: float = 0.0
@@ -123,25 +154,32 @@ class Entity(object):
     in_fort: Optional[int] = None
     alive: bool = True
 
-    def to_rule_view(self):
-        """Project to the read-only view consumed by ``rules`` (no dependency)."""
-        return {
-            "uid": self.uid,
-            "name": self.name,
-            "affiliation": self.affiliation,
-            "domain": self.domain,
-            "unit_type": self.unit_type,
-            "unit_kind": self.unit_kind,
-            "alive": self.alive,
-            "armor": self.armor,
-            "blood": self.blood,
-            "max_blood": self.max_blood,
-            "concealed": self.concealed,
-            "moving": self.moving,
-            "stacked": self.stacked,
-            "marching": self.marching,
-            "suppressed": self.suppressed,
-            "readiness": self.readiness,
-            "value": self.value,
-            "ammo": dict(self.ammo),
-        }
+    def to_rule_view(self, stacked: Optional[bool] = None) -> EntityRuleView:
+        """Project to the read-only view consumed by ``rules``.
+
+        ``stacked`` is a combat flag (any ground unit sharing the rule cell);
+        callers with a ``World`` should pass ``World.stacked(self)`` so the
+        value is computed for the current tick instead of the stale field.
+        """
+        return EntityRuleView(
+            uid=self.uid,
+            name=self.name,
+            affiliation=self.affiliation,
+            domain=self.domain,
+            unit_type=self.unit_type,
+            unit_kind=self.unit_kind,
+            alive=self.alive,
+            armor=self.armor,
+            blood=self.blood,
+            max_blood=self.max_blood,
+            concealed=self.concealed,
+            moving=self.moving,
+            stacked=self.stacked if stacked is None else bool(stacked),
+            marching=self.marching,
+            suppressed=self.suppressed,
+            readiness=self.readiness,
+            value=self.value,
+            ammo=dict(self.ammo),
+            weapons=list(self.weapons),
+            observe_distance=dict(self.observe_distance),
+        )

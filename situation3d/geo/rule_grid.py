@@ -185,6 +185,21 @@ class RuleGrid(HexGrid):
         rows = int(math.ceil(height_m / (cls.RULE_CELL_M * math.sqrt(3.0) / 2.0))) + 2
         return cls((lon_min + lon_max) / 2.0, lat0, cols, rows)
 
+    @classmethod
+    def from_grid_meta(cls, grid: dict) -> "RuleGrid":
+        """Build from ``basic.json`` ``grid`` metadata (must be a 200 m map)."""
+        width = float(grid["width_m"])
+        if abs(width - cls.RULE_CELL_M) > 1e-6:
+            raise ValueError(
+                "grid width_m=%s is not the 200 m 庙算 rule scale; use "
+                "LegacyHexGrid for old campaign maps" % width)
+        return cls(
+            center_lon=float(grid["center_lon"]),
+            center_lat=float(grid["center_lat"]),
+            cols=int(grid["cols"]),
+            rows=int(grid["rows"]),
+        )
+
 
 def rule_distance(a: Sequence[float], b: Sequence[float],
                   grid: RuleGrid) -> int:

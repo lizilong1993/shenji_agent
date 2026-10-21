@@ -60,6 +60,7 @@ class TestTimeBaseFormulas(unittest.TestCase):
     def test_sdk_step_count(self):
         self.assertEqual(sdk_max_step(1800, 1.0), 1800)
         self.assertEqual(sdk_max_step(1800, 5.0), 360)
+        self.assertEqual(sdk_max_step(100, 3.0), 33)  # floor, frames rounded down
         self.assertEqual(sdk_max_step(100, 0), 100)
 
     def test_sdk_seconds(self):
