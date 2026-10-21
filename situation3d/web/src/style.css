@@ -10,8 +10,10 @@
   --red: #c8352c;
   --blue: #1f5fbf;
   --accent: #1668dc;
-  --topbar: #16202f;
-  --topbar-text: #e8edf5;
+  /* 2026-10-21 用户要求全站框架 light 色系：顶栏由深蓝改为白底深字，
+     仅保留 accent 蓝作为主操作按钮的点缀色。 */
+  --topbar: #ffffff;
+  --topbar-text: #1d2430;
 
   /* TS等级配色：1 和缓 → 4 高危 */
   --lv1: #4a9c6d;
@@ -48,6 +50,7 @@ body {
   padding: 0 16px;
   background: var(--topbar);
   color: var(--topbar-text);
+  border-bottom: 1px solid var(--border);
 }
 
 .brand { display: flex; align-items: baseline; min-width: 0; }
@@ -55,7 +58,7 @@ body {
 .brand-sub {
   margin-left: 10px;
   font-size: 12px;
-  color: #9fb0c6;
+  color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -67,21 +70,30 @@ body {
 .menu-btn {
   height: 28px;
   padding: 0 12px;
-  border: 1px solid #33445c;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: #223047;
-  color: #d5dfee;
+  background: var(--panel);
+  color: var(--text);
   font-size: 12px;
   font-family: inherit;
   cursor: pointer;
 }
 
 .topbar-actions button:hover,
-.menu-btn:hover { background: #2c3d58; }
+.menu-btn:hover { background: #eef2f8; }
 .topbar-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .topbar-actions button.primary:hover { background: #2b7ae8; }
 
-.status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9fb0c6; white-space: nowrap; }
+/* 浅色顶栏下浏览器默认的黑色焦点框很突兀：鼠标操作不画框，
+   键盘操作（:focus-visible）用 accent 蓝框保持可访问性。 */
+.topbar-actions button:focus:not(:focus-visible),
+.menu-btn:focus:not(:focus-visible),
+.menu-item:focus:not(:focus-visible) { outline: none; }
+.topbar-actions button:focus-visible,
+.menu-btn:focus-visible,
+.menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #d0a020; flex: 0 0 auto; }
 .dot.ok { background: #37b24d; }
 .dot.err { background: #e03131; }
@@ -101,10 +113,10 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 6px;
-  border: 1px solid #33445c;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #1c2837;
-  box-shadow: 0 12px 30px rgba(10, 18, 30, .45);
+  background: var(--panel);
+  box-shadow: 0 12px 30px rgba(16, 26, 40, .18);
   display: none;
   z-index: 60;
 }
@@ -124,16 +136,16 @@ body {
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: #cfdaea;
+  color: var(--text);
   font-family: inherit;
   cursor: pointer;
   overflow: hidden;
 }
 
-.menu-item:hover { background: #26364b; }
-.menu-item.active { border-color: var(--accent); background: #22344c; }
+.menu-item:hover { background: #eef2f8; }
+.menu-item.active { border-color: var(--accent); background: #e8f1ff; }
 
-.menu-item .mi-head { display: block; font-size: 13px; font-weight: 600; color: #eef3fa; }
+.menu-item .mi-head { display: block; font-size: 13px; font-weight: 600; color: var(--text); }
 /* `.mi-sub` 与 `.mi-desc` 随案例菜单的两行副文本一起删掉了（菜单现在只留案例名）。
    留着指向不存在元素的规则，下一个人会以为菜单里还有副标题可调。 */
 
@@ -582,10 +594,11 @@ select {
 .tpr-tag.tpr-blue { background: rgba(36, 113, 163, .12); color: #1d5f90; }
 .tpr-model { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
 .tpr-view { position: relative; height: 150px; margin: 0 10px;
-  border-radius: 3px; background: #0d1520; overflow: hidden; }
+  border: 1px solid var(--border); border-radius: 3px;
+  background: #ffffff; overflow: hidden; }
 .tpr-view.hidden { display: none; }
 .tpr-view-note { position: absolute; inset: 0; display: flex; align-items: center;
-  justify-content: center; color: #9db0c6; font-size: 11px; }
+  justify-content: center; color: var(--text-dim); font-size: 11px; }
 .tpr-state { display: flex; align-items: center; gap: 7px; padding: 6px 10px 2px; }
 .tpr-pill { color: #fff; border-radius: 8px; padding: 1px 8px; font-size: 10px; }
 .tpr-hp { flex: 1 1 auto; height: 5px; border-radius: 3px; background: #e4e9f0;
@@ -1583,7 +1596,7 @@ select {
 .menu-sep {
   height: 1px;
   margin: 6px 4px;
-  background: #33445c;
+  background: var(--border);
 }
 
 .menu-item-quiet .mi-head { font-weight: 500; }

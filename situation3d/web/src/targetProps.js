@@ -198,7 +198,8 @@
 
     var scene = viewer.scene;
     scene.globe.show = false;
-    scene.backgroundColor = C.Color.fromCssColorString('#0d1520');
+    // 用户 2026-10-21：预览背景与系统 UI 同为浅色（白底），不再用深色视口。
+    scene.backgroundColor = C.Color.WHITE;
     if (scene.skyBox) scene.skyBox.show = false;
     if (scene.sun) scene.sun.show = false;
     if (scene.moon) scene.moon.show = false;
@@ -476,8 +477,9 @@
     if (!isSea && !isLand) return;           // 空中目标不画参照面
     var L = modelLength(def);
     var radius = Math.max(8, L * (isSea ? 1.6 : 1.1));
-    var fill = isSea ? 'rgba(47,111,159,0.30)' : 'rgba(120,126,136,0.22)';
-    var line = isSea ? 'rgba(88,166,214,0.65)' : 'rgba(154,163,173,0.55)';
+    // 浅色视口里的参照盘用 UI 语义色淡染：海上=蓝、地面=灰，透明度压到不抢模型。
+    var fill = isSea ? 'rgba(31,95,191,0.10)' : 'rgba(107,118,136,0.10)';
+    var line = isSea ? 'rgba(31,95,191,0.45)' : 'rgba(107,118,136,0.40)';
     groundEnt = viewer.entities.add({
       id: 'tpr-ground',
       position: new C.CallbackProperty(function () {
