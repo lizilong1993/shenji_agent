@@ -129,7 +129,49 @@ python3 scripts/evaluate_jev.py --model /tmp/jev_model/qwen3.5-0.8b-nli-v2s-long
 
 原始结果：`docs/geo_engine/jev_eval_20261021.json`。
 
-## 7. 参考
+## 7. 意图识别与行为预测（建议层）
+
+**可以集成，但只能作为“建议层”**：读同一份席位过滤观测，输出各敌方单位的意图/下一行为概率，写入
+`World.intel` 与观察 JSON；规则、CRT、探测不读取它作为真值。
+
+### 7.1 映射到 JEV 原语
+
+| 任务 | JEV 原语 | 说明 |
+|---|---|---|
+| 意图识别 | CHOICE | 封闭标签：`assault/defend/recon/feint/retreat/reinforce/fire_support/resupply/hold`；输出 softmax 概率 |
+| 行为预测 | CHOICE | 封闭标签：`advance/hold/retreat/attack/reposition/withdraw`；不回归坐标，路径仍由 planner 负责 |
+| 威胁评分/置信 | SCORE/NOUL | 可作为指挥排序的辅助分数（如“是否正在准备突击”的二值判断） |
+
+### 7.2 已实现原型
+
+- `policy/intent.py`：`IntentEstimator`（每个敌方单位保留最近 6 帧位置/速度/血量/域/事件摘要）、
+  `BehaviorPredictor`；两者都只依赖 `JevClient`，mock/本地/HTTP 均可。
+- `World.intel` + `World.set_intel/intel_for`：建议结果挂在对应席位；`geoio.observation` 输出 `intel` 字段；
+  `sim/commander._commander_state` 也带上 `intel`，供后续指挥策略使用。
+- `scripts/run_intel_demo.py`：跑案例、每 N tick 计算并写入建议；`policy/intent.py` 与 `tests/test_intent.py`
+  已覆盖 mock 推理、历史窗口、观察/指挥官状态注入。
+- 不改变任何规则/裁决；没有模型时用 mock，离线可跑。
+
+### 7.3 关键限制
+
+1. **不是序列模型**：JEV 读取一段文本 premise；历史靠滑窗摘要拼接，长期依赖/多单位协同需要自建特征或改用
+   带时序的编码器。
+2. **零样本域偏移**：公开 JEV 未训练兵棋意图；需用历史回放/推演日志标注（意图、下一行为、时间窗）后评测/微调。
+3. **只能给粗粒度行为**：位置预测应落在“扇区/目标点候选”上（N/NE/E… × 距离档），不要指望经纬度回归。
+4. **迷雾约束**：只用已探测实体的历史；不能把真值或其他席位的观测喂给模型。
+5. **延迟**：0.8B CPU 单次多选项约 7–8 s（实测）；意图/行为预测可低频（10–30 s 一次）或放到 GPU 服务，
+   不能每个 1 s tick 调用。
+6. **不可闭环**：在意图 F1 / 行为 top-3 达到预设阈值前，预测只作 UI/指挥建议，不进入自动开火/移动逻辑，
+   避免错误预测放大。
+
+### 7.4 评测建议
+
+- 数据：从既有 replay/campaign 日志切窗，标注真实意图与下一行为；按时间/战区划分训练/测试。
+- 指标：意图 accuracy、macro-F1、top-3、Brier/ECE；行为 top-1/top-3；预测提前量（提前多少秒命中）；
+  单次延迟与显存。
+- 流程：先在离线回放上对比规则启发式（当前基线），再小流量 A/B；通过阈值后才考虑接入 `RuleCommander` 的威胁排序。
+
+## 8. 参考
 
 - openjev 模型卡与 serving：<https://huggingface.co/AlexWortega/openjev>
 - Qwen-jev 教程（PolyForm 非商用）：<https://github.com/AnubhabBanerjee/Qwen-jev>

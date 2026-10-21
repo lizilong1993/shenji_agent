@@ -57,6 +57,7 @@ class World(object):
         self.supply_points: List[Tuple[float, float]] = []
         self.events: List[dict] = []
         self._event_id = 0
+        self.intel: Dict[int, dict] = {}
         self._cell_cache: Dict[int, Tuple[int, int]] = {}
         self._detect_cache: Dict[Tuple[int, int], tuple] = {}
         self._scan_slice = 0
@@ -341,6 +342,13 @@ class World(object):
                 return True
         return False
 
+    # -- advisory intel -----------------------------------------------------
+    def set_intel(self, side: int, data: dict) -> None:
+        self.intel[int(side)] = dict(data)
+
+    def intel_for(self, side: int) -> dict:
+        return dict(self.intel.get(int(side), {}))
+
     # -- commander ----------------------------------------------------------
     def _commander_state(self, side: int) -> dict:
         from geo.geodesy import haversine_m, initial_bearing_deg
@@ -391,7 +399,8 @@ class World(object):
                             "bearing": round(bearing, 1)})
         return {"side": side, "time_s": round(self.time_s, 3),
                 "units": units, "enemies": enemies,
-                "objectives": objectives}
+                "objectives": objectives,
+                "intel": self.intel_for(side)}
 
     def _apply_commander_orders(self, ctx: WorldRuleContext) -> None:
         if self.commander is None or self.time_s < self._commander_next_s:

@@ -116,4 +116,5 @@ def observation(world, seat: Optional[int] = None, legacy_grid=None) -> dict:
         "time_s": round(world.time_s, 3),
         "entities": entities,
         "objectives": objectives,
+        "intel": (world.intel_for(seat) if seat is not None else {}),
     }
