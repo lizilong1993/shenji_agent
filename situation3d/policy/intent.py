@@ -76,9 +76,11 @@ class BehaviorResult:
 
 
 class IntentEstimator(object):
-    def __init__(self, client: JevClient, window: int = 6):
+    def __init__(self, client: JevClient, window: int = 6,
+                 labels: Optional[Iterable[str]] = None):
         self.client = client
         self.window = int(window)
+        self.labels = tuple(labels or INTENT_LABELS)
         self.history: Dict[int, Deque[str]] = {}
         self.last_latency_s = None
 
@@ -114,12 +116,12 @@ class IntentEstimator(object):
                 questions=[DecisionQuestion(
                     type=DECISION_CHOICE,
                     instructions="Classify the enemy force's operational intent.",
-                    options=list(INTENT_LABELS),
+                    options=list(self.labels),
                     criteria={str(i): label
-                              for i, label in enumerate(INTENT_LABELS)})])
+                              for i, label in enumerate(self.labels)})])
             answer = self.client.decide(request)
             probs = {k: float(v) for k, v in (answer.probabilities or {}).items()
-                     if k in INTENT_LABELS}
+                     if k in self.labels}
             if not probs:
                 continue
             total = sum(probs.values()) or 1.0
@@ -139,8 +141,10 @@ class IntentEstimator(object):
 
 
 class BehaviorPredictor(object):
-    def __init__(self, client: JevClient):
+    def __init__(self, client: JevClient,
+                 labels: Optional[Iterable[str]] = None):
         self.client = client
+        self.labels = tuple(labels or BEHAVIOR_LABELS)
 
     def predict(self, observation: dict, seat: int) -> Dict[int, BehaviorResult]:
         results: Dict[int, BehaviorResult] = {}
@@ -153,12 +157,12 @@ class BehaviorPredictor(object):
                 questions=[DecisionQuestion(
                     type=DECISION_CHOICE,
                     instructions="Predict the enemy unit's next coarse behavior.",
-                    options=list(BEHAVIOR_LABELS),
+                    options=list(self.labels),
                     criteria={str(i): label
-                              for i, label in enumerate(BEHAVIOR_LABELS)})])
+                              for i, label in enumerate(self.labels)})])
             answer = self.client.decide(request)
             probs = {k: float(v) for k, v in (answer.probabilities or {}).items()
-                     if k in BEHAVIOR_LABELS}
+                     if k in self.labels}
             if not probs:
                 continue
             total = sum(probs.values()) or 1.0

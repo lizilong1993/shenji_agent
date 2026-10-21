@@ -1,0 +1,64 @@
+{
+ "labels": [
+  "assault",
+  "defend",
+  "recon",
+  "retreat"
+ ],
+ "model": "hf-space",
+ "rule_all": {
+  "samples": 24,
+  "accuracy": 1.0,
+  "macro_f1": 1.0,
+  "predictions": [
+   "assault",
+   "assault",
+   "assault",
+   "assault",
+   "assault",
+   "assault",
+   "defend",
+   "defend",
+   "defend",
+   "defend",
+   "defend",
+   "defend",
+   "recon",
+   "recon",
+   "recon",
+   "recon",
+   "recon",
+   "recon",
+   "retreat",
+   "retreat",
+   "retreat",
+   "retreat",
+   "retreat",
+   "retreat"
+  ]
+ },
+ "rule_subset": {
+  "samples": 4,
+  "accuracy": 1.0,
+  "macro_f1": 1.0,
+  "predictions": [
+   "assault",
+   "defend",
+   "recon",
+   "retreat"
+  ]
+ },
+ "jev_subset": {
+  "samples": 4,
+  "accuracy": 0.5,
+  "macro_f1": 0.375,
+  "predictions": [
+   "retreat",
+   "defend",
+   "retreat",
+   "retreat"
+  ],
+  "latency_ms_avg": 14766.4,
+  "latency_ms_max": 17482.6
+ }
+}

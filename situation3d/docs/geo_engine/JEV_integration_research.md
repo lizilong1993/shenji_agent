@@ -171,6 +171,24 @@ python3 scripts/evaluate_jev.py --model /tmp/jev_model/qwen3.5-0.8b-nli-v2s-long
   单次延迟与显存。
 - 流程：先在离线回放上对比规则启发式（当前基线），再小流量 A/B；通过阈值后才考虑接入 `RuleCommander` 的威胁排序。
 
+### 7.5 实测对比：规则基线 vs JEV（2026-10-21）
+
+受控合成集：4 类意图（assault/defend/recon/retreat）×6 个窗口，轨迹与开火事件由脚本生成，真值精确；
+规则基线只用运动学/事件/目标归属，JEV 用同一语义特征文本（闭集 4 选项）。JEV 走公开 openjev
+HF Space（0.8B v2s-long）以避免本地 CPU 慢；同口径取 4 个窗口（每类 1 个）。
+
+| 任务 | 规则基线 | JEV 零样本 | JEV 延迟 |
+|---|---|---|---|
+| 意图识别 | accuracy 1.00 / macro-F1 1.00（24/24；子集 4/4） | accuracy 0.50 / macro-F1 0.375（4 个窗口） | 约 14.8 s/窗口 |
+| 行为预测 | accuracy 1.00 / macro-F1 1.00（4/4） | accuracy 0.50 / macro-F1 0.40（4 个窗口） | 约 15.3 s/窗口 |
+
+原始结果：`docs/geo_engine/intent_eval_20261021.json`、`behavior_eval_20261021.json`。
+
+结论：**当前规则基线更好**。需要说明合成集是按运动学特征生成的，规则基线有结构性优势；但 JEV 零样本
+绝对准确率只有 50%、单窗口 15 s，且错误模式偏保守（常输出 defend/advance），不适合直接替代规则。
+JEV 要进入意图/行为预测，至少需要：GPU 服务、用本引擎回放标注的意图/行为数据做微调、再按同口径复测；
+在 F1/top-3 达标前只保留建议层。
+
 ## 8. 参考
 
 - openjev 模型卡与 serving：<https://huggingface.co/AlexWortega/openjev>

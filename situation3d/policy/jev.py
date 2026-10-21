@@ -94,6 +94,65 @@ class HttpJevClient(object):
                               raw=data)
 
 
+class HfSpaceJevClient(object):
+    """Calls the public openjev HF Space ``run_nli`` endpoint.
+
+    This is for evaluation/demo only: it depends on a third-party Space and
+    network access.  Each option is one NLI request; the Space returns HTML
+    with an entailment percentage.
+    """
+
+    def __init__(self, base_url: str = "https://alexwortega-openjev.hf.space",
+                 timeout_s: float = 30.0, poll_s: float = 0.6):
+        self.base_url = base_url.rstrip("/")
+        self.timeout_s = float(timeout_s)
+        self.poll_s = float(poll_s)
+        self.last_latency_s = None
+
+    def _one(self, premise: str, hypothesis: str) -> float:
+        import re
+        import time
+        payload = json.dumps({"data": [premise, hypothesis]}).encode("utf-8")
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(
+                    self.base_url + "/gradio_api/call/run_nli", data=payload,
+                    headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+                    event_id = json.loads(resp.read().decode("utf-8"))["event_id"]
+                deadline = time.time() + self.timeout_s
+                while time.time() < deadline:
+                    time.sleep(self.poll_s)
+                    with urllib.request.urlopen(
+                            self.base_url + "/gradio_api/call/run_nli/" + event_id,
+                            timeout=self.timeout_s) as resp:
+                        text = resp.read().decode("utf-8")
+                    if "event: complete" not in text:
+                        continue
+                    match = re.search(r"entailment</span><span class='opt-btn-pct'>(\d+)%",
+                                      text)
+                    if match:
+                        return float(match.group(1)) / 100.0
+                    return 0.0
+            except Exception:
+                time.sleep(2.0)
+        return 0.0
+
+    def decide(self, request: DecisionRequest) -> DecisionAnswer:
+        import time
+        q = request.questions[0]
+        premise = request.state + "\nQuestion: " + q.instructions
+        t0 = time.perf_counter()
+        probs = []
+        for option in list(q.options)[:8]:
+            probs.append(self._one(premise, "The chosen action is: " + option))
+        self.last_latency_s = time.perf_counter() - t0
+        total = sum(probs) or 1.0
+        return DecisionAnswer(probabilities={opt: float(p / total)
+                                             for opt, p in zip(q.options, probs)},
+                              confidence=float(max(probs) / total))
+
+
 class LocalOpenJevClient(object):
     """Runs an openjev/Qwen sequence-classification checkpoint on CPU/GPU.
 
@@ -146,7 +205,7 @@ class LocalOpenJevClient(object):
                 # One option per forward: CPU batching on this architecture is
                 # slower than sequential short sequences.
                 batch = self._tok(text, return_tensors="pt", truncation=True,
-                                  max_length=64)
+                                  max_length=256)
                 batch = {k: v.to(self.device) for k, v in batch.items()}
                 logits = self._model(**batch).logits
                 probs.append(float(torch.softmax(logits, dim=-1)[0, self._ent_idx]))
