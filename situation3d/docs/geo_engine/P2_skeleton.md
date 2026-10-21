@@ -48,4 +48,4 @@ GEORULES_GOLDEN=1 python3 -m unittest tests/test_golden_replay.py # 2 项
 2. `sim/motion` 连续弧长积分 + 子步碰撞；
 3. 规则格在“进入新格”时校验堆叠/桥梁容量（`World` 已提供占用查询）；
 4. `rules/combat.py` 迁移时用 `RuleContext.rule_distance`，禁止直接 import `geo`；
-5. 补 F0/F1/F2 制导标志探针；生成 `map_9001` 后补录台海 golden replay。
+5. 补 F0/F1/F2 制导标志探针；台海 golden replay 已录制（`tests/fixtures/golden_taiwan_campaign_manifest.json`）。

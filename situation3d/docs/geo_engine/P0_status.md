@@ -45,13 +45,18 @@
 - F0/F1/F2 制导标志语义（P4 前补）；
 - 台海案例 golden replay（见 §5）。
 
-## 5. 台海 golden replay 说明
+## 5. 台海 golden replay（已录制）
 
-`campaigns/taiwan_landing.py` 使用的 `map_9001` 由 `scripts/build_campaign_map.py` 现场生成，未入库；重建需要 Natural Earth 陆地 shapefile 与 Terrarium 地形瓦片（仓库内无缓存），本阶段未重建。因此本阶段录制的是**内核级 golden replay**（公开想定 1231 + map_123，300 tick，seed 20261021），用于锁定 6982407 的运动/裁决行为。
+`map_9001` 由 `scripts/build_campaign_map.py` 现场生成、未入库；本轮从既有 campaign worktree 取得该图（`basic.json` + `cost.pickle`），放入本 worktree 的 `web/data/campaign_maps/map_9001/`（该目录被 `.gitignore` 忽略）。
 
-台海案例的 golden replay 需在拥有 map_9001 的环境执行：
+录制结果（`tests/fixtures/golden_taiwan_campaign_manifest.json`）：
 
-```bash
-python3 scripts/run_campaign.py --case taiwan_landing --out /tmp/tw --seed 20261021
-# 对输出 JSON 取 hash 并存档；或在生成 map_9001 后用 run_wargame_core_demo 录制
-```
+| 项 | 值 |
+|---|---|
+| 命令 | `python3 scripts/run_campaign.py --case taiwan_landing --out <dir> --seed 20261021` |
+| 输出 | 1440 tick / 7 阶段 / 934 事件 / 20,647,907 B |
+| 输出 sha256 | `652104edeb790fa306d76f4e07a776b14171b9a793e0b29efd2f8ef12f66e414` |
+| 地图 sha256 | `basic.json` c1b57153…、`cost.pickle` 6f7c2e0a… |
+| 结局（引擎） | 蓝方胜，红 78 / 蓝 221，红损 16 / 蓝损 7 |
+
+两次独立运行输出 sha256 完全一致；`tests/test_golden_taiwan.py` 在 `GEORULES_TW=1` 时重跑并校验哈希（约 14–20 s），默认只校验 manifest 与地图哈希。注意引擎结局与脚本设定结局不一致（`match=false`），这是基线行为，golden replay 锁定的就是该行为。
