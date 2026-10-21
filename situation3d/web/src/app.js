@@ -92,7 +92,8 @@ const state = {
   targets: {},              // id -> { def, entity, trail: [], lastTick, sensorEntity }
   layers: { targets: true, targetsRed: true, targetsBlue: true,
             tracks: true, routes: true, hotspots: true, labels: true,
-            targetPanel: true, overview: true, focusMask: false, occupation: true },
+            targetPanel: true, targetProps: false, overview: true,
+            focusMask: false, occupation: true },
   filters: { red: true, blue: true, sea: true, land: true, air: true },
   selected: null,
   focusMaskEntity: null, // 选中掩码图元（懒建：没选中就先不建）
@@ -722,6 +723,9 @@ function initViewer() {
     Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
   if (window.Overview) Overview.init(viewer);
+  // 目标属性面板：注册主 Viewer 与只读环境；预览 Viewer 要等
+  // 「图层勾选 + 选中目标」同时成立时才惰性创建（见 targetProps.js）。
+  if (window.TargetProps) TargetProps.init(viewer, targetPropsApi());
   if (window.Places) Places.init(viewer);
   // 在线三维实景只是登记 viewer，真正的联网在建 tileset 时才发生（见 bindUI），
   // 这样"没配置令牌"的部署不会在开页面时就发一次注定 401 的请求。
@@ -1527,6 +1531,8 @@ function teardownScene() {
   if (window.TargetCombatFx) TargetCombatFx.dispose();
   if (window.TargetFx) TargetFx.dispose();
   if (window.TargetMotion) TargetMotion.dispose(viewer);
+  // 面板预览是独立 Viewer，不随 viewer.entities.removeAll() 清理，必须显式销毁。
+  if (window.TargetProps) TargetProps.reset();
   viewer.entities.removeAll();
   redrawPlotsAfterClear();
   state.targets = {};
@@ -1920,7 +1926,8 @@ function closeCaseMenu() { closeAllMenus(); }
 
 const LAYER_GROUPS = [
   { name: 'TS图层', ids: ['layerHotspots', 'layerRoutes'] },
-  { name: '目标图层', ids: ['layerTargetsRed', 'layerTargetsBlue', 'layerLabels', 'layerTracks'] },
+  // layerLabels 自 2026-10-21 起不在面板显示（panel:false），也不参与批量命令。
+  { name: '目标图层', ids: ['layerTargetsRed', 'layerTargetsBlue', 'layerTracks'] },
   { name: '底图', ids: ['modelTianditu', 'modelTiandituLabel', 'modelImagery',
                         'modelHotspotImagery', 'modelUrbanImagery',
                         'modelPlaces', 'modelTerrain',
@@ -2006,6 +2013,9 @@ function applyLayerCommand(cmd) {
   // 否则「全部显示」对它们无效 —— 这类漏项不会报错，只会表现为按钮没反应。
   LayerRegistry.LAYERS.forEach(function (d) {
     if (only && only.indexOf(d.group) < 0) return;
+    // panel:false 的行用户看不见、也关不掉：批量命令同样不能碰，否则
+    // 「全部显示」会打开一个没有 UI 入口的开关（如选中掩码压暗全图）。
+    if (d.panel === false) return;
     if (ids.indexOf(d.id) < 0) ids.push(d.id);
   });
   ids.forEach(function (id) {
@@ -2217,8 +2227,10 @@ function createTargetEntities() {
         // 完整历史（第 0 帧 → 当前帧）。窗口只影响掩码/取证读数，不影响绘制。
         return rec ? rec.trail : [];
       }, false),
-      width: 1.5,
-      material: color.withAlpha(0.12),
+      width: 1,
+      // 中性浅灰、低不透明度：历史全程线只是底噪，不与阵营色/近期白线抢视线。
+      // 近期白色实线（2.5 px）压在它上面，两者取自同一份 rec.trail，几何上完全重合。
+      material: Cesium.Color.fromCssColorString('#9aa3ad').withAlpha(0.3),
       clampToGround: false,
     };
 
@@ -2248,9 +2260,11 @@ function createTargetEntities() {
           const pts = predictedTrackPoints(def);
           return pts.map(function (p) { return Cesium.Cartesian3.fromDegrees(p[0], p[1], p[2] || 0); });
         }, false),
-        width: 2,
+        width: 1.5,
+        // 计划轨迹与历史实线同属「历史轨迹」图层，统一用中性灰虚线；按阵营
+        // 着色时红方目标的虚线在屏幕上呈粉红色，和历史轨迹混在一起分不清。
         material: new Cesium.PolylineDashMaterialProperty({
-          color: color.withAlpha(0.9),
+          color: Cesium.Color.fromCssColorString('#c9cfd6').withAlpha(0.8),
           dashLength: 14,
         }),
         clampToGround: false,
@@ -2268,8 +2282,8 @@ function createTargetEntities() {
         width: 16,
         height: 16,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        // 用 polylines 的 material 颜色没法复用到 billboard，直接用阵营色近似
-        color: color,
+        // 与上方计划虚线同一中性色（billboard 不能复用 polyline 的 material）。
+        color: Cesium.Color.fromCssColorString('#c9cfd6').withAlpha(0.8),
       },
     });
 
@@ -2340,6 +2354,20 @@ function targetFxApi() {
     tick: function () { return state.tick; },
     tickFloat: function () { return state.tickFloat; },
     selected: function () { return state.selected; },
+  };
+}
+
+/**
+ * targetProps.js 需要的只读环境：目标记录、案例数据、帧号与主时钟。
+ * 面板不持有任何状态副本，位置/朝向/着色每帧都从主实体属性读回。
+ */
+function targetPropsApi() {
+  return {
+    rec: function (id) { return state.targets[id] || null; },
+    data: function () { return state.data; },
+    tick: function () { return state.tick; },
+    playing: function () { return !!state.playing; },
+    clockTime: function () { return viewer ? viewer.clock.currentTime : null; },
   };
 }
 
@@ -2981,15 +3009,16 @@ function syncEntities() {
       rec.trail.length = 0;
       rec.lastTick = -1;
     }
-    if (visible && state.layers.tracks && state.tick > rec.lastTick) {
+    // 航迹是**数据**而不是显示状态：与「历史轨迹」开关、目标可见性无关地持续
+    // 累积。早先在图层关闭时清空 rec.trail、且 lastTick 照常前移，重新勾选后
+    // 航迹只能从当时那帧重新长出来（暂停/深链时甚至为空），表现为"只剩最近一段"。
+    if (state.tick > rec.lastTick) {
       for (let t = rec.lastTick + 1; t <= state.tick; t++) {
         const s = positionFor(id, t);
         if (s) rec.trail.push(Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt));
       }
+      rec.lastTick = state.tick;
     }
-    rec.lastTick = state.tick;
-
-    if (!state.layers.tracks) rec.trail.length = 0;
     if (rec.recentEntity) rec.recentEntity.show = visible && state.layers.tracks && rec.trail.length > 1;
     // 历史轨迹**全程实线**：不按窗口切片。窗口只用于掩码取值（updateFocusMask），
     // 绘制给用户看的是从第 0 帧到当前帧的完整航迹（需求：不要只画固定步长）。
@@ -4167,6 +4196,7 @@ function selectTarget(id, fly, height) {
   syncSelection();
   renderTargetCounts();
   renderTargetStatus(id);
+  if (window.TargetProps) TargetProps.setTarget(id);
   refreshRelations(true);
   // The banner shows the operation's phase plus the selected unit's own phase when
   // the two differ, so it has to be refreshed on selection - otherwise picking a
@@ -4184,6 +4214,7 @@ function clearTargetSelection() {
   setPlottingHidden(false);
   syncSelection();
   renderTargetStatus(null);
+  if (window.TargetProps) TargetProps.setTarget(null);
   refreshRelations(true);
   markScene('clearTargetSelection');
 }
@@ -5960,6 +5991,9 @@ function loop(nowMs) {
   if (window.TargetMotion) TargetMotion.syncClock(state.tickFloat);
   if (window.TargetFx) TargetFx.frame(dt);
   if (window.TargetCombatFx) TargetCombatFx.frame(dt);
+  // 属性面板的侧视相机与实时字段：只在图层勾选且有选中目标时工作，
+  // 内部自带节流；预览 Viewer 用 requestRenderMode，暂停时不渲染。
+  if (window.TargetProps) TargetProps.frame(dt);
 
   if (RenderGovernor.take()) syncEntities();
   // 标签避让按时间节流（不受 RenderGovernor 的脏标记影响：相机微动也要重排）。
@@ -7001,6 +7035,11 @@ function bindUI() {
     }],
     ['layerLabels', function (v) { state.layers.labels = v; markScene('layerLabels'); }],
     ['layerTracks', function (v) { state.layers.tracks = v; markScene('layerTracks'); }],
+    // 「目标属性」：只切面板显隐与预览 Viewer 生命周期，不改主场景图元。
+    ['layerTargetProps', function (v) {
+      state.layers.targetProps = v;
+      if (window.TargetProps) TargetProps.setEnabled(v);
+    }],
     ['modelSensor', function (v) { setSensors(v); }],
     // WSF3D 建筑高度图层：**图层的创建写在 `setWsf3dOverlay` 里**，
     // 而那个函数只有 URL 钩子会调。该行在注册表里是 `kind:'imagery'` 且

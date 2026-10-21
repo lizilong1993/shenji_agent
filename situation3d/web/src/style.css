@@ -539,6 +539,74 @@ select {
 .swatch.line { width: 14px; height: 2px; border-radius: 0; background: #f0a020; }
 .swatch.hotspot { background: rgba(216, 74, 58, .30); border: 1px solid #d84a3a; }
 
+/* ---------------- 目标属性（右下角，Legend 上方） ----------------
+   「目标图层 · 目标属性」勾选且选中目标后显示。面板内上半部是第二 Cesium
+   3D 视图（侧视镜像主实体），下半部是实时属性。宽 300、高度自适应，
+   字段区独立滚动，避免顶到右上角的鸟瞰图/指南针与左下角比例尺。 */
+.target-props {
+  position: absolute;
+  right: 12px;
+  bottom: 50px;               /* Legend（bottom 12 + 高约 30）上方 8px */
+  width: 300px;
+  /* 右上角是「鸟瞰图(12..202) → 指南针(210..294) → 复位视角(302..~330)」一列，
+     面板顶部必须落在它下面：高度 = 容器高 - bottom(50) - 392 留白，上限 408。
+     极矮窗口下 calc 会变成负数（max-height 不接受负值），故用 max() 兜一个
+     160px 的下界；此时字段区仍可滚动，见下方 media query。 */
+  max-height: min(408px, calc(100% - 392px));
+  max-height: max(160px, min(408px, calc(100% - 392px)));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .95);
+  box-shadow: 0 4px 16px rgba(15, 23, 34, .18);
+  font-size: 11px;
+  overflow: hidden;
+  z-index: 5;
+}
+.target-props.hidden { display: none; }
+.tpr-head { display: flex; align-items: center; padding: 7px 10px 5px;
+  border-bottom: 1px solid var(--border); }
+.tpr-title { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.tpr-title b { font-size: 12px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; }
+.tpr-id { color: var(--text-dim); font-size: 10px; }
+.tpr-empty { padding: 14px 12px; color: var(--text-dim); text-align: center; }
+.tpr-empty.hidden { display: none; }
+.tpr-body { display: flex; flex-direction: column; min-height: 0; }
+.tpr-body.hidden { display: none; }
+.tpr-badges { display: flex; gap: 5px; padding: 6px 10px 4px; flex-wrap: wrap; }
+.tpr-tag { padding: 1px 6px; border-radius: 8px; background: #eef2f7;
+  color: #43506a; font-size: 10px; white-space: nowrap; }
+.tpr-tag.tpr-red { background: rgba(192, 57, 43, .12); color: #a9352a; }
+.tpr-tag.tpr-blue { background: rgba(36, 113, 163, .12); color: #1d5f90; }
+.tpr-model { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+.tpr-view { position: relative; height: 150px; margin: 0 10px;
+  border-radius: 3px; background: #0d1520; overflow: hidden; }
+.tpr-view.hidden { display: none; }
+.tpr-view-note { position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; color: #9db0c6; font-size: 11px; }
+.tpr-state { display: flex; align-items: center; gap: 7px; padding: 6px 10px 2px; }
+.tpr-pill { color: #fff; border-radius: 8px; padding: 1px 8px; font-size: 10px; }
+.tpr-hp { flex: 1 1 auto; height: 5px; border-radius: 3px; background: #e4e9f0;
+  border: 1px solid #c8d1dd; overflow: hidden; }
+.tpr-hp i { display: block; height: 100%; border-radius: 2px; }
+.tpr-hp-text { color: var(--text-dim); font-size: 10px;
+  font-variant-numeric: tabular-nums; }
+.tpr-fields { padding: 2px 10px 8px; overflow-y: auto; min-height: 0; }
+.tpr-sec { margin: 7px 0 2px; color: #12325c; font-weight: 600; font-size: 10.5px; }
+.tpr-row { display: flex; align-items: baseline; gap: 8px; line-height: 1.55; }
+.tpr-row span { flex: 0 0 64px; color: var(--text-dim); }
+.tpr-row b { flex: 1 1 auto; font-weight: 500; text-align: right; min-width: 0;
+  word-break: break-all; font-variant-numeric: tabular-nums; }
+@media (max-width: 1280px) {
+  .target-props { width: 268px; }
+  .tpr-view { height: 132px; }
+}
+@media (max-height: 760px) {
+  .tpr-view { height: 116px; }
+}
+
 /* 瓦片加载进度徽标（"正在加载瓦片… 剩余 N"）已按需求删除（2026-10-17）。
    进度回调仍保留在 app.js 的 onTileLoadProgress()：它还负责底图空闲判定
    （预加载的调度闸门）与空闲后创建鸟瞰图。 */

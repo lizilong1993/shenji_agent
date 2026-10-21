@@ -83,6 +83,7 @@
   /** 一行图层：复选框 + 名称 + 数量徽标 + （可展开时）箭头。 */
   var LAYER_HINTS = {
     layerLabels: '目标标牌：目标编号 + 具体型号的屏幕标签',
+    layerTargetProps: '目标属性：选中目标的 3D 侧视预览与实时属性（右下角图例上方）',
     'overlay.focusMask': '选中掩码：压暗全图，只保留选中目标及其轨迹范围',
     modelSensor: '传感器覆盖：按目标 sensor_range_km 绘制作用半径',
     layerTargetPanel: '目标元数据面板：选中目标后，在右栏显示状态、意图与参数',
@@ -319,11 +320,11 @@
       box.open = true;
       box.appendChild(el('summary', null, g));
       var groupRows = rows.filter(function (s) { return s.group === g; });
-      var direct = groupRows.filter(function (s) { return !s.subgroup; });
+      var direct = groupRows.filter(function (s) { return !s.subgroup && s.panel !== false; });
       direct.sort(function (a, b) { return (a.z - b.z) || (a.id < b.id ? -1 : 1); })
         .forEach(function (s) { appendLayerRow(box, s); });
       var subs = {};
-      groupRows.filter(function (s) { return !!s.subgroup; }).forEach(function (s) {
+      groupRows.filter(function (s) { return !!s.subgroup && s.panel !== false; }).forEach(function (s) {
         (subs[s.subgroup] = subs[s.subgroup] || []).push(s);
       });
       Object.keys(subs).forEach(function (sg) {
