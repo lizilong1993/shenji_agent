@@ -2846,6 +2846,17 @@ function refreshPredictEntity(id) {
   if (!rec || !rec.predict) return;
   const pred = (state.selected === id && isVisible(rec.def) && state.layers.tracks)
     ? predictedTrackPoints(rec.def) : [];
+  // The arrow asset points north. Cesium billboard rotation is CCW, so a
+  // clockwise compass bearing is applied as -bearing.
+  if (rec.predict.billboard) {
+    var rot = 0;
+    if (pred.length >= 2) {
+      var a = pred[pred.length - 2], b = pred[pred.length - 1];
+      rot = -predBearing(a, b) * Math.PI / 180;
+    }
+    rec.predict.billboard.rotation = rot;
+    rec.predict.billboard.alignedAxis = Cesium.Cartesian3.UNIT_Z;
+  }
   setEntityShow(rec.predict, pred.length >= 2);
 }
 
@@ -2927,23 +2938,45 @@ function trailWindowOf(rec, id) {
  * 计划轨迹：从当前位置沿计划航路剩余段，或是航向外推。
  * 返回 `[lon, lat, alt]`：虚线 + 终点箭头都基于它，与历史实线分开绘制。
  */
+/** Bearing from point A to B in degrees, clockwise from north. Both are [lon, lat, alt]. */
+function predBearing(a, b) {
+  var cos = Math.cos((a[1] || 0) * Math.PI / 180) || 1;
+  return (Math.atan2((b[0] - a[0]) * cos, b[1] - a[1]) * 180 / Math.PI + 360) % 360;
+}
+
 function predictedTrackPoints(def) {
   const s = positionFor(def.id, state.tick);
   if (!s) return [];
   const out = [[s.lon, s.lat, s.alt]];
   if (!def.waypoints || def.waypoints.length < 2) {
     // 没有航路点（例如 CZML 驱动的新案例）：用**后续帧的计划位置**作为计划轨迹。
-    // 数据集本身就有完整的逐帧计划航迹，比"航向外推"更可靠。
+    // 密集案例只取前 10 分钟，并在第一次明显转向处截断——否则闭环巡逻/折返
+    // 会在 30 分钟窗口里画成一整圈多边形，看起来像"乱画"。
     const frames = (state.data && state.data.frames) || [];
+    const dense = !!(state.data && (state.data.campaign_contract_version ||
+      ((state.data.targets || []).length > 50)));
+    const horizon = dense ? 20 : PREDICT_HORIZON_TICKS;
     if (frames.length > state.tick + 1) {
-      const end = Math.min(frames.length - 1, state.tick + PREDICT_HORIZON_TICKS);
-      const step = Math.max(1, Math.floor((end - state.tick) / 8));
-      for (let t = state.tick + step; t <= end; t += step) {
+      const end = Math.min(frames.length - 1, state.tick + horizon);
+      var prevBearing = null;
+      var lastPt = null;
+      for (let t = state.tick + 1; t <= end; t++) {
         const p = positionFor(def.id, t);
-        if (p) out.push([p.lon, p.lat, p.alt]);
+        if (!p) continue;
+        const pt = [p.lon, p.lat, p.alt];
+        if (lastPt) {
+          const cos = Math.cos(lastPt[1] * Math.PI / 180) || 1;
+          if (Math.hypot((pt[0] - lastPt[0]) * cos, pt[1] - lastPt[1]) < 0.00002) continue;
+        }
+        if (lastPt && prevBearing !== null && out.length >= 3) {
+          const b = predBearing(lastPt, pt);
+          const diff = Math.abs(((b - prevBearing + 540) % 360) - 180);
+          if (diff > 45) break;
+        }
+        if (lastPt) prevBearing = predBearing(lastPt, pt);
+        out.push(pt);
+        lastPt = pt;
       }
-      const last = positionFor(def.id, end);
-      if (last && out[out.length - 1][0] !== last.lon) out.push([last.lon, last.lat, last.alt]);
     }
     return out;
   }
