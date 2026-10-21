@@ -343,6 +343,7 @@
     tank99a: { model: './assets/models/type_99a_gunfx.glb', offset: [0.2, 0, 1.3], muzzle: [-6.4, 0, 2.35] },
     ship071: { model: './assets/models/type_071_gunfx.glb', offset: [-80, 0, 14], muzzle: [-84, 0, 15] },
     tankm1a2: { model: './assets/models/type_m1a2_gunfx.glb', offset: [0.8, 0, 2.2], muzzle: [-5.2, 0, 3.25] },
+    hq9: { model: './assets/models/type_hq9_launcherfx.glb', offset: [2.6, 0, 2.5], muzzle: [-3.3, 0, 3.8] },
   };
   var proxyEnts = {};
   var proxyRecoil = { ship052c: 0, ship054a: 0, tank99a: 0, ship071: 0, tankm1a2: 0 };
@@ -355,6 +356,7 @@
     if (/99a|ztz-?99/i.test(text)) return 'tank99a';
     if (/071|yuzhao|昆仑山/i.test(text)) return 'ship071';
     if (/m1a2/i.test(text)) return 'tankm1a2';
+    if (/红旗-?9|hq-?9/i.test(text)) return 'hq9';
     return null;
   }
 
