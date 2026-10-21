@@ -318,7 +318,6 @@
       var box = el('details', 'layer-group panel-block');
       box.open = true;
       box.appendChild(el('summary', null, g));
-      if (g === '目标图层') box.appendChild(domainFilterRow());
       var groupRows = rows.filter(function (s) { return s.group === g; });
       var direct = groupRows.filter(function (s) { return !s.subgroup; });
       direct.sort(function (a, b) { return (a.z - b.z) || (a.id < b.id ? -1 : 1); })

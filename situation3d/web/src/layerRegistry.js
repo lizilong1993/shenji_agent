@@ -302,10 +302,6 @@
   // handler 在 app.js 的映射表里（state.layers.focusMask → updateFocusMask）。
   { id: 'overlay.focusMask', kind: 'target', z: 35, label: '选中掩码',
     group: '目标图层', default: false },
-    { id: 'modelSensor', kind: 'target', z: 40, label: '传感器覆盖',
-      group: '目标图层', default: false },
-    { id: 'layerTargetPanel', kind: 'target', z: 50, label: '目标元数据面板',
-      group: '目标图层', default: true },
 
     // ---- 地图组件 ----
     //

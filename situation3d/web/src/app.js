@@ -32,6 +32,7 @@ const LEVEL_CLASS = { 1: 'lv1', 2: 'lv2', 3: 'lv3', 4: 'lv4' };
 // TRAIL_WINDOW_TICKS：历史轨迹**全量保留**，只在渲染时切片。窗口只影响"看多少"，
 // 不影响"清空后从第 0 帧重建"的回退逻辑（回退靠 rec.lastTick，不靠窗口）。
 const TRAIL_WINDOW_TICKS = 120;
+const RECENT_TRAIL_TICKS = 30; // 近期白色实线只显示最近 15 分钟
 // 目标轨迹来源：默认取"计划航路剩余段"，是一段**计划轨迹**（虚线）；
 // 'kinematic' 才是航向外推备选。两种模式都走同一套标绘渲染，不再另建独立轨迹实体。
 const TRACK_MODE = 'planned';
@@ -41,7 +42,7 @@ const PREDICT_HORIZON_TICKS = 60;
 const TRACK_HORIZON_TICKS = 60;
 const TICK_SECONDS = 30;
 // 掩码内环的最小挖空半径（度）：目标刚起步、轨迹只有几帧时也看得见那个点。
-const FOCUS_MASK_PAD_DEG = 0.05;
+const FOCUS_MASK_PAD_DEG = 0.015;
 // 选中掩码的图元 id：左键拾取被它挡住时要能认出它（它不是可选对象）。
 const FOCUS_MASK_ID = 'overlay-focus-mask';
 
@@ -1919,8 +1920,7 @@ function closeCaseMenu() { closeAllMenus(); }
 
 const LAYER_GROUPS = [
   { name: 'TS图层', ids: ['layerHotspots', 'layerRoutes'] },
-  { name: '目标图层', ids: ['layerTargetsRed', 'layerTargetsBlue', 'layerLabels', 'layerTracks', 'modelSensor',
-                            'layerTargetPanel'] },
+  { name: '目标图层', ids: ['layerTargetsRed', 'layerTargetsBlue', 'layerLabels', 'layerTracks'] },
   { name: '底图', ids: ['modelTianditu', 'modelTiandituLabel', 'modelImagery',
                         'modelHotspotImagery', 'modelUrbanImagery',
                         'modelPlaces', 'modelTerrain',
@@ -2218,9 +2218,25 @@ function createTargetEntities() {
         return rec ? rec.trail : [];
       }, false),
       width: 2,
-      material: color.withAlpha(0.85),
+      material: color.withAlpha(0.25),
       clampToGround: false,
     };
+
+    // 近期轨迹：白色实线，只显示最近 RECENT_TRAIL_TICKS 帧；与低透明度
+    // 的历史全程线叠加，既看得清"刚刚怎么走"，又不会让整条历史抢视线。
+    const recent = viewer.entities.add({
+      id: 'recent-' + def.id,
+      show: false,
+      polyline: {
+        positions: new Cesium.CallbackProperty(function () {
+          const rec = state.targets[def.id];
+          return rec ? rec.trail.slice(-RECENT_TRAIL_TICKS) : [];
+        }, false),
+        width: 2.5,
+        material: Cesium.Color.WHITE.withAlpha(0.95),
+        clampToGround: false,
+      },
+    });
 
     // 计划轨迹：虚线 + 终点箭头，由「历史轨迹」图层统一管理（不再单独成标绘层）。
     // 与历史实线是两个独立图元，视觉上区分"已发生"与"计划"。
@@ -2288,11 +2304,11 @@ function createTargetEntities() {
         return Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
       }, false),
       billboard: {
-        image: window.TargetStatus ? TargetStatus.barUri(100, 0, 30, 4) : undefined,
-        width: 30,
+        image: window.TargetStatus ? TargetStatus.barUri(100, 0, 34, 4) : undefined,
+        width: 34,
         height: 4,
         verticalOrigin: Cesium.VerticalOrigin.TOP,
-        pixelOffset: new Cesium.Cartesian2(0, 19),
+        pixelOffset: new Cesium.Cartesian2(0, 17),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     });
@@ -2304,6 +2320,7 @@ function createTargetEntities() {
       entity: entity,
       predict: predict,
       sensorEntity: sensorEntity,
+      recentEntity: recent,
       hpBar: hpBar,
       trail: [],
       lastTick: -1,
@@ -2871,7 +2888,13 @@ function declutterLabels(force) {
       }
     }
 
-    if (fits) {
+    if (state.selected && it.pri >= 3) {
+      // The selected target's label is always shown; overlap/off-screen is
+      // preferable to losing the identity of the unit being inspected.
+      _declutterHidden.delete(it.label);
+      it.label.show = true; shown++;
+      if (fits) placed.push(r);
+    } else if (fits) {
       var n = (_declutterHidden.get(it.label) || 0) + 1;
       if (_declutterHidden.has(it.label) && n < DECLUTTER_CLEAR_PASSES) {
         // 刚空出来一轮还不够：继续藏，防抖。
@@ -2929,12 +2952,13 @@ function syncEntities() {
     // 标签避让的隐藏是**另一层状态**：syncEntities 每次脏帧都会重写 show，
     // 不乘上它就会把隐藏的标签重新点亮（实测表现为标牌闪烁）。
     rec.entity.label.show = visible && state.layers.labels
-      && !_declutterHidden.has(rec.entity.label);
+      && (state.selected === id || !_declutterHidden.has(rec.entity.label));
     // 图标始终显示（模型形态抬到头顶），原因见 applyTargetBillboardAnchor。
     rec.entity.billboard.show = visible;
     applyTargetBillboardAnchor(rec.entity, useModel);
     if (rec.entity.model) rec.entity.model.show = visible && useModel;
-    rec.sensorEntity.show = visible && state.filters.sensors === true;
+    // 传感器只在选中目标时显示，不再需要独立图层开关。
+    rec.sensorEntity.show = visible && state.selected === id;
 
     // 主 3D 图标底部血条：与整体TS/鸟瞰图同一 TargetStatus 口径。
     // 只在档位或 0.1% 血量变化时换图，避免每帧重建 SVG。
@@ -2945,7 +2969,7 @@ function syncEntities() {
       if (rec.hpKey !== hpKey) {
         rec.hpKey = hpKey;
         rec.hpBar.billboard.image = hpSt
-          ? TargetStatus.barUri(hpSt.hp, hpSt.status, 30, 4)
+          ? TargetStatus.barUri(hpSt.hp, hpSt.status, 34, 4)
           : undefined;
       }
       rec.hpBar.show = visible;
@@ -2966,6 +2990,7 @@ function syncEntities() {
     rec.lastTick = state.tick;
 
     if (!state.layers.tracks) rec.trail.length = 0;
+    if (rec.recentEntity) rec.recentEntity.show = visible && state.layers.tracks && rec.trail.length > 1;
     // 历史轨迹**全程实线**：不按窗口切片。窗口只用于掩码取值（updateFocusMask），
     // 绘制给用户看的是从第 0 帧到当前帧的完整航迹（需求：不要只画固定步长）。
     rec.entity.polyline.show = visible && state.layers.tracks && rec.trail.length > 1;
@@ -3113,7 +3138,7 @@ function updateFocusMask() {
   let e = s.lon + FOCUS_MASK_PAD_DEG;
   let so = s.lat - FOCUS_MASK_PAD_DEG;
   let n = s.lat + FOCUS_MASK_PAD_DEG;
-  const pts = trailWindowOf(rec, id);
+  const pts = rec ? rec.trail.slice(-RECENT_TRAIL_TICKS) : [];
   for (let i = 0; i < pts.length; i++) {
     const c = Cesium.Cartographic.fromCartesian(pts[i]);
     if (!c) continue;
@@ -3143,7 +3168,7 @@ function updateFocusMask() {
       show: false,
       polygon: {
         hierarchy: hierarchy,
-        material: Cesium.Color.fromCssColorString('#0b1a2a').withAlpha(0.45),
+        material: Cesium.Color.fromCssColorString('#0b1a2a').withAlpha(0.62),
         // 地面分类：普通 height=0 多边形与球面同深度，实测整帧亮度和不开掩码一样（没渲染出来）。
         classificationType: Cesium.ClassificationType.BOTH,
         outline: false,
@@ -4070,7 +4095,7 @@ function updateAutoPlots(tick) {
       autoPlotState.visible[spec.id] = vis;
     }
     if (!vis || !spec.dynamic) return;
-    if (t === autoPlotState.lastDynamic) return;
+    if (autoPlotState.lastDynamic >= 0 && t - autoPlotState.lastDynamic < 10) return;
     try {
       if (spec.dynamic === 'aew_observation') {
         var p = positionFor(spec.actor, t);
