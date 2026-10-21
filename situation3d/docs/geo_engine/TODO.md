@@ -11,14 +11,17 @@ JEV 适配与规则 vs JEV 的意图/行为评测、建议层 `World.intel`、CO
 ## P0（下一阶段必做，建议 2–3 周）
 
 ### 1. 补齐 P1 数据管线：PBF / GEBCO / COG
-- 现状：Overpass + Terrarium 在线/离线可用；图层是 JSON；无水深、无 PBF、无 COG/FlatGeobuf。
+- 现状：Overpass + Terrarium 在线/离线可用；PBF 导入、Copernicus GLO-30、GEBCO 15″ 水深、
+  高度回退与 envpack v2 分块已完成（2026-10-21，见 P1_data_pipeline.md §6）；图层仍为 JSON，无 COG/FlatGeobuf。
+  高度覆盖 28.1%（目标 80% 未达标，受 GBA/Overture 台湾数据稀疏限制）。
 - 交付：
   - `osmium`/.osm.pbf 导入器（离线大范围，替代 Overpass 限流）；
   - Copernicus GLO-30 或现有 20 m DEM 接入；GEBCO 15″ + 近岸 ENC/港口测深的 `water.depth` 栅格；
   - 建筑高度回退（Overture `num_floors×3 m`）、道路 bridge/tunnel/maxheight/maxweight 字段；
   - envpack v2：COG/GeoParquet 或至少按 5 km 分块 JSON + manifest 版本；运行时 `EnvPackEnvironment` 读取 v1/v2。
-- 验收：运行时零在线请求；路网最大连通分量 ≥95%；建筑高度面积覆盖 ≥80%；水域/水深无空洞；
-  `mode=online` 与 `mode=offline` 同缓存构建的图层 sha256 一致。
+- 验收：运行时零在线请求 ✓；路网最大连通分量 96.8% ✓；建筑高度面积覆盖 28.1% ✗（待更换高度源）；
+  水域/水深无空洞 ✓（20×20 无空值）；在线/离线图层与分块 sha256 一致 ✓。
+- 待办：分块按需加载（当前整包读取）、Overture/GBA 高度源改进、ENC/港口测深、COG/GeoParquet。
 - 依赖：本机 Clash 隧道（`172.16.10.254:7897` → `ssh -R 27980`）；GDAL/osmium 工具链（服务器已有 `ogr2ogr`）。
 
 ### 2. 补齐 P4 规则：间瞄 / 雷场 / 桥隧 / 制导

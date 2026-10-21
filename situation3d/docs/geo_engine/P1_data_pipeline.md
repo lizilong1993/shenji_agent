@@ -74,11 +74,41 @@ python3 scripts/run_geo_demo.py --case taiwan_landing \
 
 ## 5. 已知限制
 
-1. **OSM 在线可达性**：服务器直连外网仍被阻断，需要本机 Clash/SSH 反向隧道；代码已支持多镜像与缓存，
-   代理就绪时 `--mode online` 即可。Geofabrik 大范围下载仍建议 `.osm.pbf` + osmium 导入器（尚未实现）。
-2. **DEM**：使用 Terrarium z10（约 150 m/像素）演示；未接 Copernicus GLO-30、GEBCO/ENC 水深。
+1. **OSM 在线可达性**：服务器直连 Overpass/Geofabrik 仍被阻断（Overpass 经 egress 代理返回 406，Geofabrik
+   超时）；需要本机 Clash/SSH 反向隧道，或改走本地 `.osm.pbf`（已实现，见 §6）。
+2. **DEM**：默认仍为 Terrarium z10（约 150 m/像素）；Copernicus GLO-30 已接入（见 §6），用
+   `--dem-source copernicus` 切换。GEBCO 水深已接入，ENC/港口测深仍未实现。
 3. **几何**：建筑/水域多边形为 OSM 原始 ring，未做拓扑修复/简化；桥隧仅记录标签，通行谓词暂未使用。
-4. **环境包格式**：JSON 图层（grid/polygons/graph），不是 COG/FlatGeobuf；接口已按 manifest 抽象，后续可替换为
-   GDAL/osmium/Shapely 产出的正式图层而不改运行时调用方。
+4. **环境包格式**：`msgeo.envpack.v2` 已在 JSON 图层基础上增加 5 km 分块文件（landcover/water/buildings
+   的 `chunks/` + manifest 索引），运行时兼容 v1/v2 但仍整包加载，按需加载分块尚未实现；仍不是
+   COG/FlatGeobuf，接口已按 manifest 抽象。
 5. **建筑遮挡 LOS** 已改为线段-多边形相交 + 建筑顶高程比较（不再点采样）；超长雷达线按 bbox 预筛。
 6. **缓存损坏**：JSON/PNG 损坏会隔离为 `.corrupt` 并按源失败回退，不会让构建崩溃。
+
+## 6. 增量：PBF / GLO-30 / GEBCO / envpack v2（2026-10-21）
+
+新增数据源与模块：
+
+| 源 | 模块 | 访问方式 | 说明 |
+|---|---|---|---|
+| Geofabrik `.osm.pbf` | `geodata/osm_pbf.py` | 本地文件（需 pyosmium） | ways 转 Overpass `out geom` 形状，复用 `normalize`；原始结果缓存到 `osm_pbf` |
+| Copernicus GLO-30 | `geodata/dem_copernicus.py` | AWS S3 COG + `gdal_translate /vsicurl` | 30 m 1″ 瓦片窗口转 AAIGrid 缓存；纯 Python 双线性采样 |
+| GEBCO 2026 15″ | `geodata/bathymetry.py` | `download.gebco.net` queue API | 提交 bbox→GeoTIFF→AAIGrid；`water.depth.json` 栅格 |
+| 建筑高度回退 | `geodata/height_fallback.py` | 本地多边形 GeoJSON（WGS84/3857 自适应） | 用 `height`/`h` 填充无 OSM 高度的建筑，>150 m 视为尖刺 |
+
+验证（Anping bbox 120.14/22.97/120.19/23.02，300 m 网格，`--osm-pbf --dem-source copernicus --height-geojson <GBA>`）：
+
+- PBF 导入 6,877 条 way（highway 2,941、building 2,665、natural 927、landuse 394、waterway 66），全量扫描 91 s；
+  道路图 **10,257 节点 / 12,576 边**，与 Overpass 包完全一致；最大连通分量 **96.8%**（≥95% 达标）。
+- 地形 20×20、水深 20×20，均无空值；GEBCO 水深范围 -23.0～+11.6 m；海上取样点由默认 20 m 改为
+  GEBCO 实测（如 10.8 m）。
+- 建筑高度：OSM 标签 120（height）+ 252（levels），GBA 回退填充 376，合计真实高度覆盖 **28.1%**
+  （目标 80% 未达标：Overture 本区仅 5.9% 有 height/num_floors；tw_lod1 GBA 瓦片质心匹配率 14%，存在偏移）。
+- envpack **v2**：manifest `msgeo.envpack.v2`，landcover/water/buildings 写入 5 km 分块（`chunks/`）并带索引；
+  `EnvPack.load` 与 `EnvPackEnvironment` 兼容 v1/v2。
+- 在线/离线回放：六类图层 sha256 全部一致，所有分块文件逐字节一致。
+
+环境注意：pyosmium 装在 `/remote-home/lizilong/jev_gpu/venv`（py310，需
+`LD_LIBRARY_PATH=/remote-home/lizilong/py310-libs`）；GEBCO 的 urllib 请求需
+`SSL_CERT_FILE=$(python -c 'import certifi;print(certifi.where())')`；Geofabrik 经本机 Clash
+（`172.16.10.254:7897`）下载。运行时（8848、演示脚本）不依赖上述工具链，仍只用系统 python。
