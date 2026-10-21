@@ -229,10 +229,14 @@
     },
     {
       // 2026-10-20 新增：台湾沿海 15 个 AOI 的 LOD1 白膜（OSM 轮廓 + GBA 高度，
-      // 114,785 栋，b3dm 瓦片）。数据为 tiles3d_db/tw_coastal.zip，由 serve.py 直发。
-      // 默认关：15 套子 tileset 的解析与根瓦片加载不应拖慢首屏。
-      // bbox 取 15 AOI 外包范围（含澎湖）；打开时相机飞到台湾全岛概览。
-      id: 'tiles3d.tw_coastal', kind: 'primitive', z: 40, default: false,
+      // b3dm 瓦片）。数据为 tiles3d_db/tw_coastal.zip，由 serve.py 直发。
+      //
+      // 【2026-10-21 改：默认开】用户要求互斥组（在线实景 / 建筑体块 / 城市白膜）
+      // 选一个作为默认。白膜是唯一带 bbox 与「定位」、且离线的三维建筑层——勾选
+      // 其它两层时它按互斥自动让位，取消勾选后 desired 仍为真、自动回到场景。
+      // 代价：15 套子 tileset 的解析与根瓦片加载会加重首屏（原先默认关正是为此）。
+      // bbox 取 15 AOI 外包范围（含澎湖）；手动打开时相机飞到台湾全岛概览。
+      id: 'tiles3d.tw_coastal', kind: 'primitive', z: 40, default: true,
       label: '台湾沿海城市建筑白膜（离线）', group: '底图', checkbox: 'modelTwCoastal',
       bbox: [119.520, 22.320, 121.910, 25.200],
       exclusives: ['tiles.google3d', 'buildings.blocks'],
