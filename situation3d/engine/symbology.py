@@ -65,9 +65,17 @@ ICONS: Dict[str, dict] = {
     "sam_battalion": {"label": "防空导弹", "domain": "land", "family": "地面防空", "abbrev": "SAM"},
     "armor": {"label": "装甲分队", "domain": "land", "family": "地面机动", "abbrev": "ARM"},
     "artillery": {"label": "炮兵分队", "domain": "land", "family": "地面火力", "abbrev": "ARTY"},
+    # Campaign v1: synthetic ground transport / support, deliberately distinct
+    # from armour so a 60-vehicle column does not read as 60 tanks.
+    "light_vehicle": {"label": "轻型车辆", "domain": "land", "family": "地面机动", "abbrev": "LTV"},
+    "truck": {"label": "运输车", "domain": "land", "family": "地面保障", "abbrev": "TRK"},
+    "engineer_vehicle": {"label": "工程车", "domain": "land", "family": "地面保障", "abbrev": "ENG"},
     # -- air -------------------------------------------------------------
     "fighter": {"label": "战斗机", "domain": "air", "family": "作战飞机", "abbrev": "FTR"},
     "aew": {"label": "预警机", "domain": "air", "family": "支援飞机", "abbrev": "AEW"},
+    # Campaign v1: a synthetic transfer platform, not a supply ship. Reusing
+    # `replenishment` here was the exact icon/role mismatch reported before.
+    "transport_ship": {"label": "转运平台", "domain": "sea", "family": "水面舰艇", "abbrev": "LST"},
 }
 
 

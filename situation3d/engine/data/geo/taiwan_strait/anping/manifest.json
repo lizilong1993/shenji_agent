@@ -1,0 +1,35 @@
+{
+ "schema": "situation3d.geo_package.v1",
+ "aoi": "anping",
+ "theatre": "taiwan_strait",
+ "bbox": [
+  120.135,
+  22.945,
+  120.225,
+  22.998
+ ],
+ "source": "OpenStreetMap via Overpass API",
+ "license": "ODbL 1.0",
+ "snapshot_osm_base": "2026-10-21T01:26:20Z",
+ "fetched_utc": "2026-10-21T01:27:39Z",
+ "files": [
+  {
+   "file": "buildings.geojson",
+   "features": 10925,
+   "sha256": "fedadf360a67ef9a534025362415dbe0e71a8b0c2904f340aa09857a30b966db",
+   "bytes": 3343375
+  },
+  {
+   "file": "water.geojson",
+   "features": 328,
+   "sha256": "60f67a259ab1ad0e854a7398a90a05691bbe94165d87ab039568c04fcbc76246",
+   "bytes": 138997
+  },
+  {
+   "file": "coastline.geojson",
+   "features": 34,
+   "sha256": "6a83c7955d25778290e6e24c901f9fdc2b05f6e3a3ee281990c2a00c3908266d",
+   "bytes": 15529
+  }
+ ]
+}

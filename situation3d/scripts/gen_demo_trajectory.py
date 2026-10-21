@@ -60,7 +60,8 @@ def write_base(out_dir: str) -> int:
 
 
 def main(argv) -> int:
-    wanted = argv[1:] or [c.case_id for c in cases.CASES]
+    wanted = argv[1:] or [c.case_id for c in cases.CASES
+                         if getattr(c, "generator", "scenario") == "scenario"]
     unknown = [c for c in wanted if c not in cases.CASES_BY_ID]
     if unknown:
         print("ERROR: unknown case(s): %s" % ", ".join(unknown), file=sys.stderr)
@@ -77,6 +78,13 @@ def main(argv) -> int:
 
     for case_id in wanted:
         case = cases.get_case(case_id)
+        if getattr(case, "generator", "scenario") == "campaign":
+            from engine.campaigns import taiwan_dense
+            path, geo = taiwan_dense.write_case(sit_dir)
+            print("case        : %s  (%s) [campaign generator]" % (case_id, case.name))
+            print("  written   : %s" % path)
+            print("  geo       : %s" % geo)
+            continue
         dataset = scenario.build_dataset(case)
         out_path = os.path.join(sit_dir, case_id + ".json")
         size = write_json(out_path, dataset)

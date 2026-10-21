@@ -25,7 +25,7 @@ and the number of opposing sensors that can see it.
 
 from __future__ import annotations
 
-from typing import Dict, List, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from . import geo
 
@@ -62,6 +62,12 @@ ROLE_STATE: Dict[str, int] = {
     "海上拦截": 1,
     "近海巡逻": 1,
     "战斗空中巡逻": 4,
+    # Campaign v1 land roles. These keys are only used by the dense-transfer
+    # case; old cases keep their existing lookup results.
+    "地面机动": 2,
+    "地面运输": 2,
+    "地面保障": 3,
+    "节点等待": 3,
 }
 
 STATE_LABELS = {
@@ -88,6 +94,10 @@ ROLE_INTENT: Dict[str, int] = {
     "海上拦截": 7,
     "近海巡逻": 8,
     "战斗空中巡逻": 10,
+    "地面机动": 13,
+    "地面运输": 13,
+    "地面保障": 14,
+    "节点等待": 14,
 }
 
 INTENT_LABELS = {
@@ -104,6 +114,8 @@ INTENT_LABELS = {
     10: "战斗空中巡逻",
     11: "跟踪监视",
     12: "接近查证",
+    13: "地面机动",
+    14: "地面保障",
 }
 
 # Own combat value, 0-35. Feeds the L1 threat score.
@@ -118,6 +130,12 @@ PLATFORM_WEIGHT: Dict[str, float] = {
     "replenishment": 6.0,
     "armor": 24.0,
     "artillery": 20.0,
+    # Campaign v1 synthetic platforms. Support vehicles are deliberately low:
+    # a truck column must not read as a combat formation.
+    "light_vehicle": 10.0,
+    "truck": 6.0,
+    "engineer_vehicle": 5.0,
+    "transport_ship": 12.0,
 }
 
 # Proximity / coverage contributions to the L1 threat score. The proximity
@@ -177,7 +195,7 @@ def _spread_km(points: List[Sequence[float]]) -> float:
 # --------------------------------------------------------------------------
 
 
-def _threat(target, position, opponents) -> tuple:
+def _threat(target, position, opponents, proximity_floor_km: float = 15.0) -> tuple:
     """Threat score for one target, plus the opposing target driving it.
 
     Three additive terms, all visible in the returned breakdown:
@@ -215,7 +233,7 @@ def _threat(target, position, opponents) -> tuple:
     if nearest is None:
         return 0.0, None, nearest_km, 0, {"base": base, "proximity": 0.0, "coverage": 0.0}
 
-    reach = max(nearest["engage_km"], 15.0)
+    reach = max(nearest["engage_km"], proximity_floor_km)
     proximity = PROXIMITY_MAX * pow(2.718281828, -PROXIMITY_DECAY * (nearest_km / reach))
     coverage = min(COVERAGE_MAX, coverage_raw)
 
@@ -259,8 +277,9 @@ def _posture_label(domain: str, code: int) -> str:
     return POSTURE_CODES.get(domain, POSTURE_CODES["sea"]).get(code, "未知")
 
 
-def _relation(min_km: float) -> int:
-    for threshold, code in RELATION_THRESHOLDS:
+def _relation(min_km: float,
+              thresholds: Sequence[Tuple[float, int]] = RELATION_THRESHOLDS) -> int:
+    for threshold, code in thresholds:
         if min_km < threshold:
             return code
     return 0
@@ -271,11 +290,20 @@ def _relation(min_km: float) -> int:
 # --------------------------------------------------------------------------
 
 
-def infer(frames: List[dict], targets, hotspot_names: Sequence[str] = ()) -> dict:
+def infer(frames: List[dict], targets, hotspot_names: Sequence[str] = (),
+          hotspots: Optional[Sequence[dict]] = None,
+          relation_thresholds: Optional[Sequence[Tuple[float, int]]] = None,
+          engagement_km: Optional[float] = None,
+          contact_km: Optional[float] = None,
+          proximity_floor_km: float = 15.0) -> dict:
     """Run the three-level inference over a frame sequence.
 
     Returns ``{"model": ..., "summary": ..., "frames": [...]}`` where each entry
     of ``frames`` is aligned index-for-index with the input ``frames``.
+
+    The optional parameters let a local-scale case use its own thresholds and
+    hotspot list without changing the global constants. Omitting them reproduces
+    the old theatre-scale behaviour exactly.
     """
     from . import scenario as scenario_mod
 
@@ -284,7 +312,19 @@ def infer(frames: List[dict], targets, hotspot_names: Sequence[str] = ()) -> dic
     domains = sorted({t.domain for t in targets})
     affiliations = sorted({t.affiliation for t in targets})
 
-    hotspots = [h for h in scenario_mod.HOTSPOTS if h["name"] in set(hotspot_names)]
+    if relation_thresholds is None:
+        relation_thresholds = RELATION_THRESHOLDS
+    if engagement_km is None:
+        engagement_km = ENGAGEMENT_KM
+    if contact_km is None:
+        contact_km = CONTACT_KM
+    if hotspots is None:
+        hotspots = [h for h in scenario_mod.HOTSPOTS
+                    if h["name"] in set(hotspot_names)]
+    else:
+        wanted = set(hotspot_names) if hotspot_names else None
+        hotspots = [h for h in hotspots
+                    if wanted is None or h["name"] in wanted]
     # Pre-compute the bounding box test inputs once.
     boxes = [(h["bbox"], h["name"]) for h in hotspots]
 
@@ -314,16 +354,17 @@ def infer(frames: List[dict], targets, hotspot_names: Sequence[str] = ()) -> dic
                 for oid in order
                 if target_by_id[oid].affiliation != t.affiliation
             ]
-            threat, nearest_id, nearest_km, covered, breakdown = _threat(t, pos, opponents)
+            threat, nearest_id, nearest_km, covered, breakdown = _threat(
+                t, pos, opponents, proximity_floor_km=proximity_floor_km)
             alert = _alert_for(threat)
 
             state = ROLE_STATE.get(t.role, 0)
             intent = ROLE_INTENT.get(t.role, 0)
             # Dynamic override: anything close to the other side is tracking it,
             # which is what an operator would actually be told.
-            if nearest_km <= CONTACT_KM and nearest_id:
+            if nearest_km <= contact_km and nearest_id:
                 intent = 11
-            if nearest_km <= ENGAGEMENT_KM and t.domain in ("sea", "air"):
+            if nearest_km <= engagement_km and t.domain in ("sea", "air"):
                 state = 7
                 intent = 12
 
@@ -374,8 +415,8 @@ def infer(frames: List[dict], targets, hotspot_names: Sequence[str] = ()) -> dic
                         dom, _posture([target_by_id[m] for m in members], spread)),
                     "opposing_key": (("blue" if aff == "red" else "red") + ":" + dom) if opp_members else None,
                     "min_distance_km": min_km,
-                    "relation": _relation(min_km) if min_km is not None else 0,
-                    "relation_label": RELATION_CODES[_relation(min_km) if min_km is not None else 0],
+                    "relation": _relation(min_km, relation_thresholds) if min_km is not None else 0,
+                    "relation_label": RELATION_CODES[_relation(min_km, relation_thresholds) if min_km is not None else 0],
                     "mean_threat": round(sum(l1[m]["threat"] for m in members) / len(members), 1),
                 })
 
@@ -468,9 +509,10 @@ def infer(frames: List[dict], targets, hotspot_names: Sequence[str] = ()) -> dic
             },
             "thresholds": {
                 "alert": [list(t) for t in ALERT_THRESHOLDS],
-                "relation_km": [list(t) for t in RELATION_THRESHOLDS],
-                "contact_km": CONTACT_KM,
-                "engagement_km": ENGAGEMENT_KM,
+                "relation_km": [list(t) for t in relation_thresholds],
+                "contact_km": contact_km,
+                "engagement_km": engagement_km,
+                "proximity_floor_km": proximity_floor_km,
             },
         },
         "summary": {
