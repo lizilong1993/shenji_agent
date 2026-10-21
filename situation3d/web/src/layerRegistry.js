@@ -229,7 +229,7 @@
       // 默认关：15 套子 tileset 的解析与根瓦片加载不应拖慢首屏。
       // bbox 取 15 AOI 外包范围（含澎湖）；打开时相机飞到台湾全岛概览。
       id: 'tiles3d.tw_coastal', kind: 'primitive', z: 40, default: false,
-      label: '台湾沿海白膜（LOD1）', group: '底图', checkbox: 'modelTwCoastal',
+      label: '台湾沿海城市建筑白膜', group: '底图', checkbox: 'modelTwCoastal',
       bbox: [119.520, 22.320, 121.910, 25.200],
       exclusives: ['tiles.google3d', 'buildings.blocks'],
     },

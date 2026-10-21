@@ -46,10 +46,12 @@
       label: 'TW2024 三维样例',
       url: './tiles3d/tw2024/tileset.json',
     },
-    // 2026-10-20：OSM 轮廓 + GBA 高度生成的 15 个沿海 AOI LOD1 白膜（tw_coastal.zip）。
+    // 2026-10-21：15 个沿海 AOI 的白膜 v2（tw_coastal_v2.zip）。
+    // v2 修复：b3dm 内 glTF 按规范改为 Y-up（v1 写的是 Z-up ECEF，Cesium 会把模型
+    // 绕 X 轴旋转 90°，加载成功但看不见）；并调大 geometricError 使城市级视距内能出图。
     'tiles3d.tw_coastal': {
-      label: '台湾沿海白膜（LOD1）',
-      url: './tiles3d/tw_coastal/tileset.json',
+      label: '台湾沿海城市建筑白膜',
+      url: './tiles3d/tw_coastal_v2/tileset.json',
     },
   };
 
