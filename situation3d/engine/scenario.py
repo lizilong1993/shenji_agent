@@ -553,7 +553,10 @@ def _build_targets() -> List[Target]:
             # emplaced, so it is not routed on the road network.
             road_bound=False,
             waypoints=coastal_route,
-            speed_kn=geo.kmh_to_knots(45.0),
+            # Positional battery: it fights from where it is emplaced. The
+            # km/h value here used to be swallowed by the geo.kmh_to_knots unit
+            # bug; now that the conversion is fixed, express "static" directly.
+            speed_kn=0.0,
             role="岸海打击",
             model="鹰击-62 岸舰导弹",
             model_note="机动岸防发射营",
@@ -580,7 +583,7 @@ def _build_targets() -> List[Target]:
             # emplaced, so it is not routed on the road network.
             road_bound=False,
             waypoints=sam_route,
-            speed_kn=geo.kmh_to_knots(30.0),
+            speed_kn=0.0,
             role="要地防空",
             model="红旗-9B 远程防空导弹",
             model_note="旅属火力单元",
@@ -713,7 +716,7 @@ def _build_targets() -> List[Target]:
             # emplaced, so it is not routed on the road network.
             road_bound=False,
             waypoints=blue_sam_route,
-            speed_kn=geo.kmh_to_knots(25.0),
+            speed_kn=0.0,
             role="要地防空",
             model="爱国者-3 防空导弹",
             model_note="PAC-3 MSE 构型",
@@ -1092,7 +1095,7 @@ def _target_speed_mps(target: Target) -> float:
     card = getattr(target, "role_card", None) or {}
     motion = (card.get("effective") or {}).get("motion") or {}
     if motion.get("immobile"):
-        return target.speed_mps
+        return 0.0
     speed = motion.get("cruise_speed_ms")
     return float(speed) if speed is not None else target.speed_mps
 
