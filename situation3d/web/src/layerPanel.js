@@ -81,6 +81,17 @@
   // ------------------------------------------------------------------------
 
   /** 一行图层：复选框 + 名称 + 数量徽标 + （可展开时）箭头。 */
+  var LAYER_HINTS = {
+    layerLabels: '目标标牌：目标编号 + 具体型号的屏幕标签',
+    'overlay.focusMask': '选中掩码：压暗全图，只保留选中目标及其轨迹范围',
+    modelSensor: '传感器覆盖：按目标 sensor_range_km 绘制作用半径',
+    layerTargetPanel: '目标元数据面板：选中目标后，在右栏显示状态、意图与参数',
+    layerTracks: '历史轨迹：已发生轨迹的实线（计划虚线也归此层）',
+    'situation.relations': '目标关系：选中目标与本方/对方目标的关系线',
+    layerHotspots: '热点区域：按接触关系动态生成的热点',
+    layerRoutes: '计划航路：目标预设航路折线',
+  };
+
   function layerRow(status) {
     var row = el('div', 'lp-row');
 
@@ -94,7 +105,9 @@
       invalidate();
     });
     label.appendChild(box);
-    label.appendChild(el('span', 'lp-label', status.label));
+    var nameEl = el('span', 'lp-label', status.label);
+    if (LAYER_HINTS[status.id]) nameEl.title = LAYER_HINTS[status.id];
+    label.appendChild(nameEl);
     row.appendChild(label);
 
     // 数量徽标：`null` = 这一层没有要素列表，不显示徽标（不是显示 0）。
