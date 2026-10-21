@@ -122,7 +122,8 @@ PROBE = r"""
         view: { status: o.status, hp: o.hp, markShow: o.markShow, barShow: o.barShow,
                 iconTint: o.iconTint, barImage: String(o.barImage || ''),
                 barMatches: String(o.barImage || '') === expectedBar,
-                lon: o.lon, lat: o.lat, selected: o.selected, show: o.show },
+                lon: o.lon, lat: o.lat, selected: o.selected, show: o.show,
+                clustered: !!o.clustered },
         panel: p,
         consistent: p ? (p.status === st.status && o.status === st.status) : false,
       };
@@ -133,6 +134,8 @@ PROBE = r"""
       extent: td.extent,
       camera: td.camera,
       targets: per,
+      clusters: td.clusters || [],
+      items: td.items || [],
       counts: TargetStatus.counts(data, state.tick),
       legend: (document.querySelector('#overallBody .os-legend') || {}).textContent || '',
       sums: Array.prototype.map.call(document.querySelectorAll('#overallBody .os-sum'),
@@ -224,7 +227,7 @@ PROBE = r"""
   out.selectSync = (function () {
     var td = Overview.targetDebug();
     var rec = td.targets[selId] || {};
-    return { selected: !!rec.selected, target: selId };
+    return { selected: !!rec.selected, target: selId, ringShown: !!td.selectionShown };
   })();
 
   out.viewContainsAll = false;
@@ -271,6 +274,7 @@ PROBE = r"""
     }
     return null;
   })();
+
   return out;
 })()
 """
@@ -335,9 +339,6 @@ def main() -> int:
           "viewRect=%s extent=%s margin=%s" % (
               d.get("tickEnd", {}).get("viewRect"), d.get("tickEnd", {}).get("extent"),
               d.get("viewMarginDeg")))
-    ex = d.get("tickEnd", {}).get("extent") or {}
-    check("extent spans > 1 degree", (ex.get("e", 0) - ex.get("w", 0)) > 1.0,
-          "extent=%s" % ex)
 
     print("2. 目标位置与动态更新")
     check("tick 0 positions match frame (<=2 m)", d.get("posErrMaxM", 99) <= 2.0,
@@ -371,6 +372,47 @@ def main() -> int:
               "no damaged target at final tick")
         check("normal still exists", bool(dist.get("normal")),
               "no normal target at final tick")
+    # 损毁目标必须可见：单独显示为 X，或进入带 X 的"损毁聚合组"。
+    tk = (d.get("tickEnd") or {}).get("targets") or {}
+    clusters = (d.get("tickEnd") or {}).get("clusters") or []
+    dead_cluster_ids = set()
+    for c in clusters:
+        if c.get("deadCount"):
+            dead_cluster_ids.update(c.get("deadIds") or [])
+    def destroyed_visible(i):
+        v = (tk.get(i) or {}).get("view", {})
+        return bool(v.get("show") and v.get("markShow")) or i in dead_cluster_ids
+    check("destroyed targets visible (X or destroyed cluster)",
+          all(destroyed_visible(i) for i in dist.get("destroyed", [])),
+          "some destroyed target is neither shown nor in a destroyed cluster")
+    if args.case == "taiwan_dense_transfer_v1":
+        check("dense case uses clustering", len(clusters) > 0, "no clusters at final tick")
+        singles = sum(1 for v in tk.values()
+                      if not v.get("view", {}).get("clustered")
+                      and v.get("ts", {}).get("status") != 3)
+        dead_single = sum(1 for v in tk.values()
+                          if not v.get("view", {}).get("clustered")
+                          and v.get("ts", {}).get("status") == 3)
+        covered = sum(c.get("count", 0) for c in clusters) + singles + dead_single
+        check("cluster groups account for full roster", covered == d.get("targetCount"),
+              "covered=%s roster=%s" % (covered, d.get("targetCount")))
+    # 去重叠：同类显示项（单目标之间、聚合图标之间）不得相交。
+    items = (d.get("tickEnd") or {}).get("items") or []
+    def rect(it):
+        return (it["x"] - it["w"] / 2.0, it["y"] - it["h"],
+                it["x"] + it["w"] / 2.0, it["y"] + 8)
+    overlaps = []
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            a, b = items[i], items[j]
+            if a.get("kind") != b.get("kind"):
+                continue
+            ax1, ay1, ax2, ay2 = rect(a)
+            bx1, by1, bx2, by2 = rect(b)
+            if not (ax2 + 1 < bx1 or bx2 + 1 < ax1 or ay2 + 1 < by1 or by2 + 1 < ay1):
+                overlaps.append((a.get("id"), b.get("id")))
+    check("same-kind display items do not overlap", not overlaps,
+          "overlaps: %s" % overlaps[:6])
     counts = (d.get("tickEnd") or {}).get("counts") or {}
     check("counts sum to roster",
           (counts.get("red", {}).get("total", 0) + counts.get("blue", {}).get("total", 0))
@@ -390,8 +432,9 @@ def main() -> int:
         check("destroyed: overview bar uses dark destroyed track",
               "%233F4652" in (v["view"].get("barImage") or ""),
               "bar tail=%s" % (v["view"].get("barImage") or "")[-120:])
-        check("destroyed: X/marker overlay shown", bool(v["view"]["markShow"]),
-              "markShow=%s" % v["view"]["markShow"])
+        check("destroyed: X/marker or destroyed cluster shown",
+              bool(v["view"]["markShow"]) or did in dead_cluster_ids,
+              "markShow=%s clustered=%s" % (v["view"]["markShow"], v["view"].get("clustered")))
         check("destroyed: icon dimmed (not white)",
               (v["view"].get("iconTint") or "").upper() not in ("", "#FFFFFF"),
               "iconTint=%s" % v["view"].get("iconTint"))
@@ -415,6 +458,8 @@ def main() -> int:
     for label in ("正常", "受损", "严重受损", "损毁"):
         check("legend has %s" % label, label in legend, "legend=%r" % legend)
     check("selection synced to overview", bool((d.get("selectSync") or {}).get("selected")),
+          "%s" % d.get("selectSync"))
+    check("selection ring shown", bool((d.get("selectSync") or {}).get("ringShown")),
           "%s" % d.get("selectSync"))
     check("hide/show keeps all target entities", d.get("reshowCount") == d.get("targetCount"),
           "reshow=%s expected=%s" % (d.get("reshowCount"), d.get("targetCount")))

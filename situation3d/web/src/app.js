@@ -6497,7 +6497,6 @@ function bindUI() {
     syncHotspotImagery();
     syncOfflineDetail();
     guardFollow();
-    if (window.Overview) Overview.onMainCameraChanged();
     if (window.Places) Places.onCameraChanged(false);
     // 相机高度跨过 LOD 阈值时才重建，且加一段防抖，避免飞行过程中反复触发。
     // 跟随期间相机每帧都在动，防抖会被反复重置而**永不执行**，所以直接跳过；

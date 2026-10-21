@@ -295,26 +295,27 @@
 
   // ── 可视资产 ────────────────────────────────────────────────────────
   // Cesium 的 billboard 需要图片而不是 DOM；小面板里的 `<img>`/CSS 又更轻。
-  // 这里只为鸟瞰图生成两种 data URI：血条与损毁暗色底。
+  // 这里为鸟瞰图生成 data URI：血条、损毁暗色底、聚合图标与选中环。
   var barCache = Object.create(null);
   var markCache = Object.create(null);
 
   function colorOf(status) { return TIERS[Math.max(0, Math.min(3, status | 0))].color; }
 
-  function barUri(hp, status, w, h) {
+  function barUri(hp, status, w, h, colorStatus) {
     status = Math.max(0, Math.min(3, status | 0));
+    var cs = (colorStatus === undefined) ? status : Math.max(0, Math.min(3, colorStatus | 0));
     w = w || 22; h = h || 4;
     hp = Math.max(0, Math.min(100, hp));
     var pct = status === 3 ? 0 : hp / 100;
-    var key = status + '|' + Math.round(pct * 100) + '|' + w + 'x' + h;
+    var key = status + '|' + cs + '|' + Math.round(pct * 100) + '|' + w + 'x' + h;
     if (barCache[key]) return barCache[key];
     // 存活目标至少留 1.5 px 填充：0.1% 血量时也不能变成"看不见颜色的空条"，
     // 否则会和损毁的空槽（深色轨道 + X）混淆。
     var fillW = status === 3 ? 0 : Math.max(1.5, (w - 2) * pct);
-    var fill = colorOf(status);
+    var fill = colorOf(cs);
     // 损毁档用深色空槽，与整体TS面板的 `.os-unit.os-s3 .os-hp` 一致；
     // 血条"整条变黑且没有填充"本身就是损毁的第二个视觉信号。
-    var track = status === 3 ? '#3F4652' : '#E4E9F0';
+    var track = cs === 3 ? '#3F4652' : '#E4E9F0';
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">'
       + '<rect x="0.5" y="0.5" width="' + (w - 1) + '" height="' + (h - 1) +
         '" rx="1" fill="' + track + '" stroke="#6B7688" stroke-width="1"/>'
@@ -325,6 +326,53 @@
       + '</svg>';
     barCache[key] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     return barCache[key];
+  }
+
+  // 聚合图标：把数量**画进图标内部**，不再外挂角标——外挂标签宽度约 30px，
+  // 两个相邻聚合的标签必然互压，还会抢点击。圆形底色按阵营：
+  //   red/blue 纯色；mixed 红蓝各半；mixeddead 红蓝各半 + 右上红角；
+  //   destroyed 深灰 + 白色 X + 数量。
+  var clusterCache = Object.create(null);
+  function clusterUri(faction, count) {
+    var key = (faction || 'neutral') + '|' + (count | 0);
+    if (clusterCache[key]) return clusterCache[key];
+    var kind = (faction === 'red' || faction === 'blue' || faction === 'mixed' ||
+                faction === 'mixeddead' || faction === 'destroyed') ? faction : 'neutral';
+    var base;
+    if (kind === 'red') base = '<circle cx="17" cy="17" r="15" fill="#C0392B"/>';
+    else if (kind === 'blue') base = '<circle cx="17" cy="17" r="15" fill="#2471A3"/>';
+    else if (kind === 'destroyed') base = '<circle cx="17" cy="17" r="15" fill="#4B5563"/>';
+    else if (kind === 'mixed' || kind === 'mixeddead') {
+      base = '<circle cx="17" cy="17" r="15" fill="#2471A3"/>'
+        + '<path d="M17 2 A15 15 0 0 0 17 32 Z" fill="#C0392B"/>';
+    } else base = '<circle cx="17" cy="17" r="15" fill="#34495E"/>';
+    var corners = (kind === 'mixeddead')
+      ? '<path d="M31 2 L34 2 L34 15 Z" fill="#B91C1C"/>'
+        + '<path d="M28.5 4.5 L32 8 M32 4.5 L28.5 8" stroke="#FFFFFF" '
+        + 'stroke-width="1.8" stroke-linecap="round"/>'
+      : '';
+    var n = Math.max(1, count | 0);
+    var label = kind === 'destroyed' ? ('✕' + n) : String(n);
+    var font = label.length >= 3 ? 10 : 12;
+    var text = '<text x="17" y="21" text-anchor="middle" font-family="sans-serif" '
+      + 'font-size="' + font + '" font-weight="700" fill="#FFFFFF">' + label + '</text>';
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34">'
+      + base
+      + '<circle cx="17" cy="17" r="15" fill="none" stroke="#FFFFFF" stroke-width="2"/>'
+      + corners + text + '</svg>';
+    clusterCache[key] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    return clusterCache[key];
+  }
+
+  // 选中目标的黄色定位环：聚合图标可能压住选中目标，这个环最后绘制、永远可见。
+  var selectionCache = null;
+  function selectionUri() {
+    if (selectionCache) return selectionCache;
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40">'
+      + '<rect x="2" y="2" width="36" height="36" rx="6" fill="none" '
+      + 'stroke="#FFD24A" stroke-width="3"/></svg>';
+    selectionCache = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    return selectionCache;
   }
 
   /**
@@ -393,6 +441,8 @@
     counts: counts,
     barUri: barUri,
     markerUri: markerUri,
+    clusterUri: clusterUri,
+    selectionUri: selectionUri,
     debug: debug,
     reset: function () {
       cache.caseId = null; cache.infRef = null; cache.targetsRef = null;
