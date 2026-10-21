@@ -341,9 +341,11 @@
     ship052c: { model: './assets/models/type_052c_gunfx.glb', offset: [-49.2, 0.38, 6.0], muzzle: [-55.6, 0.38, 7.35] },
     ship054a: { model: './assets/models/type_054a_gunfx.glb', offset: [-46.34, 0, 6.95], muzzle: [-50.4, 0, 8.05] },
     tank99a: { model: './assets/models/type_99a_gunfx.glb', offset: [0.2, 0, 1.3], muzzle: [-6.4, 0, 2.35] },
+    ship071: { model: './assets/models/type_071_gunfx.glb', offset: [-80, 0, 14], muzzle: [-84, 0, 15] },
+    tankm1a2: { model: './assets/models/type_m1a2_gunfx.glb', offset: [0.8, 0, 2.2], muzzle: [-5.2, 0, 3.25] },
   };
   var proxyEnts = {};
-  var proxyRecoil = { ship052c: 0, ship054a: 0, tank99a: 0 };
+  var proxyRecoil = { ship052c: 0, ship054a: 0, tank99a: 0, ship071: 0, tankm1a2: 0 };
   var deaths = {};
 
   function proxyKey(def) {
@@ -351,6 +353,8 @@
     if (/052d|052c|luyang/i.test(text)) return 'ship052c';
     if (/054a/i.test(text)) return 'ship054a';
     if (/99a|ztz-?99/i.test(text)) return 'tank99a';
+    if (/071|yuzhao|昆仑山/i.test(text)) return 'ship071';
+    if (/m1a2/i.test(text)) return 'tankm1a2';
     return null;
   }
 
