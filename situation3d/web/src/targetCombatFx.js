@@ -35,6 +35,7 @@
   var statusCache = {};
   var origStyle = {};
   var lastStatusTick = -1;
+  var scanAngle = 0;
   var lastCameraCheck = 0;
   var visibleScanIds = 0;
 
@@ -51,6 +52,19 @@
   function apiSelected() { return ctx && ctx.api.selected ? ctx.api.selected() : null; }
   function e(id) { return ctx.api.entity ? ctx.api.entity(id) : null; }
   function sample(id) { return ctx.api.sample ? ctx.api.sample(id) : null; }
+
+  /** 按 Viewer 时钟（tickFloat 插值）取当前位置；sample() 只到整数 tick。 */
+  function currentGeo(id) {
+    var rec = e(id);
+    if (rec && rec.position) {
+      try {
+        var c = rec.position.getValue(ctx.viewer.clock.currentTime);
+        var g = Cesium.Cartographic.fromCartesian(c);
+        if (g) return { lon: Cesium.Math.toDegrees(g.longitude), lat: Cesium.Math.toDegrees(g.latitude), alt: g.height || 0 };
+      } catch (err) {}
+    }
+    return sample(id);
+  }
 
   function makeFlashImage() {
     var c = document.createElement('canvas');
@@ -191,7 +205,20 @@
     Object.keys(origStyle).forEach(function (id) { restoreStyle(id); });
   }
 
+  function clearPersistentState() {
+    Object.keys(smoke).forEach(function (id) {
+      (smoke[id].ents || []).forEach(function (ent) { ctx.viewer.entities.remove(ent); });
+    });
+    smoke = {};
+    smokeState = {};
+    destroyed = {};
+    statusCache = {};
+    lastStatusTick = -1;
+    Object.keys(origStyle).forEach(function (id) { restoreStyle(id); });
+  }
+
   function rebuildState(tick) {
+    if (!combatEnabled) { statusCache = {}; return; }
     // 回拖/跳转：按已发生的事件恢复“已损毁/受损”的持久状态，不补播瞬时特效。
     (data.events || []).forEach(function (ev) {
       if (!ev || Number(ev.tick) > tick) return;
@@ -225,12 +252,14 @@
     if (tick < lastTick || tick - lastTick > 8) {
       // 拖动/跳转：重置瞬时层，按新时刻恢复持久状态
       clearTransientLayer();
+      clearPersistentState();
       lastTick = tick;
       rebuildState(tick);
     } else {
       for (var t = lastTick + 1; t <= tick; t++) processTick(t);
       lastTick = tick;
     }
+    if (ctx.api.playing && ctx.api.playing()) scanAngle += Math.max(0, dt || 0) * 1.1;
     updateProjectiles();
     updateTransients();
     updateDamageStates(tick);
@@ -338,7 +367,7 @@
         Cesium.Cartesian3.fromDegrees(s2.lon, s2.lat, s2.alt || 0));
       var hdg = Cesium.Math.toRadians(s2.heading || 0);
       var fx = Math.sin(hdg), fy = Math.cos(hdg);
-      var dx = -off.fwd;
+      var dx = off.fwd;
       var wx = enu[0] * fx + enu[4] * fy;
       var wy = enu[1] * fx + enu[5] * fy;
       var wz = enu[2] * fx + enu[6] * fy;
@@ -355,6 +384,7 @@
   // 开火 / 命中 / 击毁
   // ------------------------------------------------------------------
   function onFire(ev) {
+    if (ctx.api.isVisible && !ctx.api.isVisible(defById[(ev.actors && ev.actors[0]) || ev.shooter_id] || {})) return;
     var shooter = (ev.actors && ev.actors[0]) || ev.shooter_id;
     if (!shooter) return;
     var m = muzzlePosition(shooter, defById[shooter]);
@@ -558,7 +588,7 @@
   function makePlumePuff(id, plume, k) {
     return ctx.viewer.entities.add({
       position: new Cesium.CallbackProperty(function () {
-        var s = sample(id);
+        var s = currentGeo(id);
         if (!s) return undefined;
         var t = apiTickFloat();
         var rise = Math.min(28, Math.max(0, t - plume.birth) * 0.35) + 3 + k * 7;
@@ -603,7 +633,7 @@
     var cam = ctx.viewer.camera.positionWC;
     Object.keys(smoke).forEach(function (id) {
       var plume = smoke[id];
-      var s = sample(id);
+      var s = currentGeo(id);
       var def = defById[id] || {};
       var on = !!(s && camH < 60000 && (ctx.api.isVisible ? ctx.api.isVisible(def) : true));
       if (on) {
@@ -666,10 +696,10 @@
   // ------------------------------------------------------------------
   function scanHierarchy() {
     if (!scan) return new Cesium.PolygonHierarchy([]);
-    var s = sample(scan.id);
+    var s = currentGeo(scan.id);
     if (!s) return new Cesium.PolygonHierarchy([]);
     var R = scan.range;
-    var ang = apiTickFloat() * 0.10;
+    var ang = scanAngle;
     var lat = s.lat, lon = s.lon;
     var alt = scan.alt || 80;
     var pts = [Cesium.Cartesian3.fromDegrees(lon, lat, alt)];
@@ -724,9 +754,9 @@
       scan.entity.ellipse.semiMajorAxis = scan.range;
       scan.entity.ellipse.semiMinorAxis = scan.range;
     }
-    var s = sample(id);
+    var s = currentGeo(id);
     if (!s) { scan.entity.show = false; return; }
-    var alt = def.domain === 'air' ? (s.alt || 0) : 80;
+    var alt = (s.alt || 0) + (def.domain === 'air' ? 0 : 40);
     scan.entity.position = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, alt);
     scan.entity.show = true;
     scan.alt = alt;

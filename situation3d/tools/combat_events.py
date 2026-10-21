@@ -46,17 +46,22 @@ def stable01(*parts):
     return int(h[:12], 16) / float(0xFFFFFFFFFFFF)
 
 
-def weapon_for(defn):
+def weapon_for(defn, target=None):
     d = str(defn.get("domain") or "").lower()
     p = str(defn.get("platform_class") or "") + str(defn.get("model") or "")
+    td = str((target or {}).get("domain") or "").lower()
     if d == "air":
         if "直升" in p or "helicopter" in p.lower():
-            return ("空地导弹", 8, 2, 18)
+            return ("空地导弹", 8, 2, 18) if td != "air" else ("空空导弹", 8, 1, 12)
         if "无人机" in p or "uav" in p.lower() or "mq" in p.lower():
-            return ("空地导弹", 9, 2, 14)
+            return ("空地导弹", 9, 2, 14) if td != "air" else None
         if "预警" in p or "aew" in p.lower():
             return None
-        return ("空空导弹", 8, 1, 18)
+        if td == "air":
+            return ("空空导弹", 8, 1, 18)
+        if td == "sea":
+            return ("空舰导弹", 10, 2, 26)
+        return ("空地导弹", 8, 2, 16)
     if d == "land":
         if "岸舰" in p or "anti" in p.lower():
             return ("岸舰导弹", 12, 3, 30)
@@ -70,6 +75,8 @@ def weapon_for(defn):
             return ("125mm 穿甲弹", 5, 1, 10)
         return None
     if d in ("sea", "naval", "maritime"):
+        if td == "air":
+            return ("舰空导弹", 8, 1, 18)
         if "补给" in p or "登陆" in p or "两栖" in p:
             return ("近防炮", 6, 1, 6)
         if "巡逻" in p or "轻护" in p or "056" in p or "沱江" in p:
@@ -155,8 +162,10 @@ def status_series(case):
             hp = 100.0
             if tot > 0 and final[i] < 100:
                 hp = 100.0 - (100.0 - final[i]) * min(1.0, expo[i] / (SETTLE_AT * tot))
+            hp = math.floor(hp * 10 + 0.5) / 10.0  # JS Math.round(hp*10)/10
             if final[i] == 0 and tot > 0 and expo[i] >= SETTLE_AT * tot:
                 hp = 0.0
+            if hp <= 0:
                 destroyed_at.setdefault(i, t)
             row[i] = round(hp, 1)
         hp_at[t] = row
@@ -164,7 +173,14 @@ def status_series(case):
 
 
 def stage_of(case, tick):
-    for ph in case.get("phases") or []:
+    phases = case.get("phases") or []
+    if phases and "first_tick" in phases[0]:
+        cur = ""
+        for ph in phases:
+            if int(ph.get("first_tick") or 0) <= tick:
+                cur = ph.get("id") or ""
+        return cur
+    for ph in phases:
         if ph.get("tick") is not None and ph.get("tick") == tick:
             return ph.get("id") or ""
     stages = case.get("stages") or []
@@ -231,7 +247,7 @@ def synth(case, include_noncombat=False):
                 d = hav_km(p[s][:2], p[tg][:2])
                 rng = float(sd.get("engage_km") or 0)
                 if rng <= 0:
-                    rng = 30.0
+                    continue
                 if d <= rng and (best is None or d < best[2]):
                     best = (s, tg, d)
             if best:
@@ -239,7 +255,7 @@ def synth(case, include_noncombat=False):
         pairs.sort(key=lambda x: x[2])
         pairs = pairs[:4]
         for s, tg, dist in pairs:
-            w = weapon_for(defs[s])
+            w = weapon_for(defs[s], defs[tg])
             if not w:
                 continue
             wname, cd, flight, dmg = w
