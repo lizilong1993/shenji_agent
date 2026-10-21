@@ -103,21 +103,6 @@
         <button type="button" class="mini" data-layer-cmd="default" title="回到首次打开时的图层状态">恢复默认</button>
       </div>
 
-      <!-- 目标过滤：阵营/域过滤器与「目标跟随」。它们**不是图层**，所以留在
-           图层面板之外 —— 混进去会让"开关"的语义变模糊（一个开关是该不该画，
-           另一个是该不该显示这一类）。 -->
-      <details class="layer-group panel-block" open>
-        <summary>目标过滤</summary>
-        <div class="domain-row">
-          <label class="check red"><input type="checkbox" id="filterRed" checked> 红方 <b id="countRed">0</b></label>
-          <label class="check blue"><input type="checkbox" id="filterBlue" checked> 蓝方 <b id="countBlue">0</b></label>
-          <label class="check"><input type="checkbox" id="filterSea" checked> 海上 <b id="countSea">0</b></label>
-          <label class="check"><input type="checkbox" id="filterLand" checked> 陆上 <b id="countLand">0</b></label>
-          <label class="check"><input type="checkbox" id="filterAir" checked> 空中 <b id="countAir">0</b></label>
-        </div>
-        <label class="check" title="第三人称斜后方跟随；取消勾选回到目标居中模式"><input type="checkbox" id="followTarget"> 目标跟随</label>
-      </details>
-
       <!-- 图层管理面板：**由 LayerRegistry 生成**，不再是写死的一堆复选框。
            在注册表里 register/unregister 一个图层，这里立刻多一行/少一行；
            每行带实时数量徽标，展开即是该层的要素列表（增删即时反映）。

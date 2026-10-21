@@ -60,7 +60,7 @@
   function signature(rows) {
     var parts = ['rev:' + LayerRegistry.revision()];
     rows.forEach(function (s) {
-      parts.push([s.group, s.id, s.desired ? 1 : 0, s.feed, s.count,
+      parts.push([s.group, s.subgroup || '', s.id, s.desired ? 1 : 0, s.feed, s.count,
                   s.expandable ? 1 : 0, expanded[s.id] ? 1 : 0].join('|'));
       if (expanded[s.id]) {
         LayerRegistry.elements(s.id).forEach(function (e) {
@@ -252,6 +252,41 @@
     return box;
   }
 
+  function appendLayerRow(host, s) {
+    host.appendChild(layerRow(s));
+    if (expanded[s.id]) {
+      var list = LayerRegistry.elements(s.id);
+      var wrap = el('div', 'lp-elems');
+      if (!list.length) {
+        wrap.appendChild(el('div', 'lp-empty', '（暂无要素）'));
+      } else {
+        list.forEach(function (it) { wrap.appendChild(elementRow(s.id, it)); });
+      }
+      host.appendChild(wrap);
+    }
+  }
+
+  /** 海/陆/空过滤：只放在目标图层条目之前。 */
+  function domainFilterRow() {
+    var wrap = el('div', 'lp-filter-row');
+    var cur = (typeof opts.getFilters === 'function') ? (opts.getFilters() || {}) : {};
+    [['sea', '海上'], ['land', '陆上'], ['air', '空中']].forEach(function (p) {
+      var lab = el('label', 'check');
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = cur[p[0]] !== false;
+      box.setAttribute('data-domain-filter', p[0]);
+      box.addEventListener('change', function () {
+        if (typeof opts.onFilter === 'function') opts.onFilter(p[0], box.checked);
+        invalidate();
+      });
+      lab.appendChild(box);
+      lab.appendChild(el('span', null, p[1]));
+      wrap.appendChild(lab);
+    });
+    return wrap;
+  }
+
   function render() {
     if (!root) return;
     // 记下滚动位置：重建会把 scrollTop 打回 0，用户展开一个要素列表就"跳回顶部"。
@@ -270,21 +305,23 @@
       var box = el('details', 'layer-group panel-block');
       box.open = true;
       box.appendChild(el('summary', null, g));
-      rows.filter(function (s) { return s.group === g; })
-        .sort(function (a, b) { return (a.z - b.z) || (a.id < b.id ? -1 : 1); })
-        .forEach(function (s) {
-          box.appendChild(layerRow(s));
-          if (expanded[s.id]) {
-            var list = LayerRegistry.elements(s.id);
-            var wrap = el('div', 'lp-elems');
-            if (!list.length) {
-              wrap.appendChild(el('div', 'lp-empty', '（暂无要素）'));
-            } else {
-              list.forEach(function (it) { wrap.appendChild(elementRow(s.id, it)); });
-            }
-            box.appendChild(wrap);
-          }
-        });
+      if (g === '目标图层') box.appendChild(domainFilterRow());
+      var groupRows = rows.filter(function (s) { return s.group === g; });
+      var direct = groupRows.filter(function (s) { return !s.subgroup; });
+      direct.sort(function (a, b) { return (a.z - b.z) || (a.id < b.id ? -1 : 1); })
+        .forEach(function (s) { appendLayerRow(box, s); });
+      var subs = {};
+      groupRows.filter(function (s) { return !!s.subgroup; }).forEach(function (s) {
+        (subs[s.subgroup] = subs[s.subgroup] || []).push(s);
+      });
+      Object.keys(subs).forEach(function (sg) {
+        var sub = el('details', 'layer-subgroup');
+        sub.open = true;
+        sub.appendChild(el('summary', null, sg));
+        subs[sg].sort(function (a, b) { return (a.z - b.z) || (a.id < b.id ? -1 : 1); })
+          .forEach(function (s) { appendLayerRow(sub, s); });
+        box.appendChild(sub);
+      });
       root.appendChild(box);
     });
 
