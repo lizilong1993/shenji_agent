@@ -123,6 +123,7 @@ class Entity:
     edges: List[dict] = field(default_factory=list)
     route_id: str = ""
     alt_m: float = 0.0
+    model: str = ""
     cum: List[float] = field(default_factory=list)
     target: object = None
 
@@ -351,6 +352,7 @@ def _vehicle_entities(net: roads.Roads, rng: random.Random,
             group="TRS", area="B", role="转运载体", cls="transport_ship",
             path=path, length_m=total, speed_mps=geo.knots_to_mps(7.0),
             loop=True, mode="sea", task="转运平台待机",
+            model="071 型船坞登陆舰",
         )
         e.cum = cum  # type: ignore[attr-defined]
         carriers[e.id] = e
@@ -375,7 +377,7 @@ def _vehicle_entities(net: roads.Roads, rng: random.Random,
         e = Entity(id=sid, kind="vessel", affiliation=aff, group="TBS",
                    area="B", role="海上巡逻", cls=cls, path=path, length_m=total,
                    speed_mps=geo.knots_to_mps(kn), loop=True, mode="sea",
-                   task="海上活动")
+                   task="海上活动", model=model)
         e.cum = cum  # type: ignore[attr-defined]
         ents.append(e)
 
@@ -402,7 +404,7 @@ def _vehicle_entities(net: roads.Roads, rng: random.Random,
         e = Entity(id=aid, kind="aircraft", affiliation=aff, group="TRA" if aff == "red" else "TBA",
                    area="B", role=role, cls=cls, path=path, length_m=total,
                    speed_mps=geo.knots_to_mps(330.0), loop=True, mode="air",
-                   alt_m=alt, task="空中活动")
+                   alt_m=alt, task="空中活动", model=model)
         e.cum = cum  # type: ignore[attr-defined]
         ents.append(e)
 
@@ -453,14 +455,14 @@ def _entity_target(e: Entity):
     from ..scenario import Target
     if e.kind == "vehicle":
         p = VEHICLE_CLASSES[e.cls]
-        name = "%s %s" % ("红方" if e.affiliation == "red" else "蓝方", p["label"])
+        name = p["model"]
         attrs = {
             "编组": e.group, "任务": e.task, "合成对象": "是",
             "车辆尺寸": "%.1f×%.1f×%.1f m" % (p["length_m"], p["width_m"], p["height_m"]),
             "数据来源": "demo_profile",
         }
         return Target(
-            target_id=e.id, name=name, platform_class=p["label"], domain="land",
+            target_id=e.id, name=name, platform_class=p["model"], domain="land",
             affiliation=e.affiliation, waypoints=[],
             speed_kn=round(geo.kmh_to_knots(p["speed_kmh"]), 1),
             role=e.role, model=p["model"], icon=p.get("legacy_icon", p["icon"]),
@@ -468,13 +470,12 @@ def _entity_target(e: Entity):
             engage_km=p["engage_km"], road_bound=True, attributes=attrs,
         )
     if e.kind == "vessel":
-        model = "071 型船坞登陆舰" if e.cls == "transport_ship" else (
-            "054A 型护卫舰" if e.cls == "frigate" else "056A 型轻型护卫舰")
+        model = e.model or ("071 型船坞登陆舰" if e.cls == "transport_ship" else
+                            ("054A 型护卫舰" if e.cls == "frigate" else "056A 型轻型护卫舰"))
         return Target(
             target_id=e.id,
-            name=("红方转运平台" if e.cls == "transport_ship" else
-                  ("红方" if e.affiliation == "red" else "蓝方") + "水面平台"),
-            platform_class=("转运平台" if e.cls == "transport_ship" else "水面平台"),
+            name=model,
+            platform_class=model,
             domain="sea", affiliation=e.affiliation, waypoints=[],
             speed_kn=round(e.speed_mps * 1.943844, 1),
             role="编队指挥" if e.cls == "transport_ship" else "近海巡逻",
@@ -483,12 +484,11 @@ def _entity_target(e: Entity):
             sensor_range_km=80.0, influence_km=40.0, engage_km=20.0,
             loop=True, attributes={"合成对象": "是", "任务": e.task},
         )
-    model = "歼-16" if e.cls == "fighter" and e.affiliation == "red" else (
-        "F-16C" if e.cls == "fighter" else ("空警-500" if e.affiliation == "red" else "E-2D"))
+    model = e.model or ("歼-16" if e.cls == "fighter" else "空警-500")
     return Target(
         target_id=e.id,
-        name=("红方" if e.affiliation == "red" else "蓝方") + ("战斗机" if e.cls == "fighter" else "预警机"),
-        platform_class="战斗机" if e.cls == "fighter" else "预警机",
+        name=model,
+        platform_class=model,
         domain="air", affiliation=e.affiliation, waypoints=[],
         speed_kn=330.0, altitude_m=e.alt_m,
         role="空中掩护" if e.cls == "fighter" else "空中警戒",
@@ -772,9 +772,9 @@ def _hotspots() -> List[dict]:
     for aid in ("D", "E", "F"):
         m = AREA_META[aid]
         w, s, e, n = m["bbox"]
-        out.append({"name": m["name"], "bbox": [round(w, 6), round(s, 6), round(e, 6), round(n, 6)],
-                    "center": [round((s + n) / 2.0, 6), round((w + e) / 2.0, 6)],
-                    "span_deg": [round(e - w, 6), round(n - s, 6)],
+        out.append({"name": m["name"], "bbox": [w, s, e, n],
+                    "center": [(s + n) / 2.0, (w + e) / 2.0],
+                    "span_deg": [round(e - w, 4), round(n - s, 4)],
                     "note": "本案例合成任务区", "kind": "area"})
     return out
 
@@ -789,7 +789,7 @@ def _objective_list(frames: Sequence[dict]) -> List[dict]:
         else:
             status = "complete" if p >= 0.75 else ("in_progress" if p > 0 else "not_started")
         out.append({
-            "id": o["id"], "name": o["name"], "lon": round(o["lon"], 6), "lat": round(o["lat"], 6),
+            "id": o["id"], "name": o["name"], "lon": o["lon"], "lat": o["lat"],
             "affiliation": o["affiliation"], "area": o["area"],
             "status": status, "progress": round(p, 2), "control": o["affiliation"],
             "depends_on": o["depends_on"],
@@ -944,7 +944,7 @@ def build_case(seed: int = 20261020) -> Tuple[dict, dict]:
         "tick_seconds": float(TICK_SECONDS),
         "tick_count": TICK_COUNT,
         "start_time_utc": START_UTC,
-        "camera": {"lon": 120.170000, "lat": 22.972000, "height": 12000.0,
+        "camera": {"lon": 120.170, "lat": 22.972, "height": 12000.0,
                    "heading": 0.0, "pitch": -60.0},
         "phases": [{"id": s[0], "name": s[1], "first_tick": s[2]} for s in STAGES],
         "stages": [{"id": s[0], "name": s[1], "start_tick": s[2], "end_tick": s[3]}
