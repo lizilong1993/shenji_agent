@@ -218,7 +218,7 @@
         name: def.name || def.id,
         position: Cesium.Cartesian3.fromDegrees(0, 0, 0),
         billboard: {
-          image: Symbology.symbolUri(def.icon, def.affiliation, {}),
+          image: Symbology.symbolUri(def.icon, def.affiliation, { domain: def.domain }),
           width: ICON_PX, height: ICON_PX,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, ICON_OFFSET_Y),
@@ -342,7 +342,8 @@
     Object.keys(targetEnts).forEach(function (tid) {
       const rec = targetEnts[tid];
       rec.icon.billboard.image = Symbology.symbolUri(
-        rec.def.icon, rec.def.affiliation, { selected: tid === selected });
+        rec.def.icon, rec.def.affiliation,
+        { selected: tid === selected, domain: rec.def.domain });
     });
     viewer.scene.requestRender();
   }

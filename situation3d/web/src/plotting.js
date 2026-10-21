@@ -1916,6 +1916,9 @@
                         Math.max.apply(null, lats) - Math.min.apply(null, lats));
     // 跨度 → 视高：经验值，够用即可（标绘通常几公里到几百公里）
     var h = Math.max(30000, Math.min(3000000, span * 111000 * 6));
+    // 选中目标时相机被 lookAt 锁在目标 ENU 上；不解绑的话 flyTo 会保存并恢复
+    // 该 transform，镜头被目标 rig 每帧拽回。
+    if (window.Follow && window.Follow.isActive()) window.Follow.detach('标绘定位');
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(lon, lat, h),
       duration: 0.8,

@@ -193,12 +193,12 @@
         var rep = items[0];
         return '<div class="os-row">'
           + '<span class="os-fam">'
-          + '<img class="os-fam-ico" src="' + Symbology.symbolUri(rep.icon, aff, {}) + '" alt="">'
+          + '<img class="os-fam-ico" src="' + Symbology.symbolUri(rep.icon, aff, { domain: rep.domain }) + '" alt="">'
           + esc(f) + '</span>'
           + '<span class="os-icons">'
           + items.map(function (t) {
               return '<span class="os-unit os-s0" data-target="' + esc(t.id) + '">'
-                + '<img class="os-icon" src="' + Symbology.symbolUri(t.icon, aff, {}) + '"'
+                + '<img class="os-icon" src="' + Symbology.symbolUri(t.icon, aff, { domain: t.domain }) + '"'
                 + ' alt="' + esc(t.id) + '">'
                 + '<span class="os-hp"><b></b></span>'
                 + '</span>';
@@ -364,7 +364,7 @@
     }
 
     var html = '<div class="ts-head">'
-      + '<img class="ts-sym" src=' + JSON.stringify(Symbology.symbolUri(def.icon, def.affiliation, {})) + ' alt="">'
+      + '<img class="ts-sym" src=' + JSON.stringify(Symbology.symbolUri(def.icon, def.affiliation, { domain: def.domain })) + ' alt="">'
       + '<div class="ts-id"><b>' + esc(def.id) + '</b>'
       + '<span>' + esc(def.name) + '</span></div></div>';
 

@@ -34,6 +34,10 @@
   const MILSYMBOL_EXPECTED = '3.0.4';
   const ASSET_BASE = './assets/symbols/';
   let useAssets = true;
+  // manifest 里有资产的图标集合。目录（engine/symbology.py 或 base.json）可能出现
+  // **没有对应资产**的键（例如别的分支加过的图标），那种键不能算"已知"，
+  // 否则 billboard 会指向 404 的 SVG，页面上是空白且不报错。
+  let assetIconSet = null;
   let assetManifest = null;
 
   // 与 engine/symbology.py 的 AFFILIATIONS 保持一致；这里的值只在数据集
@@ -189,6 +193,26 @@
       { d: 'M22,40 L22,33 L32,26 L42,33 L42,40 Z', fill: true },
       { d: 'M30,40 L30,35 L34,35 L34,40' },
     ],
+    // 大类兜底（新目标没有专属图标时按域落到这里）
+    generic_sea: [
+      { d: 'M20,35 L44,35 L40,40 L24,40 Z', fill: true },
+      { d: 'M32,35 L32,27' },
+      { d: 'M26,40 L38,40' },
+    ],
+    generic_land: [
+      { d: 'M24,26 L40,40' },
+      { d: 'M40,26 L24,40' },
+      { d: 'M23,27 L27,23' },
+      { d: 'M37,23 L41,27' },
+    ],
+    generic_air: [
+      { d: 'M32,24 L44,40 L32,36 L20,40 Z', fill: true },
+    ],
+    unknown: [
+      { c: [32, 34, 4], fill: false },
+      { d: 'M28.5,30 C28.5,27 35.5,27 35.5,30 C35.5,32.5 32,32.5 32,35' },
+      { c: [32, 39, 1], fill: true },
+    ],
   };
 
   const UNKNOWN_GLYPH = [
@@ -196,16 +220,35 @@
     { d: 'M32,40 L32,40.5' },
   ];
 
+  // 专属图标 → 大类（按域）→ unknown。目录里没有的键**不能画空白**：
+  // 新目标只来得及写 domain 时，就落到 generic_sea / generic_land / generic_air。
+  const GENERIC_BY_DOMAIN = { sea: 'generic_sea', land: 'generic_land', air: 'generic_air' };
+
+  function isKnownIcon(icon) {
+    if (!icon) return false;
+    // 用静态资产时**必须有资产**才算已知：只存在于目录里的键会渲染成空图。
+    if (useAssets && assetIconSet) return assetIconSet.has(icon);
+    if (Object.prototype.hasOwnProperty.call(ICONS, icon)) return true;
+    return Object.prototype.hasOwnProperty.call(GLYPHS, icon);
+  }
+
+  function resolveIcon(icon, domain) {
+    if (isKnownIcon(icon)) return icon;
+    const g = GENERIC_BY_DOMAIN[domain];
+    if (g && isKnownIcon(g)) return g;
+    return 'unknown';
+  }
+
   function affiliationOf(key) {
     return AFFILIATIONS[key] || FALLBACK_AFFILIATIONS[key] || {
       color: '#6b7688', ink: '#3b434f', label: '未知',
     };
   }
 
-  function domainOf(icon) {
+  function domainOf(icon, fallback) {
     const meta = ICONS[icon];
     if (meta && meta.domain) return meta.domain;
-    return 'land';
+    return fallback || 'land';
   }
 
   function pathEl(item, color) {
@@ -230,10 +273,11 @@
    */
   function symbolSvg(icon, affiliation, opts) {
     opts = opts || {};
+    icon = resolveIcon(icon, opts.domain);
     const aff = affiliationOf(affiliation);
     const frame = aff.color;
     const ink = '#ffffff';
-    const domain = domainOf(icon);
+    const domain = domainOf(icon, opts.domain);
     const glyph = GLYPHS[icon] || UNKNOWN_GLYPH;
     // 帧形由对抗关系决定：友方矩形、敌方尖角菱形（见 framePath 的说明）。
     const fp = framePath(affiliation);
@@ -301,11 +345,16 @@
    * 直接用；缓存也随之变成"路径查询"，比编码 SVG 便宜得多。
    */
   function assetUri(icon, affiliation, opts) {
+    opts = opts || {};
+    icon = resolveIcon(icon, opts.domain);
     return ASSET_BASE + icon + '_' + affiliation + (opts.selected ? '_sel' : '') + '.svg';
   }
 
   function symbolUri(icon, affiliation, opts) {
+    // 兼容两种调用：`symbolUri(icon, aff, 'air')` 与 `symbolUri(icon, aff, {domain:'air'})`。
+    if (typeof opts === 'string') opts = { domain: opts };
     opts = opts || {};
+    icon = resolveIcon(icon, opts.domain);
     if (useAssets) return assetUri(icon, affiliation, opts);
     const key = icon + '|' + affiliation + '|' + (opts.selected ? 1 : 0) + '|' + (opts.dim ? 1 : 0);
     let uri = cache.get(key);
@@ -335,6 +384,11 @@
       .then(function (m) {
         assetManifest = m;
         useAssets = true;
+        assetIconSet = new Set();
+        Object.keys((m && m.symbols) || {}).forEach(function (k) {
+          var mm = /^(.+)_(red|blue)(?:_sel)?$/.exec(k);
+          if (mm) assetIconSet.add(mm[1]);
+        });
         // 版本对不上说明产物不是当前 milsymbol 生成的，仍可用但要留痕。
         if (m && m.milsymbol && m.milsymbol !== MILSYMBOL_EXPECTED) {
           console.warn('[symbology] 符号资产由 milsymbol ' + m.milsymbol +
@@ -359,6 +413,7 @@
   /** 手动切换资产/兜底模式（verifyAssets 会自己调；测试与诊断也用它）。 */
   function setAssetMode(on) {
     useAssets = !!on;
+    if (!useAssets) assetIconSet = null;
     cache.clear();
   }
 
@@ -375,13 +430,13 @@
     return DOMAINS[domain] || domain || '未知';
   }
 
-  function iconLabel(icon) {
-    const meta = ICONS[icon];
+  function iconLabel(icon, domain) {
+    const meta = ICONS[resolveIcon(icon, domain)];
     return meta ? meta.label : '未知目标';
   }
 
-  function iconAbbrev(icon) {
-    const meta = ICONS[icon];
+  function iconAbbrev(icon, domain) {
+    const meta = ICONS[resolveIcon(icon, domain)];
     return meta ? meta.abbrev : 'UNK';
   }
 
@@ -397,6 +452,8 @@
     iconAbbrev: iconAbbrev,
     domainLabel: domainLabel,
     domainOf: domainOf,
+    resolveIcon: resolveIcon,
+    GENERIC_BY_DOMAIN: GENERIC_BY_DOMAIN,
     affiliationOf: affiliationOf,
   };
 })(window);

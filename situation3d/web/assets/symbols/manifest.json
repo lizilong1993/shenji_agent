@@ -115,6 +115,48 @@
       "sidc": "10063000001202040000",
       "viewBoxSize": "188"
     },
+    "generic_air_blue": {
+      "affiliation": "blue",
+      "icon": "generic_air",
+      "selectedVariant": "generic_air_blue_sel.svg",
+      "sidc": "10030100001101040000",
+      "viewBoxSize": "164"
+    },
+    "generic_air_red": {
+      "affiliation": "red",
+      "icon": "generic_air",
+      "selectedVariant": "generic_air_red_sel.svg",
+      "sidc": "10060100001101040000",
+      "viewBoxSize": "174"
+    },
+    "generic_land_blue": {
+      "affiliation": "blue",
+      "icon": "generic_land",
+      "selectedVariant": "generic_land_blue_sel.svg",
+      "sidc": "10031000001205000000",
+      "viewBoxSize": "194"
+    },
+    "generic_land_red": {
+      "affiliation": "red",
+      "icon": "generic_land",
+      "selectedVariant": "generic_land_red_sel.svg",
+      "sidc": "10061000001205000000",
+      "viewBoxSize": "188"
+    },
+    "generic_sea_blue": {
+      "affiliation": "blue",
+      "icon": "generic_sea",
+      "selectedVariant": "generic_sea_blue_sel.svg",
+      "sidc": "10033000001202030000",
+      "viewBoxSize": "164"
+    },
+    "generic_sea_red": {
+      "affiliation": "red",
+      "icon": "generic_sea",
+      "selectedVariant": "generic_sea_red_sel.svg",
+      "sidc": "10063000001202030000",
+      "viewBoxSize": "188"
+    },
     "helicopter_blue": {
       "affiliation": "blue",
       "icon": "helicopter",
@@ -212,6 +254,20 @@
       "selectedVariant": "uav_red_sel.svg",
       "sidc": "10060100001102000000",
       "viewBoxSize": "174"
+    },
+    "unknown_blue": {
+      "affiliation": "blue",
+      "icon": "unknown",
+      "selectedVariant": "unknown_blue_sel.svg",
+      "sidc": "10031000001205000000",
+      "viewBoxSize": "194"
+    },
+    "unknown_red": {
+      "affiliation": "red",
+      "icon": "unknown",
+      "selectedVariant": "unknown_red_sel.svg",
+      "sidc": "10061000001205000000",
+      "viewBoxSize": "188"
     }
   }
 }
