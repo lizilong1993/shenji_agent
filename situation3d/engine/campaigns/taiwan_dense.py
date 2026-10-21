@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 from .. import geo, roads, symbology
 
 CASE_ID = "taiwan_dense_transfer_v1"
-CASE_NAME = "登台2"
+CASE_NAME = "台海方向多域态势演化与岸海衔接（虚构演示）"
 CASE_DESC = ("红蓝两组合成对象在真实海岸与路网上的转运、衔接、保障与观测演示；"
              "任务进度受对象可用性、道路可达性和保障状态约束。")
 THEATRE = "taiwan_strait"
@@ -340,8 +340,10 @@ def _vehicle_entities(net: roads.Roads, rng: random.Random,
     # Carriers: four synthetic transfer platforms offshore, slow loops.
     for i in range(4):
         base_lat = 22.962 + i * 0.004
-        path = [(base_lat, 120.132), (base_lat + 0.004, 120.128),
-                (base_lat + 0.006, 120.133), (base_lat + 0.002, 120.137)]
+        # Keep transfer platforms in open water west of the Anping coastline;
+        # the earlier 120.13x loop sat over the fish-pond belt.
+        path = [(base_lat, 120.095), (base_lat + 0.004, 120.091),
+                (base_lat + 0.006, 120.096), (base_lat + 0.002, 120.099)]
         path = path + [path[0]]
         cum, total = _cum_path(path)
         e = Entity(
@@ -356,14 +358,14 @@ def _vehicle_entities(net: roads.Roads, rng: random.Random,
 
     # Red escorts and blue surface group.
     ship_specs = [
-        ("TRS005", "red", "frigate", "054A 型护卫舰", 22.945, 120.120, 10.0),
-        ("TRS006", "red", "corvette", "056A 型轻型护卫舰", 22.930, 120.128, 12.0),
-        ("TBS001", "blue", "frigate", "成功级护卫舰", 22.955, 120.108, 10.0),
-        ("TBS002", "blue", "frigate", "成功级护卫舰", 22.940, 120.115, 11.0),
-        ("TBS003", "blue", "corvette", "沱江级巡逻舰", 22.925, 120.120, 14.0),
-        ("TBS004", "blue", "corvette", "沱江级巡逻舰", 22.972, 120.115, 13.0),
-        ("TBS005", "blue", "frigate", "成功级护卫舰", 22.985, 120.120, 9.0),
-        ("TBS006", "blue", "corvette", "沱江级巡逻舰", 22.998, 120.126, 12.0),
+        ("TRS005", "red", "frigate", "054A 型护卫舰", 22.945, 120.085, 10.0),
+        ("TRS006", "red", "corvette", "056A 型轻型护卫舰", 22.930, 120.093, 12.0),
+        ("TBS001", "blue", "frigate", "成功级护卫舰", 22.955, 120.075, 10.0),
+        ("TBS002", "blue", "frigate", "成功级护卫舰", 22.940, 120.082, 11.0),
+        ("TBS003", "blue", "corvette", "沱江级巡逻舰", 22.925, 120.088, 14.0),
+        ("TBS004", "blue", "corvette", "沱江级巡逻舰", 22.972, 120.082, 13.0),
+        ("TBS005", "blue", "frigate", "成功级护卫舰", 22.985, 120.086, 9.0),
+        ("TBS006", "blue", "corvette", "沱江级巡逻舰", 22.998, 120.092, 12.0),
     ]
     for sid, aff, cls, model, lat, lon, kn in ship_specs:
         path = [(lat, lon), (lat + 0.006, lon - 0.004),
@@ -387,10 +389,14 @@ def _vehicle_entities(net: roads.Roads, rng: random.Random,
                 ("aew", "E-2D", "空中警戒", 6200.0)]):
             air_specs.append((aff, prefix + "%03d" % (j + 1), cls, model, role, alt))
     for aff, aid, cls, model, role, alt in air_specs:
-        lat = 22.955 + (0.008 if aff == "red" else 0.000)
-        lon = 120.105 + (0.010 if cls == "aew" else 0.0)
-        path = [(lat, lon), (lat + 0.018, lon + 0.020),
-                (lat + 0.004, lon + 0.040), (lat - 0.012, lon + 0.018)]
+        # Real-sized patrol circuits (~40-60 km legs), not a 3 km local loop.
+        # Red orbits over the northern strait, blue over the southern approach.
+        if aff == "red":
+            base = [(22.92, 119.92), (23.18, 120.02), (23.02, 120.30), (22.76, 120.08)]
+        else:
+            base = [(22.62, 120.00), (22.90, 120.14), (22.72, 120.40), (22.48, 120.12)]
+        j = int(aid[-3:]) - 1
+        path = [(la + 0.010 * (j % 2), lo + 0.010 * (j // 2)) for la, lo in base]
         path = path + [path[0]]
         cum, total = _cum_path(path)
         e = Entity(id=aid, kind="aircraft", affiliation=aff, group="TRA" if aff == "red" else "TBA",
@@ -766,9 +772,9 @@ def _hotspots() -> List[dict]:
     for aid in ("D", "E", "F"):
         m = AREA_META[aid]
         w, s, e, n = m["bbox"]
-        out.append({"name": m["name"], "bbox": [w, s, e, n],
-                    "center": [(s + n) / 2.0, (w + e) / 2.0],
-                    "span_deg": [round(e - w, 4), round(n - s, 4)],
+        out.append({"name": m["name"], "bbox": [round(w, 6), round(s, 6), round(e, 6), round(n, 6)],
+                    "center": [round((s + n) / 2.0, 6), round((w + e) / 2.0, 6)],
+                    "span_deg": [round(e - w, 6), round(n - s, 6)],
                     "note": "本案例合成任务区", "kind": "area"})
     return out
 
@@ -783,7 +789,7 @@ def _objective_list(frames: Sequence[dict]) -> List[dict]:
         else:
             status = "complete" if p >= 0.75 else ("in_progress" if p > 0 else "not_started")
         out.append({
-            "id": o["id"], "name": o["name"], "lon": o["lon"], "lat": o["lat"],
+            "id": o["id"], "name": o["name"], "lon": round(o["lon"], 6), "lat": round(o["lat"], 6),
             "affiliation": o["affiliation"], "area": o["area"],
             "status": status, "progress": round(p, 2), "control": o["affiliation"],
             "depends_on": o["depends_on"],
@@ -938,7 +944,7 @@ def build_case(seed: int = 20261020) -> Tuple[dict, dict]:
         "tick_seconds": float(TICK_SECONDS),
         "tick_count": TICK_COUNT,
         "start_time_utc": START_UTC,
-        "camera": {"lon": 120.170, "lat": 22.972, "height": 12000.0,
+        "camera": {"lon": 120.170000, "lat": 22.972000, "height": 12000.0,
                    "heading": 0.0, "pitch": -60.0},
         "phases": [{"id": s[0], "name": s[1], "first_tick": s[2]} for s in STAGES],
         "stages": [{"id": s[0], "name": s[1], "start_tick": s[2], "end_tick": s[3]}

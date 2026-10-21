@@ -641,7 +641,7 @@
            '  layers ' + viewer.imageryLayers.length +
            '  canvas ' + c.width + 'x' + c.height +
            '  extent ' + (extent
-             ? [extent.w, extent.s, extent.e, extent.n].map(function (v) { return v.toFixed(2); }).join(',')
+             ? [extent.w, extent.s, extent.e, extent.n].map(function (v) { return v.toFixed(6); }).join(',')
              : '—') +
            '  visible ' + isVisible();
   }
