@@ -269,14 +269,18 @@
         { node: 'yj62_tube2', axis: 'Y', pivot: [3.0, 1.35, 3.35], lift: true },
       ],
     },
+    m1a2: {
+      parts: [{ node: 'Object_7', axis: 'X', recoil: true }],
+    },
   };
-  var rigAngles = { z10: 0, hq16: 0, yj62: 0 };
+  var rigAngles = { z10: 0, hq16: 0, yj62: 0, m1a2: 0 };
 
   function rigKey(def) {
     var text = ((def && def.model) || '') + ' ' + ((def && def.platform_class) || '');
     if (/直-?10|z-?10/i.test(text)) return 'z10';
     if (/红旗-?16|hq-?16|ly-?80/i.test(text)) return 'hq16';
     if (/鹰击-?62|yj-?62/i.test(text)) return 'yj62';
+    if (/m1a2/i.test(text)) return 'm1a2';
     return null;
   }
 
@@ -298,13 +302,21 @@
     var out = {};
     RIGS[key].parts.forEach(function (part) {
       var axis = axisOf(part.axis);
+      if (part.recoil) {
+        out[part.node] = new Cesium.NodeTransformationProperty({
+          translation: new Cesium.CallbackProperty(function () {
+            return new Cesium.Cartesian3(rigAngles[key], 0, 0);
+          }, false),
+        });
+        return;
+      }
       out[part.node] = new Cesium.NodeTransformationProperty({
         rotation: new Cesium.CallbackProperty(function () {
-          var a = part.lift ? -rigAngles.yj62 : rigAngles[key];
+          var a = part.lift ? -rigAngles.yj62 : (part.sweep ? rigAngles[key] : rigAngles[key]);
           return Cesium.Quaternion.fromAxisAngle(axis, a, new Cesium.Quaternion());
         }, false),
         translation: new Cesium.CallbackProperty(function () {
-          var a = part.lift ? -rigAngles.yj62 : rigAngles[key];
+          var a = part.lift ? -rigAngles.yj62 : (part.sweep ? rigAngles[key] : rigAngles[key]);
           var q = Cesium.Quaternion.fromAxisAngle(axis, a, new Cesium.Quaternion());
           return pivotTranslation(part.pivot, q);
         }, false),
@@ -335,6 +347,7 @@
       rigAngles.z10 = (rigAngles.z10 + d * 9.0) % (Math.PI * 2);
       rigAngles.hq16 = (rigAngles.hq16 + d * 0.9) % (Math.PI * 2);
       rigAngles.yj62 = Math.max(0, rigAngles.yj62 - d * 0.18);
+      rigAngles.m1a2 = Math.max(0, rigAngles.m1a2 - d * 0.9);
     }
     updateProjectiles();
     updateTransients();
@@ -461,7 +474,11 @@
   // ------------------------------------------------------------------
   function onFire(ev) {
     var shooterDef = defById[(ev.actors && ev.actors[0]) || ev.shooter_id];
-    if (shooterDef && rigKey(shooterDef) === 'yj62') rigAngles.yj62 = 0.22;
+    if (shooterDef) {
+      var rk = rigKey(shooterDef);
+      if (rk === 'yj62') rigAngles.yj62 = 0.22;
+      else if (rk === 'm1a2') rigAngles.m1a2 = 0.35;
+    }
     if (ctx.api.isVisible && !ctx.api.isVisible(defById[(ev.actors && ev.actors[0]) || ev.shooter_id] || {})) return;
     var shooter = (ev.actors && ev.actors[0]) || ev.shooter_id;
     if (!shooter) return;
