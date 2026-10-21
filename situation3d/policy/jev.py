@@ -94,6 +94,69 @@ class HttpJevClient(object):
                               raw=data)
 
 
+class LocalOpenJevClient(object):
+    """Runs an openjev/Qwen sequence-classification checkpoint on CPU/GPU.
+
+    Each option is scored as an NLI hypothesis against the state; the
+    entailment probabilities are normalised over options.  The model is
+    loaded lazily so importing this module never requires torch.
+    """
+
+    def __init__(self, model_path: str, device: str = "cpu",
+                 entailment_label: str = "entailment", max_options: int = 8):
+        self.model_path = model_path
+        self.device = device
+        self.entailment_label = entailment_label
+        self.max_options = max_options
+        self.last_latency_s = None
+        self._model = None
+        self._tok = None
+        self._ent_idx = None
+        self._template = "Premise: {premise}\nHypothesis: {hypothesis}"
+
+    def _load(self):
+        if self._model is not None:
+            return
+        import torch
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
+        self._tok = AutoTokenizer.from_pretrained(self.model_path)
+        self._model = AutoModelForSequenceClassification.from_pretrained(self.model_path)
+        self._model.to(self.device).eval()
+        id2label = getattr(self._model.config, "id2label", {}) or {}
+        inv = {str(v).lower(): int(k) for k, v in id2label.items()}
+        self._ent_idx = inv.get(self.entailment_label, 1)
+        self._template = getattr(self._model.config, "nli_template", self._template)
+
+    def decide(self, request: DecisionRequest) -> DecisionAnswer:
+        import time
+        import torch
+        self._load()
+        q = request.questions[0]
+        options = list(q.options)[:self.max_options]
+        if not options:
+            return DecisionAnswer(probabilities={})
+        premise = request.state + "\nQuestion: " + q.instructions
+        texts = [self._template.format(premise=premise,
+                                       hypothesis="The chosen action is: " + opt)
+                 for opt in options]
+        t0 = time.perf_counter()
+        probs = []
+        with torch.no_grad():
+            for text in texts:
+                # One option per forward: CPU batching on this architecture is
+                # slower than sequential short sequences.
+                batch = self._tok(text, return_tensors="pt", truncation=True,
+                                  max_length=64)
+                batch = {k: v.to(self.device) for k, v in batch.items()}
+                logits = self._model(**batch).logits
+                probs.append(float(torch.softmax(logits, dim=-1)[0, self._ent_idx]))
+        self.last_latency_s = time.perf_counter() - t0
+        total = sum(probs) or 1.0
+        return DecisionAnswer(probabilities={opt: float(p / total)
+                                             for opt, p in zip(options, probs)},
+                              confidence=float(max(probs) / total))
+
+
 class MockJevClient(object):
     """Deterministic stand-in: prefers options containing given keywords."""
 
@@ -144,6 +207,32 @@ def summarize_observation(observation: dict, seat: int) -> str:
         lines.append("objective %s owner=%s value=%s" % (
             _sanitize(obj.get("name", "?")), obj.get("owner", "?"),
             obj.get("value", "?")))
+    return "\n".join(lines)
+
+
+def summarize_entity(observation: dict, seat: int, uid: int) -> str:
+    """Compact per-entity state (own unit + up to 3 nearest enemies)."""
+    own = None
+    enemies = []
+    for entity in observation.get("entities", []):
+        if entity.get("id") == uid:
+            own = entity
+        elif entity.get("affiliation") != seat:
+            enemies.append(entity)
+    lines = ["Time: %.1f s" % float(observation.get("time_s", 0.0))]
+    if own is not None:
+        lines.append("own unit %s %s at %s hp=%s speed=%.1f" % (
+            own.get("id"), _sanitize(own.get("unit_kind", "unit")),
+            _fmt_pos(own.get("pos") or {}), own.get("blood", "?"),
+            float(own.get("speed_ms", 0.0))))
+    # Keep the prompt short: only 3 contacts, nearest first.
+    enemies.sort(key=lambda e: _fmt_pos(e.get("pos") or {}))
+    for entity in enemies[:2]:
+        lines.append("enemy unit %s %s at %s hp=%s" % (
+            entity.get("id"), _sanitize(entity.get("unit_kind", "unit")),
+            _fmt_pos(entity.get("pos") or {}), entity.get("blood", "?")))
+    for obj in observation.get("objectives", [])[:2]:
+        lines.append("objective owner=%s" % (obj.get("owner", "?"),))
     return "\n".join(lines)
 
 
@@ -201,13 +290,14 @@ class JevPolicy(object):
         return candidates[0].action
 
     def choose(self, observation: dict, seat: int,
-               candidates: Optional[List[Candidate]] = None) -> Optional[dict]:
+               candidates: Optional[List[Candidate]] = None,
+               state: Optional[str] = None) -> Optional[dict]:
         candidates = candidates if candidates is not None else build_candidates(observation, seat)
         if not candidates:
             return None
         if self.client is None:
             return self._fallback(candidates)
-        state = summarize_observation(observation, seat)
+        state = state or summarize_observation(observation, seat)
         labels = [c.label for c in candidates]
         request = DecisionRequest(
             state=state,

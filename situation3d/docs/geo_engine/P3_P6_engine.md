@@ -77,7 +77,7 @@ CZML 22 packets, observation 12 KB
 
 ## 6. 已知限制（后续工作）
 
-1. **P1 数据**：已完成在线（Overpass/Terrarium）/离线（共享缓存）双路径构建与运行时 `EnvPackEnvironment`，详见 `P1_data_pipeline.md`；当前 OSM 在线链路不可达、图层为 JSON 而非 COG/FlatGeobuf，水深仍为演示值。
+1. **P1 数据**：已完成在线（Overpass/Terrarium）/离线（共享缓存）双路径构建与运行时 `EnvPackEnvironment`，详见 `P1_data_pipeline.md`；在线 OSM/DEM 已验证（经本机 Clash 反向隧道），离线回放图层哈希一致；图层为 JSON 而非 COG/FlatGeobuf，水深仍为演示值。
 2. **规则空白**：间瞄计划/校射/散布、雷场/路障/工事、导弹飞行段、制导/引导射击、压制恢复细化尚未实现；间接火力武器只有表数据。
 3. **桥梁/隧道/航道宽度**：basic.json 无承载/净空/宽度字段，通行谓词未覆盖。
 4. **传感器/海空武器**：参数为 MVP 合成值，未标定真实型号。

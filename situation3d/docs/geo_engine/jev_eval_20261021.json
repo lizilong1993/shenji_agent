@@ -1,0 +1,44 @@
+{
+ "seed": 20261021,
+ "model": "/tmp/jev_model/qwen3.5-0.8b-nli-v2s-long",
+ "results": {
+  "heuristic": {
+   "policy": "heuristic",
+   "ticks": 96,
+   "decisions": 8,
+   "actions_applied": 6,
+   "red_alive": 2,
+   "blue_alive": 0,
+   "red_blood": 5,
+   "blue_blood": 0,
+   "objectives": {
+    "(10, 20)": 0,
+    "(20, 10)": 1
+   },
+   "events": 11,
+   "direct_fire": 5,
+   "destroyed": 2,
+   "decision_latency_ms": null,
+   "decision_latency_max_ms": null
+  },
+  "jev": {
+   "policy": "jev",
+   "ticks": 96,
+   "decisions": 8,
+   "actions_applied": 16,
+   "red_alive": 2,
+   "blue_alive": 1,
+   "red_blood": 4,
+   "blue_blood": 1,
+   "objectives": {
+    "(10, 20)": 0,
+    "(20, 10)": 1
+   },
+   "events": 14,
+   "direct_fire": 9,
+   "destroyed": 1,
+   "decision_latency_ms": 7511.3,
+   "decision_latency_max_ms": 10385.4
+  }
+ }
+}

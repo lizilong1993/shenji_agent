@@ -40,6 +40,40 @@ def _bbox(ring):
     return min(xs), min(ys), max(xs), max(ys)
 
 
+class _SpatialIndex(object):
+    """Coarse lon/lat bucket index for polygons/edges (stdlib only)."""
+
+    def __init__(self, cell_deg: float = 0.01):
+        self.cell = float(cell_deg)
+        self.buckets = {}
+
+    def _range(self, x0, y0, x1, y1):
+        ix0, ix1 = int(math.floor(x0 / self.cell)), int(math.floor(x1 / self.cell))
+        iy0, iy1 = int(math.floor(y0 / self.cell)), int(math.floor(y1 / self.cell))
+        for ix in range(ix0, ix1 + 1):
+            for iy in range(iy0, iy1 + 1):
+                yield (ix, iy)
+
+    def add(self, item, bbox):
+        for key in self._range(*bbox):
+            self.buckets.setdefault(key, []).append(item)
+
+    def query(self, lon, lat):
+        return self.buckets.get((int(math.floor(lon / self.cell)),
+                                 int(math.floor(lat / self.cell))), ())
+
+    def query_bbox(self, x0, y0, x1, y1):
+        seen = set()
+        out = []
+        for key in self._range(x0, y0, x1, y1):
+            for item in self.buckets.get(key, ()):
+                if id(item) in seen:
+                    continue
+                seen.add(id(item))
+                out.append(item)
+        return out
+
+
 class EnvPackEnvironment(object):
     def __init__(self, root: str):
         self.root = root
@@ -60,6 +94,24 @@ class EnvPackEnvironment(object):
                     item["_bbox"] = _bbox(ring)
                     kept.append(item)
             layer[:] = kept
+        self._landcover_index = _SpatialIndex()
+        self._water_index = _SpatialIndex()
+        self._building_index = _SpatialIndex()
+        for item in self._landcover:
+            self._landcover_index.add(item, item["_bbox"])
+        for item in self._water:
+            self._water_index.add(item, item["_bbox"])
+        for item in self._buildings:
+            self._building_index.add(item, item["_bbox"])
+        self._road_index = _SpatialIndex(0.02)
+        nodes = (self._roads.get("nodes") or {})
+        for edge in self._roads.get("edges") or []:
+            pa, pb = nodes.get(edge["a"]), nodes.get(edge["b"])
+            if not pa or not pb:
+                continue
+            edge["_bbox"] = (min(pa[0], pb[0]), min(pa[1], pb[1]),
+                             max(pa[0], pb[0]), max(pa[1], pb[1]))
+            self._road_index.add(edge, edge["_bbox"])
         self._basic = None
         fallback = self.manifest.get("fallback_basic_json")
         if fallback and os.path.isfile(os.path.join(root, fallback)):
@@ -136,7 +188,11 @@ class EnvPackEnvironment(object):
 
     # -- polygons ----------------------------------------------------------
     def _polygon_at(self, items, lon, lat):
-        for item in items:
+        if isinstance(items, _SpatialIndex):
+            candidates = items.query(lon, lat)
+        else:
+            candidates = items
+        for item in candidates:
             x0, y0, x1, y1 = item.get("_bbox") or _bbox(item.get("ring") or [[0, 0]])
             if lon < x0 or lon > x1 or lat < y0 or lat > y1:
                 continue
@@ -148,10 +204,10 @@ class EnvPackEnvironment(object):
         key = (round(lon, 5), round(lat, 5))
         if key in self._landcover_cache:
             return self._landcover_cache[key]
-        if self._polygon_at(self._water, lon, lat) is not None:
+        if self._polygon_at(self._water_index, lon, lat) is not None:
             value = LandCover.WATER
         else:
-            item = self._polygon_at(self._landcover, lon, lat)
+            item = self._polygon_at(self._landcover_index, lon, lat)
             if item is not None:
                 value = item.get("class") or LandCover.OPEN
             elif self._basic_env is not None:
@@ -165,7 +221,7 @@ class EnvPackEnvironment(object):
         key = (round(lon, 5), round(lat, 5))
         if key in self._water_cache:
             return self._water_cache[key]
-        item = self._polygon_at(self._water, lon, lat)
+        item = self._polygon_at(self._water_index, lon, lat)
         if item is not None:
             depth = self.layers.get("water", {}).get("depth_m", 20.0)
             value = float(item.get("depth_m") or depth)
@@ -180,7 +236,7 @@ class EnvPackEnvironment(object):
         return self.water_depth(lon, lat) is not None
 
     def building_at(self, lon: float, lat: float) -> Optional[Building]:
-        item = self._polygon_at(self._buildings, lon, lat)
+        item = self._polygon_at(self._building_index, lon, lat)
         if item is not None:
             return Building(item.get("ring") or [], float(item.get("height_m") or 6.0))
         if self._basic_env is not None:
@@ -188,7 +244,7 @@ class EnvPackEnvironment(object):
         return None
 
     def cover_height(self, lon: float, lat: float) -> float:
-        item = self._polygon_at(self._buildings, lon, lat)
+        item = self._polygon_at(self._building_index, lon, lat)
         if item is not None:
             return float(item.get("height_m") or 6.0)
         cover = self.landcover(lon, lat)
@@ -201,7 +257,9 @@ class EnvPackEnvironment(object):
         if (max(a[0], b[0]) < bb[0] or min(a[0], b[0]) > bb[2]
                 or max(a[1], b[1]) < bb[1] or min(a[1], b[1]) > bb[3]):
             return False
-        for item in self._buildings:
+        candidates = self._building_index.query_bbox(
+            min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1]))
+        for item in candidates:
             ring = item.get("ring") or []
             x0, y0, x1, y1 = item.get("_bbox")
             if (max(a[0], b[0]) < x0 or min(a[0], b[0]) > x1
@@ -279,7 +337,11 @@ class EnvPackEnvironment(object):
 
     def road_class(self, lon: float, lat: float, tolerance_m: float = 30.0) -> int:
         nodes = self._roads.get("nodes") or {}
-        for edge in self._roads.get("edges") or []:
+        cell = self._road_index.cell
+        d_deg = tolerance_m / 100000.0
+        candidates = self._road_index.query_bbox(lon - d_deg, lat - d_deg,
+                                                 lon + d_deg, lat + d_deg)
+        for edge in candidates:
             pa = nodes.get(edge["a"])
             pb = nodes.get(edge["b"])
             if not pa or not pb:
@@ -292,7 +354,10 @@ class EnvPackEnvironment(object):
         nodes = self._roads.get("nodes") or {}
         best = None
         best_d = None
-        for edge in self._roads.get("edges") or []:
+        d_deg = max_m / 100000.0
+        candidates = self._road_index.query_bbox(lon - d_deg, lat - d_deg,
+                                                 lon + d_deg, lat + d_deg)
+        for edge in candidates:
             pa = nodes.get(edge["a"])
             pb = nodes.get(edge["b"])
             if not pa or not pb:

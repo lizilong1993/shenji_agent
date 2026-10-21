@@ -99,7 +99,37 @@ sim/world.step
 4. 建立兵棋候选数据集（observation→候选→人工/规则标注），微调或蒸馏小模型；
 5. 与确定性检查并用：非法候选过滤 + 关键时刻人工/规则兜底 + 全事件回放。
 
-## 6. 参考
+## 6. 实测对比（openjev 0.8B CPU，2026-10-21）
+
+测试环境：server155，无可用 GPU（NVML 初始化失败），openjev `qwen3.5-0.8b-nli-v2s-long`（1.7 GB）+
+transformers 5.20 / torch 2.7 CPU，每选项单独前向（短序列），状态文本压缩到 2 个敌方单位与 2 个目标。
+
+场景：30×30 格、2 红坦克 vs 2 蓝坦克、2 个目标点、dt=10 s、96 tick、每 12 tick 决策一次（8 次决策；
+蓝方固定使用启发式）。同一 seed 对比：
+
+| 指标 | 当前启发式 | JEV 0.8B |
+|---|---|---|
+| 红方存活/血量 | 2 / 5 | 2 / 4 |
+| 蓝方存活/血量 | 0 / 0 | 1 / 1 |
+| 毁伤 | 2 | 1 |
+| 目标归属 | 红 1、蓝 1 | 红 1、蓝 1 |
+| 决策延迟 | 毫秒级 | 平均 7.5 s，最大 10.4 s |
+| 依赖 | 无 | 1.7 GB 权重 + torch/transformers，GPU 不可用时 CPU 极慢 |
+
+结论：**当前启发式方案在本引擎中更好**——任务效果不劣（本次还多毁伤 1 个目标），延迟低 3–4 个数量级，
+无模型/许可依赖。JEV 0.8B 的公开 NLI 能力没有转化为兵棋优势，且 CPU 延迟无法满足 1–10 s 决策节奏。
+
+因此默认策略保持启发式；JEV 适配层保留为**可选实验策略**（`--policy jev` 或 `JevPolicy(client=...)`），
+需在 GPU 服务、领域微调和候选集评测完成后再考虑切换。复现命令：
+
+```bash
+python3 scripts/evaluate_jev.py --model /tmp/jev_model/qwen3.5-0.8b-nli-v2s-long \
+  --ticks 96 --decision-every 12 --out docs/geo_engine/jev_eval_20261021.json
+```
+
+原始结果：`docs/geo_engine/jev_eval_20261021.json`。
+
+## 7. 参考
 
 - openjev 模型卡与 serving：<https://huggingface.co/AlexWortega/openjev>
 - Qwen-jev 教程（PolyForm 非商用）：<https://github.com/AnubhabBanerjee/Qwen-jev>

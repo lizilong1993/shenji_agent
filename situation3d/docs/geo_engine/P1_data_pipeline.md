@@ -58,20 +58,24 @@ python3 scripts/run_geo_demo.py --case taiwan_landing \
 
 ## 4. 验证结果（2026-10-21，server155）
 
-- **在线 DEM**：Terrarium 可用，Anping 300 m 网格抓取成功；**离线回放**同一网格 sha256 完全一致：
-  `e071d17cdf1ad1484ef9695a02e485205808668384816a95c155f314c3e5491a`。
-- **OSM 在线**：Overpass 主站 502、kumi 不可达、osm.ch 仅瑞士数据、Geofabrik 网络不可达；因此本轮在线 OSM 记录为
-  `fallback-basic (OnlineSourceError)`，不影响离线路径。
-- **OSM 离线**：向缓存写入 Anping 样本（17 个 way）后，`mode=offline` 构建出道路 20 节点/10 边、水域 1 个、
-  建筑 5 个、林地 1 块，`provenance.osm=offline-cache`，无 fallback；运行时 `EnvPackEnvironment` 能采到水/建筑/林地/道路。
-- **运行时**：台海案例 33 单位、300 tick、dt=30 s 使用离线包，p50 85 ms / p95 142 ms（数据丰富包；基础
-  basic.json 环境同场景约 12 ms）。建筑遮挡采样已按线长限幅并做整体 bbox 预筛。
+- **代理方式**：服务器直连外网被阻断；使用本机 Clash（`172.16.10.254:7897`）经 SSH 反向隧道
+  （`ssh -R 27980:172.16.10.254:7897`）供 server155 使用，设置 `HTTPS_PROXY=http://127.0.0.1:27980` 后
+  Overpass/Terrarium 均可达。在线构建与离线回放都在同一次缓存上完成。
+- **在线构建（真实数据）**：Anping bbox（120.14/22.97/120.19/23.02），300 m 网格；产出道路 **10,257 节点 /
+  12,576 边**、水域 **759** 个多边形、建筑 **2,665** 个、土地利用 **283** 块；`provenance.osm=online`、
+  `dem=online`、`fallback=false`。
+- **离线回放**：同一缓存 `mode=offline`，五类图层（terrain/landcover/water/buildings/roads）sha256 **全部相同**，
+  `provenance` 为 `offline-cache`。
+- **持久化**：真实环境包保存在服务器 `situation3d/envpacks/anping_demo`，共享缓存
+  `situation3d/envpacks/geocache_anping`（`.gitignore` 已排除，可复现重建）。
+- **运行时**：台海案例 33 单位、120 tick、dt=30 s 使用真实离线包，p50 60.9 ms / p95 95.3 ms（数据丰富包；
+  基础 basic.json 环境同场景约 12 ms）。建筑遮挡已改为线段-多边形相交；多边形/道路加了 0.01°/0.02° 空间桶索引。
 - 测试：`tests/test_geo_engine_core.py` 含双路径管线（注入 fake OSM/DEM、离线缺失、OSM 归一化、pack 运行时采样）。
 
 ## 5. 已知限制
 
-1. **OSM 在线可达性**：当前服务器到 Overpass/Geofabrik 的链路不稳定/不可达；代码已支持多镜像与缓存，恢复网络后
-   直接 `--mode online` 即可。若长期不可达，可改用离线 `.osm.pbf` + osmium 的导入器（尚未实现）。
+1. **OSM 在线可达性**：服务器直连外网仍被阻断，需要本机 Clash/SSH 反向隧道；代码已支持多镜像与缓存，
+   代理就绪时 `--mode online` 即可。Geofabrik 大范围下载仍建议 `.osm.pbf` + osmium 导入器（尚未实现）。
 2. **DEM**：使用 Terrarium z10（约 150 m/像素）演示；未接 Copernicus GLO-30、GEBCO/ENC 水深。
 3. **几何**：建筑/水域多边形为 OSM 原始 ring，未做拓扑修复/简化；桥隧仅记录标签，通行谓词暂未使用。
 4. **环境包格式**：JSON 图层（grid/polygons/graph），不是 COG/FlatGeobuf；接口已按 manifest 抽象，后续可替换为
