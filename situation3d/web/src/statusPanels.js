@@ -372,7 +372,7 @@
       + '<span class="ts-sym-wrap">'
       + '<img class="ts-sym" src=' + JSON.stringify(Symbology.symbolUri(def.icon, def.affiliation, { domain: def.domain })) + ' alt="">'
       + '<span class="ts-hp os-s' + tsStatus + '"><b style="width:'
-      + Math.max(6, Math.min(100, Math.round(tsHp))) + '%"></b></span>'
+      + (tsStatus === 3 ? 0 : Math.max(6, Math.min(100, Math.round(tsHp)))) + '%"></b></span>'
       + '</span>'
       + '<div class="ts-id"><b>' + esc(def.id) + '</b>'
       + '<span>' + esc(def.name) + '</span></div></div>';
