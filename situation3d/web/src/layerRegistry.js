@@ -274,9 +274,9 @@
     // `default` 与迁移前 HTML 的 checked 一致（`layerOverview` 例外：它由
     // `setOverview` 在启动时按可用性决定，这里给 false 避免"声明开着但实际没挂"）。
     { id: 'layerHotspots', kind: 'situation', z: 10, label: '热点区域',
-      group: 'TS图层', default: true },
+      group: 'TS图层', default: false },
     { id: 'layerRoutes', kind: 'situation', z: 20, label: '计划航路',
-      group: 'TS图层', default: true },
+      group: 'TS图层', default: false },
     { id: 'layerOverview', kind: 'situation', z: 30, label: '全局鸟瞰',
       group: 'TS图层', default: false },
     // 方向 2：占领区域 —— **已下线**（2026-10-20 用户要求，显示与功能一并停用）。
@@ -571,6 +571,7 @@
       var expandable = hasProvider(l.id);
       return {
         id: l.id, kind: l.kind, z: l.z, label: l.label, group: l.group,
+        subgroup: l.subgroup || null,
         checkbox: l.checkbox || null,
         desired: r.desired,
         effective: !!effective[l.id],

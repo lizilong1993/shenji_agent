@@ -1920,8 +1920,7 @@ function closeCaseMenu() { closeAllMenus(); }
 const LAYER_GROUPS = [
   { name: 'TS图层', ids: ['layerHotspots', 'layerRoutes'] },
   { name: '目标图层', ids: ['layerTargetsRed', 'layerTargetsBlue', 'layerLabels', 'layerTracks', 'modelSensor',
-                            'layerTargetPanel', 'filterRed', 'filterBlue', 'filterSea',
-                            'filterLand', 'filterAir'] },
+                            'layerTargetPanel'] },
   { name: '底图', ids: ['modelTianditu', 'modelTiandituLabel', 'modelImagery',
                         'modelHotspotImagery', 'modelUrbanImagery',
                         'modelPlaces', 'modelTerrain',
@@ -4003,7 +4002,7 @@ function registerRelationsLayer() {
   if (!window.LayerRegistry || !LayerRegistry.register) return;
   if (LayerRegistry.def && LayerRegistry.def(REL_LAYER_ID)) return;
   LayerRegistry.register({
-    id: REL_LAYER_ID, kind: 'plot', z: 45, default: true,
+    id: REL_LAYER_ID, kind: 'plot', z: 45, default: false,
     label: '\u76ee\u6807\u5173\u7cfb', group: 'TS\u56fe\u5c42',
     handler: function (id, want) { setRelationsVisible(want); },
   });
@@ -6144,7 +6143,7 @@ window.SituationHost = {
     items.forEach(function (it) { used[it.layer] = (used[it.layer] || 0) + 1; });
     return {
       categories: (window.Plotting && Plotting.categories) ? Plotting.categories() : [],
-      registered: LayerRegistry.list('plot').filter(function (l) { return l.group === '标绘'; })
+      registered: LayerRegistry.list('plot').filter(function (l) { return l.subgroup === '标绘'; })
         .map(function (l) {
           return { id: l.id, label: l.label, z: l.z,
                    count: LayerRegistry.elements(l.id).length,
@@ -6480,7 +6479,7 @@ function ensurePlotLayer(layerId) {
   var cat = Plotting.categoryOfLayer(layerId);
   LayerRegistry.register({
     id: layerId, kind: 'plot', z: cat.z,
-    label: cat.zh, group: '标绘', default: true,
+    label: cat.zh, group: 'TS图层', subgroup: '标绘', default: false,
   });
   // register() 的 runtime 初始 desired=false。新类别默认可见，但**用户之前关掉过的
   // 类别要恢复为关**（图层会因清空而注销，显隐意图不能跟着丢）。
@@ -6504,7 +6503,7 @@ function syncPlotLayers() {
   // as manageable rows instead of the whole group disappearing.
   Plotting.categories().forEach(function (c) { used[c.layer] = true; });
   var usedIds = Object.keys(used).sort();
-  var registered = LayerRegistry.list('plot').filter(function (l) { return l.group === '标绘'; })
+  var registered = LayerRegistry.list('plot').filter(function (l) { return l.subgroup === '标绘'; })
     .map(function (l) { return l.id; }).sort();
   var missing = usedIds.filter(function (id) { return registered.indexOf(id) < 0; });
   var extra = registered.filter(function (id) { return usedIds.indexOf(id) < 0; });
@@ -6550,7 +6549,7 @@ function registerLayerProviders() {
   // registerPlotLayerProvider() 补上。
   if (window.Plotting) {
     LayerRegistry.list('plot').forEach(function (d) {
-      if (d.group === '标绘') registerPlotLayerProvider(d.id);
+      if (d.subgroup === '标绘') registerPlotLayerProvider(d.id);
     });
   }
 
@@ -6896,6 +6895,10 @@ function bindPanelChrome() {
     n.addEventListener('pointerdown', onDown);
     n.addEventListener('mousedown', onDown);
   });
+  [left, right].forEach(function (p) {
+    p.addEventListener('click', function (e) { e.stopPropagation(); });
+    p.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+  });
   syncToggles();
 }
 
@@ -6921,10 +6924,12 @@ function bindUI() {
   // 不含图层栈，只标记的话 sink 根本不会被调用——开关点了画面不变（实测如此）。
   if (window.LayerPanel) {
     LayerPanel.bind(document.getElementById('layerPanel'), {
+      getFilters: function () { return state.filters; },
+      onFilter: function (domain, on) { state.filters[domain] = !!on; refilter(); },
       onChange: function (id, want) {
         // 动态标绘图层会因清空而注销；把用户意图记在 app 侧，重建时恢复。
         var d = LayerRegistry.def(id);
-        if (d && d.group === '标绘') _plotLayerDesired[id] = !!want;
+        if (d && d.subgroup === '标绘') _plotLayerDesired[id] = !!want;
         LayerRegistry.setDesired(id, want);
         applyLayers();
         if (want) {
