@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 from .. import geo, roads, symbology
 
 CASE_ID = "taiwan_dense_transfer_v1"
-CASE_NAME = "登台2"
+CASE_NAME = "TW2"
 CASE_DESC = ("红蓝两组合成对象在真实海岸与路网上的转运、衔接、保障与观测演示；"
              "任务进度受对象可用性、道路可达性和保障状态约束。")
 THEATRE = "taiwan_strait"

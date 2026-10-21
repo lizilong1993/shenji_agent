@@ -47,7 +47,7 @@ DEFAULT_CAMERA = {
 CASES: List[DemoCase] = [
     DemoCase(
         case_id="india_china_west",
-        name="中印1",
+        name="ZY1",
         description=(
             "高原边境对峙TS：红方高原合成营沿 Indus 谷机动，无人机实施侦察监视；"
             "蓝方以列城为后勤枢纽沿干线前送，德普桑前哨分队守备 DBO 走廊，"
@@ -71,7 +71,7 @@ CASES: List[DemoCase] = [
     ),
     DemoCase(
         case_id="taiwan_landing",
-        name="登台1",
+        name="TW1",
         description=(
             "红方两栖编队自大陆沿海集结装载、经台湾海峡航渡，在护航与制空掩护下"
             "于西岸滩头换乘编波、抢滩突击，随后沿路网向内陆推进夺控要点；"
@@ -98,7 +98,7 @@ CASES: List[DemoCase] = [
     ),
     DemoCase(
         case_id="taiwan_dense_transfer_v1",
-        name="登台2",
+        name="TW2",
         description=(
             "红蓝两组合成对象在真实海岸与路网上的转运、衔接、保障与观测演示；"
             "任务进度受对象可用性、道路可达性和保障状态约束。"
