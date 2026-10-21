@@ -6,18 +6,18 @@
  * `app.js` 已经 3500 多行，而这两块都是"给定数据渲染 DOM"，与相机、图层、帧循环
  * 无关。放在这里可以独立读、独立改，也避免 app.js 继续膨胀。
  *
- * 一个必须说清的取舍：颜色语义是**告警等级**，不是战损
- * ----------------------------------------------------
- * 参考图里图标颜色编码的是「血量 100%/70%/50%/30%」。本系统**没有任何战损/血量
- * 字段**（`engine/scenario.py` 的 Target 只有经纬度、航速、航向、传感器、交战半径
- * 等），因此这里用每帧推理已有的告警等级（`engine/inference.py` 的 ALERT_CODES：
- * 0 正常 / 1 注意 / 2 警告 / 3 严重）作为颜色维度，图例如实写成对应文字。
+ * 状态语义（2026-10-21 起）
+ * ------------------------
+ * 指标从"告警等级"改为**战损四档**（正常 / 受损 / 严重受损 / 损毁），
+ * 与鸟瞰图共用 `targetStatus.js` 的同一份血量估计与阈值——两边只做渲染，
+ * 不再各自定义档位，避免"面板绿、地图黄"的分叉。
  *
- * 若将来真要展示战损，正确做法是给引擎加字段并仿真损伤过程，而不是在这里用别的量
- * 冒充血量——那会让人把"告警等级高"读成"已经被打残了"。
+ * 数据里没有真实血量字段；血量是 `targetStatus.js` 按高告警持续时长累计的
+ * **战损估计**，规则与速率写在该模块顶部并可经 `TargetStatus.debug()` 读出。
  *
- * 图标不新建 4 套 SVG：复用 `Symbology.symbolUri` 的红/蓝原色图标，用 CSS filter
- * 逐级降饱和压暗（见 style.css 的 `.os-tier-*`），得到与参考图相同的单调渐变观感。
+ * 图标本体仍是 `Symbology.symbolUri` 的阵营原色军标；状态靠**紧贴图标底部的
+ * 血条 + 损毁叉形遮罩**表达（见 style.css 的 `.os-unit.s*`），兵种与阵营始终可辨。
+ * 受损/严重受损不画状态环或角标——血条的颜色与长度就是状态本身。
  */
 (function () {
   'use strict';
@@ -62,17 +62,33 @@
   ];
   var FAMILY_FALLBACK = '其它';
 
-  // 告警等级 -> 文案与档位。等级取自 `engine/inference.py` 的 ALERT_CODES，
-  // 不改写它的措辞，避免两处说法不一致。
-  var TIERS = [
-    { label: '正常单位', cls: 'os-tier-0' },
-    { label: '注意单位', cls: 'os-tier-1' },
-    { label: '警告单位', cls: 'os-tier-2' },
-    { label: '严重单位', cls: 'os-tier-3' },
+  // 战损四档。档位定义与颜色唯一来源是 `targetStatus.js`；下面的 FALLBACK 只在
+  // 该模块未加载时使用（例如只部署了部分源码），避免面板直接开天窗。
+  // 渲染用的 `.os-s<N>` 类由序号生成，与 CSS 的 `.os-s0..3` 一一对应。
+  var FALLBACK_TIERS = [
+    { label: '正常', color: '#2E9E5B' },
+    { label: '受损', color: '#D9A514' },
+    { label: '严重受损', color: '#E2662A' },
+    { label: '损毁', color: '#4B5563' },
   ];
+  var TIERS = ((window.TargetStatus && TargetStatus.TIERS) || FALLBACK_TIERS)
+    .map(function (t, i) {
+      return { label: t.label, cls: 'os-s' + i, color: t.color };
+    });
+
+  function tierOf(status) {
+    return TIERS[Math.max(0, Math.min(TIERS.length - 1, status | 0))];
+  }
+
+  function statusAt(data, tid, tick) {
+    if (window.TargetStatus && typeof TargetStatus.at === 'function') {
+      return TargetStatus.at(data, tid, tick);
+    }
+    return { hp: 100, status: 0, label: TIERS[0].label, alert: null, alertLabel: '' };
+  }
 
   // 按案例缓存已构建的 DOM，避免每帧重建图标。
-  var cache = { key: null, imgs: {} };
+  var cache = { key: null, units: {}, sums: {} };
 
   function esc(s) {
     return String(s === null || s === undefined ? '' : s)
@@ -85,12 +101,6 @@
     return (meta && meta.family) || FAMILY_FALLBACK;
   }
 
-  function tierIndex(alert, hasInference) {
-    // 没有该帧的推理结果时不猜等级，一律按"正常"渲染并在 title 里说明。
-    if (!hasInference || typeof alert !== 'number') return 0;
-    return Math.max(0, Math.min(TIERS.length - 1, alert | 0));
-  }
-
   /**
    * 整体TS栏。
    *
@@ -100,8 +110,11 @@
    *
    * 展示案例**完整编成**，不跟随地图上的红/蓝/域过滤开关——它是"全局整体状态"汇总，
    * 跟着地图过滤会让人以为编成变了。
+   *
+   * 每帧只更新既有 DOM 的 class / 血条宽度 / title，结构仍只在案例切换时重建。
+   * 这也是为什么这里接受 `tick`：血量是随时间累计的量，不能用"当前推理帧"代替。
    */
-  function renderOverall(hostEl, data, inferenceFrame) {
+  function renderOverall(hostEl, data, _inferenceFrame, tick) {
     if (!hostEl) return;
     if (!data || !data.targets || !data.targets.length) {
       hostEl.innerHTML = '<div class="os-empty">未加载TS</div>';
@@ -110,29 +123,58 @@
     }
 
     var icons = (data.symbology && data.symbology.icons) || {};
-    var sig = data.case_id + '|' + data.targets.length;
+    // 签名必须带目标 id：前端生成的 TS 的 case_id 固定为 custom，
+    // 两次编成长度相同但成员不同时，只按长度命中会残留上一份 DOM。
+    var sig = (data.case_id || '') + '|' +
+      data.targets.map(function (t) { return t.id; }).join(',');
 
     if (cache.key !== sig) {
       cache.key = sig;
-      cache.imgs = {};
+      cache.units = {};
+      cache.sums = {};
       hostEl.innerHTML = buildOverall(data, icons);
-      // 建好结构后把每个目标的 <img> 收进映射，之后每帧只改 class，不重建 DOM。
+      // 建好结构后把每个目标的 DOM 收进映射，之后每帧只改样式，不重建 DOM。
       Array.prototype.forEach.call(
-        hostEl.querySelectorAll('.os-icon[data-target]'), function (img) {
-          cache.imgs[img.getAttribute('data-target')] = img;
+        hostEl.querySelectorAll('.os-unit[data-target]'), function (unit) {
+          cache.units[unit.getAttribute('data-target')] = {
+            unit: unit,
+            fill: unit.querySelector('.os-hp > b'),
+          };
         });
+      Array.prototype.forEach.call(hostEl.querySelectorAll('.os-sum[data-side]'), function (el) {
+        cache.sums[el.getAttribute('data-side')] = el;
+      });
     }
 
-    var has = !!inferenceFrame;
-    Object.keys(cache.imgs).forEach(function (tid) {
-      var entry = has ? (inferenceFrame.targets || {})[tid] : null;
-      var t = tierIndex(entry ? entry.alert : undefined, has && !!entry);
-      var img = cache.imgs[tid];
-      img.className = 'os-icon ' + TIERS[t].cls;
-      img.title = entry
-        ? (tid + ' · ' + (entry.alert_label || TIERS[t].label))
-        : (tid + ' · 无该帧推理结果');
+    tick = (tick === undefined || tick === null) ? 0 : (tick | 0);
+    Object.keys(cache.units).forEach(function (tid) {
+      var rec = cache.units[tid];
+      var st = statusAt(data, tid, tick);
+      var tier = tierOf(st.status);
+      rec.unit.className = 'os-unit ' + tier.cls;
+      rec.fill.style.width = st.status === 3
+        ? '0%'
+        : Math.max(6, Math.min(100, Math.round(st.hp))) + '%';   // 存活档至少留一丝颜色
+      rec.unit.title = tid + ' · ' + tier.label
+        + ' · 血量估计 ' + Math.round(st.hp) + '%'
+        + (st.alertLabel ? ' · 告警 ' + st.alertLabel : '');
     });
+
+    var counts = (window.TargetStatus && typeof TargetStatus.counts === 'function')
+      ? TargetStatus.counts(data, tick)
+      : null;
+    if (counts) {
+      ['red', 'blue'].forEach(function (side) {
+        var el = cache.sums[side];
+        if (!el) return;
+        var c = counts[side];
+        var parts = [];
+        TIERS.forEach(function (t, i) {
+          if (c.n[i]) parts.push(t.label + ' ' + c.n[i]);
+        });
+        el.textContent = parts.length ? parts.join(' · ') : '无目标';
+      });
+    }
   }
 
   function buildOverall(data, icons) {
@@ -155,8 +197,11 @@
           + esc(f) + '</span>'
           + '<span class="os-icons">'
           + items.map(function (t) {
-              return '<img class="os-icon os-tier-0" data-target="' + esc(t.id) + '"'
-                + ' src="' + Symbology.symbolUri(t.icon, aff, {}) + '" alt="' + esc(t.id) + '">';
+              return '<span class="os-unit os-s0" data-target="' + esc(t.id) + '">'
+                + '<img class="os-icon" src="' + Symbology.symbolUri(t.icon, aff, {}) + '"'
+                + ' alt="' + esc(t.id) + '">'
+                + '<span class="os-hp"><b></b></span>'
+                + '</span>';
             }).join('')
           + '</span>'
           + '<span class="os-count">共 <b>' + items.length + '</b> 单位</span>'
@@ -166,14 +211,16 @@
       return '<div class="os-side os-' + aff + '">'
         + '<div class="os-head"><span class="os-title">' + esc(label) + '</span>'
         + '<span class="os-sub">参战单位总览</span></div>'
+        + '<div class="os-sum" data-side="' + aff + '">—</div>'
         + (rows || '<div class="os-empty">无目标</div>')
         + '</div>';
     }
 
     var legend = '<div class="os-legend">'
       + TIERS.map(function (t, i) {
-          return '<span><i class="os-sw os-tier-' + i + '"></i>' + esc(t.label) + '</span>';
+          return '<span><i class="os-sw ' + t.cls + '"></i>' + esc(t.label) + '</span>';
         }).join('')
+      + '<span class="os-legend-note">血条=战损估计</span>'
       + '</div>';
 
     return side('red', '红方') + side('blue', '蓝方') + legend;
@@ -308,7 +355,7 @@
   var DOMAIN_ZH = { sea: '水面', land: '陆上', air: '空中' };
   var AFFIL_ZH = { red: '红方', blue: '蓝方' };
 
-  function renderTargetStatus(hostEl, def, frameState, l1, entry, frames, tick) {
+  function renderTargetStatus(hostEl, def, frameState, l1, entry, frames, tick, data) {
     if (!hostEl) return;
     if (!def) {
       hostEl.innerHTML = '<div class="ts-empty">未选择目标</div>';
@@ -323,6 +370,7 @@
 
     // ---- 1. 目标状态信息：这一帧的读数 ----
     var st = frameState || {};
+    var dmg = data ? statusAt(data, def.id, tick) : null;
     html += '<div class="ts-sec">'
       + '<h4>目标状态信息</h4>';
     if (frameState) {
@@ -334,6 +382,8 @@
         + kv('已航程', typeof st.travelled_m === 'number'
             ? (st.travelled_m / 1000).toFixed(1) + ' km' : '—')
         + kv('状态', st.reached_end ? '已到达终点' : '航渡中')
+        + (dmg ? kv('战损', dmg.label + '（血量估计 ' + Math.round(dmg.hp) + '%）',
+                    'ts-dmg os-s' + dmg.status) : '')
         + kv('阵营', AFFIL_ZH[def.affiliation] || def.affiliation || '—')
         + kv('域', DOMAIN_ZH[def.domain] || def.domain || '—')
         + kv('装备', def.icon_label || def.icon || '—');
@@ -384,7 +434,7 @@
     renderTargetStatus: renderTargetStatus,
     deriveActivity: deriveActivity,
     headingStd: headingStd,
-    _resetCache: function () { cache.key = null; cache.imgs = {}; },
+    _resetCache: function () { cache.key = null; cache.units = {}; cache.sums = {}; },
     // I08：暴露空态投递与去重复位，供测试断言"提示确实进入统一事件流"
     _emitEmptyState: _emitEmptyState,
     _resetEmptyState: function () { _lastEmptyKey = null; },

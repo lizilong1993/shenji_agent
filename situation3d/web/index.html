@@ -138,13 +138,19 @@
 
       <!-- 加载进度徽标（"正在加载瓦片… 剩余 N"）已按需求删除（2026-10-17） -->
 
-      <!-- 鸟瞰图：第二个 Cesium 2D 视图，显示真实地球缩略图并与主相机联动 -->
+      <!-- 全局鸟瞰：第二个 Cesium 2D 视图，按案例战场范围自动取景，
+           显示红蓝全部目标与战损状态（图标 + 紧贴底部的血条）。
+           组件上方不写标题/说明文字；Cesium 学分标识在 overview.js 里隐藏。 -->
       <div id="overviewWrap" class="overview-wrap hidden">
-        <div class="ov-head">
-          <span class="ov-title">鸟瞰图 · 与主图同视点</span>
-          <button id="ovHide" type="button" class="ov-btn" aria-label="隐藏">×</button>
-        </div>
+        <button id="ovHide" type="button" class="ov-btn ov-close" aria-label="隐藏">×</button>
         <div id="overviewContainer" class="ov-canvas"></div>
+        <div class="ov-legend">
+          <span><i class="ov-sw os-s0"></i>正常</span>
+          <span><i class="ov-sw os-s1"></i>受损</span>
+          <span><i class="ov-sw os-s2"></i>严重受损</span>
+          <span><i class="ov-sw os-s3"></i>损毁</span>
+          <span class="ov-note">战损估计</span>
+        </div>
       </div>
 
       <!-- 地图组件：Cesium 1.145 无内置指南针与比例尺，三项均为自建。
@@ -185,7 +191,7 @@
     </section>
 
     <aside class="panel panel-right">
-      <!-- 整体TS栏：全局各类型、各方目标的整体状态（图标 + 告警等级着色）。
+      <!-- 整体TS栏：全局各类型、各方目标的整体战损状态（图标 + 紧贴底部的血条）。
            展示案例完整编成，不跟随地图上的红/蓝/域过滤开关。 -->
       <section class="panel-block">
         <h2>整体TS</h2>
@@ -264,6 +270,7 @@
   <script src="./vendor/cesium/Cesium.js"></script>
   <script src="./src/tilecache.js"></script>
   <script src="./src/theme.js"></script>
+  <script src="./src/targetStatus.js"></script>
   <script src="./src/eventFeed.js"></script>
   <script src="./src/symbology.js"></script>
   <script src="./src/entityLod.js"></script>

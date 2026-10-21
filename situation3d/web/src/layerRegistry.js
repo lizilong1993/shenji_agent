@@ -277,7 +277,7 @@
       group: 'TS图层', default: true },
     { id: 'layerRoutes', kind: 'situation', z: 20, label: '计划航路',
       group: 'TS图层', default: true },
-    { id: 'layerOverview', kind: 'situation', z: 30, label: '鸟瞰图',
+    { id: 'layerOverview', kind: 'situation', z: 30, label: '全局鸟瞰',
       group: 'TS图层', default: false },
     // 方向 2：占领区域 —— **已下线**（2026-10-20 用户要求，显示与功能一并停用）。
     // 原实现：引擎逐帧下发 frames[i]["occupation"]，主视图面图元与小地图掩码由

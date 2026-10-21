@@ -1397,6 +1397,10 @@ function applySituationData(data, caseId) {
       state.data = data;
       state.caseId = caseId || data.case_id || null;
       state.inference = data.inference_frames || null;
+      // 案例数据换了：面板结构与战损缓存都必须重建。"前端生成的TS"的
+      // case_id 固定为 custom，只靠 case_id 命中会残留上一份编成。
+      if (window.StatusPanels && StatusPanels._resetCache) StatusPanels._resetCache();
+      if (window.TargetStatus && TargetStatus.reset) TargetStatus.reset();
       state.tick = 0;
       state.tickFloat = 0;
       state.selected = null;
@@ -1452,10 +1456,6 @@ function applySituationData(data, caseId) {
       // 空闲时不占用视线。案例身份已由顶栏 `#scenarioName` 显示，不再重复。
       setStatus('', 'ok');
       setSwitchNote('已加载「' + data.case_name + '」。各开关的生效状态会在此说明。');
-      if (window.Overview && window.Overview.setCenter) {
-        const cam = data.camera || {};
-        if (isFinite(cam.lon) && isFinite(cam.lat)) Overview.setCenter(cam.lon, cam.lat);
-      }
       // 装载完TS后补一次建筑体块。refreshBuildings() 原本只挂在"选中热点 /
       // 解除跟随 / 目标高度变化"上，于是一进页面就带 `?buildings=1`（或先开开关
       // 再选案例）时体块不会出现——除非用户再去点一个热点。色带未就绪时
@@ -1734,6 +1734,15 @@ function clearSituation() {
   state.data = null;
   state.caseId = null;
   state.inference = null;
+  // 鸟瞰图随 TS 一起清空，否则会残留上一场的图标与取景。
+  if (window.Overview && Overview.clear) Overview.clear();
+  // 整体TS面板也要回到空态；只清 state.data 的话 updateInferenceUi 会因
+  // state.data 为空而跳过渲染，上一场的图标/血条会一直留在右栏。
+  if (window.StatusPanels) {
+    StatusPanels._resetCache();
+    StatusPanels.renderOverall(dom.overallBody, null, null, 0);
+  }
+  if (window.TargetStatus) TargetStatus.reset();
   state.tick = 0;
   state.tickFloat = 0;
   state.selected = null;
@@ -3124,6 +3133,8 @@ function syncSelection() {
     rec.entity.billboard.image = Symbology.symbolUri(
       rec.def.icon, rec.def.affiliation, { selected: state.selected === id });
   });
+  // 鸟瞰图同步选中高亮：同一次点击在两个视图里看起来必须是同一个目标。
+  if (window.Overview && Overview.setSelected) Overview.setSelected(state.selected);
   // 选中/取消选中会改变掩码的洞：立即重画一次，不等下一帧。
   updateFocusMask();
 }
@@ -3161,12 +3172,17 @@ function regionIntentCounts(inf) {
 
 function updateInferenceUi() {
   const inf = inferenceAt(state.tick);
+  // 鸟瞰图与整体TS同一节奏：目标位置、战损状态、血条都在这里推一次。
+  // 播放推进、拖动时间轴、切案例、换选中都会经过本函数，不需要另挂定时器。
+  if (window.Overview && state.data && Overview.updateSituation) {
+    Overview.updateSituation(state.data, state.tick);
+  }
   if (!inf) {
     if (dom.rlValue) dom.rlValue.textContent = '—';
     if (dom.rlNote) dom.rlNote.textContent = '未加载推理结果';
-    // 没有推理帧时整体TS栏仍然渲染，只是所有图标按"正常"档并在 title 里说明。
+    // 没有推理帧时整体TS栏仍然渲染，只是战损估计停在"未受高告警"的正常档。
     if (window.StatusPanels && dom.overallBody && state.data) {
-      StatusPanels.renderOverall(dom.overallBody, state.data, null);
+      StatusPanels.renderOverall(dom.overallBody, state.data, null, state.tick);
     }
     return;
   }
@@ -3184,11 +3200,10 @@ function updateInferenceUi() {
   }
   if (dom.rlNote) dom.rlNote.textContent = noteText;
 
-  // 整体TS栏：红蓝双方各类型目标的整体状态（图标按告警等级着色）。
-  // 只更新每个图标 `<img>` 的档位 class，结构在案例切换时才重建——见
-  // statusPanels.js 的缓存说明。
+  // 整体TS栏：红蓝双方各类型目标的整体战损状态（图标 + 紧贴底部的血条）。
+  // 只更新既有 DOM 的档位/血量，结构在案例切换时才重建——见 statusPanels.js。
   if (window.StatusPanels && dom.overallBody && state.data) {
-    StatusPanels.renderOverall(dom.overallBody, state.data, inf);
+    StatusPanels.renderOverall(dom.overallBody, state.data, inf, state.tick);
   }
 
   // 主导意图：等级回答"多紧张"，意图回答"在打什么"，两者并列才算把区域TS说全。
@@ -3962,7 +3977,8 @@ function renderTargetStatus(id) {
   const inf = inferenceAt(state.tick);
   const l1 = (inf && inf.targets[id]) || null;
   StatusPanels.renderTargetStatus(
-    host, rec.def, s || null, l1, l1, state.data && state.data.frames, state.tick);
+    host, rec.def, s || null, l1, l1, state.data && state.data.frames, state.tick,
+    state.data);
   // Step C: activity state (ontology parent class) beside the unit's own phase.
   var fr = (state.data && state.data.frames) ? state.data.frames[state.tick] : null;
   var up = (fr && fr.unit_phase && fr.unit_phase[id]) || null;
@@ -4948,11 +4964,11 @@ function setOverview(on) {
   if (!window.Overview) return;
   try {
     Overview.show();
-    setSwitchNote('鸟瞰图已显示：真实地球缩略图，黄框为主相机当前视野。点击鸟瞰图可跳转主视角。');
+    setSwitchNote('全局鸟瞰已显示：按战场范围自动取景，标出红蓝全部目标与战损状态。点击目标可跳转主视角。');
   } catch (e) {
     state.layers.overview = false;
     if (box) box.checked = false;
-    setSwitchNote('鸟瞰图不可用：' + e.message);
+    setSwitchNote('全局鸟瞰不可用：' + e.message);
   }
 }
 
@@ -5237,6 +5253,11 @@ function reloadSituation() {
   createTargetEntities();
   attachMotionAndFx(state.data);
   if (typeof applyTargetLod === "function") applyTargetLod(true);
+  // 编成可能被 TS 管理改过：鸟瞰图的目标图元与取景要跟着重建。
+  if (window.Overview && Overview.setData) Overview.setData(state.data);
+  // 面板/战损缓存按"案例+目标数"命中；编成改了但数量没变时也要重建。
+  if (window.StatusPanels && StatusPanels._resetCache) StatusPanels._resetCache();
+  if (window.TargetStatus && TargetStatus.reset) TargetStatus.reset();
   updateOccupationAreas();
   renderHotspotTable();
   renderTargetCounts();

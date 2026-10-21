@@ -620,8 +620,8 @@ select {
 .ts-fold[open] > summary { margin-bottom: 4px; }
 
 /* ---------------- 右侧「整体TS栏」的样式 ----------------
-   图标用 CSS filter 分级降饱和压暗，而不是新建 4 套 SVG：颜色语义是告警等级
-   （正常/注意/警告/严重），不是战损——见 statusPanels.js 顶部说明。 */
+   档位唯一来源是 targetStatus.js；图标本体保持阵营原色，状态由**紧贴图标
+   底部的血条**颜色/长度表达，损毁另有暗色叉遮罩与空槽。 */
 
 .os-body { display: flex; flex-direction: column; gap: 8px; }
 
@@ -657,18 +657,62 @@ select {
   color: var(--text-dim);
 }
 .os-fam-ico { width: 15px; height: 15px; flex: 0 0 auto; }
-.os-icons { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 1px; }
-.os-icon { width: 16px; height: 16px; display: block; }
+.os-icons { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 3px 2px; }
+/* 一个目标 = 图标 + 血条 + 状态标记。图标本体不改色，类型与阵营始终可辨。 */
+.os-unit {
+  position: relative;
+  width: 20px;
+  padding-top: 1px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.os-icon { width: 18px; height: 18px; display: block; }
+.os-hp {
+  width: 18px;
+  height: 4px;
+  margin-top: -1px;           /* 抵掉军标资产底部的透明留白，视觉上紧贴图标 */
+  box-sizing: border-box;
+  background: #e4e9f0;
+  border: 1px solid #6b7688;
+  border-radius: 1px;
+  overflow: hidden;
+}
+.os-hp > b { display: block; height: 100%; width: 100%; background: #2E9E5B; }
+.os-unit.os-s1 .os-hp > b { background: #D9A514; }
+.os-unit.os-s2 .os-hp > b { background: #E2662A; }
+.os-unit.os-s3 .os-hp { background: #3f4652; }
+.os-unit.os-s3 .os-hp > b { background: #4B5563; }
+/* 损毁：图标压暗 + 叉形遮罩；血条为空槽。仍保留轮廓，避免"整个目标消失"。 */
+.os-unit.os-s3 .os-icon { opacity: .45; filter: grayscale(1); }
+
+/* 损毁遮罩：只在图标上叠叉。受损/严重受损不再画环或角标——状态只由
+   紧贴图标底部的血条颜色与长度表达（2026-10-21 用户要求）。 */
+.os-unit.os-s3::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 18px;
+  height: 18px;
+  background:
+    linear-gradient(45deg, transparent 43%, #B91C1C 43%, #B91C1C 57%, transparent 57%),
+    linear-gradient(-45deg, transparent 43%, #B91C1C 43%, #B91C1C 57%, transparent 57%);
+  pointer-events: none;
+}
 .os-count { flex: 0 0 auto; font-size: 10.5px; color: var(--text-dim); }
 .os-count b { font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
 
 .os-empty { padding: 6px 8px; font-size: 11px; color: var(--text-dim); }
 
-/* 四档告警：满色 -> 逐级降饱和压暗，得到与参考图一致的单调渐变 */
-.os-tier-0 { filter: none; }
-.os-tier-1 { filter: saturate(.72) brightness(.94); }
-.os-tier-2 { filter: saturate(.5) brightness(.8); }
-.os-tier-3 { filter: grayscale(.78) brightness(.7); }
+/* 每方状态摘要：一眼看出这一侧还有多少能打的。 */
+.os-sum {
+  padding: 2px 8px 3px;
+  border-bottom: 1px dashed #eef2f7;
+  font-size: 9.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
 
 .os-legend {
   display: flex;
@@ -684,13 +728,21 @@ select {
 .os-sw {
   display: inline-block;
   width: 9px;
-  height: 9px;
-  border-radius: 2px;
+  height: 5px;
+  border-radius: 1px;
+  border: 1px solid #6b7688;
   background: #c8352c;
 }
-.os-sw.os-tier-1 { background: #c05a52; }
-.os-sw.os-tier-2 { background: #9d6a66; }
-.os-sw.os-tier-3 { background: #8a8a8a; }
+.os-sw.os-s0 { background: #2E9E5B; }
+.os-sw.os-s1 { background: #D9A514; }
+.os-sw.os-s2 { background: #E2662A; }
+.os-sw.os-s3 { background: #4B5563; }
+
+/* 目标TS栏里的战损读数：用同色系中更深的颜色，保证白底上的对比度。 */
+.ts-dmg.os-s0 { color: #2E9E5B; }
+.ts-dmg.os-s1 { color: #B8860B; }
+.ts-dmg.os-s2 { color: #C24E14; }
+.ts-dmg.os-s3 { color: #B91C1C; }
 
 /* ---------------- 右侧「区域TS栏」的样式 ---------------- */
 
@@ -987,7 +1039,7 @@ select {
 .map-comp {
   position: absolute;
   right: 12px;
-  top: 192px;              /* 鸟瞰图 172 + 间距 8 + 12 */
+  top: 210px;              /* 全局鸟瞰 190 + 间距 8 + 12 */
   width: 84px;
   height: 84px;
   z-index: 36;
@@ -1028,7 +1080,7 @@ select {
 .map-locate {
   position: absolute;
   right: 12px;
-  top: 284px;              /* 指南针 192 + 84 + 间距 8 */
+  top: 302px;              /* 指南针 210 + 84 + 间距 8 */
   z-index: 36;
   padding: 4px 10px;
   border: 1px solid var(--border);
@@ -1192,7 +1244,8 @@ select {
 .map-scalebar.hidden { display: none; }
 
 @media (max-width: 1280px) {
-  .map-comp { width: 72px; height: 72px; }
+  .map-comp { width: 72px; height: 72px; top: 180px; }
+  .map-locate { top: 260px; }
   .map-viewpoint { top: 126px; min-width: 166px; font-size: 10.5px; }
   .map-scalebar { top: 188px; }
 }
@@ -1214,8 +1267,8 @@ select {
   position: absolute;
   right: 12px;
   top: 12px;
-  width: 240px;
-  height: 172px;
+  width: 268px;
+  height: 190px;
   display: flex;
   flex-direction: column;
   border: 1px solid #b9c6d8;
@@ -1228,20 +1281,52 @@ select {
 
 .overview-wrap.hidden { display: none; }
 
-.ov-head {
-  flex: 0 0 auto;
-  height: 24px;
+/* 组件上方不再有标题/说明栏；关闭按钮浮在地图右上角（2026-10-21 用户要求）。 */
+.ov-close {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  padding: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 6px 0 9px;
-  border-bottom: 1px solid var(--border);
-  background: #f3f7fd;
-  font-size: 11px;
-  color: var(--text-dim);
+  justify-content: center;
+  border: 1px solid rgba(80, 100, 130, .45);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, .82);
+  color: #4a5568;
 }
+.ov-close:hover { background: #fff; }
 
-.ov-title { flex: 1 1 auto; }
+/* 状态图例：与「整体TS」共用同一组档位颜色（.os-s*），避免两处语义分叉。 */
+.ov-legend {
+  flex: 0 0 auto;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-top: 1px solid var(--border);
+  background: #f7f9fc;
+  font-size: 9.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.ov-legend span { display: flex; align-items: center; gap: 3px; }
+.ov-legend .ov-note { margin-left: auto; font-style: italic; }
+.ov-sw {
+  display: inline-block;
+  width: 9px;
+  height: 5px;
+  border-radius: 1px;
+  border: 1px solid #6b7688;
+}
+.ov-sw.os-s0 { background: #2E9E5B; }
+.ov-sw.os-s1 { background: #D9A514; }
+.ov-sw.os-s2 { background: #E2662A; }
+.ov-sw.os-s3 { background: #4B5563; }
 
 .ov-btn {
   border: 0;
@@ -1255,35 +1340,17 @@ select {
 .ov-canvas { flex: 1 1 auto; position: relative; }
 .ov-canvas > .cesium-viewer { position: absolute; inset: 0; }
 
-.ov-credits {
-  position: absolute;
-  left: 4px;
-  bottom: 2px;
-  font-size: 8px;
-  color: #8a94a4;
-  opacity: .7;
-  pointer-events: none;
-}
-
-/* Cesium 默认 credit 会带一个较大的 ion 标识，在 240×148 的缩略图里会占掉半屏。
-   缩到最小并贴底，既保留 Esri 的归属声明又不遮挡地球。 */
+/* 组件底部不再显示 Cesium / 影像归属文字（用户要求）。
+   JS 里还会把 creditContainer 直接隐藏，这里作为加载时序与样式双重兜底。 */
 #overviewContainer .cesium-widget-credits {
-  position: absolute;
-  left: 3px;
-  bottom: 1px;
-  font-size: 8px;
-  line-height: 1.1;
-  opacity: .75;
-}
-
-#overviewContainer .cesium-widget-credits img,
-#overviewContainer .cesium-widget-credits svg {
-  max-height: 9px;
-  width: auto;
+  display: none !important;
 }
 
 @media (max-width: 1280px) {
-  .overview-wrap { width: 180px; height: 130px; }
+  .overview-wrap { width: 200px; height: 160px; }
+  /* 200px 宽放不下 4 档 + 注释，缩字号并隐藏注释，避免被裁切。 */
+  .ov-legend { gap: 5px; padding: 0 6px; font-size: 9px; }
+  .ov-legend .ov-note { display: none; }
 }
 
 /* ---------------- TS模态框（输入 / 管理 / 下载） ----------------
