@@ -33,6 +33,7 @@ import heapq
 import json
 import math
 import os
+from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from . import geo
@@ -58,6 +59,23 @@ class RoadError(ValueError):
     """Road data missing, malformed, or a route that cannot be satisfied."""
 
 
+@dataclass
+class RouteResult:
+    """A routed path plus the OSM edges it traverses.
+
+    ``path`` is the (lat, lon) polyline the generator samples; ``nodes`` are the
+    node indices and ``edges`` keeps ``way_id`` / speed for the geo manifest.
+    Keeping both means the route is reproducible after the road snapshot changes
+    only if the caller records ``way_id`` and the snapshot hash.
+    """
+
+    path: List[Tuple[float, float]]
+    nodes: List[int]
+    edges: List[dict]
+    weak_comp: Optional[int] = None
+    max_snap_km: float = MAX_SNAP_KM
+
+
 def network_path(theatre: str) -> str:
     return os.path.join(ROADS_DIR, "%s.json" % theatre)
 
@@ -73,7 +91,8 @@ class Roads(object):
     """A loaded road network with routing."""
 
     __slots__ = ("theatre", "nodes", "ways", "adj", "speed", "meta",
-                 "_grid", "_cell", "comp", "comp_sizes", "_by_comp", "_dist_cache")
+                 "_grid", "_cell", "comp", "comp_sizes", "_by_comp", "_dist_cache",
+                 "way_ids", "weak_comp", "weak_comp_sizes", "_by_weak_comp")
 
     def __init__(self, doc: dict, grid_deg: float = 0.25):
         if doc.get("schema") != "situation3d.roads.v1":
@@ -94,11 +113,13 @@ class Roads(object):
 
         # Adjacency: node index -> [(neighbour index, metres, km/h), ...]
         adj = [[] for _ in range(len(self.nodes))]
+        way_ids: Dict[Tuple[int, int], object] = {}
         for w in self.ways:
             idx = w.get("nodes") or []
             kmh = float(self.speed.get(w.get("class") or "", 40.0))
             oneway = bool(w.get("oneway"))
             reverse = bool(w.get("reverse"))
+            wid = w.get("id")
             for a, b in zip(idx, idx[1:]):
                 m = _dist_m(self.nodes[a], self.nodes[b])
                 if m <= 0.0:
@@ -109,9 +130,12 @@ class Roads(object):
                 bwd = (not oneway) or reverse
                 if fwd:
                     adj[a].append((b, m, kmh))
+                    way_ids.setdefault((a, b), wid)
                 if bwd:
                     adj[b].append((a, m, kmh))
+                    way_ids.setdefault((b, a), wid)
         self.adj = adj
+        self.way_ids = way_ids
 
         # Weakly-connected components. Road networks along a disputed border are
         # frequently *not* contiguous in OSM: the India-China graph splits into 52
@@ -144,6 +168,38 @@ class Roads(object):
         self._by_comp = {}
         for i, c in enumerate(comp):
             self._by_comp.setdefault(c, []).append(i)
+
+        # Undirected (weak) components. The component walk above follows the
+        # directed adjacency, so a one-way street can split a physically joined
+        # block into separate labels. Snapping and local-case routing need the
+        # weak view; keep both rather than changing `comp` and silently moving
+        # the old cases' snap choices.
+        und = [[] for _ in range(len(self.nodes))]
+        for u, row in enumerate(adj):
+            for v, _m, _k in row:
+                und[u].append(v)
+                und[v].append(u)
+        wcomp = [-1] * len(self.nodes)
+        wid = 0
+        for s in range(len(self.nodes)):
+            if wcomp[s] != -1:
+                continue
+            wcomp[s] = wid
+            stack = [s]
+            while stack:
+                u = stack.pop()
+                for v in und[u]:
+                    if wcomp[v] == -1:
+                        wcomp[v] = wid
+                        stack.append(v)
+            wid += 1
+        self.weak_comp = wcomp
+        self.weak_comp_sizes = {}
+        for c in wcomp:
+            self.weak_comp_sizes[c] = self.weak_comp_sizes.get(c, 0) + 1
+        self._by_weak_comp = {}
+        for i, c in enumerate(wcomp):
+            self._by_weak_comp.setdefault(c, []).append(i)
         # Cache for `distance_to_network_km`. Feature extraction asks the same
         # question for every (target, frame) and again when predicting, and each
         # answer walks thousands of grid nodes; on the India graph an uncached
@@ -332,6 +388,119 @@ class Roads(object):
             if m < limit_m and (best_m is None or m < best_m):
                 best, best_m = i, m
         return best
+
+    def weak_components(self) -> List[int]:
+        """Node -> undirected component id. Read-only view of the weak labels."""
+        return self.weak_comp
+
+    def nearest_node_in_weak_component(self, lat: float, lon: float, comp_id: int,
+                                       max_km: float = MAX_SNAP_KM) -> Optional[int]:
+        """Nearest node belonging to one undirected component, else None."""
+        members = self._by_weak_comp.get(comp_id)
+        if not members:
+            return None
+        best = None
+        best_m = None
+        limit_m = max_km * 1000.0
+        for i in members:
+            m = _dist_m([lon, lat], self.nodes[i])
+            if m < limit_m and (best_m is None or m < best_m):
+                best, best_m = i, m
+        return best
+
+    def _edge_speed(self, u: int, v: int) -> float:
+        for w, _m, kmh in self.adj[u]:
+            if w == v:
+                return float(kmh)
+        return 40.0
+
+    def route_edges(self, waypoints: Sequence[Tuple[float, float]],
+                    max_snap_km: float = MAX_SNAP_KM,
+                    weak_comp: Optional[int] = None) -> RouteResult:
+        """Route a waypoint list and return the OSM edges traversed.
+
+        Snapping first prefers the undirected component that covers the most
+        waypoints, then every leg is checked on the *directed* graph. A point
+        that is only reachable by driving the wrong way down a one-way street
+        therefore fails instead of producing a plausible-looking track.
+        """
+        if not waypoints:
+            return RouteResult([], [], [], weak_comp, max_snap_km)
+
+        free: List[int] = []
+        for lat, lon in waypoints:
+            i = self.nearest_node(lat, lon, max_km=max_snap_km)
+            if i is None:
+                raise RoadError(
+                    "waypoint (%.4f, %.4f) is more than %.1f km from any road in "
+                    "the %s network" % (lat, lon, max_snap_km, self.theatre))
+            free.append(i)
+
+        if weak_comp is None:
+            counts: Dict[int, int] = {}
+            for i in free:
+                c = self.weak_comp[i]
+                counts[c] = counts.get(c, 0) + 1
+            weak_comp = max(
+                counts, key=lambda c: (counts[c], self.weak_comp_sizes.get(c, 0)))
+
+        nodes: List[int] = []
+        for (lat, lon) in waypoints:
+            i = self.nearest_node_in_weak_component(
+                lat, lon, weak_comp, max_km=max_snap_km)
+            if i is None:
+                raise RoadError(
+                    "component mismatch in the %s network: no road within %.1f km "
+                    "of (%.4f, %.4f) in weak component %d"
+                    % (self.theatre, max_snap_km, lat, lon, weak_comp))
+            nodes.append(i)
+
+        out_nodes: List[int] = [nodes[0]]
+        for a, b in zip(nodes, nodes[1:]):
+            if a == b:
+                continue
+            path = self.route(a, b)
+            if path is None:
+                raise RoadError(
+                    "no directed road route from %s to %s in the %s network"
+                    % (self.node_latlon(a), self.node_latlon(b), self.theatre))
+            out_nodes.extend(path[1:])
+
+        edges: List[dict] = []
+        for u, v in zip(out_nodes, out_nodes[1:]):
+            edges.append({
+                "from": u,
+                "to": v,
+                "way_id": self.way_ids.get((u, v)),
+                "length_m": round(_dist_m(self.nodes[u], self.nodes[v]), 1),
+                "speed_kmh": self._edge_speed(u, v),
+            })
+
+        path = [self.node_latlon(i) for i in out_nodes]
+        return RouteResult(path, out_nodes, edges, weak_comp, max_snap_km)
+
+    def path_speed_profile(self, edges: Sequence[dict]) -> dict:
+        """Distance/time/mean speed from per-edge class speeds.
+
+        The legacy `path_speed_kmh` divides by a fixed 40 km/h and is kept for
+        old callers; this method is the one strict cases should use.
+        """
+        total_m = 0.0
+        total_s = 0.0
+        for e in edges:
+            m = float(e.get("length_m") or 0.0)
+            kmh = float(e.get("speed_kmh") or 40.0)
+            if m <= 0 or kmh <= 0:
+                continue
+            total_m += m
+            total_s += (m / 1000.0) / kmh * 3600.0
+        mean = (total_m / 1000.0) / (total_s / 3600.0) if total_s > 0 else 0.0
+        return {
+            "distance_m": round(total_m, 1),
+            "time_s": round(total_s, 1),
+            "mean_kmh": round(mean, 2),
+            "edge_count": len(edges),
+        }
 
     def path_length_km(self, path: Sequence[Tuple[float, float]]) -> float:
         return geo.path_length_m(path) / 1000.0

@@ -31,6 +31,9 @@ class DemoCase:
     # image/terrain coverage. Defaults to the Taiwan Strait because every case
     # in the registry so far is there.
     theatre: str = "taiwan_strait"
+    # "scenario" = classic pre-generated scenario builder; "campaign" = the
+    # dense-transfer generator under engine/campaigns/.
+    generator: str = "scenario"
 
 
 DEFAULT_CAMERA = {
@@ -92,6 +95,26 @@ CASES: List[DemoCase] = [
             "中国台湾省 台北松山机场", "中国台湾省 高雄国际机场", "中国台湾省 台中清泉岗机场",
         ],
         camera=dict(DEFAULT_CAMERA),
+    ),
+    DemoCase(
+        case_id="taiwan_dense_transfer_v1",
+        name="台海方向多域态势演化与岸海衔接（虚构演示）",
+        description=(
+            "红蓝两组合成对象在真实海岸与路网上的转运、衔接、保障与观测演示；"
+            "任务进度受对象可用性、道路可达性和保障状态约束。"
+            "所有对象与参数均为虚构，真实地理仅作背景。"
+        ),
+        target_ids=(["TRV%03d" % i for i in range(1, 37)]
+                    + ["TBV%03d" % i for i in range(1, 25)]
+                    + ["TRS%03d" % i for i in range(1, 7)]
+                    + ["TBS%03d" % i for i in range(1, 7)]
+                    + ["TRA%03d" % i for i in range(1, 5)]
+                    + ["TBA%03d" % i for i in range(1, 5)]),
+        hotspot_names=["D区岸海衔接", "E区岸上任务", "F区保障"],
+        camera={"lon": 120.170, "lat": 22.972, "height": 12000.0,
+                "heading": 0.0, "pitch": -60.0},
+        theatre="taiwan_strait",
+        generator="campaign",
     ),
 ]
 
