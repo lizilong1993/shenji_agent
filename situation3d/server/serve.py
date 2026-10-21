@@ -527,6 +527,19 @@ def warm_situations_index():
         print("[situations] 预热失败：%s" % exc, flush=True)
 TDT_TIMEOUT = 12.0
 TDT_MAX_LEVEL = 18
+# 天地图"此级别下，该区域无影像"占位图。
+#
+# 天地图在区域/层级没有影像时**不回 404**，而是回一张固定的灰色 PNG（图上是
+# "此级别下，该区域无影像，请放大或缩小地图后再浏览"），且对所有缺图瓦片都是
+# **同一份字节**（2026-10-21 实测：4769 B，md5 c0edbdcb…；台海与印度方向、z16–z18
+# 多点抽样一致）。把它当有效瓦片发出去，Cesium 会用它在父级影像之上覆盖一块灰，
+# 整屏只剩那句提示。代理把它判成缺失、回 404 后，Cesium 对缺失瓦片的处理是保留
+# 父级（更低层级）已加载的影像并拉伸——正是"维持相邻层级影像"的效果。
+#
+# 离线瓦片库 tianditu_satellite.mbtiles 里也烘焙进了 5 万多张这种占位瓦片
+# （z14–z17），所以 /tdt 的瓦片库命中、上游取回，以及 /tiles_db 直发三条路径都要判。
+TDT_BLANK_TILE_MD5 = "c0edbdcb2c8ddd3e6a5cf09348c0fcb4"
+TDT_BLANK_TILE_SIZE = 4769
 # 探测到的 UA 组合（'server' = 非浏览器 UA）。默认按服务器端 key 起步，因为
 # 服务器端 key 更常见于后端代理场景。
 _TDT_UA_MODE = ["server"]
@@ -882,6 +895,17 @@ def fetch_tdt_tile(layer, z, x, y):
 
     _TDT_LAST_ERROR[0] = last
     raise RuntimeError(last)
+
+
+def tdt_blank_tile(data):
+    """是否天地图"此级别下，该区域无影像"的占位图（见 TDT_BLANK_TILE_MD5）。
+
+    先比长度再算 md5：正常影像瓦片几乎不会正好 4769 字节，绝大多数请求只付一次
+    整数比较；长度命中才做哈希（几百微秒）。占位图同样写进磁盘缓存，重复请求
+    只花一次读盘 + 哈希，不会反复打上游。
+    """
+    return (len(data) == TDT_BLANK_TILE_SIZE
+            and hashlib.md5(data).hexdigest() == TDT_BLANK_TILE_MD5)
 
 
 # --------------------------------------------------------------------------
@@ -1404,6 +1428,10 @@ class Handler(SimpleHTTPRequestHandler):
         if not data:
             self.send_error(404, "no such tile")
             return
+        # 与 /tdt 同理：库里烘焙进去的天地图占位图也按缺失处理（见 TDT_BLANK_TILE_MD5）。
+        if tdt_blank_tile(data):
+            self.send_error(404, "no imagery at this level")
+            return
         self._send_tile(data, tile_db_ctype(data))
 
     def _tiles3d_item(self):
@@ -1480,6 +1508,10 @@ class Handler(SimpleHTTPRequestHandler):
         if db_path:
             data = tile_db_get(db_path, z, x, y)
             if data:
+                # 库里可能烘焙进了占位图（见 TDT_BLANK_TILE_MD5），一样按缺失处理。
+                if tdt_blank_tile(data):
+                    self.send_error(404, "no imagery at this level")
+                    return
                 self._send_tile(
                     data, tile_db_ctype(data))
                 return
@@ -1497,6 +1529,9 @@ class Handler(SimpleHTTPRequestHandler):
                       % (layer, z, x, y, reason))
                 _TDT_LOG_STATE[0] = reason
             self.send_error(404, "tile unavailable")
+            return
+        if tdt_blank_tile(data):
+            self.send_error(404, "no imagery at this level")
             return
         self._send_tile(data, ctype)
 
