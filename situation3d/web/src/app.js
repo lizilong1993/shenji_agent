@@ -3598,7 +3598,11 @@ function relClear() {
 var REL_LABEL_MAX_KM = 260;
 
 function relAddLine(from, to, dashed, color, text) {
-  var alt = Math.max(0, (Number(from.alt) || 0) + (Number(to.alt) || 0)) / 2;
+  // ⚠ 两端**各自的真实高度**，不能用平均高度：飞机 8500 m 连水面舰艇 0 m 时，
+  // 平均高度画出来的线两端各悬空 4 km，视觉上完全不贴目标（实测截图）。
+  var altFrom = Math.max(0, Number(from.alt) || 0);
+  var altTo = Math.max(0, Number(to.alt) || 0);
+  var alt = (altFrom + altTo) / 2;      // 只用于标签中点
   // 过远的关联只画线不写字（见 REL_LABEL_MAX_KM）。
   if (relKm(from, to) > REL_LABEL_MAX_KM) text = '';
   // **没有文字就不建 label 实体**：空字符串的标签在 Cesium 里仍占一个图元，
@@ -3606,7 +3610,7 @@ function relAddLine(from, to, dashed, color, text) {
   var ent = viewer.entities.add({
     polyline: {
       positions: Cesium.Cartesian3.fromDegreesArrayHeights(
-        [from.lon, from.lat, alt, to.lon, to.lat, alt]),
+        [from.lon, from.lat, altFrom, to.lon, to.lat, altTo]),
       width: 2,
       material: dashed
         ? new Cesium.PolylineDashMaterialProperty({ color: color, dashLength: 16 })
@@ -6722,22 +6726,43 @@ function bindPicking() {
     updateGeoReadout();
   }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
+  // 记录按下位置：用来区分"点击"和"拖拽"（拖动地图不应改变选中态）。
+  var downPos = null;
+  handler.setInputAction(function (m) {
+    downPos = Cesium.Cartesian2.clone(m.position);
+  }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+
   handler.setInputAction(function (click) {
     // 绘制模式下左键**只落控制点，不选中目标**：否则点在地图上会误切换选中，
     // 把正在画的标绘打断。模式退出后恢复原有拾取行为。
     if (plotDraw) {
       const carto = groundCartoAt(click.position.x, click.position.y);
       if (carto) addPlotPoint(carto);
+      downPos = null;
       return;
+    }
+    // 按下与松开相距超过 6 px 视为拖拽（旋转/平移地图），不改变选中态。
+    if (downPos) {
+      const dx = click.position.x - downPos.x;
+      const dy = click.position.y - downPos.y;
+      downPos = null;
+      if (Math.sqrt(dx * dx + dy * dy) > 6) return;
     }
     const picked = viewer.scene.pick(click.position);
     const id = picked && picked.id && typeof picked.id.id === 'string' ? picked.id.id : null;
-    if (!id) return;
+    if (!id) {
+      // 点到空白（天空/地面）：取消目标选中，关系线随之清除。
+      if (state.selected) clearTargetSelection();
+      return;
+    }
 
     if (id.indexOf('target-') === 0) {
       selectTarget(id.slice('target-'.length), false);
     } else if (id.indexOf('hotspot-') === 0) {
       selectHotspot(Number(id.slice('hotspot-'.length)), false);
+    } else if (state.selected) {
+      // 点到其它非目标图元（标牌、关系线、航路、热点面…）：同样取消选中。
+      clearTargetSelection();
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 }
