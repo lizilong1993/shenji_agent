@@ -319,11 +319,11 @@
       box.open = true;
       box.appendChild(el('summary', null, g));
       var groupRows = rows.filter(function (s) { return s.group === g; });
-      var direct = groupRows.filter(function (s) { return !s.subgroup; });
+      var direct = groupRows.filter(function (s) { return !s.subgroup && s.panel !== false; });
       direct.sort(function (a, b) { return (a.z - b.z) || (a.id < b.id ? -1 : 1); })
         .forEach(function (s) { appendLayerRow(box, s); });
       var subs = {};
-      groupRows.filter(function (s) { return !!s.subgroup; }).forEach(function (s) {
+      groupRows.filter(function (s) { return !!s.subgroup && s.panel !== false; }).forEach(function (s) {
         (subs[s.subgroup] = subs[s.subgroup] || []).push(s);
       });
       Object.keys(subs).forEach(function (sg) {

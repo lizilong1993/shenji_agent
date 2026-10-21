@@ -1920,7 +1920,8 @@ function closeCaseMenu() { closeAllMenus(); }
 
 const LAYER_GROUPS = [
   { name: 'TS图层', ids: ['layerHotspots', 'layerRoutes'] },
-  { name: '目标图层', ids: ['layerTargetsRed', 'layerTargetsBlue', 'layerLabels', 'layerTracks'] },
+  // layerLabels 自 2026-10-21 起不在面板显示（panel:false），也不参与批量命令。
+  { name: '目标图层', ids: ['layerTargetsRed', 'layerTargetsBlue', 'layerTracks'] },
   { name: '底图', ids: ['modelTianditu', 'modelTiandituLabel', 'modelImagery',
                         'modelHotspotImagery', 'modelUrbanImagery',
                         'modelPlaces', 'modelTerrain',
@@ -2006,6 +2007,9 @@ function applyLayerCommand(cmd) {
   // 否则「全部显示」对它们无效 —— 这类漏项不会报错，只会表现为按钮没反应。
   LayerRegistry.LAYERS.forEach(function (d) {
     if (only && only.indexOf(d.group) < 0) return;
+    // panel:false 的行用户看不见、也关不掉：批量命令同样不能碰，否则
+    // 「全部显示」会打开一个没有 UI 入口的开关（如选中掩码压暗全图）。
+    if (d.panel === false) return;
     if (ids.indexOf(d.id) < 0) ids.push(d.id);
   });
   ids.forEach(function (id) {
@@ -2217,8 +2221,10 @@ function createTargetEntities() {
         // 完整历史（第 0 帧 → 当前帧）。窗口只影响掩码/取证读数，不影响绘制。
         return rec ? rec.trail : [];
       }, false),
-      width: 1.5,
-      material: color.withAlpha(0.12),
+      width: 1,
+      // 中性浅灰、低不透明度：历史全程线只是底噪，不与阵营色/近期白线抢视线。
+      // 近期白色实线（2.5 px）压在它上面，两者取自同一份 rec.trail，几何上完全重合。
+      material: Cesium.Color.fromCssColorString('#9aa3ad').withAlpha(0.3),
       clampToGround: false,
     };
 
@@ -2248,9 +2254,11 @@ function createTargetEntities() {
           const pts = predictedTrackPoints(def);
           return pts.map(function (p) { return Cesium.Cartesian3.fromDegrees(p[0], p[1], p[2] || 0); });
         }, false),
-        width: 2,
+        width: 1.5,
+        // 计划轨迹与历史实线同属「历史轨迹」图层，统一用中性灰虚线；按阵营
+        // 着色时红方目标的虚线在屏幕上呈粉红色，和历史轨迹混在一起分不清。
         material: new Cesium.PolylineDashMaterialProperty({
-          color: color.withAlpha(0.9),
+          color: Cesium.Color.fromCssColorString('#c9cfd6').withAlpha(0.8),
           dashLength: 14,
         }),
         clampToGround: false,
@@ -2268,8 +2276,8 @@ function createTargetEntities() {
         width: 16,
         height: 16,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        // 用 polylines 的 material 颜色没法复用到 billboard，直接用阵营色近似
-        color: color,
+        // 与上方计划虚线同一中性色（billboard 不能复用 polyline 的 material）。
+        color: Cesium.Color.fromCssColorString('#c9cfd6').withAlpha(0.8),
       },
     });
 
@@ -2981,15 +2989,16 @@ function syncEntities() {
       rec.trail.length = 0;
       rec.lastTick = -1;
     }
-    if (visible && state.layers.tracks && state.tick > rec.lastTick) {
+    // 航迹是**数据**而不是显示状态：与「历史轨迹」开关、目标可见性无关地持续
+    // 累积。早先在图层关闭时清空 rec.trail、且 lastTick 照常前移，重新勾选后
+    // 航迹只能从当时那帧重新长出来（暂停/深链时甚至为空），表现为"只剩最近一段"。
+    if (state.tick > rec.lastTick) {
       for (let t = rec.lastTick + 1; t <= state.tick; t++) {
         const s = positionFor(id, t);
         if (s) rec.trail.push(Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt));
       }
+      rec.lastTick = state.tick;
     }
-    rec.lastTick = state.tick;
-
-    if (!state.layers.tracks) rec.trail.length = 0;
     if (rec.recentEntity) rec.recentEntity.show = visible && state.layers.tracks && rec.trail.length > 1;
     // 历史轨迹**全程实线**：不按窗口切片。窗口只用于掩码取值（updateFocusMask），
     // 绘制给用户看的是从第 0 帧到当前帧的完整航迹（需求：不要只画固定步长）。

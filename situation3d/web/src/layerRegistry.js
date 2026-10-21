@@ -293,14 +293,17 @@
       group: '目标图层', default: true },
     { id: 'layerTargetsBlue', kind: 'target', z: 11, label: '蓝方目标',
       group: '目标图层', default: true },
-    { id: 'layerLabels', kind: 'target', z: 20, label: '目标标牌',
+    // 目标标牌：开关对画面无可感知影响（标牌只在避让时隐藏），按用户要求
+    // 2026-10-21 从图层面板移除，只保留内部开关。
+    { id: 'layerLabels', kind: 'target', z: 20, label: '目标标牌', panel: false,
       group: '目标图层', default: true },
     // 「历史轨迹」图层同时管理历史实线与计划虚线（虚线 + 终点箭头）。
     { id: 'layerTracks', kind: 'target', z: 30, label: '历史轨迹',
       group: '目标图层', default: true },
   // B4 选中掩码：外环全图 + 内环挖空「选中目标 + 它的轨迹范围」。
   // handler 在 app.js 的映射表里（state.layers.focusMask → updateFocusMask）。
-  { id: 'overlay.focusMask', kind: 'target', z: 35, label: '选中掩码',
+  // 2026-10-21 按用户要求从面板移除（看不出效果）；内部开关保留。
+  { id: 'overlay.focusMask', kind: 'target', z: 35, label: '选中掩码', panel: false,
     group: '目标图层', default: false },
 
     // ---- 地图组件 ----
@@ -568,6 +571,7 @@
       return {
         id: l.id, kind: l.kind, z: l.z, label: l.label, group: l.group,
         subgroup: l.subgroup || null,
+        panel: l.panel !== false,   // false 的行不在图层面板里显示（内部开关保留）
         checkbox: l.checkbox || null,
         desired: r.desired,
         effective: !!effective[l.id],
