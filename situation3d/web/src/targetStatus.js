@@ -16,7 +16,7 @@
  *
  *   1. 交战暴露 E = Σ 每帧权重；alert 2 -> 1，alert 3 -> 3，其余 0。
  *   2. 按整段案例的 E_total 排序分配最终档位（占比按编成总数）：
- *        前 6%   -> 损毁（最终 0 HP）
+ *        前 6%   -> 损毁（最终 0 HP；仅当最高暴露 >= 800 才启用）
  *        随后 10% -> 严重受损（最终 30..5 HP）
  *        再后 22% -> 受损（最终 68..40 HP）
  *        其余    -> 正常（100 HP）
@@ -56,6 +56,10 @@
 
   // 血量随暴露进度落位到最终档的位置：80% 暴露时到达最终值。
   var SETTLE_AT = 0.8;
+
+  // 只有最高暴露达到该值（约 267 帧严重告警，约 2.2 小时）才允许出现损毁档。
+  // 否则低强度对峙（如中印案例最高暴露 642）也会被"排名前 6%"强行判毁。
+  var MIN_DESTROY_EXPOSURE = 800;
 
   var THRESHOLDS = { severe: 35, damaged: 70 };
 
@@ -146,6 +150,12 @@
       dN = Math.floor(dN * cap / total);
       sN = Math.max(0, Math.floor(sN * cap / total));
       mN = Math.max(0, cap - dN - sN);
+    }
+    // 低强度案例不因排名而制造损毁：最高暴露不足阈值时取消损毁档，
+    // 由严重/受损档承接排名靠前的目标。
+    if (dN > 0 && active.length &&
+        cache.totalExposure[active[0]] < MIN_DESTROY_EXPOSURE) {
+      dN = 0;
     }
 
     active.forEach(function (id, i) {
@@ -361,6 +371,7 @@
       bands: BANDS,
       weights: WEIGHTS,
       settleAt: SETTLE_AT,
+      minDestroyExposure: MIN_DESTROY_EXPOSURE,
       thresholds: THRESHOLDS,
       caseId: cache.caseId,
       tick: cache.tick,
