@@ -23,6 +23,29 @@ from sim import sensors as sensor_model
 from mobility.profile import profile_for
 
 DEFAULT_ANCHOR = (119.9, 23.1)
+DETECTION_MODELS = ("table", "spotting", "shadow")
+DIRECT_FIRE_MODELS = ("crt", "physics", "shadow")
+
+
+def _engine_section(value) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def _as_bool(value, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return default
+
+
+def _as_float(value, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
 
 INDIRECT_IDS = {72, 88, 89}
 
@@ -180,7 +203,23 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
     else:
         grid = _grid_for(basic, scenario)
         env = MapGridEnvironment(basic, grid)
-    world = World(env, _rule_grid_for(grid), dt_s=dt_s, seed=seed, plan_grid=grid)
+    engine = _engine_section(scenario.get("engine"))
+    detection_model = str(engine.get("detection_model") or "table").lower()
+    if detection_model not in DETECTION_MODELS:
+        detection_model = "table"
+    direct_fire_model = str(engine.get("direct_fire_model") or "crt").lower()
+    if direct_fire_model not in DIRECT_FIRE_MODELS:
+        direct_fire_model = "crt"
+    commander_interval_s = _as_float(engine.get("commander_interval_s"), 2.0)
+    world = World(env, _rule_grid_for(grid), dt_s=dt_s, seed=seed, plan_grid=grid,
+                  detection_model=detection_model,
+                  direct_fire_model=direct_fire_model,
+                  enable_radio_share=_as_bool(engine.get("enable_radio_share"), False),
+                  enable_tactics=_as_bool(engine.get("enable_tactics"), False),
+                  commander_interval_s=commander_interval_s)
+    if _as_bool(engine.get("enable_commander"), False):
+        from sim.commander import RuleCommander
+        world.set_commander(RuleCommander(), commander_interval_s)
     for op in scenario.get("operators") or []:
         unit_type = _unit_type(op)
         domain = _domain(str(op.get("name") or ""), int(op.get("type") or 2), unit_type)
@@ -204,13 +243,18 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             affiliation=int(op.get("color") or 0),
             domain=domain,
             profile_id=unit_type,
-            pose=Pose(lon, lat, env.elevation(lon, lat)),
+            pose=Pose(lon, lat, env.elevation(lon, lat),
+                      heading_deg=_as_float(op.get("heading_deg"), 0.0)),
             unit_type=unit_type,
             unit_kind=_unit_kind(op, unit_type),
             blood=int(op.get("blood") or 1),
             max_blood=int(op.get("max_blood") or op.get("blood") or 1),
             armor=armor,
+            armor_profile={str(k): float(v) for k, v in (op.get("armor_profile") or {}).items()},
             size_class=str(op.get("size_class") or profile.size_class),
+            concealment=(float(op["concealment"]) if op.get("concealment") is not None else None),
+            comms_range_m=(600.0 if op.get("comms_range_m") is None
+                           else _as_float(op.get("comms_range_m"), 600.0)),
             depth=str(op.get("depth") or "surface"),
             emitting=bool(op.get("emitting", True)),
             observe_distance={str(k): int(v) for k, v in (op.get("observe_distance") or {}).items()},
