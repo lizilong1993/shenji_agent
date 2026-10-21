@@ -46,12 +46,13 @@
       label: 'TW2024 三维样例',
       url: './tiles3d/tw2024/tileset.json',
     },
-    // 2026-10-21：15 个沿海 AOI 的白膜 v2（tw_coastal_v2.zip）。
-    // v2 修复：b3dm 内 glTF 按规范改为 Y-up（v1 写的是 Z-up ECEF，Cesium 会把模型
-    // 绕 X 轴旋转 90°，加载成功但看不见）；并调大 geometricError 使城市级视距内能出图。
+    // 2026-10-21：15 个沿海 AOI 的白膜 v3（tw_coastal_v3.zip）。
+    // v2：修复 b3dm glTF 轴向（Y-up）并调大 geometricError。
+    // v3：并入 GBA 全量卫星解译轮廓（GBA.Polygon，CC BY-NC，仅内部使用），
+    //     14 个 AOI 建模栋数 +82%（含 100% 有效高度），详见调研报告第 9 节。
     'tiles3d.tw_coastal': {
       label: '台湾沿海城市建筑白膜',
-      url: './tiles3d/tw_coastal_v2/tileset.json',
+      url: './tiles3d/tw_coastal_v3/tileset.json',
     },
   };
 
