@@ -1,0 +1,2687 @@
+{
+  "schema": "situation3d.wargame_core.demo.v1",
+  "scenario_path": "/remote-home/lizilong/shenji_agent/land_wargame_sdk/Data/Data/scenarios/1231.json",
+  "map_path": "/remote-home/lizilong/shenji_agent/land_wargame_sdk/Data/Data/maps/map_123/basic.json",
+  "seed": 20261021,
+  "tick_seconds": 30.0,
+  "result": {
+    "scenario_id": 1231,
+    "tick": 300,
+    "winner": null,
+    "reason": "",
+    "score": {
+      "red": 24,
+      "blue": 154
+    },
+    "units": [
+      {
+        "id": 14905,
+        "name": "重型坦克",
+        "color": 1,
+        "type": 2,
+        "sub_type": 0,
+        "unit_type": "vehicle",
+        "domain": "land",
+        "pos": 1631,
+        "row": 16,
+        "col": 31,
+        "blood": 0,
+        "max_blood": 3,
+        "armor": 4,
+        "alive": false,
+        "suppressed": false,
+        "concealed": false,
+        "moving": false,
+        "marching": false,
+        "altitude_band": "ground",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 1.0,
+        "strength": 100.0,
+        "ammo": {
+          "cannon_large": 3,
+          "mg": 30
+        }
+      },
+      {
+        "id": 14906,
+        "name": "重型坦克",
+        "color": 1,
+        "type": 2,
+        "sub_type": 0,
+        "unit_type": "vehicle",
+        "domain": "land",
+        "pos": 1631,
+        "row": 16,
+        "col": 31,
+        "blood": 0,
+        "max_blood": 3,
+        "armor": 4,
+        "alive": false,
+        "suppressed": false,
+        "concealed": false,
+        "moving": false,
+        "marching": false,
+        "altitude_band": "ground",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 1.0,
+        "strength": 100.0,
+        "ammo": {
+          "cannon_large": 0,
+          "mg": 29
+        }
+      },
+      {
+        "id": 14908,
+        "name": "重型战车",
+        "color": 1,
+        "type": 2,
+        "sub_type": 1,
+        "unit_type": "vehicle",
+        "domain": "land",
+        "pos": 2030,
+        "row": 20,
+        "col": 30,
+        "blood": 1,
+        "max_blood": 3,
+        "armor": 3,
+        "alive": true,
+        "suppressed": false,
+        "concealed": false,
+        "moving": false,
+        "marching": false,
+        "altitude_band": "ground",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 1.0,
+        "strength": 100.0,
+        "ammo": {
+          "autocannon": 11,
+          "atgm": 0
+        }
+      },
+      {
+        "id": 14910,
+        "name": "重型战车",
+        "color": 1,
+        "type": 2,
+        "sub_type": 1,
+        "unit_type": "vehicle",
+        "domain": "land",
+        "pos": 2030,
+        "row": 20,
+        "col": 30,
+        "blood": 3,
+        "max_blood": 3,
+        "armor": 3,
+        "alive": true,
+        "suppressed": false,
+        "concealed": false,
+        "moving": false,
+        "marching": false,
+        "altitude_band": "ground",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 1.0,
+        "strength": 100.0,
+        "ammo": {
+          "autocannon": 13,
+          "atgm": 0
+        }
+      },
+      {
+        "id": 14911,
+        "name": "重型坦克",
+        "color": 0,
+        "type": 2,
+        "sub_type": 0,
+        "unit_type": "vehicle",
+        "domain": "land",
+        "pos": 2622,
+        "row": 26,
+        "col": 22,
+        "blood": 0,
+        "max_blood": 4,
+        "armor": 4,
+        "alive": false,
+        "suppressed": false,
+        "concealed": false,
+        "moving": false,
+        "marching": false,
+        "altitude_band": "ground",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 1.0,
+        "strength": 100.0,
+        "ammo": {
+          "cannon_large": 8,
+          "mg": 30
+        }
+      },
+      {
+        "id": 14913,
+        "name": "无人战车",
+        "color": 0,
+        "type": 2,
+        "sub_type": 4,
+        "unit_type": "vehicle",
+        "domain": "land",
+        "pos": 2624,
+        "row": 26,
+        "col": 24,
+        "blood": 0,
+        "max_blood": 4,
+        "armor": 0,
+        "alive": false,
+        "suppressed": false,
+        "concealed": false,
+        "moving": true,
+        "marching": false,
+        "altitude_band": "ground",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 1.0,
+        "strength": 100.0,
+        "ammo": {
+          "autocannon": 16
+        }
+      },
+      {
+        "id": 14914,
+        "name": "中型战车",
+        "color": 0,
+        "type": 2,
+        "sub_type": 1,
+        "unit_type": "vehicle",
+        "domain": "land",
+        "pos": 2623,
+        "row": 26,
+        "col": 23,
+        "blood": 0,
+        "max_blood": 4,
+        "armor": 2,
+        "alive": false,
+        "suppressed": false,
+        "concealed": false,
+        "moving": true,
+        "marching": false,
+        "altitude_band": "ground",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 1.0,
+        "strength": 100.0,
+        "ammo": {
+          "autocannon": 16,
+          "atgm": 0
+        }
+      },
+      {
+        "id": 14907,
+        "name": "步兵小队",
+        "color": 1,
+        "type": 1,
+        "sub_type": 2,
+        "unit_type": "infantry",
+        "domain": "land",
+        "pos": 1631,
+        "row": 16,
+        "col": 31,
+        "blood": 3,
+        "max_blood": 3,
+        "armor": 0,
+        "alive": true,
+        "suppressed": false,
+        "concealed": false,
+        "moving": false,
+        "marching": false,
+        "altitude_band": "ground",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 1.0,
+        "strength": 100.0,
+        "ammo": {
+          "small_arms": 30,
+          "portable_atgm": 3
+        }
+      },
+      {
+        "id": 14909,
+        "name": "步兵小队",
+        "color": 1,
+        "type": 1,
+        "sub_type": 2,
+        "unit_type": "infantry",
+        "domain": "land",
+        "pos": 1631,
+        "row": 16,
+        "col": 31,
+        "blood": 3,
+        "max_blood": 3,
+        "armor": 0,
+        "alive": true,
+        "suppressed": false,
+        "concealed": false,
+        "moving": false,
+        "marching": false,
+        "altitude_band": "ground",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 1.0,
+        "strength": 100.0,
+        "ammo": {
+          "small_arms": 30,
+          "portable_atgm": 3
+        }
+      },
+      {
+        "id": 14912,
+        "name": "步兵小队",
+        "color": 0,
+        "type": 1,
+        "sub_type": 2,
+        "unit_type": "infantry",
+        "domain": "land",
+        "pos": 2725,
+        "row": 27,
+        "col": 25,
+        "blood": 0,
+        "max_blood": 4,
+        "armor": 0,
+        "alive": false,
+        "suppressed": false,
+        "concealed": false,
+        "moving": false,
+        "marching": false,
+        "altitude_band": "ground",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 1.0,
+        "strength": 100.0,
+        "ammo": {
+          "small_arms": 30,
+          "portable_atgm": 0
+        }
+      },
+      {
+        "id": 14915,
+        "name": "巡飞弹",
+        "color": 0,
+        "type": 3,
+        "sub_type": 7,
+        "unit_type": "uav",
+        "domain": "air",
+        "pos": 1631,
+        "row": 16,
+        "col": 31,
+        "blood": 4,
+        "max_blood": 4,
+        "armor": 0,
+        "alive": true,
+        "suppressed": false,
+        "concealed": false,
+        "moving": false,
+        "marching": false,
+        "altitude_band": "中空",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 0.58,
+        "strength": 100.0,
+        "ammo": {
+          "cannon_small": 12,
+          "bvr": 8,
+          "wvr": 6,
+          "air_ground": 0,
+          "asm_light": 8
+        }
+      },
+      {
+        "id": 14916,
+        "name": "巡飞弹",
+        "color": 0,
+        "type": 3,
+        "sub_type": 7,
+        "unit_type": "uav",
+        "domain": "air",
+        "pos": 1631,
+        "row": 16,
+        "col": 31,
+        "blood": 4,
+        "max_blood": 4,
+        "armor": 0,
+        "alive": true,
+        "suppressed": false,
+        "concealed": false,
+        "moving": false,
+        "marching": false,
+        "altitude_band": "中空",
+        "depth": "surface",
+        "readiness": 0.85,
+        "fuel": 0.58,
+        "strength": 100.0,
+        "ammo": {
+          "cannon_small": 12,
+          "bvr": 8,
+          "wvr": 6,
+          "air_ground": 0,
+          "asm_light": 8
+        }
+      }
+    ],
+    "objectives": [
+      {
+        "coord": 2030,
+        "row": 20,
+        "col": 30,
+        "value": 80,
+        "owner": "blue",
+        "name": "主要"
+      },
+      {
+        "coord": 1631,
+        "row": 16,
+        "col": 31,
+        "value": 50,
+        "owner": "blue",
+        "name": "次要"
+      }
+    ],
+    "events": [
+      {
+        "id": "EV-000001",
+        "tick": 1,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14915,
+          14905
+        ],
+        "location": [
+          24,
+          44
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 5.0,
+        "pk": 0.14,
+        "roll": 0.546,
+        "result": "miss",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "巡飞弹 对 重型坦克 发射航空制导炸弹：未命中",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000002",
+        "tick": 1,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14916,
+          14905
+        ],
+        "location": [
+          24,
+          44
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 5.0,
+        "pk": 0.14,
+        "roll": 0.385,
+        "result": "miss",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "巡飞弹 对 重型坦克 发射航空制导炸弹：未命中",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000003",
+        "tick": 5,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14905,
+          14911
+        ],
+        "location": [
+          26,
+          22
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 8,
+        "effective_attack_level": 6,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1,
+          "shooter_moving": -1
+        },
+        "roll": 2,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 4,
+        "description": "重型坦克 对 重型坦克 使用大号直瞄炮射击：无效果",
+        "raw": {
+          "distance": 18
+        }
+      },
+      {
+        "id": "EV-000004",
+        "tick": 5,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14908,
+          14911
+        ],
+        "location": [
+          26,
+          22
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 8,
+        "effective_attack_level": 6,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1,
+          "shooter_moving": -1
+        },
+        "roll": 8,
+        "result": "suppressed",
+        "damage": 0,
+        "target_blood": 4,
+        "description": "重型战车 对 重型坦克 使用重型导弹射击：压制",
+        "raw": {
+          "distance": 18
+        }
+      },
+      {
+        "id": "EV-000005",
+        "tick": 5,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14914,
+          14905
+        ],
+        "location": [
+          23,
+          38
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 8,
+        "effective_attack_level": 6,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1,
+          "shooter_moving": -1
+        },
+        "roll": 8,
+        "result": "suppressed",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "中型战车 对 重型坦克 使用重型导弹射击：压制",
+        "raw": {
+          "distance": 20
+        }
+      },
+      {
+        "id": "EV-000006",
+        "tick": 6,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14908,
+          14911
+        ],
+        "location": [
+          26,
+          22
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0
+        },
+        "roll": 7,
+        "result": "suppressed",
+        "damage": 0,
+        "target_blood": 4,
+        "description": "重型战车 对 重型坦克 使用重型导弹射击：压制",
+        "raw": {
+          "distance": 18
+        }
+      },
+      {
+        "id": "EV-000007",
+        "tick": 6,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14910,
+          14911
+        ],
+        "location": [
+          26,
+          22
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 8,
+        "effective_attack_level": 7,
+        "modifiers": {
+          "elevation": 0,
+          "shooter_moving": -1
+        },
+        "roll": 12,
+        "result": "damage",
+        "damage": 1,
+        "target_blood": 3,
+        "description": "重型战车 对 重型坦克 使用重型导弹射击：毁伤 1",
+        "raw": {
+          "distance": 20
+        }
+      },
+      {
+        "id": "EV-000008",
+        "tick": 6,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14914,
+          14905
+        ],
+        "location": [
+          23,
+          38
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0
+        },
+        "roll": 12,
+        "result": "damage",
+        "damage": 2,
+        "target_blood": 1,
+        "description": "中型战车 对 重型坦克 使用重型导弹射击：毁伤 2",
+        "raw": {
+          "distance": 20
+        }
+      },
+      {
+        "id": "EV-000009",
+        "tick": 7,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14905,
+          14913
+        ],
+        "location": [
+          26,
+          23
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 8,
+        "effective_attack_level": 9,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1,
+          "target_stacked": 2
+        },
+        "roll": 5,
+        "result": "damage",
+        "damage": 1,
+        "target_blood": 3,
+        "description": "重型坦克 对 无人战车 使用大号直瞄炮射击：毁伤 1",
+        "raw": {
+          "distance": 17
+        }
+      },
+      {
+        "id": "EV-000010",
+        "tick": 7,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14906,
+          14913
+        ],
+        "location": [
+          26,
+          23
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1,
+          "target_stacked": 2,
+          "shooter_moving": -1
+        },
+        "roll": 9,
+        "result": "damage",
+        "damage": 2,
+        "target_blood": 1,
+        "description": "重型坦克 对 无人战车 使用大号直瞄炮射击：毁伤 2",
+        "raw": {
+          "distance": 17
+        }
+      },
+      {
+        "id": "EV-000011",
+        "tick": 7,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14908,
+          14911
+        ],
+        "location": [
+          26,
+          22
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0
+        },
+        "roll": 8,
+        "result": "suppressed",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "重型战车 对 重型坦克 使用重型导弹射击：压制",
+        "raw": {
+          "distance": 18
+        }
+      },
+      {
+        "id": "EV-000012",
+        "tick": 7,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14910,
+          14911
+        ],
+        "location": [
+          26,
+          22
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0
+        },
+        "roll": 8,
+        "result": "suppressed",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "重型战车 对 重型坦克 使用重型导弹射击：压制",
+        "raw": {
+          "distance": 20
+        }
+      },
+      {
+        "id": "EV-000013",
+        "tick": 7,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14914,
+          14905
+        ],
+        "location": [
+          23,
+          38
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0
+        },
+        "roll": 2,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 1,
+        "description": "中型战车 对 重型坦克 使用重型导弹射击：无效果",
+        "raw": {
+          "distance": 20
+        }
+      },
+      {
+        "id": "EV-000014",
+        "tick": 8,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14905,
+          14913
+        ],
+        "location": [
+          26,
+          24
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 8,
+        "effective_attack_level": 9,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1,
+          "target_stacked": 2
+        },
+        "roll": 5,
+        "result": "damage",
+        "damage": 1,
+        "target_blood": 0,
+        "description": "重型坦克 对 无人战车 使用大号直瞄炮射击：毁伤 1，目标被摧毁",
+        "raw": {
+          "distance": 16
+        }
+      },
+      {
+        "id": "EV-000015",
+        "tick": 8,
+        "type": "destroyed",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14913
+        ],
+        "location": [
+          26,
+          24
+        ],
+        "description": "无人战车 被摧毁",
+        "raw": {}
+      },
+      {
+        "id": "EV-000016",
+        "tick": 8,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14914,
+          14905
+        ],
+        "location": [
+          23,
+          38
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0
+        },
+        "roll": 2,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 1,
+        "description": "中型战车 对 重型坦克 使用重型导弹射击：无效果",
+        "raw": {
+          "distance": 20
+        }
+      },
+      {
+        "id": "EV-000017",
+        "tick": 9,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14905,
+          14911
+        ],
+        "location": [
+          26,
+          22
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0
+        },
+        "roll": 2,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "重型坦克 对 重型坦克 使用大号直瞄炮射击：无效果",
+        "raw": {
+          "distance": 18
+        }
+      },
+      {
+        "id": "EV-000018",
+        "tick": 9,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14906,
+          14911
+        ],
+        "location": [
+          26,
+          22
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0
+        },
+        "roll": 12,
+        "result": "damage",
+        "damage": 2,
+        "target_blood": 1,
+        "description": "重型坦克 对 重型坦克 使用大号直瞄炮射击：毁伤 2",
+        "raw": {
+          "distance": 18
+        }
+      },
+      {
+        "id": "EV-000019",
+        "tick": 9,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14908,
+          14911
+        ],
+        "location": [
+          26,
+          22
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0
+        },
+        "roll": 11,
+        "result": "damage",
+        "damage": 1,
+        "target_blood": 0,
+        "description": "重型战车 对 重型坦克 使用重型导弹射击：毁伤 1，目标被摧毁",
+        "raw": {
+          "distance": 18
+        }
+      },
+      {
+        "id": "EV-000020",
+        "tick": 9,
+        "type": "destroyed",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14911
+        ],
+        "location": [
+          26,
+          22
+        ],
+        "description": "重型坦克 被摧毁",
+        "raw": {}
+      },
+      {
+        "id": "EV-000021",
+        "tick": 9,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 neutral → red",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "red",
+            "name": "主要"
+          },
+          "from": "neutral",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000022",
+        "tick": 10,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14905,
+          14914
+        ],
+        "location": [
+          26,
+          23
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1,
+          "target_stacked": 2,
+          "shooter_moving": -1
+        },
+        "roll": 11,
+        "result": "damage",
+        "damage": 2,
+        "target_blood": 2,
+        "description": "重型坦克 对 中型战车 使用大号直瞄炮射击：毁伤 2",
+        "raw": {
+          "distance": 16
+        }
+      },
+      {
+        "id": "EV-000023",
+        "tick": 10,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14906,
+          14914
+        ],
+        "location": [
+          26,
+          23
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1,
+          "target_stacked": 2,
+          "shooter_moving": -1
+        },
+        "roll": 12,
+        "result": "damage",
+        "damage": 2,
+        "target_blood": 0,
+        "description": "重型坦克 对 中型战车 使用大号直瞄炮射击：毁伤 2，目标被摧毁",
+        "raw": {
+          "distance": 16
+        }
+      },
+      {
+        "id": "EV-000024",
+        "tick": 10,
+        "type": "destroyed",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14914
+        ],
+        "location": [
+          26,
+          23
+        ],
+        "description": "中型战车 被摧毁",
+        "raw": {}
+      },
+      {
+        "id": "EV-000025",
+        "tick": 14,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 neutral → red",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "red",
+            "name": "次要"
+          },
+          "from": "neutral",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000026",
+        "tick": 20,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "blue",
+            "name": "主要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000027",
+        "tick": 25,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14915,
+          14905
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.8,
+        "pk": 0.14,
+        "roll": 0.062,
+        "result": "hit",
+        "damage": 1,
+        "target_blood": 0,
+        "description": "巡飞弹 对 重型坦克 发射航空制导炸弹：命中，毁伤 1，目标被摧毁",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000028",
+        "tick": 25,
+        "type": "destroyed",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14905
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "description": "重型坦克 被摧毁",
+        "raw": {}
+      },
+      {
+        "id": "EV-000029",
+        "tick": 26,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14916,
+          14906
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.8,
+        "pk": 0.14,
+        "roll": 0.462,
+        "result": "miss",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "巡飞弹 对 重型坦克 发射航空制导炸弹：未命中",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000030",
+        "tick": 26,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 blue → red",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "red",
+            "name": "主要"
+          },
+          "from": "blue",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000031",
+        "tick": 27,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "blue",
+            "name": "次要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000032",
+        "tick": 33,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 blue → red",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "red",
+            "name": "次要"
+          },
+          "from": "blue",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000033",
+        "tick": 34,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "blue",
+            "name": "主要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000034",
+        "tick": 40,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 blue → red",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "red",
+            "name": "主要"
+          },
+          "from": "blue",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000035",
+        "tick": 41,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "blue",
+            "name": "次要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000036",
+        "tick": 47,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 blue → red",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "red",
+            "name": "次要"
+          },
+          "from": "blue",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000037",
+        "tick": 48,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "blue",
+            "name": "主要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000038",
+        "tick": 49,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14915,
+          14906
+        ],
+        "location": [
+          19,
+          30
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.6,
+        "pk": 0.14,
+        "roll": 0.091,
+        "result": "hit",
+        "damage": 1,
+        "target_blood": 2,
+        "description": "巡飞弹 对 重型坦克 发射航空制导炸弹：命中，毁伤 1",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000039",
+        "tick": 50,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14916,
+          14906
+        ],
+        "location": [
+          19,
+          30
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.2,
+        "pk": 0.14,
+        "roll": 0.308,
+        "result": "miss",
+        "damage": 0,
+        "target_blood": 2,
+        "description": "巡飞弹 对 重型坦克 发射航空制导炸弹：未命中",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000040",
+        "tick": 55,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "blue",
+            "name": "次要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000041",
+        "tick": 56,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 blue → red",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "red",
+            "name": "主要"
+          },
+          "from": "blue",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000042",
+        "tick": 58,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14912,
+          14906
+        ],
+        "location": [
+          19,
+          30
+        ],
+        "weapon": "便携导弹",
+        "attack_level": 8,
+        "effective_attack_level": 7,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1
+        },
+        "roll": 12,
+        "result": "damage",
+        "damage": 1,
+        "target_blood": 1,
+        "description": "步兵小队 对 重型坦克 使用便携导弹射击：毁伤 1",
+        "raw": {
+          "distance": 10
+        }
+      },
+      {
+        "id": "EV-000043",
+        "tick": 59,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14912,
+          14906
+        ],
+        "location": [
+          20,
+          30
+        ],
+        "weapon": "便携导弹",
+        "attack_level": 8,
+        "effective_attack_level": 7,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1
+        },
+        "roll": 6,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 1,
+        "description": "步兵小队 对 重型坦克 使用便携导弹射击：无效果",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000044",
+        "tick": 60,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14912,
+          14906
+        ],
+        "location": [
+          20,
+          30
+        ],
+        "weapon": "便携导弹",
+        "attack_level": 8,
+        "effective_attack_level": 8,
+        "modifiers": {
+          "elevation": 0
+        },
+        "roll": 4,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 1,
+        "description": "步兵小队 对 重型坦克 使用便携导弹射击：无效果",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000045",
+        "tick": 62,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 blue → red",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "red",
+            "name": "次要"
+          },
+          "from": "blue",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000046",
+        "tick": 63,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "blue",
+            "name": "主要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000047",
+        "tick": 64,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14906,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 2,
+        "effective_attack_level": 2,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1,
+          "target_stacked": 2,
+          "shooter_moving": -1
+        },
+        "roll": 4,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 4,
+        "description": "重型坦克 对 步兵小队 使用大号直瞄炮射击：无效果",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000048",
+        "tick": 64,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14908,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "速射炮",
+        "attack_level": 3,
+        "effective_attack_level": 3,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1,
+          "target_stacked": 2,
+          "shooter_moving": -1
+        },
+        "roll": 4,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 4,
+        "description": "重型战车 对 步兵小队 使用速射炮射击：无效果",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000049",
+        "tick": 64,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14910,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 5,
+        "effective_attack_level": 5,
+        "modifiers": {
+          "elevation": 0,
+          "target_moving": -1,
+          "target_stacked": 2,
+          "shooter_moving": -1
+        },
+        "roll": 3,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 4,
+        "description": "重型战车 对 步兵小队 使用重型导弹射击：无效果",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000050",
+        "tick": 65,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14906,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 2,
+        "effective_attack_level": 4,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 12,
+        "result": "damage",
+        "damage": 1,
+        "target_blood": 3,
+        "description": "重型坦克 对 步兵小队 使用大号直瞄炮射击：毁伤 1",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000051",
+        "tick": 65,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14908,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "速射炮",
+        "attack_level": 3,
+        "effective_attack_level": 5,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 2,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "重型战车 对 步兵小队 使用速射炮射击：无效果",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000052",
+        "tick": 65,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14910,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "重型导弹",
+        "attack_level": 5,
+        "effective_attack_level": 7,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 3,
+        "result": "suppressed",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "重型战车 对 步兵小队 使用重型导弹射击：压制",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000053",
+        "tick": 66,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14906,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 2,
+        "effective_attack_level": 4,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 2,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "重型坦克 对 步兵小队 使用大号直瞄炮射击：无效果",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000054",
+        "tick": 66,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14908,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "速射炮",
+        "attack_level": 3,
+        "effective_attack_level": 5,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 6,
+        "result": "suppressed",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "重型战车 对 步兵小队 使用速射炮射击：压制",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000055",
+        "tick": 66,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14910,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "速射炮",
+        "attack_level": 3,
+        "effective_attack_level": 5,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 4,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "重型战车 对 步兵小队 使用速射炮射击：无效果",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000056",
+        "tick": 67,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14906,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 2,
+        "effective_attack_level": 4,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 7,
+        "result": "suppressed",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "重型坦克 对 步兵小队 使用大号直瞄炮射击：压制",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000057",
+        "tick": 67,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14908,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "速射炮",
+        "attack_level": 3,
+        "effective_attack_level": 5,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 2,
+        "result": "none",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "重型战车 对 步兵小队 使用速射炮射击：无效果",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000058",
+        "tick": 67,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14910,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "速射炮",
+        "attack_level": 3,
+        "effective_attack_level": 5,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 11,
+        "result": "damage",
+        "damage": 1,
+        "target_blood": 2,
+        "description": "重型战车 对 步兵小队 使用速射炮射击：毁伤 1",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000059",
+        "tick": 68,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14906,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "大号直瞄炮",
+        "attack_level": 2,
+        "effective_attack_level": 4,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 10,
+        "result": "damage",
+        "damage": 1,
+        "target_blood": 1,
+        "description": "重型坦克 对 步兵小队 使用大号直瞄炮射击：毁伤 1",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000060",
+        "tick": 68,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14908,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "速射炮",
+        "attack_level": 3,
+        "effective_attack_level": 5,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 7,
+        "result": "suppressed",
+        "damage": 0,
+        "target_blood": 1,
+        "description": "重型战车 对 步兵小队 使用速射炮射击：压制",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000061",
+        "tick": 68,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14910,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "速射炮",
+        "attack_level": 3,
+        "effective_attack_level": 5,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 6,
+        "result": "suppressed",
+        "damage": 0,
+        "target_blood": 1,
+        "description": "重型战车 对 步兵小队 使用速射炮射击：压制",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000062",
+        "tick": 69,
+        "type": "direct_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14906,
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "weapon": "车载轻武器",
+        "attack_level": 1,
+        "effective_attack_level": 3,
+        "modifiers": {
+          "elevation": 0,
+          "target_stacked": 2
+        },
+        "roll": 10,
+        "result": "damage",
+        "damage": 1,
+        "target_blood": 0,
+        "description": "重型坦克 对 步兵小队 使用车载轻武器射击：毁伤 1，目标被摧毁",
+        "raw": {
+          "distance": 9
+        }
+      },
+      {
+        "id": "EV-000063",
+        "tick": 69,
+        "type": "destroyed",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14912
+        ],
+        "location": [
+          27,
+          25
+        ],
+        "description": "步兵小队 被摧毁",
+        "raw": {}
+      },
+      {
+        "id": "EV-000064",
+        "tick": 73,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14915,
+          14906
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.8,
+        "pk": 0.14,
+        "roll": 0.106,
+        "result": "hit",
+        "damage": 1,
+        "target_blood": 0,
+        "description": "巡飞弹 对 重型坦克 发射航空制导炸弹：命中，毁伤 1，目标被摧毁",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000065",
+        "tick": 73,
+        "type": "destroyed",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14906
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "description": "重型坦克 被摧毁",
+        "raw": {}
+      },
+      {
+        "id": "EV-000066",
+        "tick": 74,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14916,
+          14908
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.8,
+        "pk": 0.14,
+        "roll": 0.103,
+        "result": "hit",
+        "damage": 1,
+        "target_blood": 2,
+        "description": "巡飞弹 对 重型战车 发射航空制导炸弹：命中，毁伤 1",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000067",
+        "tick": 74,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 blue → red",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "red",
+            "name": "主要"
+          },
+          "from": "blue",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000068",
+        "tick": 75,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "blue",
+            "name": "次要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000069",
+        "tick": 82,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "blue",
+            "name": "主要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000070",
+        "tick": 82,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 blue → red",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "red",
+            "name": "次要"
+          },
+          "from": "blue",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000071",
+        "tick": 88,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 blue → red",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "red",
+            "name": "主要"
+          },
+          "from": "blue",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000072",
+        "tick": 89,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "blue",
+            "name": "次要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000073",
+        "tick": 95,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 blue → red",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "red",
+            "name": "次要"
+          },
+          "from": "blue",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000074",
+        "tick": 96,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "blue",
+            "name": "主要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000075",
+        "tick": 97,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14915,
+          14907
+        ],
+        "location": [
+          16,
+          32
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.2,
+        "pk": 0.14,
+        "roll": 0.806,
+        "result": "miss",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "巡飞弹 对 步兵小队 发射航空制导炸弹：未命中",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000076",
+        "tick": 98,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "warn",
+        "actors": [
+          14916,
+          14908
+        ],
+        "location": [
+          17,
+          31
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.6,
+        "pk": 0.14,
+        "roll": 0.086,
+        "result": "hit",
+        "damage": 1,
+        "target_blood": 1,
+        "description": "巡飞弹 对 重型战车 发射航空制导炸弹：命中，毁伤 1",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000077",
+        "tick": 102,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 blue → red",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "red",
+            "name": "主要"
+          },
+          "from": "blue",
+          "to": "red"
+        }
+      },
+      {
+        "id": "EV-000078",
+        "tick": 103,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          16,
+          31
+        ],
+        "description": "目标点「次要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 1631,
+            "row": 16,
+            "col": 31,
+            "value": 50,
+            "owner": "blue",
+            "name": "次要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000079",
+        "tick": 110,
+        "type": "objective",
+        "source": "engine",
+        "level": "info",
+        "actors": [],
+        "location": [
+          20,
+          30
+        ],
+        "description": "目标点「主要」归属 red → blue",
+        "raw": {
+          "objective": {
+            "coord": 2030,
+            "row": 20,
+            "col": 30,
+            "value": 80,
+            "owner": "blue",
+            "name": "主要"
+          },
+          "from": "red",
+          "to": "blue"
+        }
+      },
+      {
+        "id": "EV-000080",
+        "tick": 121,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14915,
+          14907
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.0,
+        "pk": 0.14,
+        "roll": 0.966,
+        "result": "miss",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "巡飞弹 对 步兵小队 发射航空制导炸弹：未命中",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000081",
+        "tick": 122,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14916,
+          14907
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.0,
+        "pk": 0.14,
+        "roll": 0.564,
+        "result": "miss",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "巡飞弹 对 步兵小队 发射航空制导炸弹：未命中",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000082",
+        "tick": 145,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14915,
+          14907
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.0,
+        "pk": 0.14,
+        "roll": 0.568,
+        "result": "miss",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "巡飞弹 对 步兵小队 发射航空制导炸弹：未命中",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000083",
+        "tick": 146,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14916,
+          14907
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.0,
+        "pk": 0.14,
+        "roll": 0.641,
+        "result": "miss",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "巡飞弹 对 步兵小队 发射航空制导炸弹：未命中",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000084",
+        "tick": 169,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14915,
+          14907
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.0,
+        "pk": 0.14,
+        "roll": 0.808,
+        "result": "miss",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "巡飞弹 对 步兵小队 发射航空制导炸弹：未命中",
+        "raw": {
+          "approximated": true
+        }
+      },
+      {
+        "id": "EV-000085",
+        "tick": 170,
+        "type": "sea_air_fire",
+        "source": "engine",
+        "level": "info",
+        "actors": [
+          14916,
+          14907
+        ],
+        "location": [
+          16,
+          31
+        ],
+        "domain": "air->land",
+        "weapon": "航空制导炸弹",
+        "range_km": 0.0,
+        "pk": 0.14,
+        "roll": 0.383,
+        "result": "miss",
+        "damage": 0,
+        "target_blood": 3,
+        "description": "巡飞弹 对 步兵小队 发射航空制导炸弹：未命中",
+        "raw": {
+          "approximated": true
+        }
+      }
+    ]
+  }
+}

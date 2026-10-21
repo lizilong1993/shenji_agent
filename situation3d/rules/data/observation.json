@@ -1,0 +1,35 @@
+{
+ "schema": "msgeo.observation.v1",
+ "source": "docs/docs.md 观察规则表",
+ "table": {
+  "infantry": {
+   "infantry": 10,
+   "vehicle": 25,
+   "helicopter": 25,
+   "uav": 1
+  },
+  "vehicle": {
+   "infantry": 10,
+   "vehicle": 25,
+   "helicopter": 25,
+   "uav": 1
+  },
+  "helicopter": {
+   "infantry": 10,
+   "vehicle": 25,
+   "helicopter": 25,
+   "uav": 1
+  },
+  "uav": {
+   "infantry": 2,
+   "vehicle": 2,
+   "helicopter": 0,
+   "uav": 0
+  }
+ },
+ "notes": [
+  "掩蔽目标被观察距离减半；车辆目标在观察者更高高程时不受掩蔽减半",
+  "目标位于通视的居民地/丛林格时被观察距离减半",
+  "无人机/巡飞弹观察距离为1格表示当前/相邻格"
+ ]
+}

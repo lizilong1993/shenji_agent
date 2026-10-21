@@ -1,0 +1,155 @@
+{
+ "schema": "msgeo.weapons0.v1",
+ "source": "Data/weapons/weapons_0.xlsx",
+ "zm_weapons": [
+  {
+   "name": "车载轻武器",
+   "weapon_id": 43,
+   "tar_type": 1,
+   "att_min": 0,
+   "att_max": 10
+  },
+  {
+   "name": "大号直瞄炮",
+   "weapon_id": 36,
+   "tar_type": 1,
+   "att_min": 0,
+   "att_max": 10
+  },
+  {
+   "name": "大号直瞄炮",
+   "weapon_id": 36,
+   "tar_type": 2,
+   "att_min": 0,
+   "att_max": 18
+  },
+  {
+   "name": "步兵轻武器",
+   "weapon_id": 29,
+   "tar_type": 1,
+   "att_min": 0,
+   "att_max": 3
+  },
+  {
+   "name": "火箭筒",
+   "weapon_id": 35,
+   "tar_type": 2,
+   "att_min": 0,
+   "att_max": 4
+  },
+  {
+   "name": "中号直瞄炮",
+   "weapon_id": 37,
+   "tar_type": 1,
+   "att_min": 0,
+   "att_max": 10
+  },
+  {
+   "name": "中号直瞄炮",
+   "weapon_id": 37,
+   "tar_type": 2,
+   "att_min": 0,
+   "att_max": 15
+  },
+  {
+   "name": "小号直瞄炮",
+   "weapon_id": 54,
+   "tar_type": 1,
+   "att_min": 0,
+   "att_max": 10
+  },
+  {
+   "name": "小号直瞄炮",
+   "weapon_id": 54,
+   "tar_type": 2,
+   "att_min": 0,
+   "att_max": 13
+  },
+  {
+   "name": "速射炮",
+   "weapon_id": 56,
+   "tar_type": 1,
+   "att_min": 0,
+   "att_max": 5
+  },
+  {
+   "name": "速射炮",
+   "weapon_id": 56,
+   "tar_type": 2,
+   "att_min": 0,
+   "att_max": 10
+  },
+  {
+   "name": "速射炮",
+   "weapon_id": 56,
+   "tar_type": 3,
+   "att_min": 0,
+   "att_max": 5
+  },
+  {
+   "name": "车载导弹",
+   "weapon_id": 69,
+   "tar_type": 2,
+   "att_min": 2,
+   "att_max": 20
+  },
+  {
+   "name": "便携导弹",
+   "weapon_id": 71,
+   "tar_type": 2,
+   "att_min": 0,
+   "att_max": 10
+  },
+  {
+   "name": "便携导弹",
+   "weapon_id": 71,
+   "tar_type": 3,
+   "att_min": 0,
+   "att_max": 5
+  },
+  {
+   "name": "重型导弹",
+   "weapon_id": 73,
+   "tar_type": 2,
+   "att_min": 2,
+   "att_max": 20
+  },
+  {
+   "name": "巡飞导弹",
+   "weapon_id": 76,
+   "tar_type": 1,
+   "att_min": 0,
+   "att_max": 2
+  },
+  {
+   "name": "巡飞导弹",
+   "weapon_id": 76,
+   "tar_type": 2,
+   "att_min": 0,
+   "att_max": 2
+  }
+ ],
+ "jm_weapons": [
+  {
+   "name": "重型炮",
+   "weapon_id": 72,
+   "tar_type": 0,
+   "att_min": 0,
+   "att_max": 20
+  },
+  {
+   "name": "中型炮",
+   "weapon_id": 88,
+   "tar_type": 0,
+   "att_min": 0,
+   "att_max": 20
+  },
+  {
+   "name": "轻型炮",
+   "weapon_id": 89,
+   "tar_type": 0,
+   "att_min": 0,
+   "att_max": 20
+  }
+ ]
+}
