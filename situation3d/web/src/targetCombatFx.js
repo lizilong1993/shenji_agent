@@ -196,6 +196,7 @@
     });
     if (scan && scan.entity) ctx.viewer.entities.remove(scan.entity);
     Object.keys(proxyEnts).forEach(function (id) { ctx.viewer.entities.remove(proxyEnts[id].entity); });
+    restoreDeaths();
     proxyEnts = {};
     transients = [];
     projectiles = [];
@@ -220,6 +221,7 @@
     statusCache = {};
     lastStatusTick = -1;
     Object.keys(origStyle).forEach(function (id) { restoreStyle(id); });
+    restoreDeaths();
   }
 
   function rebuildState(tick) {
@@ -342,6 +344,7 @@
   };
   var proxyEnts = {};
   var proxyRecoil = { ship052c: 0, ship054a: 0, tank99a: 0 };
+  var deaths = {};
 
   function proxyKey(def) {
     var text = ((def && def.model) || '') + ' ' + ((def && def.platform_class) || '');
@@ -604,6 +607,37 @@
     }
   }
 
+  function startDeath(id) {
+    if (deaths[id]) return;
+    var rec = e(id);
+    var def = defById[id] || {};
+    if (!rec || !rec.position) return;
+    var mode = def.domain === 'sea' ? 'sink' : (def.domain === 'air' ? 'crash' : 'wreck');
+    if (mode === 'wreck') return;
+    var orig = rec.position;
+    var start = Date.now();
+    deaths[id] = { orig: orig, start: start, mode: mode };
+    rec.position = new Cesium.CallbackProperty(function (time) {
+      var p = null;
+      try { p = orig.getValue(time); } catch (err) {}
+      if (!p) return p;
+      var k = Math.min(1, (Date.now() - start) / (mode === 'sink' ? 12000 : 8000));
+      var g = Cesium.Cartographic.fromCartesian(p);
+      if (!g) return p;
+      var h = g.height || 0;
+      var drop = mode === 'sink' ? 7 * k : Math.max(0, h - 2) * k;
+      return Cesium.Cartesian3.fromRadians(g.longitude, g.latitude, Math.max(0, h - drop));
+    }, false);
+  }
+
+  function restoreDeaths() {
+    Object.keys(deaths).forEach(function (id) {
+      var rec = e(id);
+      if (rec) rec.position = deaths[id].orig;
+    });
+    deaths = {};
+  }
+
   function onDestroy(ev) {
     var id = ev.target_id || (ev.actors && ev.actors[0]);
     if (!id) return;
@@ -614,6 +648,7 @@
       loc = [s.lon, s.lat, s.alt || 0];
     }
     destroyed[id] = true;
+    startDeath(id);
     var p = Cesium.Cartesian3.fromDegrees(loc[0], loc[1], loc[2] || 0);
     spawnExplosion(p);
     ensureSmoke(id, 4);
