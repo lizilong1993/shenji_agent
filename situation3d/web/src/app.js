@@ -2106,13 +2106,11 @@ function applyTargetBillboardAnchor(entity, modelMode) {
   // 把实体反复标脏。
   if (entity._iconAnchorModel === modelMode) return;
   entity._iconAnchorModel = modelMode;
-  if (modelMode) {
-    bb.verticalOrigin = Cesium.VerticalOrigin.BOTTOM;
-    bb.pixelOffset = new Cesium.Cartesian2(0, -52);
-  } else {
-    bb.verticalOrigin = Cesium.VerticalOrigin.CENTER;
-    bb.pixelOffset = new Cesium.Cartesian2(0, 0);
-  }
+  // The symbol sits at the model centre and must stay above it; the old
+  // "lift above the model head" offset hid the symbol behind the mesh.
+  bb.verticalOrigin = Cesium.VerticalOrigin.CENTER;
+  bb.pixelOffset = new Cesium.Cartesian2(0, 0);
+  bb.disableDepthTestDistance = Number.POSITIVE_INFINITY;
 }
 
 function createTargetEntities() {
@@ -2953,11 +2951,13 @@ function predictedTrackPoints(def) {
     // 密集案例只取前 10 分钟，并在第一次明显转向处截断——否则闭环巡逻/折返
     // 会在 30 分钟窗口里画成一整圈多边形，看起来像"乱画"。
     const frames = (state.data && state.data.frames) || [];
+    // Predict to the next turning point, not a fixed wall-clock horizon.
+    // The cap is only a safety valve for a perfectly straight path.
     const dense = !!(state.data && (state.data.campaign_contract_version ||
       ((state.data.targets || []).length > 50)));
-    const horizon = dense ? 20 : PREDICT_HORIZON_TICKS;
+    const safetyTicks = dense ? 240 : PREDICT_HORIZON_TICKS;
     if (frames.length > state.tick + 1) {
-      const end = Math.min(frames.length - 1, state.tick + horizon);
+      const end = Math.min(frames.length - 1, state.tick + safetyTicks);
       var prevBearing = null;
       var lastPt = null;
       for (let t = state.tick + 1; t <= end; t++) {
@@ -2971,7 +2971,9 @@ function predictedTrackPoints(def) {
         if (lastPt && prevBearing !== null && out.length >= 3) {
           const b = predBearing(lastPt, pt);
           const diff = Math.abs(((b - prevBearing + 540) % 360) - 180);
-          if (diff > 45) break;
+          // Include the turn point itself, then stop: the prediction is
+          // "current leg -> next turn", not a fixed 10-minute slice.
+          if (diff > 30) { out.push(pt); break; }
         }
         if (lastPt) prevBearing = predBearing(lastPt, pt);
         out.push(pt);
