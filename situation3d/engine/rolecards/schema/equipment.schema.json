@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "situation3d.equipment.v2",
+  "title": "Role card equipment catalogue (武器/传感器/通信)",
+  "type": "object",
+  "required": ["schema", "weapons", "sensors", "comms"],
+  "properties": {
+    "schema": { "const": "situation3d.equipment.v2" },
+    "weapons": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label", "category", "tar_types", "range_km", "shoot_on_move"],
+        "properties": {
+          "label": { "type": "string" },
+          "category": { "type": "string" },
+          "tar_types": { "type": "array", "items": { "type": "string" } },
+          "range_km": { "type": "number", "minimum": 0 },
+          "min_range_km": { "type": "number", "minimum": 0 },
+          "shoot_on_move": { "type": "boolean" },
+          "cooldown_s": { "type": "number", "minimum": 0 },
+          "guidance": { "type": "string" },
+          "sdk": { "type": "object" }
+        }
+      }
+    },
+    "sensors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label", "kind", "range_km"],
+        "properties": {
+          "label": { "type": "string" },
+          "kind": { "type": "string" },
+          "range_km": { "type": "number", "minimum": 0 },
+          "quality": { "type": "number", "minimum": 0 },
+          "passive": { "type": "boolean" },
+          "channels": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "comms": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label", "range_km"],
+        "properties": {
+          "label": { "type": "string" },
+          "range_km": { "type": "number", "minimum": 0 },
+          "relay": { "type": "boolean" },
+          "jam_resist": { "type": "number", "minimum": 0, "maximum": 1 },
+          "encrypted": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

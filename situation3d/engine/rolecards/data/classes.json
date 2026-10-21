@@ -1,0 +1,486 @@
+{
+  "schema": "situation3d.rolecard-classes.v1",
+  "classes": [
+    {
+      "schema": "situation3d.rolecard-class.v1",
+      "class_id": "land.infantry",
+      "label": "人员",
+      "domain": "land",
+      "sdk_type": 1,
+      "symbol_families": [
+        "防御阵地",
+        "地面机动"
+      ],
+      "value_policy": "大类卡不定义随小类变化的数值；速度、防护、装备、载员均由小类卡定义。",
+      "shared": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "offroad"
+          ]
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "can_retreat": true
+        },
+        "logistics": {
+          "supply_class": "ground.infantry"
+        }
+      },
+      "required_values": [
+        "motion.max_speed_ms",
+        "protection.max_blood",
+        "protection.armor_class",
+        "sensors",
+        "weapons",
+        "capacity"
+      ],
+      "equipment_policy": {
+        "weapon_categories": [
+          "small_arms",
+          "machine_gun",
+          "atgm",
+          "manpads"
+        ],
+        "sensor_kinds": [
+          "visual",
+          "ir"
+        ]
+      },
+      "unknown_subclass": "land.infantry.unknown",
+      "subclasses": [
+        "land.infantry.rifle",
+        "land.infantry.recon",
+        "land.infantry.atgm",
+        "land.infantry.manpads",
+        "land.infantry.engineer",
+        "land.infantry.unknown"
+      ]
+    },
+    {
+      "schema": "situation3d.rolecard-class.v1",
+      "class_id": "land.vehicle",
+      "label": "车辆",
+      "domain": "land",
+      "sdk_type": 2,
+      "symbol_families": [
+        "地面机动",
+        "地面火力",
+        "地面防空",
+        "地面保障",
+        "岸防兵力"
+      ],
+      "value_policy": "大类卡不定义随小类变化的数值；例如坦克 80 km/h、运输车 90 km/h 的差异由小类卡定义，车辆大类卡不设速度上限。",
+      "shared": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": [
+            "road",
+            "offroad"
+          ]
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "can_retreat": true
+        },
+        "logistics": {
+          "supply_class": "ground.vehicle"
+        }
+      },
+      "required_values": [
+        "motion.max_speed_ms",
+        "motion.cruise_speed_ms",
+        "motion.terrain.factors",
+        "protection.armor_class",
+        "protection.max_blood",
+        "sensors",
+        "weapons",
+        "capacity"
+      ],
+      "equipment_policy": {
+        "weapon_categories": [
+          "cannon",
+          "autocannon",
+          "machine_gun",
+          "atgm",
+          "sam",
+          "mlrs",
+          "howitzer",
+          "anti_ship_missile"
+        ],
+        "sensor_kinds": [
+          "visual",
+          "ir",
+          "radar"
+        ]
+      },
+      "unknown_subclass": "land.vehicle.unknown",
+      "subclasses": [
+        "land.vehicle.mbt",
+        "land.vehicle.light_tank",
+        "land.vehicle.ifv",
+        "land.vehicle.apc",
+        "land.vehicle.amphibious",
+        "land.vehicle.recon",
+        "land.vehicle.spg",
+        "land.vehicle.towed_artillery",
+        "land.vehicle.mlrs",
+        "land.vehicle.sam",
+        "land.vehicle.aaa",
+        "land.vehicle.coastal_launcher",
+        "land.vehicle.truck",
+        "land.vehicle.car",
+        "land.vehicle.engineer",
+        "land.vehicle.ugv",
+        "land.vehicle.radar",
+        "land.vehicle.command",
+        "land.vehicle.unknown"
+      ]
+    },
+    {
+      "schema": "situation3d.rolecard-class.v1",
+      "class_id": "land.installation",
+      "label": "工事与固定阵地",
+      "domain": "land",
+      "sdk_type": 4,
+      "symbol_families": [
+        "防御阵地",
+        "岸防兵力",
+        "地面防空"
+      ],
+      "value_policy": "大类卡只声明固定部署这一共性；具体防护、传感器与武器由小类卡定义。",
+      "shared": {
+        "identity": {
+          "primary_domain": "land",
+          "mobility_modes": []
+        },
+        "motion": {
+          "immobile": true
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "can_retreat": false
+        }
+      },
+      "required_values": [
+        "protection.max_blood",
+        "protection.armor_class",
+        "sensors",
+        "weapons",
+        "capacity"
+      ],
+      "equipment_policy": {
+        "weapon_categories": [
+          "machine_gun",
+          "sam",
+          "anti_ship_missile"
+        ],
+        "sensor_kinds": [
+          "visual",
+          "radar",
+          "ir"
+        ]
+      },
+      "unknown_subclass": "land.installation.unknown",
+      "subclasses": [
+        "land.installation.personnel_fort",
+        "land.installation.vehicle_fort",
+        "land.installation.coastal_battery",
+        "land.installation.sam_site",
+        "land.installation.outpost",
+        "land.installation.unknown"
+      ]
+    },
+    {
+      "schema": "situation3d.rolecard-class.v1",
+      "class_id": "sea.surface",
+      "label": "水面舰艇",
+      "domain": "sea",
+      "sdk_type": 2,
+      "sdk_type_note": "庙算公开样本未出现舰艇专属 type，2 为占位；导入时按名称或显式 subclass_id 解析。",
+      "symbol_families": [
+        "水面舰艇",
+        "两栖舰船",
+        "辅助舰船"
+      ],
+      "value_policy": "大类卡不定义航速、吃水、武器等随舰型变化的数值；由驱逐舰、护卫舰、登陆舰等小类卡定义。",
+      "shared": {
+        "identity": {
+          "primary_domain": "sea",
+          "mobility_modes": [
+            "water"
+          ]
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "can_retreat": true
+        },
+        "logistics": {
+          "supply_class": "naval.surface"
+        }
+      },
+      "required_values": [
+        "motion.max_speed_ms",
+        "motion.cruise_speed_ms",
+        "motion.sea.draft_m",
+        "protection.max_blood",
+        "sensors",
+        "weapons",
+        "capacity"
+      ],
+      "equipment_policy": {
+        "weapon_categories": [
+          "naval_gun",
+          "vls_sam",
+          "sam",
+          "anti_ship_missile",
+          "ciws",
+          "autocannon",
+          "torpedo"
+        ],
+        "sensor_kinds": [
+          "radar",
+          "sonar",
+          "esm"
+        ]
+      },
+      "unknown_subclass": "sea.surface.unknown",
+      "subclasses": [
+        "sea.surface.destroyer",
+        "sea.surface.frigate",
+        "sea.surface.corvette",
+        "sea.surface.missile_boat",
+        "sea.surface.landing_ship",
+        "sea.surface.transport_ship",
+        "sea.surface.replenishment",
+        "sea.surface.carrier",
+        "sea.surface.auxiliary",
+        "sea.surface.unknown"
+      ]
+    },
+    {
+      "schema": "situation3d.rolecard-class.v1",
+      "class_id": "sea.subsurface",
+      "label": "潜艇",
+      "domain": "subsurface",
+      "sdk_type": 2,
+      "sdk_type_note": "庙算公开样本未出现潜艇专属 type，2 为占位；导入时按名称或显式 subclass_id 解析。",
+      "symbol_families": [
+        "水面舰艇"
+      ],
+      "value_policy": "大类卡不定义潜深、航速与武器；由攻击潜艇、弹道导弹潜艇等小类卡定义。",
+      "shared": {
+        "identity": {
+          "primary_domain": "subsurface",
+          "mobility_modes": [
+            "water"
+          ]
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "can_retreat": true
+        },
+        "logistics": {
+          "supply_class": "naval.subsurface"
+        }
+      },
+      "required_values": [
+        "motion.max_speed_ms",
+        "motion.sea.max_operating_depth_m",
+        "protection.max_blood",
+        "sensors",
+        "weapons"
+      ],
+      "equipment_policy": {
+        "weapon_categories": [
+          "torpedo",
+          "anti_ship_missile",
+          "ballistic_missile"
+        ],
+        "sensor_kinds": [
+          "sonar",
+          "esm",
+          "radar"
+        ]
+      },
+      "unknown_subclass": "sea.subsurface.unknown",
+      "subclasses": [
+        "sea.subsurface.attack",
+        "sea.subsurface.missile",
+        "sea.subsurface.unknown"
+      ]
+    },
+    {
+      "schema": "situation3d.rolecard-class.v1",
+      "class_id": "air.aircraft",
+      "label": "飞机",
+      "domain": "air",
+      "sdk_type": 3,
+      "symbol_families": [
+        "作战飞机",
+        "支援飞机",
+        "通用"
+      ],
+      "value_policy": "大类卡不定义速度、升限、载荷等随机型变化的数值；由战斗机、预警机、运输机等小类卡定义。",
+      "shared": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ]
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "can_retreat": true
+        },
+        "logistics": {
+          "supply_class": "air"
+        }
+      },
+      "required_values": [
+        "motion.max_speed_ms",
+        "motion.air.service_ceiling_m",
+        "protection.max_blood",
+        "sensors",
+        "weapons",
+        "capacity"
+      ],
+      "equipment_policy": {
+        "weapon_categories": [
+          "air_to_air",
+          "air_to_surface",
+          "cruise_missile",
+          "cannon",
+          "torpedo"
+        ],
+        "sensor_kinds": [
+          "radar",
+          "ir",
+          "esm",
+          "sonar"
+        ]
+      },
+      "unknown_subclass": "air.aircraft.unknown",
+      "subclasses": [
+        "air.aircraft.fighter",
+        "air.aircraft.stealth_fighter",
+        "air.aircraft.strike",
+        "air.aircraft.bomber",
+        "air.aircraft.aew",
+        "air.aircraft.transport",
+        "air.aircraft.tanker",
+        "air.aircraft.patrol",
+        "air.aircraft.unknown"
+      ]
+    },
+    {
+      "schema": "situation3d.rolecard-class.v1",
+      "class_id": "air.helicopter",
+      "label": "直升机",
+      "domain": "air",
+      "sdk_type": 3,
+      "symbol_families": [
+        "作战飞机",
+        "支援飞机",
+        "通用"
+      ],
+      "value_policy": "大类卡不定义速度、升限与挂载；由武装直升机、运输直升机等小类卡定义。",
+      "shared": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ]
+        },
+        "behavior": {
+          "default_roe": "return_fire",
+          "can_retreat": true
+        },
+        "logistics": {
+          "supply_class": "air.rotary"
+        }
+      },
+      "required_values": [
+        "motion.max_speed_ms",
+        "motion.air.service_ceiling_m",
+        "protection.max_blood",
+        "sensors",
+        "weapons",
+        "capacity"
+      ],
+      "equipment_policy": {
+        "weapon_categories": [
+          "cannon",
+          "atgm",
+          "air_to_air"
+        ],
+        "sensor_kinds": [
+          "visual",
+          "ir",
+          "radar"
+        ]
+      },
+      "unknown_subclass": "air.helicopter.unknown",
+      "subclasses": [
+        "air.helicopter.attack",
+        "air.helicopter.transport",
+        "air.helicopter.recon",
+        "air.helicopter.unknown"
+      ]
+    },
+    {
+      "schema": "situation3d.rolecard-class.v1",
+      "class_id": "air.uav",
+      "label": "无人机",
+      "domain": "air",
+      "sdk_type": 3,
+      "symbol_families": [
+        "支援飞机",
+        "作战飞机",
+        "通用"
+      ],
+      "value_policy": "大类卡不定义速度、升限与载荷；由中高空长航时、战术无人机、巡飞弹等小类卡定义。",
+      "shared": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ]
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "can_retreat": true
+        },
+        "logistics": {
+          "supply_class": "air.uav"
+        }
+      },
+      "required_values": [
+        "motion.max_speed_ms",
+        "motion.air.service_ceiling_m",
+        "protection.max_blood",
+        "sensors",
+        "weapons"
+      ],
+      "equipment_policy": {
+        "weapon_categories": [
+          "atgm",
+          "air_to_surface",
+          "loitering_warhead"
+        ],
+        "sensor_kinds": [
+          "visual",
+          "ir",
+          "radar"
+        ]
+      },
+      "unknown_subclass": "air.uav.unknown",
+      "subclasses": [
+        "air.uav.male",
+        "air.uav.tactical",
+        "air.uav.loitering",
+        "air.uav.unknown"
+      ]
+    }
+  ]
+}

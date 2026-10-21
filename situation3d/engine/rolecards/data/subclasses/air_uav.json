@@ -1,0 +1,492 @@
+{
+  "schema": "situation3d.rolecard-subclasses.v1",
+  "class_id": "air.uav",
+  "subclasses": [
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.uav.male",
+      "class_id": "air.uav",
+      "label": "中高空长航时无人机",
+      "tags": [
+        "uav",
+        "male",
+        "isr"
+      ],
+      "reference_model": "MQ-9",
+      "confidence": "high",
+      "sdk": {
+        "type": 3,
+        "sub_type": 5,
+        "basic_speed_kmh": 100,
+        "armor": 0,
+        "max_blood": 1
+      },
+      "source": {
+        "refs": [
+          "wiki:MQ-9",
+          "zm:scenario_operators"
+        ],
+        "note": "MQ-9：482 km/h、升限 15420 m、续航 27 h、4 枚海尔法。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "uav",
+            "family": "支援飞机"
+          },
+          "model": {
+            "asset": "type_mq9",
+            "asset_approximation": false,
+            "reference": "MQ-9"
+          },
+          "dimensions": {
+            "length_m": 11.0,
+            "width_m": 20.1,
+            "height_m": 3.8
+          }
+        },
+        "motion": {
+          "max_speed_ms": 134.0,
+          "cruise_speed_ms": 87.0,
+          "accel_ms2": 2.23,
+          "decel_ms2": 4.46,
+          "air": {
+            "service_ceiling_m": 15420,
+            "min_clearance_m": 150.0,
+            "climb_rate_ms": 8,
+            "descent_rate_ms": 9.6,
+            "agl_m": 200,
+            "runway_required_m": 1000
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 1,
+          "size_class": "medium",
+          "signature": {
+            "radar": 0.9,
+            "ir": 1.0,
+            "sonar": 0.0,
+            "esm": 0.8
+          },
+          "concealment": {
+            "stationary": 0.5,
+            "moving": 0.15
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.eo.uav",
+            "mount": "belly",
+            "count": 1
+          },
+          {
+            "ref": "sensor.sar.uav",
+            "mount": "belly",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.hellfire",
+            "mount": "wing",
+            "count": 4,
+            "ammo_max": 4,
+            "ammo_default": 4,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.satcom.uav",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.datalink.air",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 0,
+          "cargo_t": 0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air.uav",
+          "fuel_capacity_l": 1800,
+          "consumption_l_per_km": 0.5
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "recon_first",
+          "reaction_time_s": 8
+        },
+        "extensions": {
+          "endurance_s": 97200
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.uav.tactical",
+      "class_id": "air.uav",
+      "label": "战术无人机",
+      "tags": [
+        "uav",
+        "tactical"
+      ],
+      "reference_model": "CH-4",
+      "confidence": "medium",
+      "sdk": {
+        "type": 3,
+        "sub_type": 5,
+        "basic_speed_kmh": 100,
+        "armor": 0,
+        "max_blood": 1
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "彩虹-4 级，续航约 30 h，4 枚 AR-1。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "uav",
+            "family": "支援飞机"
+          },
+          "model": {
+            "asset": "type_mq9",
+            "asset_approximation": true,
+            "reference": "CH-4"
+          },
+          "dimensions": {
+            "length_m": 8.5,
+            "width_m": 18.0,
+            "height_m": 3.4
+          }
+        },
+        "motion": {
+          "max_speed_ms": 83.33,
+          "cruise_speed_ms": 61.11,
+          "accel_ms2": 1.39,
+          "decel_ms2": 2.78,
+          "air": {
+            "service_ceiling_m": 8000,
+            "min_clearance_m": 150.0,
+            "climb_rate_ms": 7,
+            "descent_rate_ms": 8.4,
+            "agl_m": 200,
+            "runway_required_m": 800
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 1,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.eo.uav.tactical",
+            "mount": "belly",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.ar1",
+            "mount": "wing",
+            "count": 4,
+            "ammo_max": 4,
+            "ammo_default": 4,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.air",
+            "mount": "hull",
+            "count": 1
+          },
+          {
+            "ref": "comm.satcom.uav",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 0,
+          "cargo_t": 0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air.uav"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "recon_first",
+          "reaction_time_s": 8
+        },
+        "extensions": {
+          "endurance_s": 108000
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.uav.loitering",
+      "class_id": "air.uav",
+      "label": "巡飞弹",
+      "tags": [
+        "uav",
+        "loitering_munition",
+        "one_way"
+      ],
+      "reference_model": "loitering munition",
+      "confidence": "medium",
+      "sdk": {
+        "type": 3,
+        "sub_type": 7,
+        "basic_speed_kmh": 100,
+        "armor": 0,
+        "max_blood": 4,
+        "weapon_ids": [
+          76
+        ]
+      },
+      "source": {
+        "refs": [
+          "zm:scenario_operators"
+        ],
+        "note": "庙算巡飞弹 type3/sub7，basic_speed=100、max_blood=4。"
+      },
+      "unknown_policy": null,
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "uav",
+            "family": "作战飞机"
+          },
+          "model": {
+            "asset": "type_mq9",
+            "asset_approximation": true,
+            "reference": "loitering munition"
+          },
+          "dimensions": {
+            "length_m": 3.0,
+            "width_m": 2.5,
+            "height_m": 0.5
+          }
+        },
+        "motion": {
+          "max_speed_ms": 55.56,
+          "cruise_speed_ms": 41.67,
+          "accel_ms2": 0.93,
+          "decel_ms2": 1.86,
+          "air": {
+            "service_ceiling_m": 3000,
+            "min_clearance_m": 30.0,
+            "climb_rate_ms": 5,
+            "descent_rate_ms": 6.0,
+            "agl_m": 200,
+            "runway_required_m": 0
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 4,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.eo.uav.tactical",
+            "mount": "nose",
+            "count": 1
+          }
+        ],
+        "weapons": [
+          {
+            "ref": "weapon.loitering.warhead",
+            "mount": "body",
+            "count": 1,
+            "ammo_max": 1,
+            "ammo_default": 1,
+            "shoot_on_move": true
+          }
+        ],
+        "comms": [
+          {
+            "ref": "comm.datalink.air",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 0,
+          "cargo_t": 0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air.uav"
+        },
+        "behavior": {
+          "default_roe": "weapons_tight",
+          "engage_policy": "point_target",
+          "reaction_time_s": 4
+        },
+        "extensions": {
+          "one_way": true,
+          "endurance_s": 7200
+        }
+      }
+    },
+    {
+      "schema": "situation3d.rolecard-subclass.v1",
+      "subclass_id": "air.uav.unknown",
+      "class_id": "air.uav",
+      "label": "无人机（未知小类）",
+      "tags": [
+        "unknown"
+      ],
+      "reference_model": null,
+      "confidence": "unknown",
+      "sdk": {
+        "type": 3,
+        "sub_type": null,
+        "basic_speed_kmh": 100,
+        "armor": 0,
+        "max_blood": 1
+      },
+      "source": {
+        "refs": [
+          "doc:demo_estimates"
+        ],
+        "note": "只确定到无人机大类时的保守卡。"
+      },
+      "unknown_policy": {
+        "combat": "soft",
+        "engage": false,
+        "note": "能力未知，按侦察无人机处理"
+      },
+      "values": {
+        "identity": {
+          "primary_domain": "air",
+          "mobility_modes": [
+            "air"
+          ],
+          "symbol": {
+            "icon": "uav",
+            "family": "通用"
+          },
+          "model": {
+            "asset": null,
+            "asset_approximation": false,
+            "reference": null
+          },
+          "dimensions": {
+            "length_m": 8.0,
+            "width_m": 12.0,
+            "height_m": 3.0
+          }
+        },
+        "motion": {
+          "max_speed_ms": 50.0,
+          "cruise_speed_ms": 38.89,
+          "accel_ms2": 0.83,
+          "decel_ms2": 1.66,
+          "air": {
+            "service_ceiling_m": 5000,
+            "min_clearance_m": 30.0,
+            "climb_rate_ms": 5,
+            "descent_rate_ms": 6.0,
+            "agl_m": 200,
+            "runway_required_m": 0
+          }
+        },
+        "protection": {
+          "armor_class": 0,
+          "max_blood": 1,
+          "size_class": "small",
+          "signature": {
+            "radar": 0.4,
+            "ir": 0.6,
+            "sonar": 0.0,
+            "esm": 0.5
+          },
+          "concealment": {
+            "stationary": 0.7,
+            "moving": 0.25
+          }
+        },
+        "sensors": [
+          {
+            "ref": "sensor.eo.uav.tactical",
+            "mount": "belly",
+            "count": 1
+          }
+        ],
+        "weapons": [],
+        "comms": [
+          {
+            "ref": "comm.datalink.air",
+            "mount": "hull",
+            "count": 1
+          }
+        ],
+        "capacity": {
+          "personnel": 0,
+          "cargo_t": 0,
+          "vehicles": 0
+        },
+        "logistics": {
+          "supply_class": "air.uav"
+        },
+        "behavior": {
+          "default_roe": "hold_fire",
+          "engage_policy": "avoid",
+          "reaction_time_s": 10
+        },
+        "extensions": {
+          "endurance_s": 21600
+        }
+      }
+    }
+  ]
+}

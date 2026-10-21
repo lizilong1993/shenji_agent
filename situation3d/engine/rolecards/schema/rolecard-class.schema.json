@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "situation3d.rolecard-class.v1",
+  "title": "Role card class (大类角色卡)",
+  "type": "object",
+  "required": [
+    "schema", "class_id", "label", "domain", "shared",
+    "required_values", "equipment_policy", "unknown_subclass", "subclasses"
+  ],
+  "properties": {
+    "schema": { "const": "situation3d.rolecard-class.v1" },
+    "class_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*([.-][a-z0-9_-]+)+$" },
+    "label": { "type": "string" },
+    "domain": { "enum": ["land", "sea", "air", "subsurface", "installation"] },
+    "sdk_type": { "type": ["integer", "null"] },
+    "sdk_type_note": { "type": "string" },
+    "symbol_families": { "type": "array", "items": { "type": "string" } },
+    "value_policy": { "type": "string" },
+    "shared": {
+      "type": "object",
+      "description": "Class-wide defaults. Numeric capabilities (max speed, armour, weapons) belong to subclasses."
+    },
+    "required_values": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Dotted paths every subclass must provide after merging with shared."
+    },
+    "equipment_policy": {
+      "type": "object",
+      "properties": {
+        "weapon_categories": { "type": "array", "items": { "type": "string" } },
+        "sensor_kinds": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "unknown_subclass": { "type": "string" },
+    "subclasses": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}
