@@ -360,6 +360,17 @@
     return null;
   }
 
+  /**
+   * 代理炮塔的当前状态，供目标属性面板镜像同一套外观与后坐（共享 proxyRecoil）。
+   * 返回 null 表示该目标没有代理炮塔。
+   */
+  function proxyState(def) {
+    var key = proxyKey(def || {});
+    if (!key || !PROXY[key]) return null;
+    return { key: key, model: PROXY[key].model, offset: PROXY[key].offset,
+             muzzle: PROXY[key].muzzle, recoil: proxyRecoil[key] || 0 };
+  }
+
   function rotatedOffset(rec, off, result) {
     var time = ctx.viewer.clock.currentTime;
     var q = null;
@@ -1020,6 +1031,7 @@
     init: init,
     frame: frame,
     nodeTransformations: nodeTransformations,
+    proxyState: proxyState,
     dispose: dispose,
     debug: debug,
   };

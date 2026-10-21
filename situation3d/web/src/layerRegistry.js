@@ -298,6 +298,11 @@
     // 「历史轨迹」图层同时管理历史实线与计划虚线（虚线 + 终点箭头）。
     { id: 'layerTracks', kind: 'target', z: 30, label: '历史轨迹',
       group: '目标图层', default: true },
+    // 「目标属性」：选中目标的 3D 侧视预览 + 实时属性面板（右下角 Legend 上方）。
+    // 它不是场景图元图层，显隐由 app.js 的逐层 handler 转给 targetProps.js；
+    // 默认关（用户勾选后才创建预览 Viewer，未勾选时零 GPU 开销）。
+    { id: 'layerTargetProps', kind: 'target', z: 33, label: '目标属性',
+      group: '目标图层', default: false },
   // B4 选中掩码：外环全图 + 内环挖空「选中目标 + 它的轨迹范围」。
   // handler 在 app.js 的映射表里（state.layers.focusMask → updateFocusMask）。
   { id: 'overlay.focusMask', kind: 'target', z: 35, label: '选中掩码',

@@ -83,6 +83,7 @@
   /** 一行图层：复选框 + 名称 + 数量徽标 + （可展开时）箭头。 */
   var LAYER_HINTS = {
     layerLabels: '目标标牌：目标编号 + 具体型号的屏幕标签',
+    layerTargetProps: '目标属性：选中目标的 3D 侧视预览与实时属性（右下角图例上方）',
     'overlay.focusMask': '选中掩码：压暗全图，只保留选中目标及其轨迹范围',
     modelSensor: '传感器覆盖：按目标 sensor_range_km 绘制作用半径',
     layerTargetPanel: '目标元数据面板：选中目标后，在右栏显示状态、意图与参数',

@@ -119,6 +119,26 @@
       <!-- 地图上的「区域级TS」横幅已移除：内容全部移到右栏「区域TS」栏。
            同一个读数不该有两份显示——地图上那份还占地、挡住地图本身。 -->
 
+      <!-- 目标属性（图层管理「目标图层 · 目标属性」勾选后生效）：
+           右下角 Legend 上方。上半部是选中目标的 3D 侧视预览（第二 Viewer，
+           与主实体同模型/同姿态/同战损），下半部是实时属性与战损状态。
+           内容与显隐由 src/targetProps.js 驱动，这里只留骨架。 -->
+      <div id="targetProps" class="target-props hidden" aria-label="目标属性">
+        <div class="tpr-head">
+          <div class="tpr-title">
+            <b id="tprName">目标属性</b>
+            <span id="tprId" class="tpr-id"></span>
+          </div>
+        </div>
+        <div id="tprEmpty" class="tpr-empty">点击场景中的目标查看属性</div>
+        <div id="tprBody" class="tpr-body hidden">
+          <div id="tprBadges" class="tpr-badges"></div>
+          <div id="tprView" class="tpr-view"></div>
+          <div id="tprState" class="tpr-state"></div>
+          <div id="tprFields" class="tpr-fields"></div>
+        </div>
+      </div>
+
       <div id="legend" class="legend">
         <span><i class="swatch red"></i>红方</span>
         <span><i class="swatch blue"></i>蓝方</span>
@@ -268,6 +288,7 @@
   <script src="./src/targetMotion.js"></script>
   <script src="./src/targetFx.js"></script>
   <script src="./src/targetCombatFx.js"></script>
+  <script src="./src/targetProps.js"></script>
   <script src="./src/assets.js"></script>
   <script src="./src/layerRegistry.js"></script>
   <script src="./src/tiles3d.js"></script>
