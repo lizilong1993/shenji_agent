@@ -313,27 +313,41 @@ ProjectionPicker / CreditDisplay），三项全部自建，归在图层管理第
   不是海拔）。与右侧「地理位置信息」面板分工不同——后者是**光标落点**。实测
   900 km 机位下两者相差约 2.2° 纬度，证明确实是两个不同的量。
 
-### 8.2 目标跟随
+### 8.2 目标视角：居中跟随与第三人称跟随
 
-开关在图层管理里；开启后点击任一目标即以其为中心持续跟随。
+**选中即绑定**：点选目标、面板「定位」、`?panel=`/`?follow=` 深链都会把相机绑定到
+该目标。`state.follow.mode` 有四种取值：
 
-**用 `camera.lookAt` + `HeadingPitchRange` 逐帧驱动，不用 `viewer.trackedEntity`**：
-后者的 `entity.viewFrom` **只在首帧生效**（跟踪中改视角必须解绑重绑），且 3D 跟踪会
-强制 `enableTilt = false`，做不到"随航向旋转 + 俯仰可控"。
+| mode | 含义 |
+|---|---|
+| `off` | 未绑定，`camera.transform` 必须是单位阵 |
+| `glide` | 选中后的平滑过渡：位置沿起止测地线插值，姿态按最短角插值 |
+| `center` | 普通选中模式：目标恒在视窗中心，跟随目标平移 |
+| `chase` | 第三人称斜后方跟随：相机绕到目标运动方向的后上方 |
+
+**普通模式（center）**：`camera.lookAt` 把参考系锁在目标 ENU 上，所以目标恒在
+视窗中心、滚轮缩放的参考原点就是目标；拖动是绕目标公转。目标移动（CZML 在
+`viewer.clock.currentTime` 的连续采样）时，相机按"相对目标的同一 heading/pitch/range"
+重新 `lookAt` 新位置，即整体平移跟随，不会逐渐偏离。static 目标不重下 `lookAt`，
+省掉每帧的相机变换与 `camera.changed` 级联。
+
+**目标跟随（chase）**：勾选后 `heading = 目标航向`、`pitch` 按域分档，相机位于目标
+正后上方并沿目标前进方向观察。目标航向/俯仰/距离用指数阻尼收敛（时间常数
+0.45 / 0.50 / 0.65 s），转弯、加减速时相机平滑绕行而不是跳变。取消勾选只把
+`mode` 切回 `center`，**不解除绑定**，因此视线不会跳。
 
 **航向公式**（由 1.145 源码 `offsetFromHeadingPitchRange` 推出，实测已复核）：
 `offset_ENU = (−r·cos p·sin h, −r·cos p·cos h, −r·sin p)`，即 `heading` 是**相机视线
-方位角**，相机**位置**方位角 = `heading + 180°`。要让相机位于目标右后上方：
-`heading = 目标航向 − 30°`。
+方位角**，相机**位置**方位角 = `heading + 180°`。所以 chase 模式取 `heading = 目标航向`
+时相机在目标正后方；旧版"右后上方"用的是 `目标航向 − 30°`。
 
-实测复核（`?case=joint_full&tick=800&follow=R06`）：相机高度 13.15 km = 8500 +
-15000·sin18°；相机相对目标 Δ北 4.8 km、Δ东 13.4 km → 水平 14.2 km = 15000·cos18°，
-方位角 70.3°；R06 末段航向 279° → 公式预期 `279+180−30 = 69°`。**吻合。**
+视角参数按域分档：center 初始 6 km/−32°（海）、6 km/−36°（陆）、22 km/−22°（空），
+并按进入时的距离钳制在 0.8×–4×；chase 为 3.5 km/−20°、4 km/−28°、15 km/−16°。
+初始选中过渡 1.2 s，用户在地图上按下或被滚轮打断时立即收敛到当前机位并锁定目标。
 
-视角参数按域分档（海 3.5 km/−22°、陆 4.0 km/−30°、空 15 km/−18°，均偏右 30°）。
-跟随相机挂在 `scene.preRender`（`Scene.render` 顺序为 preUpdate → update → preRender
-→ draw，在这里改相机本帧生效）。目标静止（暂停或到达航路终点）时跳过，既省掉每帧的
-`lookAt` 也不再刷 `camera.changed`。
+**chase 模式下的交互**：按下鼠标即 `suspend`，拖拽期间仍保持目标居中、只把姿态
+让给用户；松手 0.7 s 后阻尼回到后上方。滚轮缩放的距离会被采纳为新的跟随距离，
+不会被阻尼拉回默认值。center 模式下拖动/滚轮完全交给 Cesium，不解除跟随。
 
 **三条必须遵守的纪律**：
 
@@ -342,14 +356,15 @@ ProjectionPicker / CreditDisplay），三项全部自建，归在图层管理第
    `ScreenSpaceCameraController` 随即把 `_globe` 置 undefined、`_ellipsoid` 换成
    单位球 → 缩放与贴地钳制失效、**可以穿到地面以下**。而 `setView` / `flyTo`
    **自己不会解锁**（它们保存并恢复原 transform），所以所有视角跳转入口都要先经
-   `detachFollow()`。诊断浮层的 `unlocked` 项就是这一条的判据。
-2. **"拖动即解除"不能用 `camera.changed` 或 `moveStart/moveEnd`**——这两个事件的
-   判定会比较 `camera.transform`，而跟随每帧都在改它，会被跟随本身持续触发。改为在
-   canvas 上捕获 `pointerdown/move/up` + `wheel`，用 4 px 阈值区分"点击切换目标"与
-   "拖动解除"；按下即 `suspend`，让拖拽第一像素起相机就归用户。
+   `detachFollow()`。诊断浮层的 `locked` 项与 `followDebug()` 的 `locked` 是判据。
+2. **"按下/拖拽/滚轮"不能用 `camera.changed` 或 `moveStart/moveEnd` 判定**——这两个
+   事件的判定会比较 `camera.transform`，而跟随每帧都在改它，会被跟随本身持续触发。
+   改为在 canvas 上捕获 `pointerdown/move/up` + `wheel`，用 4 px 阈值区分"点击切换
+   目标"与"拖拽"；**只有 chase 模式**在按下时 `suspend`，center 模式不打断公转。
 3. **跟随时 `camera.changed` 每帧触发，会把建筑体块的 400 ms 防抖反复重置而永不执行**。
    改为 `if (state.follow.id) return;`，并在 `detachFollow()` 收尾时补一次
    `refreshBuildings()`。
+
 
 ### 8.3 一个真实 Bug 的根因（已修）
 
