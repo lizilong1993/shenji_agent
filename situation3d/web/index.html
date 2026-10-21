@@ -78,8 +78,13 @@
     </div>
   </header>
 
-  <main class="workspace">
-    <aside class="panel panel-left">
+  <main class="workspace" id="workspace">
+    <button type="button" id="toggleLeftPanel" class="panel-toggle panel-toggle-left"
+            title="收起左栏" aria-label="收起左栏">‹</button>
+    <button type="button" id="toggleRightPanel" class="panel-toggle panel-toggle-right"
+            title="收起右栏" aria-label="收起右栏">›</button>
+    <aside class="panel panel-left" id="panelLeft">
+      <div class="panel-resizer panel-resizer-right" data-resize="left" title="拖动调整左栏宽度"></div>
       <!-- 图层管理独立滚动：它内容最长（四大类 + 说明文字），小屏上会把下面的
            目标列表挤出可视区。整列滚动会让目标列表跟着一起滚，所以这里只让
            图层管理这一块滚，目标列表固定在下方。 -->
@@ -190,7 +195,8 @@
       <!-- 界面不写操作说明：操作方法见用户手册。 -->
     </section>
 
-    <aside class="panel panel-right">
+    <aside class="panel panel-right" id="panelRight">
+      <div class="panel-resizer panel-resizer-left" data-resize="right" title="拖动调整右栏宽度"></div>
       <!-- 整体TS栏：全局各类型、各方目标的整体战损状态（图标 + 紧贴底部的血条）。
            展示案例完整编成，不跟随地图上的红/蓝/域过滤开关。 -->
       <section class="panel-block">
@@ -276,6 +282,7 @@
   <script src="./src/entityLod.js"></script>
   <script src="./src/targetMotion.js"></script>
   <script src="./src/targetFx.js"></script>
+  <script src="./src/targetCombatFx.js"></script>
   <script src="./src/assets.js"></script>
   <script src="./src/layerRegistry.js"></script>
   <script src="./src/tiles3d.js"></script>
