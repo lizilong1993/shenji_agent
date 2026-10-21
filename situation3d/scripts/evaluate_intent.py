@@ -251,6 +251,7 @@ def main(argv=None) -> int:
     ap.add_argument("--task", choices=("both", "intent", "behavior"), default="both")
     ap.add_argument("--jev-limit", type=int, default=8,
                     help="JEV window count (CPU is slow); rule is also scored on this subset")
+    ap.add_argument("--device", default="cpu", help="cpu or cuda")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
 
@@ -270,7 +271,7 @@ def main(argv=None) -> int:
     if args.space:
         client = HfSpaceJevClient()
     elif args.model:
-        client = LocalOpenJevClient(args.model)
+        client = LocalOpenJevClient(args.model, device=args.device)
     else:
         client = MockJevClient(preference=("assault", "recon", "retreat", "defend"))
     jev = evaluate_jev_semantic(subset, client) if args.task in ("both", "intent") else None

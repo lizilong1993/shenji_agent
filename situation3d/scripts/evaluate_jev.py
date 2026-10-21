@@ -125,13 +125,14 @@ def jev_controller(world, seat: int, policy: JevPolicy) -> Dict[str, float]:
 
 
 def run_episode(policy_name: str, model_path: str, ticks: int,
-                decision_every: int, seed: int) -> dict:
+                decision_every: int, seed: int, device: str = "cpu") -> dict:
     basic = make_basic()
     scenario = make_scenario()
     world = build_world(scenario, basic, seed=seed, dt_s=10.0)
     client = None
     if policy_name == "jev":
-        client = LocalOpenJevClient(model_path) if model_path else MockJevClient()
+        client = (LocalOpenJevClient(model_path, device=device)
+                  if model_path else MockJevClient())
     policy = JevPolicy(client=client) if policy_name == "jev" else None
     latencies: List[float] = []
     applied = 0
@@ -175,14 +176,15 @@ def main(argv=None) -> int:
     ap.add_argument("--ticks", type=int, default=80)
     ap.add_argument("--decision-every", type=int, default=4)
     ap.add_argument("--seed", type=int, default=20261021)
+    ap.add_argument("--device", default="cpu", help="cpu or cuda")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
 
     results = {
         "heuristic": run_episode("heuristic", args.model, args.ticks,
-                                 args.decision_every, args.seed),
+                                 args.decision_every, args.seed, args.device),
         "jev": run_episode("jev", args.model, args.ticks,
-                           args.decision_every, args.seed),
+                           args.decision_every, args.seed, args.device),
     }
     payload = {"seed": args.seed, "model": args.model or "mock", "results": results}
     text = json.dumps(payload, ensure_ascii=False, indent=1)
