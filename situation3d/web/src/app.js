@@ -136,9 +136,24 @@ const state = {
   imageryStats: null,       // 底图瓦片请求统计（诊断用）
   inference: null,          // inference_frames，与 frames 逐帧对齐
 
-  // 目标跟随。enabled 是图层管理里的开关，id 是当前被跟随的目标；
-  // suspend 在用户按下鼠标时置位，让相机在拖拽期间完全交给用户。
-  follow: { enabled: false, id: null, suspend: false, press: null, last: null, notified: false },
+  // 目标视角。id 是当前相机绑定的目标，mode 是相机驾驶模式：
+  //   off    未绑定（camera.transform 必须是单位阵）
+  //   glide  选中后的平滑过渡（逐帧沿测地线插值）
+  //   center 普通选中模式：lookAt 锁定目标，目标始终居中，缩放围绕目标
+  //   chase  第三人称斜后方跟随：相机绕到目标运动方向的后上方并沿前进方向观察
+  // enabled 只对应「目标跟随」复选框（chase）；suspend 在 chase 模式下用户
+  // 按下鼠标时置位，让相机在拖拽期间完全交给用户，松手后阻尼回到跟随位。
+  follow: {
+    enabled: false, id: null, mode: 'off', suspend: false, press: null,
+    resumeAt: 0, glide: null,
+    focus: null,          // 当前 lookAt 的原点（上一目标位置），用于平移跟随
+    lastPos: null,        // 上一帧目标位置（航向兜底用）
+    pose: { heading: 0, pitch: 0, range: 0 },
+    chaseRange: null,     // chase 模式的距离；滚轮缩放直接改它
+    lastNow: 0,
+    lastLockMs: 0,        // 最近一次自动改相机的时间（建筑体块防抖用）
+    notified: false,
+  },
 
   // 地图组件显隐（图层管理第四类）
   components: { compass: true, scalebar: true, viewpoint: true },
@@ -336,13 +351,14 @@ function renderDiagnostics() {
                '  ' + (window.TileCache.prefetchConfig ? JSON.stringify(TileCache.prefetchConfig()) : ''));
     if (tc.lastError) lines.push('cache error     ' + String(tc.lastError).slice(0, 120));
   }
-  // 跟随与参考系状态。unlocked 必须是 true：camera.lookAt 会把 camera.transform
-  // 锁在目标 ENU 上，而 setView / flyTo 不会自动解锁，锁定状态下缩放与贴地钳制
-  // 会失效（可以穿到地面以下）。解除跟随必须让这一项回到 true。
+  // 目标视角与参考系状态。跟随时 camera.transform 被 lookAt 锁在目标 ENU 上，
+  // 这是**预期状态**；只有未跟随时才必须是单位阵，否则 setView / flyTo 会把
+  // orientation 按残留的 ENU 解释，缩放与贴地钳制失效（可以穿到地面以下）。
   lines.push('follow          ' + (state.follow.id || '-') +
-             '  enabled ' + state.follow.enabled +
+             '  mode ' + state.follow.mode +
+             '  chase ' + state.follow.enabled +
              '  suspend ' + state.follow.suspend +
-             '  unlocked ' + viewer.camera.transform.equals(Cesium.Matrix4.IDENTITY));
+             '  locked ' + !viewer.camera.transform.equals(Cesium.Matrix4.IDENTITY));
   lines.push('camChanged      ' + camChangedCount + ' 次');
   if (window.Overview) lines.push('overview        ' + Overview.debugInfo());
   if (window.Places) lines.push('places          ' + Places.debugInfo());
@@ -1450,7 +1466,7 @@ function applySituationData(data, caseId) {
         dom.followTarget.disabled = false;
         dom.followTarget.title = '';
       }
-      setFollowNote('开启后点击任一目标，相机以随航向旋转的追踪视角持续跟随；拖动地图即自动解除。');
+      setFollowNote('选中目标即居中跟随；勾选「目标跟随」切换第三人称斜后方视角。');
       // 原先这里打印「就绪 · N 个目标 · M 帧 · K 个热点区域」。按界面重构要求
       // 移除该概略文本；状态栏只保留**动态**信息（加载进度、错误、操作反馈），
       // 空闲时不占用视线。案例身份已由顶栏 `#scenarioName` 显示，不再重复。
@@ -2115,13 +2131,11 @@ function applyTargetBillboardAnchor(entity, modelMode) {
   // 把实体反复标脏。
   if (entity._iconAnchorModel === modelMode) return;
   entity._iconAnchorModel = modelMode;
-  if (modelMode) {
-    bb.verticalOrigin = Cesium.VerticalOrigin.BOTTOM;
-    bb.pixelOffset = new Cesium.Cartesian2(0, -52);
-  } else {
-    bb.verticalOrigin = Cesium.VerticalOrigin.CENTER;
-    bb.pixelOffset = new Cesium.Cartesian2(0, 0);
-  }
+  // The symbol sits at the model centre and must stay above it; the old
+  // "lift above the model head" offset hid the symbol behind the mesh.
+  bb.verticalOrigin = Cesium.VerticalOrigin.CENTER;
+  bb.pixelOffset = new Cesium.Cartesian2(0, 0);
+  bb.disableDepthTestDistance = Number.POSITIVE_INFINITY;
 }
 
 function createTargetEntities() {
@@ -2855,6 +2869,17 @@ function refreshPredictEntity(id) {
   if (!rec || !rec.predict) return;
   const pred = (state.selected === id && isVisible(rec.def) && state.layers.tracks)
     ? predictedTrackPoints(rec.def) : [];
+  // The arrow asset points north. Cesium billboard rotation is CCW, so a
+  // clockwise compass bearing is applied as -bearing.
+  if (rec.predict.billboard) {
+    var rot = 0;
+    if (pred.length >= 2) {
+      var a = pred[pred.length - 2], b = pred[pred.length - 1];
+      rot = -predBearing(a, b) * Math.PI / 180;
+    }
+    rec.predict.billboard.rotation = rot;
+    rec.predict.billboard.alignedAxis = Cesium.Cartesian3.UNIT_Z;
+  }
   setEntityShow(rec.predict, pred.length >= 2);
 }
 
@@ -2936,23 +2961,49 @@ function trailWindowOf(rec, id) {
  * 计划轨迹：从当前位置沿计划航路剩余段，或是航向外推。
  * 返回 `[lon, lat, alt]`：虚线 + 终点箭头都基于它，与历史实线分开绘制。
  */
+/** Bearing from point A to B in degrees, clockwise from north. Both are [lon, lat, alt]. */
+function predBearing(a, b) {
+  var cos = Math.cos((a[1] || 0) * Math.PI / 180) || 1;
+  return (Math.atan2((b[0] - a[0]) * cos, b[1] - a[1]) * 180 / Math.PI + 360) % 360;
+}
+
 function predictedTrackPoints(def) {
   const s = positionFor(def.id, state.tick);
   if (!s) return [];
   const out = [[s.lon, s.lat, s.alt]];
   if (!def.waypoints || def.waypoints.length < 2) {
     // 没有航路点（例如 CZML 驱动的新案例）：用**后续帧的计划位置**作为计划轨迹。
-    // 数据集本身就有完整的逐帧计划航迹，比"航向外推"更可靠。
+    // 密集案例只取前 10 分钟，并在第一次明显转向处截断——否则闭环巡逻/折返
+    // 会在 30 分钟窗口里画成一整圈多边形，看起来像"乱画"。
     const frames = (state.data && state.data.frames) || [];
+    // Predict to the next turning point, not a fixed wall-clock horizon.
+    // The cap is only a safety valve for a perfectly straight path.
+    const dense = !!(state.data && (state.data.campaign_contract_version ||
+      ((state.data.targets || []).length > 50)));
+    const safetyTicks = dense ? 240 : PREDICT_HORIZON_TICKS;
     if (frames.length > state.tick + 1) {
-      const end = Math.min(frames.length - 1, state.tick + PREDICT_HORIZON_TICKS);
-      const step = Math.max(1, Math.floor((end - state.tick) / 8));
-      for (let t = state.tick + step; t <= end; t += step) {
+      const end = Math.min(frames.length - 1, state.tick + safetyTicks);
+      var prevBearing = null;
+      var lastPt = null;
+      for (let t = state.tick + 1; t <= end; t++) {
         const p = positionFor(def.id, t);
-        if (p) out.push([p.lon, p.lat, p.alt]);
+        if (!p) continue;
+        const pt = [p.lon, p.lat, p.alt];
+        if (lastPt) {
+          const cos = Math.cos(lastPt[1] * Math.PI / 180) || 1;
+          if (Math.hypot((pt[0] - lastPt[0]) * cos, pt[1] - lastPt[1]) < 0.00002) continue;
+        }
+        if (lastPt && prevBearing !== null && out.length >= 3) {
+          const b = predBearing(lastPt, pt);
+          const diff = Math.abs(((b - prevBearing + 540) % 360) - 180);
+          // Include the turn point itself, then stop: the prediction is
+          // "current leg -> next turn", not a fixed 10-minute slice.
+          if (diff > 30) { out.push(pt); break; }
+        }
+        if (lastPt) prevBearing = predBearing(lastPt, pt);
+        out.push(pt);
+        lastPt = pt;
       }
-      const last = positionFor(def.id, end);
-      if (last && out[out.length - 1][0] !== last.lon) out.push([last.lon, last.lat, last.alt]);
     }
     return out;
   }
@@ -3932,12 +3983,13 @@ function selectTarget(id, fly, height) {
   if (prev && prev !== id) refreshPredictEntity(prev);
   if (id) refreshPredictEntity(id);
   setPlottingHidden(!!id);
-  const s = positionFor(id, state.tick);
-  if (state.follow.enabled) {
-    // 跟随开启时，点击目标是"换一个跟随对象"，不能再走 flyTo —— 两者会互抢相机
-    startFollow(id);
-  } else if (fly && s) {
-    flyTo(s.lon, s.lat, height || 180000);
+  // 选中即绑定相机：目标平滑移到视窗中心并持续跟随；勾选「目标跟随」时
+  // 直接用第三人称斜后方位姿。fly=true（面板「定位」）强制重新居中，
+  // height 沿用"目标上方 N 米"的定位语义。
+  if (!id) {
+    detachFollow('取消选中');
+  } else if (state.targets[id]) {
+    beginTargetView(id, { force: !!fly, height: fly ? height : null });
   }
   syncSelection();
   renderTargetCounts();
@@ -3950,11 +4002,12 @@ function selectTarget(id, fly, height) {
   markScene('selectTarget');
 }
 
-/** 清除选中态并把目标TS栏复位成提示语。Esc 与「解除跟随」都会走到这里。 */
+/** 清除选中态；相机随之解除绑定。Esc 与「解除跟随」都会走到这里。 */
 function clearTargetSelection() {
   const prev = state.selected;
   state.selected = null;
   if (prev) refreshPredictEntity(prev);
+  if (state.follow.id || state.follow.mode !== 'off') detachFollow('取消选中');
   setPlottingHidden(false);
   syncSelection();
   renderTargetStatus(null);
@@ -4996,89 +5049,458 @@ function setComponent(name, on) {
 }
 
 // --------------------------------------------------------------------------
-// 目标跟随
+// 目标视角：普通居中跟随（center）与第三人称斜后方跟随（chase）
 // --------------------------------------------------------------------------
 //
-// 用 camera.lookAt + HeadingPitchRange 逐帧驱动，不用 viewer.trackedEntity：
-// 后者的 entity.viewFrom **只在首帧生效**（跟踪中改视角必须解绑重绑），且 3D
-// 跟踪会强制 enableTilt = false，做不到"随航向旋转 + 俯仰可控"。
+// 两种模式共用同一套参考系：camera.lookAt + HeadingPitchRange 把相机锁在
+// 目标 ENU 上。锁定的好处正是需求要的语义 —— 目标始终在视窗中心，拖动是绕
+// 目标公转；代价是解除时必须 lookAtTransform(Matrix4.IDENTITY)（见
+// detachFollow 的说明）。
+//
+// ⚠ 缩放**不能交给 Cesium 的默认滚轮**：1.145 的 ScreenSpaceCameraController
+// 在 3D 下按光标位置缩放，光标偏离目标时目标会被推离中心。本模块在 canvas 的
+// capture 阶段接管 wheel（center/chase 都直接改"相机→目标"的斜距再 lookAt），
+// 因此缩放中心恒为目标。没有绑定目标时才交回 Cesium。
+//
+//   center  普通选中模式：跟随目标平移，保留用户自己的方位/俯仰/距离；
+//           拖动=绕目标公转，滚轮=以目标为中心缩放。
+//   chase   第三人称斜后方：相机绕到目标运动方向的后上方，视线沿目标前进
+//           方向；航向/俯仰/距离用指数阻尼收敛，转弯、加减速时不会跳。
 //
 // HeadingPitchRange 的语义（由 1.145 源码 offsetFromHeadingPitchRange 推出）：
 //   offset_ENU = ( -r·cos p·sin h, -r·cos p·cos h, -r·sin p )
 //   ⇒ heading 是**相机视线方位角**，相机**位置**方位角 = heading + 180°。
-// 所以要让相机位于目标的右后上方：heading = 目标航向 - 偏角。
+// 所以 chase 模式 heading = 目标航向 时，相机恰好在目标正后方并沿前进方向观察。
 
-const FOLLOW_VIEW = {
-  sea:  { range:  3500, pitchDeg: -22, rightDeg: 30 },   // 高于目标约 1.3 km
-  land: { range:  4000, pitchDeg: -30, rightDeg: 30 },   // 高于目标约 2.0 km，俯视阵地
-  air:  { range: 15000, pitchDeg: -18, rightDeg: 30 },   // 高于目标约 4.6 km
+const TARGET_VIEW = {
+  sea:  { range:  6000, pitchDeg: -32 },   // 选中后的默认观察距离/俯角
+  land: { range:  6000, pitchDeg: -36 },
+  air:  { range: 22000, pitchDeg: -22 },
 };
 
+const CHASE_VIEW = {
+  sea:  { range:  3500, pitchDeg: -20 },   // 高于目标约 1.2 km、后方 3.3 km
+  land: { range:  4000, pitchDeg: -28 },   // 高于目标约 1.9 km
+  air:  { range: 15000, pitchDeg: -16 },   // 高于目标约 4.1 km
+};
+
+// 距离钳制：太小会穿进模型，太大失去"跟随"的意义。
+const FOLLOW_RANGE_MIN = 300;
+const FOLLOW_RANGE_MAX = 120000;
+// 目标移动超过该距离才重下 lookAt（米）。静止时完全不碰相机。
+const FOLLOW_MOVE_EPS = 0.02;
+// 初始居中过渡：相机沿起止位置间的测地线插值，同时转到目标/跟随位。
+const GLIDE_MS = 1200;
+// chase 模式下拖拽结束到恢复跟随的停顿（毫秒），让用户能停在手动视角上看一眼。
+const CHASE_RESUME_DELAY_MS = 700;
+
 const _followHpr = new Cesium.HeadingPitchRange(0, 0, 0);
+const _rigEnu = new Cesium.Matrix4();
+const _rigInv = new Cesium.Matrix4();
+const _rigLocal = new Cesium.Cartesian3();
+const _rigOffset = new Cesium.Cartesian3();
+const _rigEnd = new Cesium.Cartesian3();
+const _rigPos = new Cesium.Cartesian3();
+const _rigGeo = new Cesium.EllipsoidGeodesic();
+const _rigMid = new Cesium.Cartographic();
+const _rigEndCarto = new Cesium.Cartographic();
+const _rigHpr = { heading: 0, pitch: 0, range: 0 };
+
+function wrapPi(a) {
+  a = (a + Math.PI) % (Math.PI * 2);
+  if (a < 0) a += Math.PI * 2;
+  return a - Math.PI;
+}
+
+/** 从 from 转到 to 的最短角差，落在 (-π, π]。 */
+function shortestAngle(from, to) {
+  return wrapPi(to - from);
+}
+
+function clampRange(r) {
+  return Math.max(FOLLOW_RANGE_MIN, Math.min(FOLLOW_RANGE_MAX, r));
+}
+
+// 用户缩放不受"跟随预设"的 120 km 上限约束，只防相机穿进模型或飞出地球。
+const ZOOM_RANGE_MIN = 10;
+const ZOOM_RANGE_MAX = 20000000;
+
+function clampZoomRange(r) {
+  return Math.max(ZOOM_RANGE_MIN, Math.min(ZOOM_RANGE_MAX, r));
+}
+
+/** 滚轮增量（像素）。deltaMode: 0=pixel, 1=行, 2=页（Firefox 常用行模式）。 */
+function wheelPixels(e) {
+  return e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+}
+
+function easeInOut(t) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+/**
+ * 目标**当前显示位置**：优先取 CZML 在 viewer.clock.currentTime 的采样
+ * （帧间连续插值），拿不到再退回整数帧坐标。相机与模型因此走同一个时间源，
+ * 近景不会出现"模型在动、相机按 tick 跳步"的相对蹭动。
+ */
+function liveTargetPosition(id) {
+  if (!viewer) return null;
+  const rec = state.targets[id];
+  if (!rec) return null;
+  try {
+    if (rec.entity && rec.entity.position) {
+      const p = rec.entity.position.getValue(viewer.clock.currentTime);
+      if (p) return Cesium.Cartesian3.clone(p, new Cesium.Cartesian3());
+    }
+  } catch (e) { /* 采样属性尚未挂上 / 时钟无效：走帧坐标兜底 */ }
+  const s = positionFor(id, state.tick);
+  if (!s) return null;
+  return Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
+}
+
+/** 由目标点与视线 heading/pitch/range 求相机世界位置。 */
+function offsetPosition(target, heading, pitch, range, result) {
+  Cesium.Transforms.eastNorthUpToFixedFrame(target, Cesium.Ellipsoid.WGS84, _rigEnu);
+  _rigOffset.x = -range * Math.cos(pitch) * Math.sin(heading);
+  _rigOffset.y = -range * Math.cos(pitch) * Math.cos(heading);
+  _rigOffset.z = -range * Math.sin(pitch);
+  return Cesium.Matrix4.multiplyByPoint(_rigEnu, _rigOffset, result);
+}
+
+/**
+ * 当前相机相对某目标点的球坐标（视线 heading/pitch + 斜距）。
+ * 自己算而不用 camera.heading/pitch：这两个 getter 会临时改写
+ * camera._transform 并两次 updateMembers，逐帧读的代价不划算（README §8.1 同结论）。
+ */
+function hprFromCameraTo(target, out) {
+  Cesium.Transforms.eastNorthUpToFixedFrame(target, Cesium.Ellipsoid.WGS84, _rigEnu);
+  Cesium.Matrix4.inverseTransformation(_rigEnu, _rigInv);
+  Cesium.Matrix4.multiplyByPoint(_rigInv, viewer.camera.positionWC, _rigLocal);
+  const range = Cesium.Cartesian3.magnitude(_rigLocal);
+  out = out || _rigHpr;
+  if (range < 1e-3) {
+    out.heading = 0;
+    out.pitch = -Math.PI / 2;
+    out.range = FOLLOW_RANGE_MIN;
+    return out;
+  }
+  out.range = range;
+  out.pitch = Math.asin(Cesium.Math.clamp(-_rigLocal.z / range, -1, 1));
+  out.heading = Math.atan2(-_rigLocal.x, -_rigLocal.y);
+  if (out.heading < 0) out.heading += Math.PI * 2;
+  return out;
+}
+
+/** 目标航向（弧度）。数据没有 heading 时用前后两帧位置求方位，再退回当前视线。 */
+function targetHeadingRad(id, s, fallback) {
+  const h = s && Number(s.heading);
+  if (isFinite(h)) return Cesium.Math.toRadians(((h % 360) + 360) % 360);
+  const f = state.follow;
+  if (f.lastPos) {
+    const p = liveTargetPosition(id);
+    if (p) {
+      const a = Cesium.Cartographic.fromCartesian(f.lastPos);
+      const b = Cesium.Cartographic.fromCartesian(p);
+      const dLon = b.longitude - a.longitude;
+      const dLat = b.latitude - a.latitude;
+      if (Math.abs(dLon) > 1e-9 || Math.abs(dLat) > 1e-9) {
+        return Math.atan2(dLon * Math.cos(b.latitude), dLat);
+      }
+    }
+  }
+  return fallback;
+}
 
 /** 被跟随目标是否仍然可跟随（存在、可见、有位置）。 */
 function followTargetUsable(id) {
   const rec = state.targets[id];
   if (!rec) return false;
   if (!isVisible(rec.def)) return false;
-  return !!positionFor(id, state.tick);
+  return !!liveTargetPosition(id);
+}
+
+/** 把相机锁到目标 ENU 参考系的指定球坐标位置。 */
+function lockAt(pos, hpr) {
+  const f = state.follow;
+  _followHpr.heading = hpr.heading;
+  _followHpr.pitch = hpr.pitch;
+  _followHpr.range = Math.max(1, hpr.range);
+  viewer.camera.lookAt(pos, _followHpr);
+  f.lastLockMs = performance.now();
+  if (!f.focus) f.focus = new Cesium.Cartesian3();
+  Cesium.Cartesian3.clone(pos, f.focus);
+  if (!f.lastPos) f.lastPos = new Cesium.Cartesian3();
+  Cesium.Cartesian3.clone(pos, f.lastPos);
 }
 
 /**
- * 每帧更新跟随相机。挂在 scene.preRender 上，本帧生效。
- *
- * 目标静止（暂停、或已到航路终点）时直接返回：既省掉每帧的 lookAt，
- * 也不再触发 camera.changed，避免无谓的级联刷新。
+ * center 模式的一帧：把相机按"相对目标的同一球坐标"平移到新目标位置。
+ * 只读几何、不做缓动 —— 目标连续移动时相机平移也连续；用户拖动/缩放后
+ * 读到的就是新的 heading/pitch/range，因此不会与交互抢相机。
  */
-function applyFollowFrame(force) {
+function applyCenterFrame(pos) {
   const f = state.follow;
-  if (!f.enabled || !f.id || f.suspend || !viewer || !state.data) return;
+  if (f.focus && Cesium.Cartesian3.distance(pos, f.focus) < FOLLOW_MOVE_EPS) return;
+  const ref = f.focus || pos;
+  const cur = hprFromCameraTo(ref);
+  lockAt(pos, cur);
+}
 
+/** chase 模式的一帧：目标位置精确跟随，姿态用指数阻尼收敛到后上方。 */
+function applyChaseFrame(nowMs, pos, rec, s) {
+  const f = state.follow;
+  const v = CHASE_VIEW[rec.def.domain] || CHASE_VIEW.sea;
+
+  if (!f.lastNow) f.lastNow = nowMs;
+  // 不限死在一帧的 1/10：headless / 低帧率下（例如 5 fps）限成 0.1 s 会让阻尼
+  // 实际慢一倍，转弯看起来"拖泥带水"。指数阻尼对任意 dt 稳定，只防切回标签页
+  // 后一次跳太远，故上限取 0.5 s。
+  const dt = Math.max(0, Math.min(0.5, (nowMs - f.lastNow) / 1000));
+  f.lastNow = nowMs;
+
+  const desiredHeading = targetHeadingRad(f.id, s, f.pose.heading);
+  const desiredPitch = Cesium.Math.toRadians(v.pitchDeg);
+  const desiredRange = f.chaseRange || v.range;
+
+  const kH = 1 - Math.exp(-dt / 0.45);
+  const kP = 1 - Math.exp(-dt / 0.50);
+  const kR = 1 - Math.exp(-dt / 0.65);
+
+  f.pose.heading = wrapPi(f.pose.heading + shortestAngle(f.pose.heading, desiredHeading) * kH);
+  f.pose.pitch += (desiredPitch - f.pose.pitch) * kP;
+  f.pose.range += (desiredRange - f.pose.range) * kR;
+
+  const moved = !f.focus || Cesium.Cartesian3.distance(pos, f.focus) >= FOLLOW_MOVE_EPS;
+  const settling =
+    Math.abs(shortestAngle(f.pose.heading, desiredHeading)) > 0.002 ||
+    Math.abs(f.pose.pitch - desiredPitch) > 0.002 ||
+    Math.abs(f.pose.range - desiredRange) > 0.5;
+  if (!moved && !settling) return;
+
+  lockAt(pos, f.pose);
+}
+
+/** glide 过渡的一帧：位置沿测地线插值，姿态按最短角插值，目标逐渐居中。 */
+function applyGlideFrame(nowMs) {
+  const f = state.follow;
+  const g = f.glide;
+  if (!g) return;
+  const raw = Math.max(0, Math.min(1, (nowMs - g.t0) / g.duration));
+  const e = easeInOut(raw);
+
+  const pos = liveTargetPosition(f.id);
+  if (!pos) { f.glide = null; f.mode = g.finalMode; return; }
+
+  offsetPosition(pos, g.endHeading, g.endPitch, g.endRange, _rigEnd);
+  const endCarto = Cesium.Cartographic.fromCartesian(_rigEnd, Cesium.Ellipsoid.WGS84, _rigEndCarto);
+
+  let dest;
+  if (Cesium.Cartesian3.distance(g.startPos, _rigEnd) < 0.5) {
+    dest = Cesium.Cartesian3.clone(_rigEnd, _rigPos);
+  } else {
+    _rigGeo.setEndPoints(g.startCarto, endCarto);
+    const mid = _rigGeo.interpolateUsingFraction(e, _rigMid);
+    const height = g.startCarto.height + (endCarto.height - g.startCarto.height) * e;
+    dest = Cesium.Cartesian3.fromRadians(
+      mid.longitude, mid.latitude, height, Cesium.Ellipsoid.WGS84, _rigPos);
+  }
+  const heading = wrapPi(g.startHeading + shortestAngle(g.startHeading, g.endHeading) * e);
+  const pitch = g.startPitch + (g.endPitch - g.startPitch) * e;
+  viewer.camera.setView({ destination: dest, orientation: { heading: heading, pitch: pitch, roll: 0 } });
+  f.lastLockMs = nowMs;
+
+  if (raw >= 1) finishGlide(pos);
+}
+
+function finishGlide(pos) {
+  const f = state.follow;
+  const g = f.glide;
+  if (!g) return;
+  const cur = hprFromCameraTo(pos);
+  f.glide = null;
+  f.mode = g.finalMode;
+  f.pose.heading = cur.heading;
+  f.pose.pitch = cur.pitch;
+  f.pose.range = cur.range;
+  f.chaseRange = f.mode === 'chase' ? clampRange(g.endRange) : null;
+  f.lastNow = 0;
+  lockAt(pos, cur);
+  setStatus((f.mode === 'chase' ? '第三人称跟随：' : '目标居中跟随：') + f.id, 'ok');
+}
+
+/** 用户在地图上一按下就结束过渡；相机停在当前机位并立刻锁定目标。 */
+function finishGlideNow() {
+  const f = state.follow;
+  if (f.mode !== 'glide' || !f.glide) return;
+  const g = f.glide;
+  const pos = liveTargetPosition(f.id);
+  if (!pos) { f.glide = null; f.mode = g.finalMode; return; }
+  finishGlide(pos);
+}
+
+/** 选中目标后的目标位姿：center 保留来向、chase 取目标航向的正后方。 */
+function endHprFor(rec, cur, mode, height) {
+  const dom = rec.def.domain;
+  if (mode === 'chase') {
+    const v = CHASE_VIEW[dom] || CHASE_VIEW.sea;
+    const s = positionFor(rec.def.id, state.tick);
+    return {
+      heading: targetHeadingRad(rec.def.id, s, cur.heading),
+      pitch: Cesium.Math.toRadians(v.pitchDeg),
+      range: v.range,
+    };
+  }
+  const v = TARGET_VIEW[dom] || TARGET_VIEW.sea;
+  if (height > 0) {
+    const pitch = Cesium.Math.toRadians(-55);
+    return { heading: cur.heading, pitch: pitch, range: height / Math.sin(-pitch) };
+  }
+  const maxPitch = dom === 'air' ? Cesium.Math.toRadians(20) : Cesium.Math.toRadians(-5);
+  return {
+    heading: cur.heading,
+    pitch: Cesium.Math.toRadians(Cesium.Math.clamp(
+      Cesium.Math.toDegrees(cur.pitch), -85, Cesium.Math.toDegrees(maxPitch))),
+    range: clampRange(Math.min(Math.max(cur.range, v.range * 0.8), v.range * 4)),
+  };
+}
+
+/**
+ * 绑定/重绑定相机到某个目标（点选、面板「定位」、深链共用）。
+ *
+ *   force  同一目标也重新做一次居中过渡（定位按钮）。
+ *   height 以"目标上方 height 米"为目标机位（面板定位的原有语义）。
+ */
+function beginTargetView(id, opts) {
+  opts = opts || {};
+  const f = state.follow;
+  const rec = state.targets[id];
+  if (!rec || !state.data || !viewer) return;
+  const pos = liveTargetPosition(id);
+  if (!pos) return;
+  const mode = f.enabled ? 'chase' : 'center';
+  const same = f.id === id && (f.mode === 'center' || f.mode === 'chase');
+  if (same && !opts.force) {
+    if (f.mode !== mode) setFollowMode(f.enabled);
+    return;
+  }
+
+  f.id = id;
+  f.focus = null;        // 旧目标的注视点不能带到新目标上（航向兜底会读错方位）
+  f.lastPos = null;
+  f.suspend = false;
+  f.press = null;
+  f.resumeAt = 0;
+  f.notified = false;
+  f.lastNow = 0;
+
+  viewer.camera.cancelFlight();
+  // 换目标时可能还锁在旧目标的 ENU 上：先解锁，否则下面的世界坐标计算会混用参考系。
+  viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+
+  const cur = hprFromCameraTo(pos);
+  const end = endHprFor(rec, cur, mode, opts.height);
+  const startPos = Cesium.Cartesian3.clone(viewer.camera.positionWC, new Cesium.Cartesian3());
+  f.glide = {
+    t0: performance.now(),
+    duration: GLIDE_MS,
+    startCarto: Cesium.Cartographic.clone(
+      Cesium.Cartographic.fromCartesian(startPos), new Cesium.Cartographic()),
+    startPos: startPos,
+    startHeading: viewer.camera.heading,
+    startPitch: viewer.camera.pitch,
+    endHeading: end.heading,
+    endPitch: end.pitch,
+    endRange: end.range,
+    finalMode: mode,
+  };
+  f.mode = 'glide';
+  f.chaseRange = mode === 'chase' ? clampRange(end.range) : null;
+}
+
+/**
+ * 勾选/取消「目标跟随」：只切换相机驾驶模式，不解除与目标的绑定。
+ * 取消勾选 → 回到普通居中模式（保持当前视角）；勾选 → 绕到目标斜后方。
+ */
+function setFollowMode(enabled) {
+  const f = state.follow;
+  f.enabled = !!enabled;
+  if (!f.id) return;
+  if (f.mode === 'glide') {
+    // 过渡中点开关：先收敛到当前机位（不改变绑定），再按新模式接管，
+    // 否则会先按旧模式的终点飞完、再被新姿态拉一次，多出一段可见的摆动。
+    const pos = liveTargetPosition(f.id);
+    if (pos) finishGlide(pos);
+    else { if (f.glide) f.glide.finalMode = f.enabled ? 'chase' : 'center'; return; }
+  }
+  if (f.enabled) {
+    if (f.mode !== 'center') return;
+    const pos = liveTargetPosition(f.id);
+    if (!pos) return;
+    const cur = hprFromCameraTo(pos);
+    f.pose.heading = cur.heading;
+    f.pose.pitch = cur.pitch;
+    f.pose.range = cur.range;
+    const rec = state.targets[f.id];
+    const v = CHASE_VIEW[(rec && rec.def.domain) || 'sea'] || CHASE_VIEW.sea;
+    f.chaseRange = v.range;
+    f.mode = 'chase';
+    f.suspend = false;
+    f.resumeAt = 0;
+    f.lastNow = 0;
+    setStatus('第三人称跟随：' + f.id, 'ok');
+  } else if (f.mode === 'chase') {
+    f.mode = 'center';
+    f.suspend = false;
+    f.resumeAt = 0;
+    const pos = liveTargetPosition(f.id);
+    if (pos) lockAt(pos, hprFromCameraTo(pos));
+    setStatus('目标居中跟随：' + f.id, 'ok');
+  }
+}
+
+/** 每帧驱动相机。挂在 scene.preRender 上，本帧生效。 */
+function applyCameraRig(nowMs) {
+  const f = state.follow;
+  if (!viewer || !state.data || !f.id) return;
   const rec = state.targets[f.id];
-  const s = rec ? positionFor(f.id, state.tick) : null;
-  if (!rec || !s || !isVisible(rec.def)) { detachFollow('目标已隐藏'); return; }
+  if (!rec || !isVisible(rec.def)) { detachFollow('目标已隐藏'); return; }
 
-  if (s.reached_end && !f.notified) {
+  if (f.mode === 'glide') { applyGlideFrame(nowMs); return; }
+
+  const pos = liveTargetPosition(f.id);
+  if (!pos) return;
+
+  const s = positionFor(f.id, state.tick);
+  if (s && s.reached_end && !f.notified) {
     f.notified = true;
     setStatus('目标 ' + f.id + ' 已到达航路终点，跟随保持', 'ok');
   }
 
-  // 跟随用 CZML 在**当前时钟**的位置，而不是整数帧坐标：否则模型在帧间平滑
-  // 移动、相机却每 tick 跳一步，近景会出现模型在画面里轻微前后蹭。
-  let pos = null;
-  try {
-    if (rec.entity && rec.entity.position) {
-      pos = rec.entity.position.getValue(viewer.clock.currentTime);
+  if (f.mode === 'chase') {
+    if (f.suspend) {
+      // 拖拽期间仍让目标保持居中（只是不强制后上方姿态）；松手后平滑归位。
+      if (f.resumeAt && !f.press && nowMs >= f.resumeAt) {
+        f.suspend = false;
+        f.resumeAt = 0;
+        const cur = hprFromCameraTo(pos);
+        f.pose.heading = cur.heading;
+        f.pose.pitch = cur.pitch;
+        f.pose.range = cur.range;
+        f.chaseRange = clampRange(cur.range);
+        f.lastNow = nowMs;
+      } else {
+        applyCenterFrame(pos);
+        return;
+      }
     }
-  } catch (e) { pos = null; }
-  if (!pos) pos = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
-  if (!force && f.last && Cesium.Cartesian3.distance(pos, f.last) < 0.5) return;
-  if (!f.last) f.last = new Cesium.Cartesian3();
-  Cesium.Cartesian3.clone(pos, f.last);
-
-  const v = FOLLOW_VIEW[rec.def.domain] || FOLLOW_VIEW.sea;
-  _followHpr.heading = Cesium.Math.toRadians((s.heading || 0) - v.rightDeg);
-  _followHpr.pitch = Cesium.Math.toRadians(v.pitchDeg);
-  _followHpr.range = v.range;
-  viewer.camera.lookAt(pos, _followHpr);
-}
-
-function startFollow(id) {
-  const f = state.follow;
-  if (!f.enabled || !state.targets[id] || !state.data) return;
-  f.id = id;
-  f.suspend = false;
-  f.press = null;
-  f.last = null;
-  f.notified = false;
-  viewer.camera.cancelFlight();      // 取消可能在飞的 flyTo，否则两者互相覆盖
-  applyFollowFrame(true);
-  setStatus('正在跟随 ' + id + ' · 拖动地图可解除', 'ok');
-  setFollowNote('正在跟随 ' + id + '。拖动地图或滚轮缩放即自动解除。');
+    applyChaseFrame(nowMs, pos, rec, s);
+  } else {
+    applyCenterFrame(pos);
+  }
 }
 
 /**
- * 解除跟随。
+ * 解除绑定/跟随。
  *
  * **必须** lookAtTransform(Matrix4.IDENTITY)：camera.lookAt 会把 camera.transform
  * 设成目标 ENU 矩阵，ScreenSpaceCameraController 随即把 _globe 置 undefined、
@@ -5090,23 +5512,30 @@ function detachFollow(reason) {
   const f = state.follow;
   const was = f.id;
   f.id = null;
+  f.mode = 'off';
   f.suspend = false;
   f.press = null;
-  f.last = null;
+  f.resumeAt = 0;
+  f.glide = null;
+  f.focus = null;
+  f.lastPos = null;
+  f.chaseRange = null;
   f.notified = false;
+  f.lastNow = 0;
+  f.lastLockMs = 0;
   f.enabled = false;
   if (dom.followTarget) dom.followTarget.checked = false;
   if (viewer) viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
   if (was) {
     setStatus('已解除目标跟随（' + was + '）' + (reason ? '：' + reason : ''), 'ok');
-    setFollowNote('已解除跟随。勾选后可再次点击目标跟随。');
+    setFollowNote('已解除。再次点击目标回到居中跟随；勾选「目标跟随」切换第三人称视角。');
     // 跟随期间 camera.changed 每帧触发，建筑体块的防抖被反复重置而从不执行；
     // 解除后补一次，让当前机位下的体块 LOD 归位。
     if (checkboxOn('modelBuildings')) refreshBuildings();
   }
 }
 
-/** 过滤/显隐变化后检查跟随是否仍然成立。 */
+/** 过滤/显隐变化后检查绑定是否仍然成立。 */
 function guardFollow() {
   if (state.follow.id && !followTargetUsable(state.follow.id)) {
     detachFollow('目标已隐藏或过滤');
@@ -5114,51 +5543,177 @@ function guardFollow() {
 }
 
 /**
- * "拖动即解除"的检测。
+ * 目标视角下的用户输入。
  *
- * 判据：跟随代码只改相机状态、**从不派发 DOM 事件**，所以画布上任何
+ * 判据：相机驱动只改相机状态、**从不派发 DOM 事件**，所以画布上任何
  * pointer/wheel 事件都来自用户。不能用 camera.changed 或 moveStart/moveEnd——
  * 它们内部会比较 camera.transform，而跟随每帧都在改 transform，会被持续触发。
  *
- * 按下即 suspend（拖拽第一像素起相机就归用户），抬起时若位移未超阈值则恢复
- * 跟随，这样"点击另一个目标"不会被误判成拖动。
+ * center：拖动/滚轮全部交给 Cesium —— 参考系原点就是目标，所以公转与缩放
+ *         天然围绕目标，不需要也不应该解除跟随。
+ * chase：按下暂时让权（suspend），期间仍保持目标居中；拖拽松手 0.7 s 后
+ *         阻尼回到后上方，滚轮缩放的距离被采用为新的跟随距离。
  */
 const DRAG_THRESHOLD_PX = 4;
 
 function bindFollowInput() {
   const canvas = viewer.scene.canvas;
 
+  // 松手/取消的统一收尾。拖拽过 → 稍后恢复 chase；纯点击 → 立即恢复。
+  function releaseFollowPress(resume) {
+    const f = state.follow;
+    const press = f.press;
+    if (!press) return;
+    f.press = null;
+    if (f.mode !== 'chase') return;
+    if (resume || press.moved) {
+      f.resumeAt = performance.now() + CHASE_RESUME_DELAY_MS;
+    } else {
+      f.suspend = false;
+      f.resumeAt = 0;
+    }
+  }
+
   canvas.addEventListener('pointerdown', function (e) {
-    if (!state.follow.id) return;
-    state.follow.press = { x: e.clientX, y: e.clientY };
-    state.follow.suspend = true;
+    const f = state.follow;
+    if (!f.id) return;
+    if (f.mode === 'glide') finishGlideNow();
+    f.press = { x: e.clientX, y: e.clientY, moved: false };
+    if (f.mode === 'chase') f.suspend = true;
+    // 指针捕获：拖出画布/窗口再松手也能收到 pointerup；不支持时忽略。
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* 老浏览器 */ }
     // 不 stopPropagation：ScreenSpaceCameraController 仍需收到事件
   }, true);
 
   window.addEventListener('pointermove', function (e) {
-    const press = state.follow.press;
+    const f = state.follow;
+    const press = f.press;
     if (!press) return;
     if (Math.abs(e.clientX - press.x) + Math.abs(e.clientY - press.y) < DRAG_THRESHOLD_PX) return;
-    state.follow.press = null;
-    detachFollow('拖动地图');
+    press.moved = true;
   }, true);
 
   window.addEventListener('pointerup', function () {
-    if (!state.follow.press) return;
-    state.follow.press = null;
-    state.follow.suspend = false;   // 未超阈值 ⇒ 是点击，恢复跟随
+    releaseFollowPress(false);
   }, true);
 
-  canvas.addEventListener('wheel', function () {
-    detachFollow('滚轮缩放');
-  }, { capture: true, passive: true });
+  // pointercancel（触摸被系统打断）与窗口失焦不会发 pointerup；没有兜底时
+  // f.press 清不掉，chase 会永久停在 suspend。失焦按"拖拽结束"处理，回来后恢复。
+  canvas.addEventListener('pointercancel', function () {
+    releaseFollowPress(true);
+  }, true);
+  window.addEventListener('blur', function () {
+    releaseFollowPress(true);
+  }, true);
+  canvas.addEventListener('lostpointercapture', function () {
+    if (state.follow.press) releaseFollowPress(true);
+  }, true);
+
+  canvas.addEventListener('wheel', function (e) {
+    const f = state.follow;
+    if (!f.id) return;
+    if (f.mode === 'glide') finishGlideNow();
+    if (f.mode !== 'chase' && f.mode !== 'center') return;
+
+    // 两种模式都由 rig 自己缩放，并拦下 Cesium 默认滚轮。Cesium 1.145 的
+    // controller 在 3D 下**按光标位置**缩放：光标不在目标上时，目标会被推离
+    // 视窗中心。这里一律按"相机→目标"的视线改变距离，目标永远留在中心。
+    e.preventDefault();
+    e.stopPropagation();
+    // Cesium 的 controller 监听在同一个 canvas 上；stopPropagation 不会拦住
+    // 同元素上的其它监听，必须 stopImmediatePropagation，否则两套缩放同帧打架。
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+    const dy = wheelPixels(e);
+    if (!dy) return;
+    const factor = Math.exp(dy * 0.0015);
+    const pos = liveTargetPosition(f.id);
+    if (!pos) return;
+
+    if (f.mode === 'center') {
+      // 保留用户当前方位/俯仰，只改到目标的距离；lookAt 的目标点不变，
+      // 因此无论光标在屏幕哪里，缩放中心都是目标。
+      const cur = hprFromCameraTo(pos);
+      cur.range = clampZoomRange(cur.range * factor);
+      lockAt(pos, cur);
+      return;
+    }
+
+    const rec = state.targets[f.id];
+    const v = CHASE_VIEW[(rec && rec.def.domain) || 'sea'] || CHASE_VIEW.sea;
+    const base = f.chaseRange || f.pose.range || v.range;
+    f.chaseRange = clampRange(base * factor);
+    f.lastNow = 0;                    // 让阻尼以当前时刻重新计时
+    // suspend（拖拽/松手后的停顿窗口）里 rig 走的是 center 分支，不会消费
+    // chaseRange；这里立即按当前视线方向应用新距离，滚轮才是"所见即所得"。
+    if (f.suspend) {
+      const cur = hprFromCameraTo(pos);
+      cur.range = f.chaseRange;
+      lockAt(pos, cur);
+    }
+  }, { capture: true, passive: false });
+}
+
+/** 取证：目标在视窗中的位置、相机与目标的几何关系。供自检/验收断言。 */
+function followDebug() {
+  const f = state.follow;
+  const out = {
+    id: f.id, mode: f.mode, chase: !!f.enabled, suspend: !!f.suspend,
+    press: !!f.press, resumeAt: f.resumeAt,
+    chaseRange: f.chaseRange, pose: { heading: f.pose.heading, pitch: f.pose.pitch, range: f.pose.range },
+    target: null, camera: null, screen: null, viewport: null,
+    locked: !!(viewer && !viewer.camera.transform.equals(Cesium.Matrix4.IDENTITY)),
+  };
+  if (!viewer) return out;
+  const cv = viewer.scene.canvas;
+  out.viewport = { w: cv.clientWidth, h: cv.clientHeight };
+  if (!f.id) return out;
+  const s = positionFor(f.id, state.tick);
+  const pos = liveTargetPosition(f.id);
+  if (s) {
+    out.target = { lon: s.lon, lat: s.lat, alt: s.alt, heading: s.heading };
+  }
+  if (!pos) return out;
+  const carto = Cesium.Cartographic.fromCartesian(pos);
+  const cam = viewer.camera.positionCartographic;
+  out.camera = {
+    lon: Cesium.Math.toDegrees(cam.longitude),
+    lat: Cesium.Math.toDegrees(cam.latitude),
+    height: cam.height,
+    distance: Cesium.Cartesian3.distance(viewer.camera.positionWC, pos),
+  };
+  try {
+    const st = Cesium.SceneTransforms.worldToWindowCoordinates
+      || Cesium.SceneTransforms.wgs84ToWindowCoordinates;
+    if (st) {
+      const p = st(viewer.scene, pos);
+      if (p) {
+        out.screen = {
+          x: p.x, y: p.y,
+          dx: p.x - out.viewport.w / 2,
+          dy: p.y - out.viewport.h / 2,
+        };
+      }
+    }
+  } catch (e) { /* 场景尚未渲染 */ }
+  if (carto) {
+    out.targetCarte = { height: carto.height };
+    out.targetLive = {
+      lon: Cesium.Math.toDegrees(carto.longitude),
+      lat: Cesium.Math.toDegrees(carto.latitude),
+      alt: carto.height,
+    };
+  }
+  return out;
 }
 
 // 供 overview.js 等其他模块调用（它们拿不到本文件的闭包）
 window.Follow = {
-  start: startFollow,
+  start: function (id) { beginTargetView(id, { force: true }); },
   detach: detachFollow,
   isActive: function () { return !!state.follow.id; },
+  mode: function () { return state.follow.mode; },
+  debug: followDebug,
 };
 
 function renderTransport() {
@@ -5185,6 +5740,10 @@ function setTick(tick) {
   const max = state.data.frames.length - 1;
   state.tick = Math.max(0, Math.min(max, Math.round(tick)));
   state.tickFloat = state.tick;
+  // 立刻把 CZML 时钟对到该帧：?tick / 时间轴 / 步进后紧接着的 selectTarget
+  // 会读 entity.position 的当前时钟采样；等下一帧 loop 再同步的话，深链会先
+  // 按旧时钟的位置开始过渡（可见的"先飞错点再回来"）。
+  if (window.TargetMotion) TargetMotion.syncClock(state.tickFloat);
   markScene('setTick');
 }
 
@@ -5579,6 +6138,14 @@ window.SituationHost = {
   // 轨迹窗口 / 目标轨迹标绘 / 掩码的取证读数：外部（自检、验收）只认这些数字，
   // "画得对不对"不能靠肉眼。
   focusDebug: focusDebug,
+  followDebug: followDebug,
+  // 取证/自检用：手动推进一帧相机（now 可注入虚拟时间）。正常渲染时由
+  // scene.preRender 每帧调用；无头浏览器帧循环停摆时，自检用它在明确的
+  // 时间步上验证阻尼/过渡，而不是靠 sleep 等帧。
+  followStep: function (now) {
+    applyCameraRig(typeof now === 'number' ? now : performance.now());
+    return followDebug();
+  },
   occupationDebug: occupationDebug,
 };
 
@@ -6050,6 +6617,9 @@ function registerLayerProviders() {
         actions: ['locate'],
         onLocate: function () {
           if (!viewer) return;
+          // 选中任何目标都会把 camera.transform 锁在目标 ENU 上；这里必须先解绑，
+          // 否则 flyTo 保存并恢复该 transform，镜头会被 rig 每帧拽回目标。
+          detachFollow('图层定位');
           viewer.camera.flyTo({
             destination: Cesium.Rectangle.fromDegrees(a.bbox[0], a.bbox[1], a.bbox[2], a.bbox[3]),
             duration: 1.6,
@@ -6267,16 +6837,19 @@ function bindUI() {
   // bindCheck 直接 return，不报错）。
 
   bindCheck('followTarget', function (v) {
-    state.follow.enabled = !!v;
-    if (!v) {
-      detachFollow('');
-    } else if (!state.data) {
+    if (v && !state.data) {
       state.follow.enabled = false;
       dom.followTarget.checked = false;
       setFollowNote('未加载TS，无法跟随。请先从「演示案例」选择案例。');
-    } else {
-      setFollowNote('已开启跟随：点击任一目标开始跟随，拖动地图即解除。');
+      return;
+    }
+    // 只切换驾驶模式，不解除与目标的绑定：取消勾选回到普通居中跟随。
+    setFollowMode(!!v);
+    if (!v) {
+      setFollowNote('已回到目标居中模式；再次勾选切换第三人称斜后方跟随。');
+    } else if (!state.follow.id) {
       setStatus('目标跟随已开启 · 点击目标开始跟随', 'ok');
+      setFollowNote('勾选后点击任一目标，相机进入第三人称斜后方跟随。');
     }
   });
 
@@ -6435,7 +7008,7 @@ function bindUI() {
 
   // 跟随相机挂在 preRender：Scene.render 的顺序是 preUpdate → update →
   // preRender → draw，在这里改相机本帧生效。
-  viewer.scene.preRender.addEventListener(function () { applyFollowFrame(false); });
+  viewer.scene.preRender.addEventListener(function () { applyCameraRig(performance.now()); });
 
   // 兜底：底图瓦片队列可能长时间不归零（视野大、瓦片多），给鸟瞰图一个延时创建。
   // 4 s 足以让主底图完成第一轮细化，不至于和它抢连接。
@@ -6499,9 +7072,13 @@ function bindUI() {
     guardFollow();
     if (window.Places) Places.onCameraChanged(false);
     // 相机高度跨过 LOD 阈值时才重建，且加一段防抖，避免飞行过程中反复触发。
-    // 跟随期间相机每帧都在动，防抖会被反复重置而**永不执行**，所以直接跳过；
-    // detachFollow() 收尾时会补一次 refreshBuildings()。
-    if (!state.follow.id && checkboxOn('modelBuildings')) {
+    // 相机 rig 正在逐帧改相机时（跟随运动目标 / chase 收敛 / glide），防抖会被
+    // 反复重置而**永不执行**，所以跳过；detachFollow() 收尾时会补一次。
+    // ⚠ 判据不能用 `state.follow.id`：现在"选中即绑定"，静止目标被选中后用户
+    // 自己缩放相机时 rig 并不改相机，仍应刷新体块 LOD。用 lastLockMs 更准确。
+    const rigBusy = !!state.follow.id &&
+      performance.now() - (state.follow.lastLockMs || 0) < 450;
+    if (!rigBusy && checkboxOn('modelBuildings')) {
       if (state.buildingTimer) clearTimeout(state.buildingTimer);
       state.buildingTimer = setTimeout(refreshBuildings, 400);
     }
@@ -7051,7 +7628,12 @@ function applySceneDoc() {
   const out = { applied: true, camera: false, layers: 0, tick: null, caseId: doc.c || null };
 
   const cam = SceneDoc.saneCamera(doc.m);
-  if (cam && viewer) out.camera = SceneDoc.applyCamera(viewer, cam);
+  if (cam && viewer) {
+    // 场景还原会覆盖机位；必须在解锁参考系后再 setView，否则 orientation
+    // 会被按目标 ENU 解释（见 detachFollow 的纪律说明）。
+    if (state.follow.id) detachFollow('场景还原机位');
+    out.camera = SceneDoc.applyCamera(viewer, cam);
+  }
 
   // 图层：只改"意图"，然后走一次统一的 apply，互斥与顺序仍由注册表解算。
   const l = doc.l;
@@ -7104,13 +7686,24 @@ function shareScene() {
 
 /** 依赖案例数据的钩子。必须在 loadCase 之后调用。 */
 function applyCaseHooks() {
+  // ?tick 必须先于 ?follow / ?panel：chase 的过渡终点要用该帧的航向，
+  // 晚于定位执行会让深链按第 0 帧航向飞到反侧，再被阻尼甩回来。
+  if (params.has('tick')) {
+    const seek = Number(params.get('tick'));
+    if (Number.isFinite(seek)) {
+      setTick(seek);
+      renderTargetCounts();
+      renderTransport();
+      updateInferenceUi();
+    }
+  }
   // 目标跟随：?follow=<目标ID>。放在这里是因为它需要 state.targets 已建好。
   if (params.has('follow')) {
     const fid = params.get('follow');
     if (state.targets[fid]) {
       if (dom.followTarget) dom.followTarget.checked = true;
       state.follow.enabled = true;
-      startFollow(fid);
+      beginTargetView(fid, { force: true });
       // ?unfollow=1 立刻解除一次，用于验证 detachFollow 里的参考系解锁
       // （camera.lookAt 会把 transform 锁在目标 ENU 上，必须显式还原成单位阵）。
       if (params.get('unfollow') === '1') detachFollow('验证解除');
@@ -7123,18 +7716,8 @@ function applyCaseHooks() {
   if (params.has('panel')) {
     const id = params.get('panel');
     if (state.targets[id]) {
-      selectTarget(id, false);
-      const s = positionFor(id, state.tick);
-      if (s) flyTo(s.lon, s.lat, 120000);
-    }
-  }
-  if (params.has('tick')) {
-    const seek = Number(params.get('tick'));
-    if (Number.isFinite(seek)) {
-      setTick(seek);
-      renderTargetCounts();
-      renderTransport();
-      updateInferenceUi();
+      // 选中即居中；深链沿用"目标上方 120 km"的定位语义。
+      selectTarget(id, true, 120000);
     }
   }
   if (params.get('autoplay') === '1') setPlaying(true);

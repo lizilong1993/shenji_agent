@@ -326,10 +326,16 @@ ProjectionPicker / CreditDisplay），三项全部自建，归在图层管理第
 | `chase` | 第三人称斜后方跟随：相机绕到目标运动方向的后上方 |
 
 **普通模式（center）**：`camera.lookAt` 把参考系锁在目标 ENU 上，所以目标恒在
-视窗中心、滚轮缩放的参考原点就是目标；拖动是绕目标公转。目标移动（CZML 在
-`viewer.clock.currentTime` 的连续采样）时，相机按"相对目标的同一 heading/pitch/range"
-重新 `lookAt` 新位置，即整体平移跟随，不会逐渐偏离。static 目标不重下 `lookAt`，
-省掉每帧的相机变换与 `camera.changed` 级联。
+视窗中心；拖动是绕目标公转。目标移动（CZML 在 `viewer.clock.currentTime` 的连续
+采样）时，相机按"相对目标的同一 heading/pitch/range"重新 `lookAt` 新位置，即整体
+平移跟随，不会逐渐偏离。static 目标不重下 `lookAt`，省掉每帧的相机变换与
+`camera.changed` 级联。
+
+**缩放必须由 rig 接管**：Cesium 1.145 的 `ScreenSpaceCameraController` 在 3D 下
+**按光标位置**缩放。光标偏离目标时，目标会被推离视窗中心——这正是旧版"以鼠标为
+缩放中心"的来源。现在 canvas 的 capture 阶段拦截 wheel：center 直接按当前
+heading/pitch 改"相机→目标"的斜距并 `lookAt`（range 只钳制在 10 m–20,000 km），
+chase 改 `chaseRange` 后阻尼收敛。只有未绑定目标时才交回 Cesium。
 
 **目标跟随（chase）**：勾选后 `heading = 目标航向`、`pitch` 按域分档，相机位于目标
 正后上方并沿目标前进方向观察。目标航向/俯仰/距离用指数阻尼收敛（时间常数
@@ -347,7 +353,8 @@ ProjectionPicker / CreditDisplay），三项全部自建，归在图层管理第
 
 **chase 模式下的交互**：按下鼠标即 `suspend`，拖拽期间仍保持目标居中、只把姿态
 让给用户；松手 0.7 s 后阻尼回到后上方。滚轮缩放的距离会被采纳为新的跟随距离，
-不会被阻尼拉回默认值。center 模式下拖动/滚轮完全交给 Cesium，不解除跟随。
+不会被阻尼拉回默认值。center 模式下拖动交给 Cesium（公转/俯仰），滚轮由 rig
+接管并按目标缩放；两种模式都不解除跟随。
 
 **三条必须遵守的纪律**：
 
