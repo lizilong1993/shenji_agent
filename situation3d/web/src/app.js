@@ -87,7 +87,7 @@ const state = {
   tick: 0,
   tickFloat: 0,
   playing: false,
-  ticksPerSecond: 30,
+  ticksPerSecond: 1,
   targets: {},              // id -> { def, entity, trail: [], lastTick, sensorEntity }
   layers: { targets: true, targetsRed: true, targetsBlue: true,
             tracks: true, routes: true, hotspots: true, labels: true,
@@ -469,7 +469,7 @@ function levelColor(level) {
 
 function fmtDeg(v, pos, neg) {
   if (v === null || v === undefined || !isFinite(v)) return '—';
-  return Math.abs(v).toFixed(4) + '°' + (v >= 0 ? pos : neg);
+  return Math.abs(v).toFixed(6) + '°' + (v >= 0 ? pos : neg);
 }
 
 // --------------------------------------------------------------------------
@@ -3468,10 +3468,10 @@ function selectHotspot(index, fly) {
 
   dom.geoRegion.textContent = hs.name;
   dom.geoLon.textContent = fmtDeg(hs.center[1], 'E', 'W') +
-    '（' + hs.bbox[0].toFixed(2) + ' – ' + hs.bbox[2].toFixed(2) + '）';
+    '（' + hs.bbox[0].toFixed(6) + ' – ' + hs.bbox[2].toFixed(6) + '）';
   dom.geoLat.textContent = fmtDeg(hs.center[0], 'N', 'S') +
-    '（' + hs.bbox[1].toFixed(2) + ' – ' + hs.bbox[3].toFixed(2) + '）';
-  dom.geoSpan.textContent = hs.span_deg[0].toFixed(2) + '° × ' + hs.span_deg[1].toFixed(2) + '°';
+    '（' + hs.bbox[1].toFixed(6) + ' – ' + hs.bbox[3].toFixed(6) + '）';
+  dom.geoSpan.textContent = hs.span_deg[0].toFixed(6) + '° × ' + hs.span_deg[1].toFixed(6) + '°';
 
   const inf = inferenceAt(state.tick);
   if (inf && inf.regions[index]) {
@@ -3544,7 +3544,7 @@ function updateGeoReadout() {
     const hs = state.data.hotspots[idx];
     const b = hs.bbox;
     dom.geoRegion.textContent = hs.name;
-    dom.geoSpan.textContent = (b[2] - b[0]).toFixed(2) + '° × ' + (b[3] - b[1]).toFixed(2) + '°';
+    dom.geoSpan.textContent = (b[2] - b[0]).toFixed(6) + '° × ' + (b[3] - b[1]).toFixed(6) + '°';
     const inf = inferenceAt(state.tick);
     if (inf && inf.regions[idx]) {
       const r = inf.regions[idx];
@@ -3920,7 +3920,7 @@ function registerRelationsLayer() {
   if (LayerRegistry.def && LayerRegistry.def(REL_LAYER_ID)) return;
   LayerRegistry.register({
     id: REL_LAYER_ID, kind: 'plot', z: 45, default: true,
-    label: '\u5173\u8054\u5173\u7cfb\u7ebf', group: 'TS\u56fe\u5c42',
+    label: '\u76ee\u6807\u5173\u7cfb', group: 'TS\u56fe\u5c42',
     handler: function (id, want) { setRelationsVisible(want); },
   });
 }
@@ -5791,6 +5791,10 @@ function syncPlotLayers() {
   if (!window.LayerRegistry || !window.Plotting) return null;
   var used = {};
   Plotting.debug().items.forEach(function (it) { used[it.layer] = true; });
+  // Keep every declared plot category registered, even when it currently has
+  // no item: the user expects 【TS图层】→【标绘】 to list 自动/手动 plot entries
+  // as manageable rows instead of the whole group disappearing.
+  Plotting.categories().forEach(function (c) { used[c.layer] = true; });
   var usedIds = Object.keys(used).sort();
   var registered = LayerRegistry.list('plot').filter(function (l) { return l.group === '标绘'; })
     .map(function (l) { return l.id; }).sort();

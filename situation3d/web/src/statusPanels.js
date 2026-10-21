@@ -290,7 +290,7 @@
 
   function fmtDeg(v, pos, neg) {
     if (typeof v !== 'number' || !isFinite(v)) return '—';
-    return Math.abs(v).toFixed(4) + '°' + (v >= 0 ? pos : neg);
+    return Math.abs(v).toFixed(6) + '°' + (v >= 0 ? pos : neg);
   }
 
   /**

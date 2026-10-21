@@ -174,8 +174,8 @@ def _centroid(points: List[Sequence[float]]) -> List[float]:
     if not points:
         return [0.0, 0.0]
     return [
-        round(sum(p[0] for p in points) / len(points), 4),
-        round(sum(p[1] for p in points) / len(points), 4),
+        round(sum(p[0] for p in points) / len(points), 6),
+        round(sum(p[1] for p in points) / len(points), 6),
     ]
 
 

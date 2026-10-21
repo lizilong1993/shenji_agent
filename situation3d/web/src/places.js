@@ -471,8 +471,8 @@
       maxRank: maxRank, candidates: candCount,
       firstPlaceSample: sample,
       cameraLonLat: viewer ? [
-        +Cesium.Math.toDegrees(viewer.camera.positionCartographic.longitude).toFixed(2),
-        +Cesium.Math.toDegrees(viewer.camera.positionCartographic.latitude).toFixed(2),
+        +Cesium.Math.toDegrees(viewer.camera.positionCartographic.longitude).toFixed(6),
+        +Cesium.Math.toDegrees(viewer.camera.positionCartographic.latitude).toFixed(6),
       ] : null,
     };
   }
