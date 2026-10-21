@@ -120,18 +120,18 @@
     },
     {
       id: 'tianditu.base', kind: 'imagery', z: 10, default: true,
-      label: '天地图影像', group: '底图', checkbox: 'modelTianditu',
+      label: '天地图影像（在线）', group: '底图', checkbox: 'modelTianditu',
       exclusives: [],
     },
     // 【2026-10-21 改：默认关】用户要求：初始化只加载「天地图影像 + 天地图注记」，
     // 热点/城区/离线高倍段都改为默认不加载。打开后行为不变（仍按相机高度自动挂/卸）。
     {
       id: 'hotspot.imagery', kind: 'imagery', z: 30, default: false,
-      label: '热点区域高清影像', group: '底图', checkbox: 'modelHotspotImagery',
+      label: '热点区域高清影像（离线）', group: '底图', checkbox: 'modelHotspotImagery',
     },
     {
       id: 'urban.imagery', kind: 'imagery', z: 40, default: false,
-      label: '城区高清影像（米级）', group: '底图', checkbox: 'modelUrbanImagery',
+      label: '城区高清影像（离线）', group: '底图', checkbox: 'modelUrbanImagery',
     },
     // 离线底图的**高倍段**（z14+），矩形来自 manifest 的逐层实测覆盖（见
     // assets.js 的 attachOfflineDetail）。它比 `imagery.offline`（z=5）高、
@@ -143,12 +143,12 @@
     //   * 放在 z=50 之上也不行——会盖住半透明的建筑高度覆盖层与注记的层次关系。
     {
       id: 'imagery.offline_detail', kind: 'imagery', z: 45, default: false,
-      label: '离线高清底图（z14+）', group: '底图', checkbox: 'modelOfflineDetail',
+      label: '高清底图（离线）', group: '底图', checkbox: 'modelOfflineDetail',
       exclusives: [],
     },
     {
       id: 'wsf3d.overlay', kind: 'imagery', z: 50, default: false,
-      label: '建筑高度图层（WSF3D）', group: '底图', checkbox: 'modelWsf3dOverlay',
+      label: '建筑高度图层（离线）', group: '底图', checkbox: 'modelWsf3dOverlay',
     },
     // 注记是栅格影像，必须在**所有**底图/高清影像之上——否则就会被盖住。
     // 以前靠一次 raiseToTop 抢救，现在由 z 序号直接决定，不再需要事后调整。
@@ -162,7 +162,7 @@
       // 改成注册表的互斥之后：`desired` 是用户意图、不被改写，判负的一方只被置为
       // 不可见，赢家一关它就自动回来；面板上还会显示"被顶掉"以及原因。
       exclusives: ['places.labels'],
-      label: '天地图注记', group: '底图', checkbox: 'modelTiandituLabel',
+      label: '天地图注记（在线）', group: '底图', checkbox: 'modelTiandituLabel',
     },
 
     // ---- 地形 / 气象 ----
@@ -175,7 +175,7 @@
     // `checkbox` 字段仍然写上：URL 钩子（`?terrain=` / `?weather=`）靠它把
     // 复选框 id 反查成图层 id（见 app.js 的 layerIdForCheckbox）。
     {
-      id: 'terrain.model', kind: 'globe', z: 10, label: '地形模型',
+      id: 'terrain.model', kind: 'globe', z: 10, label: '地形模型（离线）',
       group: '底图', default: false, checkbox: 'modelTerrain',
       // 与 20m 网格互斥：Cesium 只有一个 terrainProvider，两者同时开时后动的赢
       // （见 resolve() 的对称仲裁）。对称互斥在另一边也有声明。
@@ -184,7 +184,7 @@
       // 2026-10-19 上传的台湾 20m DEM（quantized-mesh，z0–z14，zip 直发）。与
       // 上面的 Terrarium 高程度图是**并列的两个地形源**，不是替换：前者全球
       // 低层 + 台海区域 z14，后者只在台湾区域有数据但精度是 20 m 网格。
-      id: 'terrain.mesh', kind: 'globe', z: 11, label: '地形模型（台湾 20m 网格）',
+      id: 'terrain.mesh', kind: 'globe', z: 11, label: '台湾 20m 地形模型（离线）',
       group: '底图', default: false, checkbox: 'modelTerrainMesh',
       // 自动定位用的空间范围 [W,S,E,N]（度）。来源：tiles3d_db/tw_dem_20m.zip
       // 的 layer.json available（z14: x 27308–27489, y 10184–10494，EPSG:4326 2× 根瓦片）。
@@ -203,7 +203,7 @@
       // `buildings3d.js` 的 `syncGlobeVisibility()` 恢复（同批改动）。
       // 想恢复"默认开"就把这一行改回 true —— 但请一并接受"默认看不到天地图与注记"。
       id: 'tiles.google3d', kind: 'primitive', z: 10, default: false,
-      label: '在线三维实景建筑（Google 3D Tiles）', group: '底图',
+      label: '在线三维实景建筑（在线）', group: '底图',
       checkbox: 'modelBuildingsOnline',
       // 实测：Google 实景瓦片与本机离线 DEM 几何冲突，启用时必须关掉 globe。
       //
@@ -221,7 +221,7 @@
     },
     {
       id: 'buildings.blocks', kind: 'primitive', z: 30, default: false,
-      label: '建筑体块（三维，本机离线）', group: '底图',
+      label: '建筑体块（离线）', group: '底图',
       checkbox: 'modelBuildings',
       exclusives: ['tiles.google3d', 'tiles3d.tw_coastal'],
     },
@@ -231,7 +231,7 @@
       // 默认关：15 套子 tileset 的解析与根瓦片加载不应拖慢首屏。
       // bbox 取 15 AOI 外包范围（含澎湖）；打开时相机飞到台湾全岛概览。
       id: 'tiles3d.tw_coastal', kind: 'primitive', z: 40, default: false,
-      label: '台湾沿海城市建筑白膜', group: '底图', checkbox: 'modelTwCoastal',
+      label: '台湾沿海城市建筑白膜（离线）', group: '底图', checkbox: 'modelTwCoastal',
       bbox: [119.520, 22.320, 121.910, 25.200],
       exclusives: ['tiles.google3d', 'buildings.blocks'],
     },
@@ -250,7 +250,7 @@
       // 注册表的仲裁规则是"后动的一方赢"，只写单向的话，用户后来手动打开离线地名
       // 也不会赢 —— 而"我刚点的开关应该生效"是更强的预期。
       exclusives: ['tianditu.label'],
-      label: '地名', group: '底图', checkbox: 'modelPlaces',
+      label: '地名（离线）', group: '底图', checkbox: 'modelPlaces',
     },
 
     // ---- 标绘栈：军队标号标绘作为一类图层纳管 ----
@@ -297,8 +297,9 @@
       group: '目标图层', default: true },
     { id: 'layerLabels', kind: 'target', z: 20, label: '目标标牌',
       group: '目标图层', default: true },
-    // 「历史轨迹」图层同时管理历史实线与计划虚线（虚线 + 终点箭头）。
-    { id: 'layerTracks', kind: 'target', z: 30, label: '历史轨迹（含计划）',
+    // 「历史轨迹」：管理历史实线与计划虚线（虚线 + 终点箭头），两类内容同属一层，
+    // 因此标题不再带括号说明（2026-10-21 用户要求）。
+    { id: 'layerTracks', kind: 'target', z: 30, label: '历史轨迹',
       group: '目标图层', default: true },
   // B4 选中掩码：外环全图 + 内环挖空「选中目标 + 它的轨迹范围」。
   // handler 在 app.js 的映射表里（state.layers.focusMask → updateFocusMask）。
