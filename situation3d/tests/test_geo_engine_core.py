@@ -214,6 +214,87 @@ class TestCRT(unittest.TestCase):
         self.assertEqual(self.crt.personnel_result(1, 2), ("suppressed", 0))
 
 
+class TestEnvPackPipeline(unittest.TestCase):
+    class FakeOsm(object):
+        def features(self, bbox):
+            c = ((bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0)
+            ring = [[c[0] - 0.002, c[1] - 0.002], [c[0] + 0.002, c[1] - 0.002],
+                    [c[0] + 0.002, c[1] + 0.002], [c[0] - 0.002, c[1] + 0.002],
+                    [c[0] - 0.002, c[1] - 0.002]]
+            road = [[bbox[0], c[1]], [bbox[2], c[1]]]
+            return {
+                "roads": [{"coords": road, "class": "primary"}],
+                "water": [{"ring": ring}],
+                "buildings": [{"ring": [[c[0] + 0.003, c[1] + 0.003],
+                                         [c[0] + 0.004, c[1] + 0.003],
+                                         [c[0] + 0.004, c[1] + 0.004],
+                                         [c[0] + 0.003, c[1] + 0.004],
+                                         [c[0] + 0.003, c[1] + 0.003]],
+                                "height_m": 12.0}],
+                "landuse": [{"ring": [[c[0] - 0.008, c[1] - 0.008],
+                                       [c[0] - 0.006, c[1] - 0.008],
+                                       [c[0] - 0.006, c[1] - 0.006],
+                                       [c[0] - 0.008, c[1] - 0.006],
+                                       [c[0] - 0.008, c[1] - 0.008]],
+                             "class": "forest"}],
+            }
+
+    class FakeDem(object):
+        def sample_grid(self, bbox, step_deg):
+            return {"lon0": bbox[0], "lat0": bbox[1], "lon1": bbox[2],
+                    "lat1": bbox[3], "cols": 2, "rows": 2,
+                    "values": [[100.0, 100.0], [100.0, 100.0]]}
+
+    def test_offline_pack_with_injected_sources(self):
+        import tempfile
+        from geodata.pipeline import build_envpack
+        from env.pack_env import EnvPackEnvironment
+        basic = make_basic()
+        grid = LegacyHexGrid.from_grid_meta(basic["grid"])
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "pack")
+            manifest = build_envpack(out, basic, grid, theatre="test",
+                                     mode="offline", cache_dir=os.path.join(tmp, "cache"),
+                                     osm_source=self.FakeOsm(), dem_source=self.FakeDem())
+            self.assertEqual(manifest["layers"]["terrain"]["source"], "offline-cache")
+            env = EnvPackEnvironment(out)
+            c = manifest["bbox"]
+            mid = ((c[0] + c[2]) / 2.0, (c[1] + c[3]) / 2.0)
+            self.assertAlmostEqual(env.elevation(*mid), 100.0, delta=0.1)
+            self.assertGreater(env.water_depth(*mid), 0.0)
+            self.assertGreaterEqual(env.building_at(mid[0] + 0.0035,
+                                                    mid[1] + 0.0035).height_m, 12.0)
+            self.assertEqual(env.landcover(mid[0] - 0.007, mid[1] - 0.007), "forest")
+            self.assertTrue(env.on_road(c[0] + 0.001, mid[1], tolerance_m=50.0))
+
+    def test_offline_cache_miss_raises(self):
+        import tempfile
+        from geodata.cache import CacheStore, OfflineCacheMiss
+        from geodata.osm import OsmSource
+        with tempfile.TemporaryDirectory() as tmp:
+            source = OsmSource(CacheStore(tmp, mode="offline"))
+            with self.assertRaises(OfflineCacheMiss):
+                source.features((119.8, 23.0, 119.9, 23.1))
+
+    def test_normalize_osm_shapes(self):
+        from geodata.osm import normalize
+        raw = {"elements": [
+            {"tags": {"highway": "primary"},
+             "geometry": [{"lon": 120.0, "lat": 23.0}, {"lon": 120.01, "lat": 23.0}]},
+            {"tags": {"building": "yes", "height": "12"},
+             "geometry": [{"lon": 120.0, "lat": 23.0}, {"lon": 120.001, "lat": 23.0},
+                          {"lon": 120.001, "lat": 23.001}, {"lon": 120.0, "lat": 23.0}]},
+            {"tags": {"natural": "water"},
+             "geometry": [{"lon": 120.0, "lat": 23.0}, {"lon": 120.002, "lat": 23.0},
+                          {"lon": 120.002, "lat": 23.002}, {"lon": 120.0, "lat": 23.0}]},
+        ]}
+        features = normalize(raw)
+        self.assertEqual(len(features["roads"]), 1)
+        self.assertEqual(len(features["buildings"]), 1)
+        self.assertEqual(features["buildings"][0]["height_m"], 12.0)
+        self.assertEqual(len(features["water"]), 1)
+
+
 class TestWorldAndRules(unittest.TestCase):
     def test_direct_fire_event(self):
         basic = make_basic()
@@ -389,14 +470,12 @@ class TestWorldAndRules(unittest.TestCase):
                 json.dump(make_basic(), fh)
             out = os.path.join(tmp, "pack")
             self.assertEqual(mod.main(["--basic", basic_path, "--out", out,
-                                       "--theatre", "test"]), 0)
+                                       "--theatre", "test",
+                                       "--no-dem", "--no-osm"]), 0)
             pack = EnvPack.load(out)
             self.assertEqual(pack.manifest["theatre"], "test")
-            self.assertTrue(os.path.isdir(os.path.join(out, "terrain")))
-            tiles = os.listdir(os.path.join(out, "terrain"))
-            self.assertTrue(tiles)
-            tx, ty = [int(x) for x in tiles[0].replace(".json", "").split("_")]
-            self.assertTrue(pack.tile_path("terrain", 0, tx, ty).is_file())
+            self.assertEqual(pack.manifest["layers"]["terrain"]["format"], "grid-json")
+            self.assertTrue(os.path.isfile(os.path.join(out, "terrain", "grid.json")))
 
     def test_legacy_move_and_fire_actions(self):
         basic = make_basic()

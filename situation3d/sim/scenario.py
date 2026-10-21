@@ -172,9 +172,14 @@ def _weapon_views(op: dict) -> Tuple[list, dict]:
 
 
 def build_world(scenario: dict, basic: dict, seed: int = 20261021,
-                dt_s: float = 1.0) -> World:
-    grid = _grid_for(basic, scenario)
-    env = MapGridEnvironment(basic, grid)
+                dt_s: float = 1.0, envpack: Optional[str] = None) -> World:
+    if envpack:
+        from env.pack_env import EnvPackEnvironment
+        env = EnvPackEnvironment(envpack)
+        grid = env.grid
+    else:
+        grid = _grid_for(basic, scenario)
+        env = MapGridEnvironment(basic, grid)
     world = World(env, _rule_grid_for(grid), dt_s=dt_s, seed=seed, plan_grid=grid)
     for op in scenario.get("operators") or []:
         unit_type = _unit_type(op)
@@ -259,9 +264,9 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
 
 
 def load_world(scenario_path: str, map_path: str, seed: int = 20261021,
-               dt_s: float = 1.0) -> World:
+               dt_s: float = 1.0, envpack: Optional[str] = None) -> World:
     with open(scenario_path, encoding="utf-8") as fh:
         scenario = json.load(fh)
     with open(map_path, encoding="utf-8") as fh:
         basic = json.load(fh)
-    return build_world(scenario, basic, seed=seed, dt_s=dt_s)
+    return build_world(scenario, basic, seed=seed, dt_s=dt_s, envpack=envpack)

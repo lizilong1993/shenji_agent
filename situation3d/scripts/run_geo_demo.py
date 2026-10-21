@@ -96,6 +96,7 @@ def main() -> int:
     ap.add_argument("--ticks", type=int, default=600)
     ap.add_argument("--seed", type=int, default=20261021)
     ap.add_argument("--dt", type=float, default=1.0)
+    ap.add_argument("--envpack", default=None)
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -109,7 +110,8 @@ def main() -> int:
         basic = json.loads(open(args.map, encoding="utf-8").read())
         raw_objs = scenario.get("cities") or []
 
-    world = build_world(scenario, basic, seed=args.seed, dt_s=args.dt)
+    world = build_world(scenario, basic, seed=args.seed, dt_s=args.dt,
+                        envpack=args.envpack)
     objectives = []
     if raw_objs and "lon" in raw_objs[0]:
         objectives = raw_objs  # already geo
