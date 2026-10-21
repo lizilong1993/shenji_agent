@@ -118,6 +118,16 @@ PLATFORM_WEIGHT: Dict[str, float] = {
     "replenishment": 6.0,
     "armor": 24.0,
     "artillery": 20.0,
+    "helicopter": 18.0,
+    "uav": 8.0,
+    "landing_ship": 10.0,
+    "transport": 4.0,
+    "outpost": 8.0,
+    # 大类兜底同样给一个中位数权重，避免未知型号落到默认值后偏高/偏低。
+    "generic_sea": 15.0,
+    "generic_land": 15.0,
+    "generic_air": 15.0,
+    "unknown": 10.0,
 }
 
 # Proximity / coverage contributions to the L1 threat score. The proximity

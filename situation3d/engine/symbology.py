@@ -73,6 +73,14 @@ ICONS: Dict[str, dict] = {
     "aew": {"label": "预警机", "domain": "air", "family": "支援飞机", "abbrev": "AEW"},
     "helicopter": {"label": "直升机", "domain": "air", "family": "作战飞机", "abbrev": "HEL"},
     "uav": {"label": "无人机", "domain": "air", "family": "支援飞机", "abbrev": "UAV"},
+    # -- 大类兜底 ---------------------------------------------------------
+    # 新目标若没有专属图标，按 domain 落到这里（而不是画一个空白/问号）。
+    # `resolve_icon()` 是唯一的解析入口：生成数据时把 icon 就地改成大类键，
+    # 前端也对旧数据做同样的兜底。
+    "generic_sea": {"label": "水面目标", "domain": "sea", "family": "通用", "abbrev": "SEA"},
+    "generic_land": {"label": "陆上目标", "domain": "land", "family": "通用", "abbrev": "GND"},
+    "generic_air": {"label": "空中目标", "domain": "air", "family": "通用", "abbrev": "AIR"},
+    "unknown": {"label": "未知目标", "domain": "land", "family": "通用", "abbrev": "UNK"},
 }
 
 
@@ -86,12 +94,26 @@ def catalog() -> dict:
     }
 
 
-def describe(icon: str) -> dict:
-    """Metadata for one icon key, falling back to an unknown-symbol entry."""
-    return ICONS.get(
-        icon,
-        {"label": "未知目标", "domain": "land", "family": "未识别", "abbrev": "UNK"},
-    )
+GENERIC_BY_DOMAIN = {"sea": "generic_sea", "land": "generic_land", "air": "generic_air"}
+
+
+def resolve_icon(icon, domain=None):
+    """Map any icon key onto one the catalogue actually has.
+
+    规则（用户 2026-10-21 要求）：**专属图标 → 大类图标 → unknown**。
+    新目标只写了 domain、icon 是新的/写错的/空的时，不能画空白：按域回退。
+    """
+    if icon and icon in ICONS:
+        return icon
+    return GENERIC_BY_DOMAIN.get(domain or "", "unknown")
+
+
+def describe(icon, domain=None):
+    """Metadata for one icon key, falling back to its domain class, then unknown."""
+    key = resolve_icon(icon, domain)
+    return ICONS.get(key, {
+        "label": "未知目标", "domain": "land", "family": "通用", "abbrev": "UNK",
+    })
 
 
 def validate(icon_keys: List[str]) -> List[str]:

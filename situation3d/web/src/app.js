@@ -2128,7 +2128,7 @@ function createTargetEntities() {
         return Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
       }, false),
       billboard: {
-        image: Symbology.symbolUri(def.icon, def.affiliation),
+        image: Symbology.symbolUri(def.icon, def.affiliation, { domain: def.domain }),
         // **固定屏幕尺寸**：34 CSS px，不随相机缩放（去掉 scaleByDistance）。
         // 之前近处 1.5×、远处 0.5×，拉远后目标牌小到读不出字。
         width: 34,
@@ -3122,7 +3122,8 @@ function syncSelection() {
   Object.keys(state.targets).forEach(function (id) {
     const rec = state.targets[id];
     rec.entity.billboard.image = Symbology.symbolUri(
-      rec.def.icon, rec.def.affiliation, { selected: state.selected === id });
+      rec.def.icon, rec.def.affiliation,
+      { selected: state.selected === id, domain: rec.def.domain });
   });
   // 选中/取消选中会改变掩码的洞：立即重画一次，不等下一帧。
   updateFocusMask();

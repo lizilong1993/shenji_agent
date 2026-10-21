@@ -80,6 +80,12 @@ PLATFORMS = {
     "landing_ship":    ("30", "120900"),   # Sea Surface / Landing Ship
     "transport":       ("10", "120300"),   # Land Unit / Transport
     "outpost":         ("10", "130000"),   # Land Unit / Installation
+    # 大类兜底（engine/symbology.resolve_icon 会把未知 icon 落到这里）：
+    # 帧形由 domain 决定，实体码复用同域已知值即可。
+    "generic_sea":     ("30", "120203"),   # Sea Surface（通用）
+    "generic_land":    ("10", "120500"),   # Land Unit（通用）
+    "generic_air":     ("01", "110104"),   # Air（通用）
+    "unknown":         ("10", "120500"),   # 未知：陆上帧 + 问号图形
 }
 
 # blue force = Friend, red force = Hostile. Colour comes from the SIDC itself
@@ -127,6 +133,10 @@ ICON_PARTS = {
     "uav": "delivery-drone",
     "transport": "truck",
     "outpost": "bunker",
+    "generic_sea": "ship-bow",
+    "generic_land": "crossed-swords",
+    "generic_air": "airplane",
+    "unknown": "uncertainty",
     "aew": None,
     "landing_ship": None,
     # aew / landing_ship 用自绘图形（见 CUSTOM_PARTS）：game-icons 没有
