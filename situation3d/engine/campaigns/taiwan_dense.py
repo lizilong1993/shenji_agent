@@ -862,6 +862,8 @@ def build_case(seed: int = 20261020) -> Tuple[dict, dict]:
     print("[campaign] frames", flush=True)
     frames = _build_frames(entities, OBJECTIVES)
     targets = [_entity_target(e) for e in entities]
+    from ..scenario import attach_role_cards
+    attach_role_cards(targets)
 
     # Static campaign fields on each target definition.
     by_id = {e.id: e for e in entities}

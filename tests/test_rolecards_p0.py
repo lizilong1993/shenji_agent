@@ -199,6 +199,59 @@ class RoleCardP0Test(unittest.TestCase):
         self.assertAlmostEqual(snapshot["projection"]["influence_km"], 10.0)
         self.assertFalse(snapshot["projection"]["road_bound"])
 
+    # -- P1 preview: card-driven movement / dataset contract ---------------
+    def test_build_frames_uses_attached_card_speed(self):
+        """With a card attached, zeroing legacy speed must not move anything.
+
+        Immobile installations are excluded from this comparison; their legacy
+        micro-speed comes from the known geo.kmh_to_knots bug and P1 will not
+        make positional batteries march.
+        """
+        for case_id, (targets, _frames) in self.scenario_frames.items():
+            fresh = copy.deepcopy(scenario.targets_for(cases.get_case(case_id)))
+            scenario.attach_role_cards(fresh)
+            moving = [t for t in fresh
+                      if not (t.role_card["effective"]["motion"].get("immobile"))]
+            reference = scenario.build_frames(moving, theatre=cases.get_case(case_id).theatre)
+            for target in moving:
+                target.speed_kn = 0.0
+            driven = scenario.build_frames(moving, theatre=cases.get_case(case_id).theatre)
+            self.assertEqual(_frame_hash(driven), _frame_hash(reference), case_id)
+
+    def test_frames_unchanged_with_cards_attached(self):
+        """Full P1 path: attach cards, then rebuild frames from scratch."""
+        for case_id in ("taiwan_landing", "india_china_west"):
+            case = cases.get_case(case_id)
+            targets = copy.deepcopy(scenario.targets_for(case))
+            scenario.attach_role_cards(targets)
+            frames = scenario.build_frames(targets, theatre=case.theatre)
+            self.assertEqual(_frame_hash(frames), GOLDEN[case_id]["sha256"], case_id)
+
+    def test_dataset_entries_include_role_card(self):
+        for case_id in ("taiwan_landing", "india_china_west"):
+            targets = copy.deepcopy(scenario.targets_for(cases.get_case(case_id)))
+            scenario.attach_role_cards(targets)
+            for target in targets:
+                entry = target.to_dataset_entry()
+                self.assertIn("role_card", entry)
+                card = entry["role_card"]
+                self.assertEqual(card["class_id"], self.registry.class_of(
+                    card["subclass_id"])["class_id"])
+                self.assertIn("effective", card)
+                self.assertEqual(card["confidence"], "legacy")
+
+    def test_dense_dataset_entries_include_role_card(self):
+        targets = self.dense_doc.get("targets") or []
+        self.assertTrue(targets)
+        for entry in targets:
+            self.assertIn("role_card", entry)
+            self.assertIn("effective", entry["role_card"])
+        by_id = {entry["id"]: entry for entry in targets}
+        self.assertEqual(by_id["TRS001"]["role_card"]["subclass_id"],
+                         "sea.surface.landing_ship")
+        self.assertEqual(by_id["TRV001"]["role_card"]["subclass_id"],
+                         "land.vehicle.amphibious")
+
     # -- frame parity ------------------------------------------------------
     def test_frames_unchanged_when_speed_read_from_card(self):
         """Rebuild frames using the card cruise speed (P1 preview).
