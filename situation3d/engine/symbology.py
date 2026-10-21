@@ -60,14 +60,19 @@ ICONS: Dict[str, dict] = {
     "frigate": {"label": "护卫舰", "domain": "sea", "family": "水面舰艇", "abbrev": "FFG"},
     "replenishment": {"label": "补给舰", "domain": "sea", "family": "辅助舰船", "abbrev": "AOE"},
     "corvette": {"label": "巡逻舰", "domain": "sea", "family": "水面舰艇", "abbrev": "PC"},
+    "landing_ship": {"label": "登陆舰", "domain": "sea", "family": "两栖舰船", "abbrev": "LST"},
     # -- land ------------------------------------------------------------
     "coastal_missile": {"label": "岸舰导弹", "domain": "land", "family": "岸防兵力", "abbrev": "ASCM"},
     "sam_battalion": {"label": "防空导弹", "domain": "land", "family": "地面防空", "abbrev": "SAM"},
     "armor": {"label": "装甲分队", "domain": "land", "family": "地面机动", "abbrev": "ARM"},
     "artillery": {"label": "炮兵分队", "domain": "land", "family": "地面火力", "abbrev": "ARTY"},
+    "transport": {"label": "运输队", "domain": "land", "family": "保障分队", "abbrev": "TRK"},
+    "outpost": {"label": "哨所阵地", "domain": "land", "family": "防御阵地", "abbrev": "OP"},
     # -- air -------------------------------------------------------------
     "fighter": {"label": "战斗机", "domain": "air", "family": "作战飞机", "abbrev": "FTR"},
     "aew": {"label": "预警机", "domain": "air", "family": "支援飞机", "abbrev": "AEW"},
+    "helicopter": {"label": "直升机", "domain": "air", "family": "作战飞机", "abbrev": "HEL"},
+    "uav": {"label": "无人机", "domain": "air", "family": "支援飞机", "abbrev": "UAV"},
 }
 
 

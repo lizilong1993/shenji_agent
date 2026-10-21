@@ -163,6 +163,32 @@
       { d: 'M28,27 A4.5,4.5 0 0 1 36,27 Z', fill: true },
       { d: 'M32,27 L32,24' },
     ],
+    helicopter: [
+      { d: 'M22,26 L42,26' },
+      { d: 'M26,37 L38,37 L36,40 L28,40 Z', fill: true },
+      { d: 'M32,26 L32,35' },
+      { d: 'M36,33 L40,33' },
+    ],
+    uav: [
+      { d: 'M32,26 L42,32 L32,30 L22,32 Z', fill: true },
+      { c: [32, 34, 2], fill: true },
+      { d: 'M32,30 L32,34' },
+    ],
+    landing_ship: [
+      { d: 'M20,35 L44,35 L41,40 L23,40 Z', fill: true },
+      { d: 'M44,35 L47,30 L48,33 L46,36 Z', fill: true },
+      { d: 'M27,30 L36,30 L36,35 L27,35 Z' },
+    ],
+    transport: [
+      { d: 'M21,33 L37,33 L37,39 L21,39 Z', fill: true },
+      { d: 'M37,35 L42,35 L42,39 L37,39 Z' },
+      { c: [25, 40, 1.8], fill: true },
+      { c: [39, 40, 1.8], fill: true },
+    ],
+    outpost: [
+      { d: 'M22,40 L22,33 L32,26 L42,33 L42,40 Z', fill: true },
+      { d: 'M30,40 L30,35 L34,35 L34,40' },
+    ],
   };
 
   const UNKNOWN_GLYPH = [
