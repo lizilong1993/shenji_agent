@@ -24,7 +24,7 @@ import math
 import os
 from typing import Optional
 
-from geodata.cache import CacheStore, OfflineCacheMiss
+from geodata.cache import CacheCorrupt, CacheStore, OfflineCacheMiss
 from geodata.dem import DemSource, OnlineDemError
 from geodata.osm import OnlineSourceError, OsmSource
 from geo.geodesy import haversine_m
@@ -131,6 +131,8 @@ def build_envpack(out: str, basic: dict, grid, theatre: str = "demo",
                   use_osm: bool = True, use_dem: bool = True,
                   osm_source=None, dem_source=None,
                   bbox=None) -> dict:
+    if resolution_m <= 0:
+        raise ValueError("resolution_m must be positive")
     cache = CacheStore(cache_dir or os.path.join(out, "_cache"), mode=mode)
     bbox = bbox or _bbox_from_basic(basic, grid)
     os.makedirs(out, exist_ok=True)
@@ -141,10 +143,8 @@ def build_envpack(out: str, basic: dict, grid, theatre: str = "demo",
         source = osm_source or OsmSource(cache)
         try:
             features = source.features(bbox)
-            provenance["osm"] = "offline-cache" if (
-                mode == "offline" or cache.has("osm", "%.6f,%.6f,%.6f,%.6f" % tuple(bbox))
-                and mode == "auto") else "online"
-        except (OfflineCacheMiss, OnlineSourceError) as exc:
+            provenance["osm"] = "online" if getattr(source, "fetched_network", False) else "offline-cache"
+        except (OfflineCacheMiss, OnlineSourceError, CacheCorrupt) as exc:
             provenance["osm"] = "fallback-basic (%s)" % type(exc).__name__
             provenance["fallback"] = True
 
@@ -154,8 +154,8 @@ def build_envpack(out: str, basic: dict, grid, theatre: str = "demo",
             dem = dem_source or DemSource(cache, zoom=dem_zoom)
             step_deg = float(resolution_m) / 111320.0
             terrain = dem.sample_grid(bbox, step_deg)
-            provenance["dem"] = "offline-cache" if mode == "offline" else "online"
-        except (OfflineCacheMiss, OnlineDemError):
+            provenance["dem"] = "online" if getattr(dem, "fetched_network", False) else "offline-cache"
+        except (OfflineCacheMiss, OnlineDemError, CacheCorrupt):
             terrain = None
     if terrain is None:
         terrain = _fallback_grid(basic, grid, bbox, resolution_m)
@@ -166,6 +166,7 @@ def build_envpack(out: str, basic: dict, grid, theatre: str = "demo",
     if not roads["edges"]:
         roads = _fallback_roads(basic, grid)
         provenance["roads"] = "fallback-basic"
+        provenance["fallback"] = True
     else:
         provenance["roads"] = provenance["osm"]
 
@@ -184,7 +185,7 @@ def build_envpack(out: str, basic: dict, grid, theatre: str = "demo",
         "schema": "msgeo.envpack.v1",
         "theatre": theatre,
         "mode": mode,
-        "built": "2026-10-21",
+        "built": __import__("datetime").date.today().isoformat(),
         "bbox": [round(float(v), 7) for v in bbox],
         "origin": {"lon": grid.center_lon, "lat": grid.center_lat, "alt": 0.0},
         "grid": {"center_lon": grid.center_lon, "center_lat": grid.center_lat,

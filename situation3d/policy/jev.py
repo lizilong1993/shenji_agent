@@ -77,6 +77,7 @@ class HttpJevClient(object):
             "questions": {self.question_key: {
                 "type": q.type,
                 "instructions": q.instructions,
+                "options": list(q.options),
                 "criteria": q.criteria or {str(i): o for i, o in enumerate(q.options)},
             }},
         }
@@ -123,18 +124,26 @@ def _fmt_pos(pos: dict) -> str:
     return "%.5f,%.5f" % (float(pos.get("lon", 0.0)), float(pos.get("lat", 0.0)))
 
 
+def _sanitize(text: str, limit: int = 40) -> str:
+    """Strip control characters/newlines and cap length before it enters a prompt."""
+    cleaned = "".join(ch if 32 <= ord(ch) < 127 or ord(ch) >= 160 else " " for ch in str(text))
+    return " ".join(cleaned.split())[:limit]
+
+
 def summarize_observation(observation: dict, seat: int) -> str:
     """Compact textual state for the decision model (detected entities only)."""
     lines = ["Time: %.1f s" % float(observation.get("time_s", 0.0))]
     for entity in observation.get("entities", []):
         side = "own" if entity.get("affiliation") == seat else "enemy"
         lines.append("%s %s %s at %s hp=%s speed=%.1f" % (
-            side, entity.get("unit_kind", "unit"), entity.get("name", "?"),
+            side, _sanitize(entity.get("unit_kind", "unit")),
+            _sanitize(entity.get("name", "?")),
             _fmt_pos(entity.get("pos") or {}), entity.get("blood", "?"),
             float(entity.get("speed_ms", 0.0))))
     for obj in observation.get("objectives", []):
         lines.append("objective %s owner=%s value=%s" % (
-            obj.get("name", "?"), obj.get("owner", "?"), obj.get("value", "?")))
+            _sanitize(obj.get("name", "?")), obj.get("owner", "?"),
+            obj.get("value", "?")))
     return "\n".join(lines)
 
 
@@ -154,9 +163,12 @@ def build_candidates(observation: dict, seat: int,
         picked = (fires + moves + stops)[:max_per_entity]
         for action in picked:
             if action["type"] == "fire":
+                weapon = action.get("weapon")
                 label = "unit %s fire target %s with %s" % (
-                    uid, action.get("target"), action.get("weapon"))
+                    uid, action.get("target"), weapon)
                 act = {"type": "fire", "entity": uid, "target": action["target"]}
+                if weapon is not None:
+                    act["weapon"] = weapon
             elif action["type"] == "move_to":
                 label = "unit %s move to %s" % (uid, _fmt_pos(action.get("target") or {}))
                 act = {"type": "move_to", "entity": uid,
@@ -165,7 +177,15 @@ def build_candidates(observation: dict, seat: int,
                 label = "unit %s hold position" % uid
                 act = {"type": "stop", "entity": uid}
             candidates.append(Candidate(label=label, action=act))
-    return candidates
+    # Guarantee unique labels (the decision API returns label-keyed probabilities).
+    seen = {}
+    unique = []
+    for c in candidates:
+        count = seen.get(c.label, 0)
+        seen[c.label] = count + 1
+        unique.append(Candidate(label=c.label if count == 0 else "%s #%d" % (c.label, count + 1),
+                                action=c.action))
+    return unique
 
 
 class JevPolicy(object):
@@ -174,17 +194,19 @@ class JevPolicy(object):
         self.client = client
         self.instructions = instructions
 
+    def _fallback(self, candidates: List[Candidate]) -> dict:
+        for c in candidates:
+            if c.action.get("type") == "fire":
+                return c.action
+        return candidates[0].action
+
     def choose(self, observation: dict, seat: int,
                candidates: Optional[List[Candidate]] = None) -> Optional[dict]:
         candidates = candidates if candidates is not None else build_candidates(observation, seat)
         if not candidates:
             return None
         if self.client is None:
-            # Offline fallback: first fire, else first move, else hold.
-            for c in candidates:
-                if c.action.get("type") == "fire":
-                    return c.action
-            return candidates[0].action
+            return self._fallback(candidates)
         state = summarize_observation(observation, seat)
         labels = [c.label for c in candidates]
         request = DecisionRequest(
@@ -193,14 +215,29 @@ class JevPolicy(object):
                 type=DECISION_CHOICE, instructions=self.instructions,
                 options=labels,
                 criteria={str(i): label for i, label in enumerate(labels)})])
-        answer = self.client.decide(request)
-        best = answer.best()
-        if best is None:
-            return None
+        try:
+            answer = self.client.decide(request)
+            probs = dict(answer.probabilities or {})
+            # Accept index-keyed responses ("0", "1", ...) from simple servers.
+            if probs and not any(k in labels for k in probs):
+                mapped = {}
+                for key, value in probs.items():
+                    try:
+                        mapped[labels[int(key)]] = float(value)
+                    except (ValueError, IndexError, TypeError):
+                        continue
+                probs = mapped
+            valid = {k: v for k, v in probs.items() if k in labels and isinstance(v, (int, float))}
+            if not valid:
+                return self._fallback(candidates)
+            best = max(valid.items(), key=lambda kv: kv[1])[0]
+        except Exception:
+            # A stalled or failing model must never block the simulation.
+            return self._fallback(candidates)
         for c in candidates:
             if c.label == best:
                 return c.action
-        return None
+        return self._fallback(candidates)
 
     def step(self, world, seat: int) -> Optional[dict]:
         """Convenience: build an observation, choose, and apply the action."""

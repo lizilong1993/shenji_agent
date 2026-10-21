@@ -10,10 +10,15 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 from pathlib import Path
 
 
 class OfflineCacheMiss(FileNotFoundError):
+    pass
+
+
+class CacheCorrupt(ValueError):
     pass
 
 
@@ -30,7 +35,11 @@ class CacheStore(object):
         return self.root / kind / safe
 
     def has(self, kind: str, name: str) -> bool:
-        return self.key(kind, name).is_file()
+        p = self.key(kind, name)
+        try:
+            return p.is_file() and p.stat().st_size > 0
+        except OSError:
+            return False
 
     def read_bytes(self, kind: str, name: str):
         p = self.key(kind, name)
@@ -41,12 +50,35 @@ class CacheStore(object):
     def write_bytes(self, kind: str, name: str, data: bytes) -> None:
         p = self.key(kind, name)
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(".tmp")
-        tmp.write_bytes(data)
-        os.replace(tmp, p)
+        fd, tmp = tempfile.mkstemp(dir=str(p.parent), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(data)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, p)
+        finally:
+            if os.path.exists(tmp):
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
 
     def read_json(self, kind: str, name: str):
-        return json.loads(self.read_bytes(kind, name).decode("utf-8"))
+        data = self.read_bytes(kind, name)
+        try:
+            return json.loads(data.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError) as exc:
+            self.quarantine(kind, name)
+            raise CacheCorrupt("corrupt JSON cache %s/%s: %s" % (kind, name, exc))
+
+    def quarantine(self, kind: str, name: str) -> None:
+        p = self.key(kind, name)
+        if p.is_file():
+            try:
+                os.replace(p, p.with_suffix(p.suffix + ".corrupt"))
+            except OSError:
+                pass
 
     def write_json(self, kind: str, name: str, obj) -> None:
         self.write_bytes(kind, name,

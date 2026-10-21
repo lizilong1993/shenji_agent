@@ -267,6 +267,72 @@ class TestEnvPackPipeline(unittest.TestCase):
             self.assertEqual(env.landcover(mid[0] - 0.007, mid[1] - 0.007), "forest")
             self.assertTrue(env.on_road(c[0] + 0.001, mid[1], tolerance_m=50.0))
 
+    def test_envpack_world_direct_fire(self):
+        import tempfile
+        from geodata.pipeline import build_envpack
+        basic = make_basic()
+        grid = LegacyHexGrid.from_grid_meta(basic["grid"])
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "pack")
+            build_envpack(out, basic, grid, mode="offline",
+                          cache_dir=os.path.join(tmp, "cache"),
+                          osm_source=self.FakeOsm(), dem_source=self.FakeDem())
+            world = build_world(scenario([operator(1, 0, 1010),
+                                          operator(2, 1, 1011, blood=5)]),
+                                basic, seed=5, envpack=out)
+            for _ in range(3):
+                world.step()
+            self.assertTrue(any(e["type"] == "direct_fire" for e in world.events))
+
+    def test_envpack_building_los_and_water_landcover(self):
+        import tempfile
+        from geodata.pipeline import build_envpack
+        from env.pack_env import EnvPackEnvironment
+        basic = make_basic()
+        grid = LegacyHexGrid.from_grid_meta(basic["grid"])
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "pack")
+            build_envpack(out, basic, grid, mode="offline",
+                          cache_dir=os.path.join(tmp, "cache"),
+                          osm_source=self.FakeOsm(), dem_source=self.FakeDem())
+            env = EnvPackEnvironment(out)
+            c = env.manifest["bbox"]
+            mid = ((c[0] + c[2]) / 2.0, (c[1] + c[3]) / 2.0)
+            self.assertEqual(env.landcover(*mid), LandCover.WATER)
+            b = (mid[0] + 0.005, mid[1] + 0.005)
+            # Terrain 100 m, building top 112 m: sight at 120 m is clear,
+            # sight at 105 m is blocked.
+            self.assertFalse(env.building_intersects(mid, 120.0, b, 120.0))
+            self.assertTrue(env.building_intersects(mid, 105.0, b, 105.0))
+
+    def test_envpack_landcover_cache_is_subcell(self):
+        import tempfile
+        from geodata.pipeline import build_envpack
+        from env.pack_env import EnvPackEnvironment
+        basic = make_basic()
+        grid = LegacyHexGrid.from_grid_meta(basic["grid"])
+        with tempfile.TemporaryDirectory() as tmp:
+            out = os.path.join(tmp, "pack")
+            build_envpack(out, basic, grid, mode="offline",
+                          cache_dir=os.path.join(tmp, "cache"),
+                          osm_source=self.FakeOsm(), dem_source=self.FakeDem())
+            env = EnvPackEnvironment(out)
+            c = env.manifest["bbox"]
+            mid = ((c[0] + c[2]) / 2.0, (c[1] + c[3]) / 2.0)
+            self.assertEqual(env.landcover(mid[0] - 0.007, mid[1] - 0.007), "forest")
+            self.assertNotEqual(env.landcover(mid[0] + 0.012, mid[1] + 0.012), "forest")
+
+    def test_cache_corruption_raises(self):
+        import tempfile
+        from geodata.cache import CacheCorrupt, CacheStore
+        from geodata.osm import OsmSource
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = CacheStore(tmp, mode="offline")
+            key = "%.6f,%.6f,%.6f,%.6f" % (119.8, 23.0, 119.9, 23.1)
+            cache.write_bytes("osm", key, b"{not-json")
+            with self.assertRaises(CacheCorrupt):
+                OsmSource(cache).features((119.8, 23.0, 119.9, 23.1))
+
     def test_offline_cache_miss_raises(self):
         import tempfile
         from geodata.cache import CacheStore, OfflineCacheMiss

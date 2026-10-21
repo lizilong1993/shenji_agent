@@ -52,10 +52,14 @@ class EnvPackEnvironment(object):
         self._water = self._load_json("water") or []
         self._buildings = self._load_json("buildings") or []
         self._roads = self._load_json("roads") or {"nodes": {}, "edges": []}
-        for item in self._landcover + self._water + self._buildings:
-            ring = item.get("ring") or []
-            if ring:
-                item["_bbox"] = _bbox(ring)
+        for layer in (self._landcover, self._water, self._buildings):
+            kept = []
+            for item in layer:
+                ring = item.get("ring") or []
+                if len(ring) >= 4:
+                    item["_bbox"] = _bbox(ring)
+                    kept.append(item)
+            layer[:] = kept
         self._basic = None
         fallback = self.manifest.get("fallback_basic_json")
         if fallback and os.path.isfile(os.path.join(root, fallback)):
@@ -76,6 +80,7 @@ class EnvPackEnvironment(object):
         self._landcover_cache = {}
         self._water_cache = {}
         self._los_cache = {}
+        self._min_elev = None
 
     def _load_json(self, layer: str):
         meta = self.layers.get(layer)
@@ -114,6 +119,21 @@ class EnvPackEnvironment(object):
         dh = self.elevation(*b) - self.elevation(*a)
         return math.degrees(math.atan2(abs(dh), 2.0 * d))
 
+    def min_elevation(self) -> float:
+        if self._min_elev is None:
+            t = self._terrain
+            if t and t.get("values"):
+                self._min_elev = min(min(row) for row in t["values"])
+            elif self._basic_env is not None:
+                self._min_elev = self._basic_env.min_elevation()
+            else:
+                self._min_elev = 0.0
+        return self._min_elev
+
+    def elevation_grade(self, lon: float, lat: float) -> int:
+        return int(round((self.elevation(lon, lat) - self.min_elevation()) /
+                         max(1.0, self.ele_grade)))
+
     # -- polygons ----------------------------------------------------------
     def _polygon_at(self, items, lon, lat):
         for item in items:
@@ -125,21 +145,24 @@ class EnvPackEnvironment(object):
         return None
 
     def landcover(self, lon: float, lat: float) -> str:
-        key = self.grid.cell_of(lon, lat)
+        key = (round(lon, 5), round(lat, 5))
         if key in self._landcover_cache:
             return self._landcover_cache[key]
-        item = self._polygon_at(self._landcover, lon, lat)
-        if item is not None:
-            value = item.get("class") or LandCover.OPEN
-        elif self._basic_env is not None:
-            value = self._basic_env.landcover(lon, lat)
+        if self._polygon_at(self._water, lon, lat) is not None:
+            value = LandCover.WATER
         else:
-            value = LandCover.OPEN
+            item = self._polygon_at(self._landcover, lon, lat)
+            if item is not None:
+                value = item.get("class") or LandCover.OPEN
+            elif self._basic_env is not None:
+                value = self._basic_env.landcover(lon, lat)
+            else:
+                value = LandCover.OPEN
         self._landcover_cache[key] = value
         return value
 
     def water_depth(self, lon: float, lat: float) -> Optional[float]:
-        key = self.grid.cell_of(lon, lat)
+        key = (round(lon, 5), round(lat, 5))
         if key in self._water_cache:
             return self._water_cache[key]
         item = self._polygon_at(self._water, lon, lat)
@@ -178,14 +201,19 @@ class EnvPackEnvironment(object):
         if (max(a[0], b[0]) < bb[0] or min(a[0], b[0]) > bb[2]
                 or max(a[1], b[1]) < bb[1] or min(a[1], b[1]) > bb[3]):
             return False
-        total = haversine_m(a, b)
-        n = max(1, int(math.ceil(total / max(100.0, total / 100.0))))
-        for i in range(n + 1):
-            f = i / float(n)
+        for item in self._buildings:
+            ring = item.get("ring") or []
+            x0, y0, x1, y1 = item.get("_bbox")
+            if (max(a[0], b[0]) < x0 or min(a[0], b[0]) > x1
+                    or max(a[1], b[1]) < y0 or min(a[1], b[1]) > y1):
+                continue
+            if not _segment_intersects_ring(a, b, ring):
+                continue
+            f = _first_inside_fraction(a, b, ring)
             lon = a[0] + (b[0] - a[0]) * f
             lat = a[1] + (b[1] - a[1]) * f
-            item = self._polygon_at(self._buildings, lon, lat)
-            if item is not None and float(item.get("height_m") or 6.0) > (h0 + (h1 - h0) * f):
+            top = self.elevation(lon, lat) + float(item.get("height_m") or 6.0)
+            if top > h0 + (h1 - h0) * f:
                 return True
         return False
 
@@ -257,7 +285,7 @@ class EnvPackEnvironment(object):
             if not pa or not pb:
                 continue
             if _point_segment_distance(lon, lat, pa, pb) <= tolerance_m:
-                return _CLASS_RANK.get(str(edge.get("class")), 1)
+                return _CLASS_RANK.get(str(edge.get("class")), 0)
         return 0
 
     def nearest_road(self, lon: float, lat: float, max_m: float = 3000.0):
@@ -269,30 +297,64 @@ class EnvPackEnvironment(object):
             pb = nodes.get(edge["b"])
             if not pa or not pb:
                 continue
-            for p in (pa, pb):
-                d = haversine_m((lon, lat), (p[0], p[1]))
-                if d <= max_m and (best_d is None or d < best_d):
-                    best_d = d
-                    best = (p[0], p[1])
+            point, d = _segment_nearest_point(lon, lat, pa, pb)
+            if d <= max_m and (best_d is None or d < best_d):
+                best_d = d
+                best = point
         return best
 
 
 _CLASS_RANK = {
     "motorway": 3, "trunk": 3, "primary": 2, "secondary": 2,
-    "tertiary": 1, "residential": 1, "track": 1, "legacy": 1,
+    "tertiary": 1, "residential": 1, "unclassified": 1,
+    "service": 1, "track": 1, "legacy": 1,
 }
+_NON_DRIVABLE = {"footway", "path", "cycleway", "steps", "pedestrian",
+                 "platform", "corridor", "bridleway", "construction", "proposed"}
 
 
-def _point_segment_distance(lon, lat, a, b) -> float:
-    """Approximate planar distance in metres from point to segment."""
+def _segment_nearest_point(lon, lat, a, b):
+    """Return (nearest lon/lat point on segment, distance metres)."""
     m_lon = 111320.0 * math.cos(math.radians(lat))
     m_lat = 110540.0
     px, py = (lon - a[0]) * m_lon, (lat - a[1]) * m_lat
     bx, by = (b[0] - a[0]) * m_lon, (b[1] - a[1]) * m_lat
     denom = bx * bx + by * by
     t = 0.0 if denom <= 1e-9 else max(0.0, min(1.0, (px * bx + py * by) / denom))
-    dx, dy = px - t * bx, py - t * by
-    return math.hypot(dx, dy)
+    qx, qy = t * bx, t * by
+    return (a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])), math.hypot(px - qx, py - qy)
+
+
+def _point_segment_distance(lon, lat, a, b) -> float:
+    return _segment_nearest_point(lon, lat, a, b)[1]
+
+
+def _segments_cross(p1, p2, p3, p4) -> bool:
+    def orient(a, b, c):
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+    o1, o2 = orient(p1, p2, p3), orient(p1, p2, p4)
+    o3, o4 = orient(p3, p4, p1), orient(p3, p4, p2)
+    return (o1 * o2 < 0) and (o3 * o4 < 0)
+
+
+def _segment_intersects_ring(a, b, ring) -> bool:
+    if _point_in_ring(a[0], a[1], ring) or _point_in_ring(b[0], b[1], ring):
+        return True
+    for i in range(len(ring) - 1):
+        if _segments_cross(a, b, ring[i], ring[i + 1]):
+            return True
+    return False
+
+
+def _first_inside_fraction(a, b, ring) -> float:
+    n = 20
+    for i in range(n + 1):
+        f = i / float(n)
+        lon = a[0] + (b[0] - a[0]) * f
+        lat = a[1] + (b[1] - a[1]) * f
+        if _point_in_ring(lon, lat, ring):
+            return f
+    return 0.5
 
 
 def load_envpack_environment(root: str):

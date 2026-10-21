@@ -16,7 +16,7 @@ import urllib.parse
 import urllib.request
 from typing import Dict, List, Optional
 
-from geodata.cache import CacheStore, OfflineCacheMiss
+from geodata.cache import CacheCorrupt, CacheStore, OfflineCacheMiss
 
 
 class OnlineSourceError(RuntimeError):
@@ -51,6 +51,7 @@ class OsmSource(object):
         self.cache = cache
         self.endpoints = endpoints or list(DEFAULT_ENDPOINTS)
         self.timeout_s = int(timeout_s)
+        self.fetched_network = False
 
     def _fetch(self, bbox) -> dict:
         s, w, n, e = bbox[1], bbox[0], bbox[3], bbox[2]
@@ -75,6 +76,7 @@ class OsmSource(object):
         if self.cache.mode == "offline" or (self.cache.mode == "auto" and self.cache.has("osm", key)):
             return self.cache.read_json("osm", key)
         data = self._fetch(bbox)
+        self.fetched_network = True
         self.cache.write_json("osm", key, data)
         return data
 
@@ -124,7 +126,7 @@ def normalize(raw: dict) -> Dict[str, list]:
         coords = _way_coords(el)
         if len(coords) < 2:
             continue
-        if "highway" in tags and not _closed(coords):
+        if "highway" in tags:
             features["roads"].append({
                 "coords": coords,
                 "class": tags.get("highway"),

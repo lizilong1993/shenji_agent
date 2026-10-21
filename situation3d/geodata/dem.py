@@ -13,7 +13,7 @@ import urllib.request
 import zlib
 from typing import Dict, List, Optional, Tuple
 
-from geodata.cache import CacheStore, OfflineCacheMiss
+from geodata.cache import CacheCorrupt, CacheStore, OfflineCacheMiss
 
 TERRARIUM_URLS = [
     "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/%d/%d/%d.png",
@@ -90,6 +90,7 @@ class DemSource(object):
         self.timeout_s = int(timeout_s)
         self.urls = urls or list(TERRARIUM_URLS)
         self._tiles: Dict[Tuple[int, int], tuple] = {}
+        self.fetched_network = False
 
     def _tile(self, x: int, y: int):
         key = (x, y)
@@ -112,8 +113,13 @@ class DemSource(object):
                     last = exc
             if data is None:
                 raise OnlineDemError("DEM tile %s failed: %s" % (name, last))
+            self.fetched_network = True
             self.cache.write_bytes("dem", name, data)
-        w, h, rgb = decode_png_rgb(data)
+        try:
+            w, h, rgb = decode_png_rgb(data)
+        except Exception as exc:
+            self.cache.quarantine("dem", name)
+            raise CacheCorrupt("corrupt DEM tile %s: %s" % (name, exc))
         self._tiles[key] = (w, h, rgb)
         return self._tiles[key]
 
