@@ -7322,6 +7322,8 @@ function bindPicking() {
     if (id.indexOf('target-') === 0) {
       selectTarget(id.slice('target-'.length), false);
     } else if (id.indexOf('hotspot-') === 0) {
+      // 热点同样不是目标：先清掉目标选中，避免“目标关系线 + 热点高亮”同时存在。
+      if (state.selected) clearTargetSelection();
       selectHotspot(Number(id.slice('hotspot-'.length)), false);
     } else if (state.selected) {
       // 点到其它非目标图元（标牌、关系线、航路、热点面…）：同样取消选中。
