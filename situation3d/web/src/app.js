@@ -3720,6 +3720,12 @@ function refreshRelations(force) {
   var spos = positionFor(sid, state.tick);
   if (!sdef || !spos) return;
   var fid = relAttr(sdef, 'formation_id');
+  // Dense cases (80 targets) turn the relation layer into a hairball: one
+  // selected target can produce ~79 lines and 34 distance labels, rebuilt
+  // every tick. Keep only the closest hostile relations in that case; old
+  // cases are untouched.
+  var dense = !!(state.data && (state.data.campaign_contract_version ||
+    ((state.data.targets || []).length > 50)));
   var eng = [], inf = [];
   Object.keys(state.targets).forEach(function (id) {
     if (id === sid) return;
@@ -3729,16 +3735,20 @@ function refreshRelations(force) {
     // 友方：同编队（formation_id 一致）或同阵营。
     // **同编队关系是数据集明确声明的 → 实测、实线、绿色。**
     if (fid && relAttr(def, 'formation_id') === fid) {
-      relAddLine(spos, pos, false, relColor('own', false),
-                 relText('own', 'measured', sdef, def, relKm(spos, pos)));
-      relView.own++;
+      if (!dense) {
+        relAddLine(spos, pos, false, relColor('own', false),
+                   relText('own', 'measured', sdef, def, relKm(spos, pos)));
+        relView.own++;
+      }
       relView.peers.push(id);
       return;
     }
     if (def.affiliation === sdef.affiliation) {
-      relAddLine(spos, pos, false, relColor('own', false),
-                 relText('own', 'measured', sdef, def, relKm(spos, pos)));
-      relView.own++;
+      if (!dense) {
+        relAddLine(spos, pos, false, relColor('own', false),
+                   relText('own', 'measured', sdef, def, relKm(spos, pos)));
+        relView.own++;
+      }
       return;
     }
     var km = relKm(spos, pos);
@@ -3749,6 +3759,12 @@ function refreshRelations(force) {
   relView.criterion = useInf ? 'influence' : 'engage';
   relView.hostileInf = inf.length;
   var drawn = useInf ? inf : eng;
+  if (dense) {
+    // Closest hostile contacts are the ones worth drawing; the rest are
+    // available in the target panel / inference data but not as screen lines.
+    drawn = drawn.slice().sort(function (a, b) { return a.km - b.km; }).slice(0, 6);
+  }
+  relView.dense = dense;
   // 敌方：距离阈值推出来的关系是**推理**（数据集没有声明交火），虚线 + 浅一档的颜色。
   drawn.forEach(function (o) {
     var def = state.targets[o.id].def;
