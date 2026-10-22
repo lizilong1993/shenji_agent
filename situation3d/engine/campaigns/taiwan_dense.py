@@ -31,12 +31,36 @@ THEATRE = "taiwan_strait"
 TICK_SECONDS = 30
 TICK_COUNT = 1440
 TERMINAL_TICK = 1000  # 战役完成/保障恢复后结束，不再固定播到 12 小时
-# 地面车辆按右侧车道偏移，避免对向车辆在路中心“穿模”。Cesium 实体本身没有
-# 物理碰撞，这里只做数据级的最小分离，不改变路线和行驶里程。
-LANE_OFFSET_M = 3.5
+# 车道模型：车辆按航向靠右行驶，所在车道中心线相对道路中心线的偏移为半个
+# 车道宽。这里只提供车道几何与碰撞体积；变道、避让与导航由外部算法实现。
+LANE_WIDTH_M = 3.75
+LANE_OFFSET_M = LANE_WIDTH_M * 0.5
 START_UTC = "2026-09-15T00:00:00Z"
-GEO_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                       "data", "geo", THEATRE, "anping")
+ENGINE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+GEO_DIR = os.path.join(ENGINE_DIR, "data", "geo", THEATRE, "anping")
+
+# 型号名 -> 归一化 GLB 资产。碰撞体积取资产真实包围盒，而不是演示用的
+# 概略尺寸（ZTD-05 的示例 profile 曾写成 4.8 m，实际车体 9.49 m）。
+MODEL_ASSET = {
+    "ZTD-05 两栖突击车": "type_ztd05.glb",
+    "东风 EQ240 运输车": "type_eq240.glb",
+    "EQ240 工程车": "type_eq240.glb",
+    "071 型船坞登陆舰": "type_071.glb",
+    "054A 型护卫舰": "type_054a.glb",
+    "056A 型轻型护卫舰": "type_056a.glb",
+    "成功级护卫舰": "type_perry.glb",
+    "沱江级巡逻舰": "type_tuochiang.glb",
+    "歼-16": "type_j16.glb",
+    "F-16C": "type_f16c.glb",
+    "空警-500": "type_kj2000.glb",
+    "E-2D": "type_e2d.glb",
+}
+try:
+    with open(os.path.join(ENGINE_DIR, "data", "models", "bboxes.json"),
+              encoding="utf-8") as _f:
+        MODEL_BBOXES = (json.load(_f) or {}).get("models") or {}
+except (IOError, ValueError):
+    MODEL_BBOXES = {}
 
 AREAS = {
     "D": (120.145, 22.960, 120.180, 22.995),
@@ -290,9 +314,28 @@ def _cum_path(path: Sequence[Tuple[float, float]]) -> Tuple[List[float], float]:
     return cum, cum[-1]
 
 
+def _collision_bbox(model: str, fallback: Optional[dict] = None) -> Optional[dict]:
+    """目标的碰撞包围盒（长/宽/高，米）。优先取资产真实包围盒。"""
+    asset = MODEL_ASSET.get(model)
+    b = MODEL_BBOXES.get(asset) if asset else None
+    if b:
+        return {
+            "length_m": b["length_m"], "width_m": b["width_m"],
+            "height_m": b["height_m"], "source": "glb_bbox", "asset": asset,
+        }
+    if fallback:
+        return {
+            "length_m": float(fallback.get("length_m") or 0.0),
+            "width_m": float(fallback.get("width_m") or 0.0),
+            "height_m": float(fallback.get("height_m") or 0.0),
+            "source": "demo_profile",
+        }
+    return None
+
+
 def _offset_right(lat: float, lon: float, hdg: float,
                   meters: float) -> Tuple[float, float]:
-    """把点向航向右侧平移 meters（米），用于车道分离。"""
+    """把点向航向右侧平移 meters（米），即车道中心线相对路中心线的偏移。"""
     if not meters:
         return lat, lon
     r = math.radians(hdg + 90.0)
@@ -470,10 +513,13 @@ def _entity_target(e: Entity):
     if e.kind == "vehicle":
         p = VEHICLE_CLASSES[e.cls]
         name = p["model"]
+        bbox = _collision_bbox(p["model"], p) or p
         attrs = {
             "编组": e.group, "任务": e.task, "合成对象": "是",
-            "车辆尺寸": "%.1f×%.1f×%.1f m" % (p["length_m"], p["width_m"], p["height_m"]),
-            "数据来源": "demo_profile",
+            "车辆尺寸": "%.1f×%.1f×%.1f m" % (
+                bbox["length_m"], bbox["width_m"], bbox["height_m"]),
+            "数据来源": "glb_bbox" if isinstance(bbox, dict) and
+                        bbox.get("source") == "glb_bbox" else "demo_profile",
         }
         return Target(
             target_id=e.id, name=name, platform_class=p["model"], domain="land",
@@ -555,7 +601,8 @@ def _state_for(e: Entity, tick: int, carrier_pos: Dict[str, Tuple[float, float, 
         lat, lon, hdg = _sample(e.path, e.cum or [0.0], along, loop=False)
         if reverse:
             hdg = (hdg + 180.0) % 360.0
-        # 右侧车道偏移：对向车流分到两侧，同向车队保持原路线间距。
+        # 车道中心线：按航向靠右半个车道宽。对向车流因此各占一条车道，
+        # 是否再变道/避让由外部的导航算法决定。
         lat, lon = _offset_right(lat, lon, hdg, LANE_OFFSET_M)
         speed_kn = e.speed_mps * 1.943844 if active else 0.0
         task = "moving" if active else "waiting"
@@ -900,8 +947,20 @@ def build_case(seed: int = 20261020) -> Tuple[dict, dict]:
         d["initial_carrier_id"] = e.carrier
         if e.kind == "vehicle":
             p = VEHICLE_CLASSES[e.cls]
-            d["physical_profile"] = {"length_m": p["length_m"], "width_m": p["width_m"],
-                                     "height_m": p["height_m"], "source": "demo_profile"}
+            bbox = _collision_bbox(p["model"], p)
+            d["collision_bbox"] = bbox
+            d["physical_profile"] = {
+                "length_m": bbox["length_m"] if bbox else p["length_m"],
+                "width_m": bbox["width_m"] if bbox else p["width_m"],
+                "height_m": bbox["height_m"] if bbox else p["height_m"],
+                "source": bbox.get("source") if bbox else "demo_profile",
+            }
+            d["lane"] = {"id": 0, "width_m": LANE_WIDTH_M,
+                         "center_offset_m": LANE_OFFSET_M, "side": "right"}
+        else:
+            bbox = _collision_bbox(d.get("model") or "")
+            if bbox:
+                d["collision_bbox"] = bbox
         tdefs.append(d)
 
     from .. import inference as inference_mod
