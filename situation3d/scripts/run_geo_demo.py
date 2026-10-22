@@ -157,7 +157,7 @@ def main() -> int:
     ap.add_argument("--envpack", default=None)
     ap.add_argument("--out", required=True)
     ap.add_argument("--detection-model",
-                    choices=("table", "spotting", "shadow"))
+                    choices=("table", "spotting", "shadow", "physical"))
     ap.add_argument("--direct-fire-model",
                     choices=("crt", "physics", "shadow"))
     ap.add_argument("--tactics", action="store_true")

@@ -32,7 +32,7 @@ from sim.rolecards_bridge import (
 from mobility.profile import profile_for
 
 DEFAULT_ANCHOR = (119.9, 23.1)
-DETECTION_MODELS = ("table", "spotting", "shadow")
+DETECTION_MODELS = ("table", "spotting", "shadow", "physical")
 DIRECT_FIRE_MODELS = ("crt", "physics", "shadow")
 
 
@@ -273,6 +273,25 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
                 "name": str(item.get("name") or "obstacle"),
                 "kind": str(item.get("kind") or "roadblock"),
                 "ring": ring})
+    for item in scenario.get("obscurants") or []:
+        if "lon" not in item or "lat" not in item:
+            continue
+        radius = _as_float(item.get("radius_m"), 300.0)
+        base = _as_float(item.get("base_m"), 0.0)
+        top = _as_float(item.get("top_m"), 200.0)
+        if radius <= 0.0:
+            continue
+        world.obscurants.append({
+            "name": str(item.get("name") or "smoke"),
+            "lon": float(item["lon"]),
+            "lat": float(item["lat"]),
+            "radius_m": radius,
+            "base_m": min(base, top),
+            "top_m": max(base, top),
+            "from_s": _as_float(item.get("from_s"), 0.0),
+            "to_s": _as_float(item.get("to_s"), 1e18),
+            "attenuation": _as_float(item.get("attenuation"), 0.02),
+        })
     for op in scenario.get("operators") or []:
         unit_type = _unit_type(op)
         domain = _domain(str(op.get("name") or ""), int(op.get("type") or 2), unit_type)

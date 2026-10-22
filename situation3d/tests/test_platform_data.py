@@ -140,13 +140,14 @@ class PlatformDataTest(unittest.TestCase):
         import tempfile
         import warnings
         old_dir = pd.PLATFORM_DIR
-        old_reg = pd._REGISTRY
         with tempfile.TemporaryDirectory() as tmp:
             with open(os.path.join(tmp, "broken.json"), "w",
                       encoding="utf-8") as fh:
                 fh.write("{not json")
             pd.PLATFORM_DIR = tmp
+            # Emulate the runtime lazy-load path (registry() would raise).
             pd._REGISTRY = None
+            pd._REGISTRY_FAILED = False
             try:
                 with warnings.catch_warnings(record=True) as caught:
                     warnings.simplefilter("always")
@@ -156,7 +157,7 @@ class PlatformDataTest(unittest.TestCase):
                     self.assertTrue(caught)
             finally:
                 pd.PLATFORM_DIR = old_dir
-                pd._REGISTRY = old_reg
+                pd.reload_registry()
 
     def test_reload_registry(self):
         import json

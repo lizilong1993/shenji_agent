@@ -162,6 +162,10 @@ class WorldRuleContext(object):
 
     # -- state -------------------------------------------------------------
     def can_detect(self, observer, target, distance=None) -> bool:
+        if self.detection_model == "physical":
+            obs = self._entity(observer)
+            tgt = self._entity(target)
+            return tgt.uid in self.world.seen.get(obs.uid, set())
         if self.detection_model == "spotting":
             from sim import spotting
             obs = self._entity(observer)

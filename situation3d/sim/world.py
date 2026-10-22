@@ -45,6 +45,7 @@ class World(object):
         self.rule_grid = rule_grid
         self.dt_s = float(dt_s)
         self.time_s = 0.0
+        self.seed = int(seed)
         self.entities: Dict[int, Entity] = {}
         self.rng = random.Random(seed)
         # Plan on the source map grid (200 m official, 1.5 km campaign) so A*
@@ -58,6 +59,10 @@ class World(object):
         self.traffic = CollisionIndex()
         self._crowd_warned: Dict[Tuple[int, int], float] = {}
         self._yield_streak: Dict[int, int] = {}
+        # Physical perception state (P1.4).
+        self.tracks: Dict[int, dict] = {}
+        self._phys_last_seen: Dict[Tuple[int, int], float] = {}
+        self.obscurants: List[dict] = []
         self.orders: Dict[int, dict] = {}
         self.cooldowns: Dict[Tuple[int, str], float] = {}
         self.weapon_states: Dict[Tuple[int, str], str] = {}
@@ -372,7 +377,10 @@ class World(object):
     def _update_sensors(self, ctx: WorldRuleContext) -> None:
         model = self.detection_model
         self.detection_shadow_error = None
-        if model == "spotting":
+        if model == "physical":
+            from sim import perception
+            seen = perception.compute_seen(self)
+        elif model == "spotting":
             entities = [e for e in self.entities.values() if e.alive and not e.on_board]
             needs_table = any(e.domain not in ("land", "amphibious") for e in entities)
             table_seen = self._compute_table_seen(ctx) if needs_table else {}
@@ -396,6 +404,16 @@ class World(object):
         if self.enable_radio_share or model == "spotting":
             seen = spotting_model.radio_share(self, seen)
         self.seen = seen
+
+    def tracks_for(self, side: int) -> List[dict]:
+        """Fused target tracks for one side (physical model)."""
+        out = []
+        for track in self.tracks.get(int(side), {}).values():
+            item = dict(track)
+            item["sensors"] = sorted(track.get("sensors") or ())
+            out.append(item)
+        out.sort(key=lambda t: t["uid"])
+        return out
 
     def detected_by(self, side: int, target_uid: int) -> bool:
         for uid, seen in self.seen.items():

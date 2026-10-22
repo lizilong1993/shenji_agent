@@ -288,26 +288,33 @@ def load_platforms(directory: Optional[str] = None) -> Dict[str, Dict[str, Any]]
 
 
 _REGISTRY: Optional[Dict[str, Dict[str, Any]]] = None
+_REGISTRY_FAILED = False
 
 
 def registry() -> Dict[str, Dict[str, Any]]:
-    global _REGISTRY
+    global _REGISTRY, _REGISTRY_FAILED
     if _REGISTRY is None:
         _REGISTRY = load_platforms()
+        _REGISTRY_FAILED = False
     return _REGISTRY
 
 
 def reload_registry(directory: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
-    global _REGISTRY
+    global _REGISTRY, _REGISTRY_FAILED
+    _REGISTRY_FAILED = False
     _REGISTRY = load_platforms(directory)
     return _REGISTRY
 
 
 def _safe_registry() -> Dict[str, Dict[str, Any]]:
     """Registry with constant fallback on invalid data (engine robustness)."""
+    global _REGISTRY_FAILED
+    if _REGISTRY_FAILED:
+        return {}
     try:
         return registry()
     except PlatformDataError as exc:
+        _REGISTRY_FAILED = True
         warnings.warn("platform data invalid, falling back to built-in "
                       "profiles: %s" % exc, RuntimeWarning, stacklevel=3)
         return {}

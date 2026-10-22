@@ -11,7 +11,7 @@
 ```json
 {
   "engine": {
-    "detection_model": "table | spotting | shadow",
+    "detection_model": "table | spotting | shadow | physical",
     "direct_fire_model": "crt | physics | shadow",
     "enable_radio_share": false,
     "enable_tactics": false,
@@ -22,6 +22,8 @@
 ```
 
 默认值与集成前完全一致：`detection_model=table`、`direct_fire_model=crt`、`enable_radio_share=false`、`enable_tactics=false`。因此现有想定、golden replay 和庙算对拍不受影响。
+
+`detection_model=physical`（P1.4，可选，默认不启用）：3D 地形/建筑/烟幕射线 + 传感器视场/探测概率 + 分方航迹，详见 `P1_4_perception.md`；该模式按 `enable_radio_share` 决定是否共享。
 
 `scripts/run_geo_demo.py` 也提供命令行开关，便于 A/B：
 
