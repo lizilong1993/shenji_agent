@@ -40,6 +40,32 @@ def main():
                   "event actor missing: %s" % actor)
     obj = x.get("objectives") or []
     check(len(obj) == 6, "objectives != 6")
+    # Collision volume + lane contract: every ground vehicle must carry a
+    # positive GLB bbox and lane geometry, otherwise the detector silently
+    # drops it and overlaps become invisible again.
+    bbox_n = 0
+    lane_n = 0
+    for z in t:
+        if z.get("entity_kind") != "vehicle":
+            continue
+        bb = z.get("collision_bbox") or {}
+        lane = z.get("lane") or {}
+        try:
+            ok_bbox = (float(bb.get("length_m")) > 0 and
+                       float(bb.get("width_m")) > 0 and
+                       float(bb.get("height_m")) > 0)
+        except (TypeError, ValueError):
+            ok_bbox = False
+        check(ok_bbox, "vehicle bbox missing: %s" % z.get("id"))
+        try:
+            ok_lane = (float(lane.get("width_m")) > 0 and
+                       abs(float(lane.get("center_offset_m"))) <
+                       float(lane.get("width_m")) * 0.75)
+        except (TypeError, ValueError):
+            ok_lane = False
+        check(ok_lane, "vehicle lane missing: %s" % z.get("id"))
+        bbox_n += int(ok_bbox)
+        lane_n += int(ok_lane)
     out = x.get("outcome") or {}
     check(out.get("script_expected") and out.get("engine", {}).get("status"),
           "outcome missing")
@@ -67,6 +93,7 @@ def main():
                       "events": len(ev), "objectives": len(obj),
                       "embarked_t0": len(emb), "ground_900": len(ground),
                       "D_ground_720": d720,
+                      "collision_bbox": bbox_n, "lane_geometry": lane_n,
                       "outcome": out.get("engine", {}).get("result"),
                       "errors": errs}, ensure_ascii=False, indent=1))
     return 0 if not errs else 1
