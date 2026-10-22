@@ -87,7 +87,9 @@ def passable(profile: PlatformProfile, lon: float, lat: float, env,
     if profile.domain == "amphibious":
         if depth is not None:
             return depth <= profile.swim_depth_m
-        return _land_ok(profile, lon, lat, env, cover)
+        if not _land_ok(profile, lon, lat, env, cover):
+            return False
+        return _road_constraint_ok(profile, lon, lat, env)
 
     # land: shallow water may be waded even though its landcover is "water"
     if depth is not None:

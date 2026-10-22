@@ -57,6 +57,12 @@ class TestBridgeConstraints(unittest.TestCase):
         env = FakeEnv(edge=None)
         self.assertTrue(passable(PROFILES["tracked"], 120.1, 23.0, env))
 
+    def test_amphibious_land_respects_weight(self):
+        env = FakeEnv(edge={"bridge": True, "maxweight": "10"})
+        self.assertFalse(passable(PROFILES["amphibious"], 120.1, 23.0, env))
+        water_env = FakeEnv(edge={"bridge": True, "maxweight": "10"}, depth=1.0)
+        self.assertTrue(passable(PROFILES["amphibious"], 120.1, 23.0, water_env))
+
     def test_edge_passable_helper(self):
         self.assertFalse(road_edge_passable(PROFILES["tracked"],
                                             {"maxweight": "30"}))
@@ -256,6 +262,36 @@ class TestIndirectFire(unittest.TestCase):
                 hits += 1
         self.assertLess(abs(hits / float(n) - expected), 0.01)
 
+    def test_scatter_tables_match_raw_sheet(self):
+        import json
+        import re
+        from rules.indirect_fire import tables
+        doc = json.load(open(os.path.join(SITUATION3D, "rules", "data", "crt.json")))
+        parsed = tables()
+        bands = ((0, 20), (21, 40), (41, 60), (61, 100000))
+        for sheet_name, table in (("无校射火力散布裁决", parsed.unobserved),
+                                  ("格内校射火力散布裁决", parsed.adjusted)):
+            sheet = doc["sheets"][sheet_name]
+            for idx, (lo, hi) in enumerate(bands, start=1):
+                expected = {}
+                for row in sheet[2:]:
+                    try:
+                        roll = int(float(row[0]))
+                    except (TypeError, ValueError):
+                        continue
+                    if not 2 <= roll <= 12:
+                        continue
+                    text = str(row[idx] or "").strip()
+                    if "命中" in text:
+                        expected[roll] = ("hit", 0)
+                    elif text:
+                        m = re.search(r"散布(\d+)格", text)
+                        expected[roll] = ("scatter", int(m.group(1)) if m else 1)
+                for roll, value in expected.items():
+                    self.assertEqual(parsed.lookup(table is parsed.adjusted, lo, roll),
+                                     value,
+                                     "%s band %s roll %s" % (sheet_name, lo, roll))
+
     def _world(self):
         from sim.scenario import build_world
         basic = {"map_id": 1, "ele_grade": 10,
@@ -310,19 +346,30 @@ class TestIndirectFire(unittest.TestCase):
 
     def test_indirect_fuzz_no_illegal_state(self):
         import random
+        from rules.indirect_fire import resolve_indirect_fire
         from sim.context import WorldRuleContext
         world = self._world()
         ctx = WorldRuleContext(world)
         rng = random.Random(5)
-        for _ in range(2000):
-            aim = (rng.randrange(0, 24), rng.randrange(0, 24))
-            from rules.indirect_fire import resolve_indirect_fire
+        shots = 0
+        attacker_cell = ctx.rule_cell(ctx.view(world.entities[1]))
+        for _ in range(200):
+            world.cooldowns.pop((1, "72"), None)
+            world.entities[1].ammo["72"] = 10
+            while True:
+                aim = (rng.randrange(0, 24), rng.randrange(0, 24))
+                if ctx.rule_distance_cells(attacker_cell, aim) <= 18:
+                    break
             event = resolve_indirect_fire(ctx.view(world.entities[1]), aim, ctx,
                                           observed=bool(rng.getrandbits(1)))
-            if event is not None:
-                self.assertIn("impact_cell", event)
-                self.assertLessEqual(event["scatter_cells"], 4)
-        self.assertTrue(world.entities[1].alive or not world.entities[1].alive)
+            self.assertIsNotNone(event)
+            self.assertIn("impact_cell", event)
+            self.assertLessEqual(event["scatter_cells"], 4)
+            impact = tuple(event["impact_cell"])
+            self.assertLessEqual(ctx.rule_distance_cells(aim, impact),
+                                 max(1, event["scatter_cells"]))
+            shots += 1
+        self.assertEqual(shots, 200)
 
 
 if __name__ == "__main__":
