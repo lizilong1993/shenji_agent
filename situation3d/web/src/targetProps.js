@@ -52,6 +52,7 @@
   var renderCount = 0;
   var attemptedFor = null;    // 当前预览是为哪个目标建的（无模型目标也要记住，避免反复重试）
   var resizeBound = false;
+  var roBound = false;        // #tprView 的 ResizeObserver（面板高度由 .map-rail 动态分配）
   var wheelBound = false;
   var fallbackTimer = null;   // requestRenderMode 看门狗（见 buildPreview）
   var lastSig = '';           // 上一帧的位姿/着色签名，暂停时据此决定是否重绘
@@ -256,6 +257,18 @@
         viewer.resize();
         try { viewer.scene.requestRender(); } catch (e) { /* 已销毁 */ }
       });
+    }
+
+    // 面板高度由 .map-rail 的 flex 布局分配（鸟瞰图/指南针显隐、窗口尺寸都会
+    // 改变它），这类内部重排不会触发 window.resize；不补这一下，预览画布的
+    // 高度会停在旧值、模型被拉伸或留黑边。
+    if (!roBound && typeof ResizeObserver !== 'undefined') {
+      roBound = true;
+      new ResizeObserver(function () {
+        if (!viewer) return;
+        viewer.resize();
+        try { viewer.scene.requestRender(); } catch (e) { /* 已销毁 */ }
+      }).observe(host);
     }
 
     return true;
@@ -905,6 +918,9 @@
     if (!show) return;
     var rec = currentId ? recOf() : null;
     var has = !!(rec && rec.def);
+    // 选中目标时面板吃满右侧剩余高度（见 style.css .tpr-has-target）；
+    // 空态只按内容高度显示提示，不铺满整列。
+    if (host) host.classList.toggle('tpr-has-target', has);
     var body = $('tprBody');
     if (body) body.classList.toggle('hidden', !has);
     var empty = $('tprEmpty');

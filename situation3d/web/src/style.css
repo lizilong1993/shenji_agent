@@ -528,13 +528,56 @@ select {
 .globe-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
 #cesiumContainer { position: absolute; inset: 0; }
 
-/* 图例：地图**右下角**（原在左下，中途挪到左上，按反馈定为右下）。
-   右下角此前被「区域级TS」横幅占着，横幅移除后空出来，正好给图例。
-   注：右上角是鸟瞰图 + 指南针，左下角是比例尺，底部居中留给视点读数。 */
-.legend {
+/* ---------------- 右侧叠加组件统一排布 ----------------
+ *
+ * 2026-10-22 之前每个组件各自写死 right/top/bottom：鸟瞰图关掉后指南针与
+ * 复位视角仍停在原位，右下角留一块空洞，目标属性面板也只能按最坏情况
+ * （假设鸟瞰图/指南针/复位视角全在）压一个固定的 max-height。
+ *
+ * 现在右侧组件全部装进 `.map-rail` 这一个 flex 列：
+ *   顶部组（.map-rail-top）自上而下：鸟瞰图 → 指南针 → 复位视角；
+ *   底部组（.map-rail-bottom）自下而上：图例 → 目标属性；
+ *   中间剩余高度归底部组，目标属性面板在其中伸缩，字段区内部滚动。
+ *
+ * 组件显隐仍然只是加/去 `.hidden`（display:none），flex 会让其余组件自动
+ * 补位、重新分配高度，不需要为每种组合另写定位规则。新增叠加组件时放进
+ * 对应的组即可，间距统一走 gap。
+ *
+ * 容器本身 pointer-events:none（整条右边缘不能挡住地图拖拽），只有组内的
+ * 具体组件接收事件。 */
+.map-rail {
   position: absolute;
+  top: 12px;
   right: 12px;
   bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 35;
+}
+.map-rail-top,
+.map-rail-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  pointer-events: none;
+}
+.map-rail-top { flex: 0 0 auto; }
+/* 底部组吃掉顶部组与图例之外的全部剩余高度；目标属性隐藏时内容贴底，
+   不会跟着顶部组一起上浮。 */
+.map-rail-bottom { flex: 1 1 0; justify-content: flex-end; }
+.map-rail-top > *,
+.map-rail-bottom > * { pointer-events: auto; }
+
+/* 图例：只能出现在底部组的最后一项（右下角）。位置由 .map-rail 决定，
+   不再自己写 right/bottom。 */
+.legend {
+  flex: 0 0 auto;
   display: flex;
   gap: 14px;
   padding: 6px 10px;
@@ -551,21 +594,16 @@ select {
 .swatch.line { width: 14px; height: 2px; border-radius: 0; background: #f0a020; }
 .swatch.hotspot { background: rgba(216, 74, 58, .30); border: 1px solid #d84a3a; }
 
-/* ---------------- 目标属性（右下角，Legend 上方） ----------------
+/* ---------------- 目标属性（右侧底部，图例上方） ----------------
    「目标图层 · 目标属性」勾选且选中目标后显示。面板内上半部是第二 Cesium
-   3D 视图（侧视镜像主实体），下半部是实时属性。宽 300、高度自适应，
-   字段区独立滚动，避免顶到右上角的鸟瞰图/指南针与左下角比例尺。 */
+   3D 视图（侧视镜像主实体），下半部是实时属性。
+
+   高度不再写死：面板位于 .map-rail-bottom，选中目标后（.tpr-has-target）
+   flex 撑满底部组的剩余高度——鸟瞰图/指南针隐藏时自动变高，空间不足时
+   由字段区内部滚动。未选中目标时按内容高度显示（提示"点击目标"），不铺满。 */
 .target-props {
-  position: absolute;
-  right: 12px;
-  bottom: 50px;               /* Legend（bottom 12 + 高约 30）上方 8px */
   width: 300px;
-  /* 右上角是「鸟瞰图(12..202) → 指南针(210..294) → 复位视角(302..~330)」一列，
-     面板顶部必须落在它下面：高度 = 容器高 - bottom(50) - 392 留白，上限 408。
-     极矮窗口下 calc 会变成负数（max-height 不接受负值），故用 max() 兜一个
-     160px 的下界；此时字段区仍可滚动，见下方 media query。 */
-  max-height: min(408px, calc(100% - 392px));
-  max-height: max(160px, min(408px, calc(100% - 392px)));
+  min-height: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border);
@@ -574,8 +612,9 @@ select {
   box-shadow: 0 4px 16px rgba(15, 23, 34, .18);
   font-size: 11px;
   overflow: hidden;
-  z-index: 5;
 }
+/* 有选中目标：吃满 .map-rail-bottom 的剩余高度（含空间不足时的收缩）。 */
+.target-props.tpr-has-target { flex: 1 1 auto; }
 .target-props.hidden { display: none; }
 .tpr-head { display: flex; align-items: center; padding: 7px 10px 5px;
   border-bottom: 1px solid var(--border); }
@@ -585,7 +624,8 @@ select {
 .tpr-id { color: var(--text-dim); font-size: 10px; }
 .tpr-empty { padding: 14px 12px; color: var(--text-dim); text-align: center; }
 .tpr-empty.hidden { display: none; }
-.tpr-body { display: flex; flex-direction: column; min-height: 0; }
+.tpr-body { display: flex; flex-direction: column; min-height: 0;
+  flex: 1 1 auto; }
 .tpr-body.hidden { display: none; }
 .tpr-badges { display: flex; gap: 5px; padding: 6px 10px 4px; flex-wrap: wrap;
   flex: 0 0 auto; }
@@ -596,7 +636,10 @@ select {
 .tpr-model { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
 .tpr-view { position: relative; height: 160px; margin: 0 10px;
   border: 1px solid var(--border); border-radius: 3px;
-  background: #ffffff; overflow: hidden; flex: 0 0 auto;
+  background: #ffffff; overflow: hidden;
+  /* 竖直方向可收缩（极矮窗口/顶部组件较多时），但保留最小模型展示区；
+     容器尺寸变化由 targetProps.js 的 ResizeObserver 补 viewer.resize()。 */
+  flex: 0 1 auto; min-height: 96px;
   cursor: grab; touch-action: none; user-select: none; }
 .tpr-view.tpr-dragging { cursor: grabbing; }
 .tpr-view.hidden { display: none; }
@@ -1142,17 +1185,14 @@ select {
 
 /* ---------------- 地图组件（指南针 / 视点坐标 / 比例尺） ----------------
  *
- * Cesium 1.145 没有内置指南针与比例尺，三项均为自建叠加层。定位在中间
- * 窗口左上竖向排布：左下已被图例与鸟瞰图占用，右上被目标信息面板占用。
- * z-index 取 36，低于目标面板的 40；视点坐标与比例尺不接收鼠标事件。
+ * Cesium 1.145 没有内置指南针与比例尺，三项均为自建叠加层。右侧竖列
+ * （鸟瞰图/指南针/复位视角）由 .map-rail 统一排布，因此这里不再写
+ * position/top/right，只定义尺寸与观感。z-index 取 36，低于模态框；
+ * 视点坐标与比例尺不接收鼠标事件。
  */
 
-/* 指南针：移到右上角、鸟瞰图下方（原在左上）。
-   z-index 36 保持；目标面板已移除，右上角不再有 40 层的面板与之冲突。 */
+/* 指南针：右侧顶部组第二项（鸟瞰图下方；鸟瞰图隐藏时自动顶到 12px）。 */
 .map-comp {
-  position: absolute;
-  right: 12px;
-  top: 210px;              /* 全局鸟瞰 190 + 间距 8 + 12 */
   width: 84px;
   height: 84px;
   z-index: 36;
@@ -1189,11 +1229,8 @@ select {
 .map-viewpoint span { color: var(--text-dim); }
 .map-viewpoint b { font-weight: 500; font-variant-numeric: tabular-nums; }
 
-/* 复位视角：顶栏「视图」菜单移除后就近放在指南针下方，保留原 id。 */
+/* 复位视角：右侧顶部组第三项（指南针下方），保留原 id。 */
 .map-locate {
-  position: absolute;
-  right: 12px;
-  top: 302px;              /* 指南针 210 + 84 + 间距 8 */
   z-index: 36;
   padding: 4px 10px;
   border: 1px solid var(--border);
@@ -1357,10 +1394,8 @@ select {
 .map-scalebar.hidden { display: none; }
 
 @media (max-width: 1280px) {
-  .map-comp { width: 72px; height: 72px; top: 180px; }
-  .map-locate { top: 260px; }
-  .map-viewpoint { top: 126px; min-width: 166px; font-size: 10.5px; }
-  .map-scalebar { top: 188px; }
+  .map-comp { width: 72px; height: 72px; }
+  .map-viewpoint { min-width: 166px; font-size: 10.5px; }
 }
 
 /* 极矮窗口优先保指南针与比例尺 */
@@ -1368,20 +1403,31 @@ select {
   .map-viewpoint { display: none; }
 }
 
+/* 窄地图列收起视点读数：它底部居中，会与左下的比例尺、右下的图例挤在
+   同一行互相压字。判断依据必须是 **.globe-wrap 的实际宽度**——左右栏
+   默认吃掉约 490–550px，窗口宽并不代表地图列宽（1024px 窗口只剩 ~376px
+   地图，居中读数必然压住图例）。容器查询直接量地图列，左右栏拖宽也跟得上。
+   读数真实内容（六位小数经纬 + 高度）约 240–260px，加上两侧组件需要
+   ~680px 才不重叠。 */
+.globe-wrap { container-type: inline-size; }
+@container (max-width: 680px) {
+  .map-viewpoint { display: none; }
+}
+
 /* ---------------- 鸟瞰图（第二个 Cesium 2D 视图） ----------------
  *
- * 放左下角：右上被目标信息面板占用，左上被地图组件竖向栈占用，右下被区域级
- * TS横幅占用。z-index 35 低于目标面板的 40。
+ * 放在右侧顶部组第一项，占用宽度 268（≤1280 时 200）；z-index 35，
+ * 低于指南针/复位视角（36）与模态框，见 .map-rail。
  */
 
-/* 鸟瞰图：移到右上角（原在左下）。目标面板已移除，右上角空出来给它。
-   指南针与复位视角依次排在它下方（见 .map-comp / .map-locate 的 top）。 */
+/* 鸟瞰图：右侧顶部组第一项（.map-rail 负责其位置）。
+   指南针与复位视角依次排在它下方——它隐藏时两者自动上移补位。 */
 .overview-wrap {
-  position: absolute;
-  right: 12px;
-  top: 12px;
   width: 268px;
   height: 190px;
+  /* .ov-close 是绝对定位的角标，容器必须是它的定位上下文；否则会跑到
+     .map-rail 的右上角（今天两者恰好重合，布局一变就会脱位）。 */
+  position: relative;
   display: flex;
   flex-direction: column;
   border: 1px solid #b9c6d8;
@@ -1464,6 +1510,17 @@ select {
   /* 200px 宽放不下 4 档 + 注释，缩字号并隐藏注释，避免被裁切。 */
   .ov-legend { gap: 5px; padding: 0 6px; font-size: 9px; }
   .ov-legend .ov-note { display: none; }
+}
+
+/* 矮窗口：顶部组固定高度（鸟瞰图是最高的一项），底部组吃掉剩余空间。
+   窗口低到一定程度时先压缩鸟瞰图、极矮时整个收起，避免底部组（图例、
+   空态目标属性）向上溢出压住复位视角。高度变化会触发 window.resize，
+   overview.js 已在该事件里补 viewer.resize()。 */
+@media (max-height: 640px) {
+  .overview-wrap { height: 150px; }
+}
+@media (max-height: 500px) {
+  .overview-wrap { display: none; }
 }
 
 /* ---------------- TS模态框（输入 / 管理 / 下载） ----------------
