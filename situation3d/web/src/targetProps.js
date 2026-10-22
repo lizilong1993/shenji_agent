@@ -23,9 +23,9 @@
  *
  * 视角（用户 2026-10-22 定稿）
  * ----------------------------
- * **2.5D 斜上方视角**（类英雄联盟）：相机位于目标前右上方（方位 35°、仰角 40°），
- * 随目标转向；取景距离由实测包围球 + 相机视场角反算，保证模型完整且尽量占满
- * 视口；滚轮可缩放，不提供自由旋转。
+ * **2.5D 斜上方视角**（类英雄联盟）：基准机位在目标前右上方（方位 35°、仰角 40°），
+ * 随目标转向；左键按住拖动可围绕模型旋转（仰角限制 6°–84°），滚轮缩放。
+ * 取景距离按模型长宽高包围盒的屏幕投影 + 透视修正反算，保证完整且尽量占满视口。
  *
  * 依赖：Cesium、TargetStatus、EntityLod；TargetFx / TargetCombatFx 可选（缺省时
  * 没有关节动画，但预览仍可用）。
@@ -42,8 +42,10 @@
   var viewer = null;          // 预览用第二 Viewer
   var previewEnt = null;
   var proxyEnt = null;        // 代理炮塔（与主场景同款，近景可见）
-  var groundEnt = null;       // 海面/地面参照盘（体现下沉/坠地）
   var zoom = 1;               // 滚轮缩放系数
+  var orbitAz = 0;            // 左键拖拽的方位偏移（弧度，叠加在基准 35° 上）
+  var orbitEl = 0;            // 左键拖拽的仰角偏移（弧度，叠加在基准 40° 上）
+  var drag = null;            // {x,y,id} 左键环绕状态
   var fitRadius = 0;          // 预览模型包围球半径（米）；模型 ready 后实测，用于完整取景
   var fitCenterLocal = null;  // 包围球中心相对目标原点的模型局部偏移（舰船原点在水线，中心在其上方）
   var renderCount = 0;
@@ -264,14 +266,15 @@
   }
 
   /**
-   * 滚轮缩放只绑定一次（#tprView 是静态 DOM，Viewer 会被反复销毁重建；
-   * 在 ensureViewer 里绑定会让监听器随重建次数累积、缩放倍率被连乘）。
+   * 预览交互只绑定一次（#tprView 是静态 DOM，Viewer 会被反复销毁重建）：
+   * 滚轮缩放；左键按住拖动围绕模型旋转（偏移叠加在 2.5D 基准机位上）。
    */
-  function bindWheel() {
+  function bindInput() {
     if (wheelBound) return;
     var host = $('tprView');
     if (!host) return;
     wheelBound = true;
+
     host.addEventListener('wheel', function (ev) {
       if (!enabled || !currentId || !viewer) return;
       ev.preventDefault();
@@ -281,6 +284,44 @@
       updateCamera();
       requestRender();
     }, { passive: false });
+
+    host.addEventListener('pointerdown', function (ev) {
+      if (!enabled || !currentId || !viewer || ev.button !== 0) return;
+      drag = { x: ev.clientX, y: ev.clientY, id: ev.pointerId };
+      host.classList.add('tpr-dragging');
+      try { host.setPointerCapture(ev.pointerId); } catch (e) { /* 忽略 */ }
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+
+    host.addEventListener('pointermove', function (ev) {
+      if (!drag || drag.id !== ev.pointerId || !viewer) return;
+      var dx = ev.clientX - drag.x;
+      var dy = ev.clientY - drag.y;
+      drag.x = ev.clientX;
+      drag.y = ev.clientY;
+      // 灵敏度约 0.5°/px；仰角限制在 6°–84°，避免钻到模型下方或正上方。
+      orbitAz -= dx * 0.0087;
+      var el = C.Math.toRadians(40) + orbitEl + dy * 0.0087;
+      el = Math.max(C.Math.toRadians(6), Math.min(C.Math.toRadians(84), el));
+      orbitEl = el - C.Math.toRadians(40);
+      updateCamera();
+      requestRender();
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+
+    function endDrag(ev) {
+      if (!drag || (ev && ev.pointerId !== undefined && ev.pointerId !== drag.id)) return;
+      var id = drag.id;
+      drag = null;
+      host.classList.remove('tpr-dragging');
+      try { host.releasePointerCapture(id); } catch (e) { /* 忽略 */ }
+      requestRender();
+    }
+    host.addEventListener('pointerup', endDrag);
+    host.addEventListener('pointercancel', endDrag);
+    host.addEventListener('lostpointercapture', endDrag);
   }
 
   function stopFallback() {
@@ -290,7 +331,6 @@
   function removePreviewEntities() {
     if (previewEnt) { try { viewer && viewer.entities.remove(previewEnt); } catch (e) {} previewEnt = null; }
     if (proxyEnt) { try { viewer && viewer.entities.remove(proxyEnt); } catch (e) {} proxyEnt = null; }
-    if (groundEnt) { try { viewer && viewer.entities.remove(groundEnt); } catch (e) {} groundEnt = null; }
   }
 
   function destroyPreview() {
@@ -338,6 +378,7 @@
     return pose.pos.x.toFixed(2) + ',' + pose.pos.y.toFixed(2) + ',' + pose.pos.z.toFixed(2)
       + '|' + (q ? (q.x.toFixed(4) + ',' + q.y.toFixed(4) + ',' + q.z.toFixed(4) + ',' + q.w.toFixed(4)) : '-')
       + '|' + zoom.toFixed(3)
+      + '|' + orbitAz.toFixed(4) + ',' + orbitEl.toFixed(4)
       + '|' + (col && col.toCssHexString ? col.toCssHexString() : '')
       + '|' + readProp(m && m.colorBlendAmount, t, '')
       + '|' + readProp(m && m.silhouetteSize, t, '');
@@ -364,6 +405,8 @@
     removePreviewEntities();
     hideNoModel();
     zoom = 1;
+    orbitAz = 0;
+    orbitEl = 0;
     fitRadius = 0;
     fitCenterLocal = null;
     lastFitTryMs = 0;
@@ -439,7 +482,6 @@
     } catch (e) { /* readyEvent 不存在也不影响显示 */ }
 
     buildProxy(def);
-    buildGround(def);
 
     // 模型异步加载不会自动触发 requestRenderMode 的帧，补几次。
     [120, 400, 900, 1600].forEach(function (ms) {
@@ -503,48 +545,7 @@
     });
   }
 
-  /** 海面/地面参照盘：击毁后主实体下沉/坠地，参照盘不动，斜上方视角里能看出"沉下去"。 */
-  function buildGround(def) {
-    var d = String(def.domain || '').toLowerCase();
-    var isSea = d === 'sea' || d === 'naval' || d === 'maritime';
-    var isLand = d === 'land';
-    if (!isSea && !isLand) return;           // 空中目标不画参照面
-    var L = modelLength(def);
-    var radius = Math.max(8, L * (isSea ? 0.8 : 0.6));
-    // 浅色视口里的参照盘用 UI 语义色淡染：海上=蓝、地面=灰，透明度压到不抢模型。
-    var fill = isSea ? 'rgba(31,95,191,0.10)' : 'rgba(107,118,136,0.10)';
-    var line = isSea ? 'rgba(31,95,191,0.45)' : 'rgba(107,118,136,0.40)';
-    groundEnt = viewer.entities.add({
-      id: 'tpr-ground',
-      position: new C.CallbackProperty(function () {
-        var rec2 = recOf();
-        if (!rec2) return undefined;
-        var pose = poseNow(rec2);
-        if (!pose.pos) return undefined;
-        var g = C.Cartographic.fromCartesian(pose.pos);
-        if (!g) return undefined;
-        // 海面取零高程；地面取目标当前高度（高原案例里地面不是 0 m）。
-        var alt = isSea ? -0.2 : Math.max(0, g.height - 0.2);
-        return C.Cartesian3.fromRadians(g.longitude, g.latitude, alt);
-      }, false),
-      ellipse: {
-        semiMajorAxis: new C.CallbackProperty(function () { return radius; }, false),
-        semiMinorAxis: new C.CallbackProperty(function () { return radius; }, false),
-        height: new C.CallbackProperty(function () {
-          var rec2 = recOf();
-          if (!rec2) return 0;
-          var pose = poseNow(rec2);
-          if (!pose.pos) return 0;
-          var g = C.Cartographic.fromCartesian(pose.pos);
-          return isSea ? -0.2 : (g ? Math.max(0, g.height - 0.2) : 0);
-        }, false),
-        material: C.Color.fromCssColorString(fill),
-        outline: true,
-        outlineColor: C.Color.fromCssColorString(line),
-        outlineWidth: 1,
-      },
-    });
-  }
+  // 参照盘已移除（用户 2026-10-22 要求）：预览只保留模型本身。
 
   // ------------------------------------------------------------------
   // 相机：2.5D 斜上方视角（类英雄联盟），随目标转向，完整取景
@@ -617,9 +618,11 @@
     var aspect = (typeof fr.aspectRatio === 'number' && fr.aspectRatio > 0) ? fr.aspectRatio : 1.8;
     var hHalf = Math.atan(Math.tan(vHalf) * aspect);
 
-    // 2.5D 机位：从模型前右上方（方位 35°、仰角 40°）俯视，兼顾正面/侧面/顶部。
-    var AZ = C.Math.toRadians(35);
-    var EL = C.Math.toRadians(40);
+    // 2.5D 机位：基准为模型前右上方（方位 35°、仰角 40°）；左键拖拽的
+    // orbitAz/orbitEl 叠加在其上，实现围绕模型的自由环绕（仰角 6°–84°）。
+    var AZ = C.Math.toRadians(35) + orbitAz;
+    var EL = Math.max(C.Math.toRadians(6),
+      Math.min(C.Math.toRadians(84), C.Math.toRadians(40) + orbitEl));
     var cosEl = Math.cos(EL), sinEl = Math.sin(EL);
     C.Cartesian3.multiplyByScalar(scratchF, cosEl * Math.cos(AZ), scratchP);  // 单位方向
     C.Cartesian3.multiplyByScalar(scratchR, cosEl * Math.sin(AZ), scratchT);
@@ -979,7 +982,7 @@
   function init(mv, a) {
     mainViewer = mv;
     api = a;
-    bindWheel();
+    bindInput();
   }
 
   function setEnabled(on) {
@@ -1080,7 +1083,7 @@
       previewSilSize: readProp(pvModel && pvModel.silhouetteSize, t, null),
       nodes: pvModel && pvModel.nodeTransformations
         ? Object.keys(pvModel.nodeTransformations) : [],
-      proxy: !!proxyEnt, ground: !!groundEnt,
+      proxy: !!proxyEnt,
     };
     var viewEl = $('tprView');
     out.viewVisible = !!(viewEl && !viewEl.classList.contains('hidden'));
@@ -1153,6 +1156,8 @@
       out.camera = {
         dist: mainPos ? C.Cartesian3.distance(viewer.camera.positionWC, mainPos) : null,
         fitRadius: fitRadius,
+        orbitAzDeg: +(C.Math.toDegrees(orbitAz)).toFixed(1),
+        orbitElDeg: +(C.Math.toDegrees(orbitEl)).toFixed(1),
         sideDot: C.Cartesian3.dot(dir, right),        // 2.5D：同时有侧向与前后分量
         fwdDot: C.Cartesian3.dot(dir, fwdLocal),
       };

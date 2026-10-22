@@ -596,7 +596,9 @@ select {
 .tpr-model { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
 .tpr-view { position: relative; height: 160px; margin: 0 10px;
   border: 1px solid var(--border); border-radius: 3px;
-  background: #ffffff; overflow: hidden; flex: 0 0 auto; }
+  background: #ffffff; overflow: hidden; flex: 0 0 auto;
+  cursor: grab; touch-action: none; user-select: none; }
+.tpr-view.tpr-dragging { cursor: grabbing; }
 .tpr-view.hidden { display: none; }
 .tpr-view-note { position: absolute; inset: 0; display: flex; align-items: center;
   justify-content: center; color: var(--text-dim); font-size: 11px; }
