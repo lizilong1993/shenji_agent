@@ -95,6 +95,29 @@
     return parts.join(' / ');
   }
 
+  /**
+   * 「目标属性」面板「基本」分区要追加的行（2026-10-22 从右栏目标意图迁入）。
+   * 返回 [{label, value}]；无 role_card 时返回空数组，面板保持原样。
+   * 展示上不再出现"角色卡"字样。
+   */
+  function basicRows(def) {
+    var rc = summary(def);
+    if (!rc) return [];
+    var rows = [
+      { label: '类型', value: typeText(rc) + (rc.unknown ? ' · 未识别小类' : '') },
+      { label: '速度', value: speedText(rc) },
+      { label: '防护', value: armorText(rc) },
+    ];
+    var sensors = sensorText(rc);
+    var weapons = weaponText(rc);
+    var capacity = capacityText(rc);
+    if (sensors) rows.push({ label: '传感器', value: sensors });
+    if (weapons) rows.push({ label: '武器', value: weapons });
+    if (capacity) rows.push({ label: '运载', value: capacity });
+    if (rc.confidence === 'legacy') rows.push({ label: '数据', value: '旧数据迁移快照' });
+    return rows;
+  }
+
   global.RoleCard = {
     summary: summary,
     typeText: typeText,
@@ -102,6 +125,7 @@
     armorText: armorText,
     sensorText: sensorText,
     weaponText: weaponText,
-    capacityText: capacityText
+    capacityText: capacityText,
+    basicRows: basicRows
   };
 }(typeof window !== 'undefined' ? window : this));

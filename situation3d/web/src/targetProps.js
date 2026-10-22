@@ -1,4 +1,4 @@
-/* situation3d — 目标属性（选中目标的 3D 侧视预览 + 实时属性）
+/* situation3d — 目标属性（选中目标的 3D 2.5D 预览 + 实时属性）
  *
  * 定位
  * ----
@@ -21,11 +21,11 @@
  * 立即 destroy，GLB 走浏览器缓存；requestRenderMode 下仅在播放、换帧或交互时
  * 请求一帧，暂停时零帧渲染。主场景只多一次属性读取与相机 setView（每帧微秒级）。
  *
- * 视角（用户 2026-10-21 指定）
+ * 视角（用户 2026-10-22 定稿）
  * ----------------------------
- * **始终侧视图**：相机固定在目标右舷（模型局部 +Y）方向、略高于水平面，看向
- * 目标；目标转向时机位跟着绕，因此永远是"侧面剪影"，滚轮可缩放，不提供自由
- * 旋转（避免偏离侧视语义）。
+ * **2.5D 斜上方视角**（类英雄联盟）：相机位于目标前右上方（方位 35°、仰角 40°），
+ * 随目标转向；取景距离由实测包围球 + 相机视场角反算，保证模型完整且尽量占满
+ * 视口；滚轮可缩放，不提供自由旋转。
  *
  * 依赖：Cesium、TargetStatus、EntityLod；TargetFx / TargetCombatFx 可选（缺省时
  * 没有关节动画，但预览仍可用）。
@@ -44,6 +44,8 @@
   var proxyEnt = null;        // 代理炮塔（与主场景同款，近景可见）
   var groundEnt = null;       // 海面/地面参照盘（体现下沉/坠地）
   var zoom = 1;               // 滚轮缩放系数
+  var fitRadius = 0;          // 预览模型包围球半径（米）；模型 ready 后实测，用于完整取景
+  var fitCenterLocal = null;  // 包围球中心相对目标原点的模型局部偏移（舰船原点在水线，中心在其上方）
   var renderCount = 0;
   var attemptedFor = null;    // 当前预览是为哪个目标建的（无模型目标也要记住，避免反复重试）
   var resizeBound = false;
@@ -53,12 +55,17 @@
 
   var lastHudMs = 0;
   var lastPreviewMs = 0;
+  var lastFitTryMs = 0;
 
   var scratchM3 = new C.Matrix3();
   var scratchR = new C.Cartesian3();
   var scratchU = new C.Cartesian3();
+  var scratchF = new C.Cartesian3();
   var scratchP = new C.Cartesian3();
   var scratchD = new C.Cartesian3();
+  var scratchT = new C.Cartesian3();
+  var scratchW = new C.Cartesian3();
+  var scratchM3b = new C.Matrix3();
 
   var dom = {};
   var cells = {};             // 动态字段 key -> <b> 节点
@@ -127,6 +134,26 @@
   function modelLength(def) {
     var cls = formClass(def);
     return (root.EntityLod && EntityLod.REAL_LENGTH_M[cls]) || 15;
+  }
+
+  // 长宽高近似比例（宽/高 = 系数 × 全长）。仅用于 2.5D 取景的 OBB 包围盒：
+  // 长舰/大翼展飞机若按包围球取景，会因"球"把细长方向也算满而显得很小。
+  // 系数取公开尺寸的上沿，再由 1.10 的边距兜底。
+  var SHAPE_RATIOS = {
+    destroyer: [0.12, 0.17], frigate: [0.13, 0.18], corvette: [0.14, 0.20],
+    patrol: [0.14, 0.20], amphibious: [0.13, 0.18], replenishment: [0.14, 0.18],
+    boat_speed: [0.30, 0.30],
+    tank: [0.34, 0.24], light_tank: [0.33, 0.26], amphibious_vehicle: [0.42, 0.32],
+    spg: [0.32, 0.32], howitzer: [0.32, 0.28], mlrs: [0.30, 0.32],
+    sam: [0.30, 0.38], anti_ship: [0.30, 0.38], truck: [0.32, 0.36],
+    fighter: [0.78, 0.16], aew: [1.00, 0.17], helicopter: [0.95, 0.34],
+    uav: [1.50, 0.36],
+  };
+
+  function modelDims(def, L) {
+    var r = SHAPE_RATIOS[formClass(def)];
+    if (!r) return null;
+    return { a: L / 2, b: L * r[0] / 2, c: L * r[1] / 2 };  // 半长 / 半宽 / 半高
   }
 
   function sideLabel(affiliation) {
@@ -337,6 +364,9 @@
     removePreviewEntities();
     hideNoModel();
     zoom = 1;
+    fitRadius = 0;
+    fitCenterLocal = null;
+    lastFitTryMs = 0;
     lastSig = '';
 
     // 节点动画与主场景共用同一套共享状态（旋翼/雷达/发射筒 + 车轮）。
@@ -400,7 +430,11 @@
     try {
       var ready = previewEnt.model && previewEnt.model.readyEvent;
       if (ready && ready.addEventListener) {
-        ready.addEventListener(function () { requestRender(); });
+        ready.addEventListener(function () {
+          // 模型就绪后实测包围球并重新取景，保证大翼展/长舰体完整可见。
+          if (measureFit() > 0) updateCamera();
+          requestRender();
+        });
       }
     } catch (e) { /* readyEvent 不存在也不影响显示 */ }
 
@@ -469,14 +503,14 @@
     });
   }
 
-  /** 海面/地面参照盘：击毁后主实体下沉/坠地，参照盘不动，侧视里能看出"沉下去"。 */
+  /** 海面/地面参照盘：击毁后主实体下沉/坠地，参照盘不动，斜上方视角里能看出"沉下去"。 */
   function buildGround(def) {
     var d = String(def.domain || '').toLowerCase();
     var isSea = d === 'sea' || d === 'naval' || d === 'maritime';
     var isLand = d === 'land';
     if (!isSea && !isLand) return;           // 空中目标不画参照面
     var L = modelLength(def);
-    var radius = Math.max(8, L * (isSea ? 1.6 : 1.1));
+    var radius = Math.max(8, L * (isSea ? 0.8 : 0.6));
     // 浅色视口里的参照盘用 UI 语义色淡染：海上=蓝、地面=灰，透明度压到不抢模型。
     var fill = isSea ? 'rgba(31,95,191,0.10)' : 'rgba(107,118,136,0.10)';
     var line = isSea ? 'rgba(31,95,191,0.45)' : 'rgba(107,118,136,0.40)';
@@ -513,8 +547,49 @@
   }
 
   // ------------------------------------------------------------------
-  // 相机：始终侧视（右舷），随目标转向
+  // 相机：2.5D 斜上方视角（类英雄联盟），随目标转向，完整取景
   // ------------------------------------------------------------------
+
+  /** 预览模型的真实包围球：模型异步加载完成后从场景 primitive 读取。 */
+  function measureFit() {
+    if (!viewer || !previewEnt) return 0;
+    var pid = previewEnt.id;
+    var prims = viewer.scene.primitives;
+    for (var i = 0; i < prims.length; i++) {
+      var p = prims.get(i);
+      if (!p) continue;
+      // ModelVisualizer 的 primitive.id 可能是实体 id 字符串，也可能包着 Entity 对象。
+      var pId = (p.id && p.id.id !== undefined) ? p.id.id : p.id;
+      if (pId !== pid) continue;
+      // 未就绪的 primitive 访问 boundingSphere 可能抛错，跳过等下一帧。
+      var bs = null;
+      try { bs = p.boundingSphere; } catch (e) { bs = null; }
+      if (!bs) continue;
+      fitRadius = bs.radius || 0;
+      var rec = recOf();
+      var pose = rec ? poseNow(rec) : null;
+      if (pose && pose.pos && pose.q && bs.center) {
+        // 记录中心相对目标原点的**模型局部**偏移，目标转向时随之旋转。
+        C.Matrix3.fromQuaternion(pose.q, scratchM3b);
+        var d = C.Cartesian3.subtract(bs.center, pose.pos, new C.Cartesian3());
+        var inv = C.Matrix3.transpose(scratchM3b, new C.Matrix3());
+        fitCenterLocal = C.Matrix3.multiplyByVector(inv, d, new C.Cartesian3());
+      } else {
+        fitCenterLocal = null;
+      }
+      return fitRadius;
+    }
+    return 0;
+  }
+
+  /** 包围球中心的世界坐标（未实测时退回目标原点）。 */
+  function previewCenter(pose) {
+    if (!pose || !pose.pos) return null;
+    if (!fitCenterLocal || !pose.q) return C.Cartesian3.clone(pose.pos, new C.Cartesian3());
+    C.Matrix3.fromQuaternion(pose.q, scratchM3b);
+    var off = C.Matrix3.multiplyByVector(scratchM3b, fitCenterLocal, new C.Cartesian3());
+    return C.Cartesian3.add(pose.pos, off, off);
+  }
 
   function updateCamera() {
     if (!viewer || !currentId) return;
@@ -526,27 +601,78 @@
     if (!q) return;
 
     C.Matrix3.fromQuaternion(q, scratchM3);
-    C.Matrix3.multiplyByVector(scratchM3, C.Cartesian3.UNIT_Y, scratchR);   // 模型右侧
-    C.Matrix3.multiplyByVector(scratchM3, C.Cartesian3.UNIT_Z, scratchU);   // 模型上方
+    C.Matrix3.multiplyByVector(scratchM3, C.Cartesian3.UNIT_X, scratchF);   // 局部 +X = 后向
+    C.Cartesian3.negate(scratchF, scratchF);                                 // 前向
+    C.Matrix3.multiplyByVector(scratchM3, C.Cartesian3.UNIT_Y, scratchR);   // 右舷
+    C.Matrix3.multiplyByVector(scratchM3, C.Cartesian3.UNIT_Z, scratchU);   // 上方
 
+    // 模型完整取景：优先用实测包围球；模型未就绪时用长度的一半兜底。
+    if (fitRadius <= 0) measureFit();
     var L = modelLength(rec.def);
-    var dist = Math.max(9, L * 1.55) * zoom;
-    // 相机 = 目标 + 右舷*dist + 上方*dist*0.16；
-    // 视点 = 目标上方 dist*0.11 —— 模型落在视口中下部（约 70% 高度），
-    // 下方留给水面/地面参照盘，而不是死居中（用户 2026-10-21 要求）。
-    C.Cartesian3.multiplyByScalar(scratchR, dist, scratchP);
-    C.Cartesian3.multiplyByScalar(scratchU, dist * 0.16, scratchD);
-    C.Cartesian3.add(pose.pos, scratchP, scratchP);
-    C.Cartesian3.add(scratchP, scratchD, scratchP);
+    var R = fitRadius > 0 ? fitRadius : Math.max(10, L * 0.6);
+    var center = previewCenter(pose);
 
-    var look = C.Cartesian3.multiplyByScalar(scratchU, dist * 0.11, new C.Cartesian3());
-    C.Cartesian3.add(pose.pos, look, look);
-    C.Cartesian3.subtract(look, scratchP, scratchD);
+    var fr = viewer.camera.frustum;
+    var vHalf = (typeof fr.fovy === 'number' && fr.fovy > 0) ? fr.fovy / 2 : Math.PI / 7;
+    var aspect = (typeof fr.aspectRatio === 'number' && fr.aspectRatio > 0) ? fr.aspectRatio : 1.8;
+    var hHalf = Math.atan(Math.tan(vHalf) * aspect);
+
+    // 2.5D 机位：从模型前右上方（方位 35°、仰角 40°）俯视，兼顾正面/侧面/顶部。
+    var AZ = C.Math.toRadians(35);
+    var EL = C.Math.toRadians(40);
+    var cosEl = Math.cos(EL), sinEl = Math.sin(EL);
+    C.Cartesian3.multiplyByScalar(scratchF, cosEl * Math.cos(AZ), scratchP);  // 单位方向
+    C.Cartesian3.multiplyByScalar(scratchR, cosEl * Math.sin(AZ), scratchT);
+    C.Cartesian3.add(scratchP, scratchT, scratchP);
+    C.Cartesian3.multiplyByScalar(scratchU, sinEl, scratchT);
+    C.Cartesian3.add(scratchP, scratchT, scratchP);                            // offset (unit)
+
+    C.Cartesian3.negate(scratchP, scratchD);                                   // 视线方向
     C.Cartesian3.normalize(scratchD, scratchD);
-    var up = C.Cartesian3.clone(scratchU, new C.Cartesian3());
+    var dot = C.Cartesian3.dot(scratchU, scratchD);
+    C.Cartesian3.multiplyByScalar(scratchD, dot, scratchW);
+    C.Cartesian3.subtract(scratchU, scratchW, scratchW);                       // cam up
+    C.Cartesian3.normalize(scratchW, scratchW);
+    C.Cartesian3.cross(scratchD, scratchW, scratchT);                          // cam right
+    C.Cartesian3.normalize(scratchT, scratchT);
+
+    // 取景距离：按 OBB（长×宽×高）投影到屏幕横/纵轴反算，取两者较大值；
+    // 细长目标（舰船、大翼展飞机）因此能明显放大，同时保证不裁切。
+    var dims = modelDims(rec.def, L);
+    var dist;
+    if (dims) {
+      function ext(axis) {
+        return Math.abs(C.Cartesian3.dot(scratchF, axis)) * dims.a
+             + Math.abs(C.Cartesian3.dot(scratchR, axis)) * dims.b
+             + Math.abs(C.Cartesian3.dot(scratchU, axis)) * dims.c;
+      }
+      var ex = ext(scratchT);          // 屏幕横向
+      var ey = ext(scratchW);          // 屏幕纵向
+      var ez = ext(scratchD);          // 深度
+      var dW = ex / Math.tan(hHalf);
+      var dH = ey / Math.tan(vHalf);
+      // 透视修正：包围盒朝向相机的一侧比中心近 ez，必须把这部分深度加上。
+      dist = Math.max(4, (Math.max(dW, dH) + ez) * 1.03) * zoom;
+    } else {
+      dist = Math.max(6, R / Math.sin(Math.min(vHalf, hHalf)) * 1.06) * zoom;
+    }
+
+    C.Cartesian3.multiplyByScalar(scratchP, dist, scratchP);
+    C.Cartesian3.add(center, scratchP, scratchP);                // camera position
+
+    // 瞄准几何中心；取景 = 完整 OBB。
+    C.Cartesian3.subtract(center, scratchP, scratchD);
+    C.Cartesian3.normalize(scratchD, scratchD);
+
+    // 相机 up 取模型上方在垂直于视线方向上的分量，避免仰视时画面歪斜。
+    var dot2 = C.Cartesian3.dot(scratchU, scratchD);
+    C.Cartesian3.multiplyByScalar(scratchD, dot2, scratchW);
+    C.Cartesian3.subtract(scratchU, scratchW, scratchW);
+    C.Cartesian3.normalize(scratchW, scratchW);
+
     viewer.camera.setView({
       destination: scratchP,
-      orientation: { direction: scratchD, up: up },
+      orientation: { direction: scratchD, up: scratchW },
     });
 
     // 头灯方向跟随相机，避免目标朝向不同导致一面全黑。
@@ -598,6 +724,21 @@
     addRow(host, '阵营', 'side');
     addRow(host, '域', 'domain');
     addRow(host, '角色', 'role');
+
+    // 能力字段并入「基本」（2026-10-22 用户要求，原右栏「能力（角色卡）」移除）：
+    // 类型/速度/防护/传感器/武器/运载/数据，只读，界面上不出现"角色卡"字样。
+    if (root.RoleCard && typeof RoleCard.basicRows === 'function') {
+      var extra = RoleCard.basicRows(def);
+      if (extra.length) {
+        var sep = document.createElement('div');
+        sep.className = 'tpr-divider';
+        host.appendChild(sep);
+        extra.forEach(function (item) {
+          var rr = addRow(host, item.label);
+          rr.val.textContent = item.value;
+        });
+      }
+    }
 
     host.appendChild(section('状态与运动'));
     addRow(host, '战损', 'damage');
@@ -879,6 +1020,19 @@
     if (!enabled || !currentId) return;
     var rec = recOf();
     if (!rec) return;
+    // 模型异步加载完成后重新取景：不依赖 readyEvent（部分 Cesium 构建的
+    // Entity.model 上没有该事件），暂停状态下也按 250 ms 轮询一次包围球。
+    if (previewEnt && fitRadius <= 0) {
+      var nowFit = (root.performance && performance.now) ? performance.now() : Date.now();
+      if (nowFit - lastFitTryMs >= 250) {
+        lastFitTryMs = nowFit;
+        if (measureFit() > 0) {
+          lastSig = '';
+          updateCamera();
+          requestRender();
+        }
+      }
+    }
     var playing = !!(api && api.playing && api.playing());
     var sig = signature(rec, poseNow(rec));
     if (playing || sig !== lastSig) {
@@ -888,7 +1042,7 @@
       if (!playing) requestRender();
     }
     updateHud(false);
-    // 播放中预览最多 ~22 fps：侧视小窗不需要跟主场景同帧率，
+    // 播放中预览最多 ~22 fps：属性小窗不需要跟主场景同帧率，
     // 主场景继续 60 fps，第二 WebGL 上下文的开销被削掉一半以上。
     if (playing) {
       var now = (root.performance && performance.now) ? performance.now() : Date.now();
@@ -938,6 +1092,55 @@
         y: +(w.y / Math.max(1, cv.clientHeight)).toFixed(3),
       } : null;
     }
+    // 取景自检：把 OBB 的 8 个角投影到屏幕（无尺寸表时退回包围球两端），
+    // 给出 0..1 的边界：越界=模型显示不全；span 太小=没占满。
+    if (viewer && previewEnt && mainPos && fitRadius > 0) {
+      var cv2 = viewer.scene.canvas;
+      var rec3 = recOf();
+      var pose3 = rec3 ? poseNow(rec3) : null;
+      var ctr = pose3 ? previewCenter(pose3) : mainPos;
+      var minX = 1, maxX = 0, minY = 1, maxY = 0;
+      function addPt(world) {
+        var sw = C.SceneTransforms.worldToWindowCoordinates(viewer.scene, world);
+        if (!sw) return;
+        var fx = sw.x / Math.max(1, cv2.clientWidth);
+        var fy = sw.y / Math.max(1, cv2.clientHeight);
+        if (fx < minX) minX = fx; if (fx > maxX) maxX = fx;
+        if (fy < minY) minY = fy; if (fy > maxY) maxY = fy;
+      }
+      var dims3 = pose3 && rec3 ? modelDims(rec3.def, modelLength(rec3.def)) : null;
+      if (dims3 && pose3.q) {
+        C.Matrix3.fromQuaternion(pose3.q, scratchM3);
+        var f3 = C.Matrix3.multiplyByVector(scratchM3, C.Cartesian3.UNIT_X, new C.Cartesian3());
+        C.Cartesian3.negate(f3, f3);
+        var r3 = C.Matrix3.multiplyByVector(scratchM3, C.Cartesian3.UNIT_Y, new C.Cartesian3());
+        var u3 = C.Matrix3.multiplyByVector(scratchM3, C.Cartesian3.UNIT_Z, new C.Cartesian3());
+        [-1, 1].forEach(function (sx) {
+          [-1, 1].forEach(function (sy) {
+            [-1, 1].forEach(function (sz) {
+              var lp = new C.Cartesian3(
+                f3.x * dims3.a * sx + r3.x * dims3.b * sy + u3.x * dims3.c * sz,
+                f3.y * dims3.a * sx + r3.y * dims3.b * sy + u3.y * dims3.c * sz,
+                f3.z * dims3.a * sx + r3.z * dims3.b * sy + u3.z * dims3.c * sz);
+              addPt(C.Cartesian3.add(ctr, lp, new C.Cartesian3()));
+            });
+          });
+        });
+      } else {
+        var camR = viewer.camera.right;
+        var camU = viewer.camera.up;
+        [-1, 1].forEach(function (sgn) {
+          [camR, camU].forEach(function (axis) {
+            C.Cartesian3.multiplyByScalar(axis, fitRadius * sgn, scratchT);
+            addPt(C.Cartesian3.add(ctr, scratchT, new C.Cartesian3()));
+          });
+        });
+      }
+      out.screenBounds = {
+        minX: +minX.toFixed(3), maxX: +maxX.toFixed(3),
+        minY: +minY.toFixed(3), maxY: +maxY.toFixed(3),
+      };
+    }
     out.posDelta = (mainPos && pvPos) ? C.Cartesian3.distance(mainPos, pvPos) : null;
     out.orientDot = (mainQ && pvQ)
       ? Math.abs(mainQ.x * pvQ.x + mainQ.y * pvQ.y + mainQ.z * pvQ.z + mainQ.w * pvQ.w) : null;
@@ -949,8 +1152,9 @@
       var dir = viewer.camera.direction;
       out.camera = {
         dist: mainPos ? C.Cartesian3.distance(viewer.camera.positionWC, mainPos) : null,
-        sideDot: C.Cartesian3.dot(dir, right),        // 侧视应为 ±1
-        fwdDot: C.Cartesian3.dot(dir, fwdLocal),      // 侧视应≈0
+        fitRadius: fitRadius,
+        sideDot: C.Cartesian3.dot(dir, right),        // 2.5D：同时有侧向与前后分量
+        fwdDot: C.Cartesian3.dot(dir, fwdLocal),
       };
     }
     return out;
@@ -963,5 +1167,8 @@
     reset: reset,
     frame: frame,
     debug: debug,
+    // 诊断口：预览 Viewer 与包围球实测（自检脚本/排障用，不参与渲染）。
+    _previewViewer: function () { return viewer; },
+    _measureFit: measureFit,
   };
 })(window);

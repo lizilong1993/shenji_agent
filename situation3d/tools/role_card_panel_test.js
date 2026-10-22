@@ -45,13 +45,22 @@ sandbox.StatusPanels.renderTargetStatus(
   null, null, null, 0, null
 );
 const html = host.innerHTML;
-assert(html.indexOf('能力（角色卡）') >= 0, 'role-card section missing');
-assert(html.indexOf('主战坦克（车辆）') >= 0, 'type text missing');
-assert(html.indexOf('巡航 50 km/h / 最大 80 km/h') >= 0, 'speed text missing');
-assert(html.indexOf('复合 · 编制 4') >= 0, 'armor text missing');
-assert(html.indexOf('炮长热像仪 5 km') >= 0, 'sensor text missing');
-assert(html.indexOf('125mm 尾翼稳定脱壳穿甲弹') >= 0, 'weapon text missing');
-assert(html.indexOf('旧数据迁移快照') >= 0, 'legacy marker missing');
+// 2026-10-22：角色卡能力块从右栏「目标意图」移除，迁入「目标属性」面板的「基本」分区。
+assert(html.indexOf('角色卡') < 0, 'right panel must not mention role cards');
+assert(html.indexOf('能力（') < 0, 'role-card section must be removed from right panel');
+assert(html.indexOf('主战坦克（车辆）') < 0, 'role-card fields must not be in right panel');
+
+// 迁移后由 RoleCard.basicRows() 提供给目标属性面板；格式化规则与旧版一致。
+const rows = sandbox.RoleCard.basicRows(def);
+const byLabel = {};
+rows.forEach(function (r) { byLabel[r.label] = r.value; });
+assert(byLabel['类型'] === '主战坦克（车辆）', 'type text missing');
+assert(byLabel['速度'] === '巡航 50 km/h / 最大 80 km/h', 'speed text missing');
+assert(byLabel['防护'] === '复合 · 编制 4', 'armor text missing');
+assert(byLabel['传感器'] === '炮长热像仪 5 km', 'sensor text missing');
+assert(byLabel['武器'] && byLabel['武器'].indexOf('125mm 尾翼稳定脱壳穿甲弹') >= 0,
+       'weapon text missing');
+assert(byLabel['数据'] === '旧数据迁移快照', 'legacy marker missing');
 
 const plain = { id: 'X', name: '旧目标', icon: 'armor', affiliation: 'red', domain: 'land' };
 const host2 = { innerHTML: '' };
@@ -59,6 +68,7 @@ sandbox.StatusPanels.renderTargetStatus(
   host2, plain, { lon: 120, lat: 23, alt: 0, heading: 0, speed_kn: 10, travelled_m: 0 },
   null, null, null, 0, null
 );
-assert(host2.innerHTML.indexOf('能力（角色卡）') < 0, 'section must not appear without card');
+assert(sandbox.RoleCard.basicRows(plain).length === 0, 'no card -> no rows');
+assert(host2.innerHTML.indexOf('角色卡') < 0, 'plain target must not mention role cards');
 
 console.log('role_card_panel_test: PASS');
