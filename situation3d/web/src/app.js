@@ -731,7 +731,9 @@ function initViewer() {
       labelsEnabled: function () { return !!state.layers.labels; },
       // declutterLabels 关掉的编队标牌，下一次聚合更新不得重新点亮。
       labelHidden: function (label) { return _declutterHidden.has(label); },
-      onUpdated: function () { markScene('target-clusters'); },
+      // 编队成员变化时立即重写各目标的 show 状态。只标脏的话，低帧率/无头环境
+      // 下会出现"成员都已出簇、图标/血条却还藏着"的一拍延迟（实测一帧 >1 s）。
+      onUpdated: function () { if (state.data) syncEntities(); },
       onZoom: function (lon, lat, height) { flyTo(lon, lat, height, -70); },
     });
   }

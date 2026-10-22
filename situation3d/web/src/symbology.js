@@ -467,6 +467,15 @@
       parts.push('<rect x="45.4" y="40.2" width="1.2" height="3.6" fill="#ffffff"/>');
     }
 
+    if (opts.deadCount > 0) {
+      // 编队内有损毁成员（鸟瞰图）：右上角红底白叉。压在帧角上，带白描边，
+      // 红菱形/蓝矩形/圆/拱都看得见；全损毁时另有整体压暗。
+      parts.push('<circle cx="50" cy="13" r="7" fill="#B91C1C" ' +
+                 'stroke="#ffffff" stroke-width="1.8"/>');
+      parts.push('<path d="M46.6 9.6 L53.4 16.4 M53.4 9.6 L46.6 16.4" ' +
+                 'stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/>');
+    }
+
     return '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" ' +
            'viewBox="0 0 64 64">' + parts.join('') + '</svg>';
   }
@@ -474,7 +483,7 @@
   function clusterUri(opts) {
     opts = opts || {};
     const key = [opts.affiliation, opts.count, opts.icon, opts.mixed ? 1 : 0,
-                 opts.domain || 'any'].join('|');
+                 opts.domain || 'any', opts.deadCount > 0 ? 1 : 0].join('|');
     let uri = clusterCache.get(key);
     if (!uri) {
       uri = toDataUri(clusterSvg(opts));
