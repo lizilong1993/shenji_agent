@@ -55,6 +55,10 @@
   var scratchY = new Cesium.Cartesian3();
   var scratchZ = new Cesium.Cartesian3();
   var scratchClock = new Cesium.JulianDate();
+  var scratchTime2 = new Cesium.JulianDate();
+  var scratchDelta = new Cesium.Cartesian3();
+  var scratchEast = new Cesium.Cartesian3();
+  var scratchNorth = new Cesium.Cartesian3();
 
   // 当前已装载的案例运动源。只保留"最新一份"：切案例时旧的立即销毁，
   // 避免异步 load 晚到时把上一案例的属性挂到新场景上。
@@ -341,6 +345,37 @@
   }
 
   /**
+   * 地面/水面目标的姿态按**当前插值位置的运动矢量**逐帧解算。
+   *
+   * 数据只有 30 s 一帧，CZML 位置在帧间是直线插值；若直接用帧里的
+   * heading 做四元数，拐弯时模型会先按旧航向、再逐渐转到新航向，看起来
+   * 像“斜着走”。这里在时钟当前时刻取 p(t) 与 p(t+0.5s)，用它们的方向
+   * 构造姿态，模型始终与眼前这段直线运动对齐。空中目标仍用 CZML 姿态
+   *（含俯仰/滚转），避免丢掉配平信息。
+   */
+  function liveGroundOrientation(def, motionEntity, fwdAxis, yawFixDeg) {
+    return new Cesium.CallbackProperty(function (time, result) {
+      var p0 = motionEntity.position.getValue(time);
+      var t1 = Cesium.JulianDate.addSeconds(time, 0.5, scratchTime2);
+      var p1 = motionEntity.position.getValue(t1);
+      if (!p0 || !p1) return result;
+      Cesium.Cartesian3.subtract(p1, p0, scratchDelta);
+      if (Cesium.Cartesian3.magnitude(scratchDelta) < 0.05) {
+        return motionEntity.orientation.getValue(time, result);
+      }
+      var m = Cesium.Transforms.eastNorthUpToFixedFrame(
+        p0, Cesium.Ellipsoid.WGS84, scratchM4);
+      Cesium.Cartesian3.fromElements(m[0], m[1], m[2], scratchEast);
+      Cesium.Cartesian3.fromElements(m[4], m[5], m[6], scratchNorth);
+      var heading = Math.atan2(
+        Cesium.Cartesian3.dot(scratchDelta, scratchEast),
+        Cesium.Cartesian3.dot(scratchDelta, scratchNorth));
+      return orientationQuat(p0, heading + Cesium.Math.toRadians(yawFixDeg),
+        0, 0, fwdAxis, result);
+    }, false);
+  }
+
+  /**
    * 装载并绑定到既有目标实体。
    *
    * @param viewer  Cesium.Viewer
@@ -372,7 +407,16 @@
         var ve = viewer.entities.getById('target-' + def.id);
         if (ve) {
           ve.position = me.position;
-          ve.orientation = me.orientation;
+          var isAir = String(def.domain || '').toLowerCase() === 'air';
+          if (isAir) {
+            ve.orientation = me.orientation;
+          } else {
+            var fwdAxis = (window.EntityLod && EntityLod.forwardAxis)
+              ? EntityLod.forwardAxis() : '+Y';
+            var yawFixDeg = (window.EntityLod && EntityLod.modelYawOffset)
+              ? EntityLod.modelYawOffset(def) : 0;
+            ve.orientation = liveGroundOrientation(def, me, fwdAxis, yawFixDeg);
+          }
           bound++;
         }
         var se = viewer.entities.getById('sensor-' + def.id);
