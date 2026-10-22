@@ -87,6 +87,20 @@
       "sidc": "10063000001202030000",
       "viewBoxSize": "188"
     },
+    "engineer_vehicle_blue": {
+      "affiliation": "blue",
+      "icon": "engineer_vehicle",
+      "selectedVariant": "engineer_vehicle_blue_sel.svg",
+      "sidc": "10031000001203000000",
+      "viewBoxSize": "194"
+    },
+    "engineer_vehicle_red": {
+      "affiliation": "red",
+      "icon": "engineer_vehicle",
+      "selectedVariant": "engineer_vehicle_red_sel.svg",
+      "sidc": "10061000001203000000",
+      "viewBoxSize": "188"
+    },
     "fighter_blue": {
       "affiliation": "blue",
       "icon": "fighter",
@@ -185,6 +199,20 @@
       "sidc": "10063000001209000000",
       "viewBoxSize": "188"
     },
+    "light_vehicle_blue": {
+      "affiliation": "blue",
+      "icon": "light_vehicle",
+      "selectedVariant": "light_vehicle_blue_sel.svg",
+      "sidc": "10031000001205000000",
+      "viewBoxSize": "194"
+    },
+    "light_vehicle_red": {
+      "affiliation": "red",
+      "icon": "light_vehicle",
+      "selectedVariant": "light_vehicle_red_sel.svg",
+      "sidc": "10061000001205000000",
+      "viewBoxSize": "188"
+    },
     "outpost_blue": {
       "affiliation": "blue",
       "icon": "outpost",
@@ -238,6 +266,34 @@
       "affiliation": "red",
       "icon": "transport",
       "selectedVariant": "transport_red_sel.svg",
+      "sidc": "10061000001203000000",
+      "viewBoxSize": "188"
+    },
+    "transport_ship_blue": {
+      "affiliation": "blue",
+      "icon": "transport_ship",
+      "selectedVariant": "transport_ship_blue_sel.svg",
+      "sidc": "10033000001202030000",
+      "viewBoxSize": "164"
+    },
+    "transport_ship_red": {
+      "affiliation": "red",
+      "icon": "transport_ship",
+      "selectedVariant": "transport_ship_red_sel.svg",
+      "sidc": "10063000001202030000",
+      "viewBoxSize": "188"
+    },
+    "truck_blue": {
+      "affiliation": "blue",
+      "icon": "truck",
+      "selectedVariant": "truck_blue_sel.svg",
+      "sidc": "10031000001203000000",
+      "viewBoxSize": "194"
+    },
+    "truck_red": {
+      "affiliation": "red",
+      "icon": "truck",
+      "selectedVariant": "truck_red_sel.svg",
       "sidc": "10061000001203000000",
       "viewBoxSize": "188"
     },

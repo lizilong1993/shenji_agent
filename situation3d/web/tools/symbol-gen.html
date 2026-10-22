@@ -34,7 +34,7 @@ window.genSymbols = function (specs) {
   for (var i = 0; i < specs.length; i++) {
     var s = specs[i];
     // 样式完全由 gen_symbols.py 通过 s.opts 传入：配色、线宽、是否画帧内图形
-    // （`icon:false` —— 帧内图形改用 game-icons 的专业绘制件，由 Python 侧注入）
+    // （`icon:false` —— 帧内图形改用 tools/gen_symbols.py 的自绘大类剪影）
     // 都在这一个对象里，页面本身不再持有任何"审美决定"。
     var opts = s.opts || { size: s.size || 40 };
     var sym = new window.ms.Symbol(s.sidc, opts);

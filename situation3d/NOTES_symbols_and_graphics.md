@@ -1,3 +1,7 @@
+> **2026-10-22 更新**：目标军标已按用户选择落地「保留 MIL-STD-2525 框体 + 统一大类白色剪影」
+> （`feat/target-icon-clusters`，见 `tools/gen_symbols.py` 的 `GLYPH_OF/GLYPH_BODIES` 与
+> `web/src/symbology.js` 的编队图标）。本文 §1.3 推荐的「剪影不套帧」未采用，保留为背景调研。
+
 # 军标图形与态势标绘：调研结论与选型建议
 
 本轮**只出结论**，不进入实现。目标军标（`web/assets/symbols/`）本轮保持现状。

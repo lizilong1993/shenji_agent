@@ -80,6 +80,13 @@ PLATFORMS = {
     "landing_ship":    ("30", "120900"),   # Sea Surface / Landing Ship
     "transport":       ("10", "120300"),   # Land Unit / Transport
     "outpost":         ("10", "130000"),   # Land Unit / Installation
+    # 2026-10-22 补齐：engine/symbology.py 里已有、但生成器一直没有 SIDC 的平台。
+    # 它们此前只能落到 JS 兜底生成器（形状与静态资产不一致），必须在这里补上。
+    # 帧内图形按大类共用（见 GLYPH_OF），SIDC 只决定帧形，所以取同域/同族已知值即可。
+    "truck":           ("10", "120300"),   # Land Unit / Transport
+    "light_vehicle":   ("10", "120500"),   # Land Unit / Armor（同属地面机动）
+    "engineer_vehicle": ("10", "120300"),  # Land Unit / Transport（保障分队）
+    "transport_ship":  ("30", "120203"),   # Sea Surface（转运平台）
     # 大类兜底（engine/symbology.resolve_icon 会把未知 icon 落到这里）：
     # 帧形由 domain 决定，实体码复用同域已知值即可。
     "generic_sea":     ("30", "120203"),   # Sea Surface（通用）
@@ -99,56 +106,174 @@ SIZE = 40
 PADDING = 12
 
 # ---------------------------------------------------------------------------
-# 观感：帧形用标准、配色用应用自己的、帧内用专业绘制的图形
+# 观感：帧形用标准、配色用应用自己的、帧内用统一的大类剪影
 # ---------------------------------------------------------------------------
-# 为什么不再用 milsymbol 的默认外观（三个实测出来的原因）：
+# 为什么不用 milsymbol 的默认外观（三个实测出来的原因）：
 #   1. 默认是北约淡彩（友方 rgb(128,224,255)、敌方 rgb(255,128,128)），在卫星影像上
 #      发白，而且与应用其它地方的 #1f5fbf / #d0342c 不一致；
 #   2. 驱逐舰/战斗机/预警机在标准里是靠**文字**辨认的（生成物里是 Arial 的 "DD"、
 #      "F"、"AEW"），不是图形；
 #   3. 整体态势栏图标只有 16px，那行文字在 16px 下约 4px 高，完全是糊的。
 #
-# 所以：**帧形仍由 milsymbol 出**（它是标准权威，帧形已实测正确：敌方菱形／友方
-# 方・圆・拱／空中敌方五角形），但 `icon:false` 不画帧内图形，改由下面这张表把
-# game-icons（CC-BY-3.0）的专业绘制件注入帧内，配色换成应用自身的饱和红蓝。
+# 2026-10-22 重设计（feat/target-icon-clusters）：
+#   * **帧形仍由 milsymbol 出**（标准权威；敌方菱形／友方方・圆・拱／空中敌方五角形）；
+#   * 帧内不再用 game-icons —— 它是线性图标、线宽和装帧各不相同，34 px 下细节糊成
+#     一片，且驱逐舰/护卫舰/巡逻舰三型几乎分不出。改为下面这套**自绘 512×512 实心
+#     剪影**：同一大类共用同一个图形（DDG/FFG/PC 都是"舰艇"），类与类之间的轮廓
+#     差异优先于型与型之间的细节差异；
+#   * 全部白填充 + 少量镂空，镂空处透出帧色。红蓝底上对比都足够。
+#
+# 图标键 → 大类。键集合必须与 engine/symbology.py 一致（check_icons_match_engine）。
+GLYPH_OF = {
+    # 水面
+    "destroyer": "sea_surface",
+    "frigate": "sea_surface",
+    "corvette": "sea_surface",
+    "transport_ship": "sea_surface",
+    "landing_ship": "amphibious",
+    "replenishment": "auxiliary",
+    # 地面
+    "coastal_missile": "coastal_missile",
+    "sam_battalion": "air_defense",
+    "armor": "armor",
+    "light_vehicle": "armor",
+    "artillery": "artillery",
+    "transport": "transport",
+    "truck": "transport",
+    "engineer_vehicle": "transport",
+    "outpost": "outpost",
+    # 空中
+    "fighter": "fighter",
+    "aew": "aew",
+    "helicopter": "helicopter",
+    "uav": "uav",
+    # 兜底
+    "generic_sea": "generic_sea",
+    "generic_land": "generic_land",
+    "generic_air": "generic_air",
+    "unknown": "unknown",
+}
+
 FRAME_FILL = {"blue": "#1f5fbf", "red": "#d0342c"}
 FRAME_EDGE = "#0f1720"        # 近黑描边：亮/暗影像上都能把符号从背景里分离出来
 GLYPH_FILL = "#ffffff"        # 饱和帧上，白色图形的对比最强
 
-# 平台 → game-icons 键。全部**实测存在**（game-icons 4137 个图标里查过）。
-# 注：game-icons **没有** frigate / destroyer / patrol，所以舰船四型从
-# battleship / iron-hulled-warship / interceptor-ship / cargo-ship 里各取其一；
-# 补给舰用 cargo-ship 语义上反而更贴。
-ICON_PARTS = {
-    "destroyer": "battleship",
-    "frigate": "iron-hulled-warship",
-    "replenishment": "cargo-ship",
-    "corvette": "interceptor-ship",
-    "coastal_missile": "missile-launcher",
-    "sam_battalion": "missile-pod",
-    "armor": "tank",
-    "artillery": "field-gun",
-    "fighter": "jet-fighter",
-    "helicopter": "helicopter",
-    "uav": "delivery-drone",
-    "transport": "truck",
-    "outpost": "bunker",
-    "generic_sea": "ship-bow",
-    "generic_land": "crossed-swords",
-    "generic_air": "airplane",
-    "unknown": "uncertainty",
-    "aew": None,
-    "landing_ship": None,
-    # aew / landing_ship 用自绘图形（见 CUSTOM_PARTS）：game-icons 没有
-    # "带雷达罩的预警机"，也没有登陆舰；原先 aew 用 "radar-dish" 画出来是一根
-    # 雷达天线，被用户当成"雷达图标"（2026-10-21 实测反馈）。
-}
-
-# 自绘图形（512×512 坐标系，与 game-icons 一致）。用于 game-icons 无对应件的平台。
-CUSTOM_PARTS = {
-    # 预警机：俯视飞机轮廓 + 背部圆盘雷达罩（环形，避免与机身糊成一块）。
-    "aew": (
+# 大类剪影（512×512 源坐标系）。轮廓统一为"实心 + 少量镂空"，不要细线细节：
+# 目标图标在屏幕上只有 34 px，帧内图形实际约 16×16 px，细线会消失。
+GLYPH_BODIES = {
+    # 水面舰艇（侧视，舰艏向右）：长舰体 + 舰桥 + 桅杆 + 烟囱 + 前主炮。
+    "sea_surface": (
+        '<path d="M40 330 L452 330 L500 356 L452 404 L78 404 Q48 404 40 378 Z"/>'
+        '<path d="M150 250 L300 250 L330 330 L150 330 Z"/>'
+        '<path d="M190 210 L280 210 L300 250 L170 250 Z"/>'
+        '<path d="M248 160 L262 160 L262 250 L248 250 Z"/>'
+        '<path d="M306 190 L342 190 L352 250 L298 250 Z"/>'
+        '<path d="M356 296 L410 296 L418 316 L356 316 Z"/>'
+        '<path d="M410 302 L470 302 L470 309 L410 309 Z"/>'
+    ),
+    # 两栖舰：平直甲板 + 右前方放下的艏跳板 + 后部高上层建筑。
+    "amphibious": (
+        '<path d="M60 320 L420 320 L470 372 L420 408 L100 408 Q70 400 60 370 Z"/>'
+        '<path d="M470 372 L512 300 L520 320 L488 392 Z"/>'
+        '<path d="M110 230 L250 230 L280 320 L110 320 Z"/>'
+        '<path d="M120 190 L220 190 L240 230 L120 230 Z"/>'
+        '<path d="M150 140 L162 140 L162 190 L150 190 Z"/>'
+    ),
+    # 辅助/补给舰：舰体 + 后部上层建筑 + 甲板上三段货舱 + 门吊。
+    "auxiliary": (
+        '<path d="M50 350 L450 350 L490 378 L440 410 L90 410 Q60 405 50 380 Z"/>'
+        '<path d="M352 250 L430 250 L430 350 L340 350 Z"/>'
+        '<path d="M88 300 L168 300 L168 344 L88 344 Z"/>'
+        '<path d="M186 300 L266 300 L266 344 L186 344 Z"/>'
+        '<path d="M284 300 L330 300 L330 344 L284 344 Z"/>'
+        '<path d="M382 180 L392 180 L392 250 L382 250 Z"/>'
+        '<path d="M338 195 L434 195 L434 205 L338 205 Z"/>'
+    ),
+    # 岸舰导弹：发射车 + 两枚斜向上的导弹弹体（与防空的竖直弹筒区分）。
+    "coastal_missile": (
+        '<path d="M200 330 L420 330 L444 384 L180 384 Z"/>'
+        '<path d="M120 270 L210 270 L210 384 L120 384 Z"/>'
+        '<path d="M270 90 L300 68 L436 286 L408 304 Z"/>'
+        '<path d="M300 68 L322 44 L344 60 L330 84 Z"/>'
+        '<path d="M318 70 L350 48 L484 272 L456 290 Z"/>'
+        '<path d="M236 392 m-28 0 a28 28 0 1 0 56 0 a28 28 0 1 0 -56 0"/>'
+        '<path d="M380 392 m-28 0 a28 28 0 1 0 56 0 a28 28 0 1 0 -56 0"/>'
+    ),
+    # 地面防空：顶置搜索雷达环 + 导弹发射箱（4 个镂空弹筒）+ 底盘。
+    "air_defense": (
         '<path fill-rule="evenodd" d="'
+        'M256 60 m-64 0 a64 64 0 1 0 128 0 a64 64 0 1 0 -128 0 '
+        'M256 60 m-40 0 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0"/>'
+        '<path d="M248 104 L264 104 L264 220 L248 220 Z"/>'
+        '<path fill-rule="evenodd" d="'
+        'M176 220 L336 220 L336 322 L176 322 Z '
+        'M198 242 L218 242 L218 300 L198 300 Z '
+        'M230 242 L250 242 L250 300 L230 300 Z '
+        'M262 242 L282 242 L282 300 L262 300 Z '
+        'M294 242 L314 242 L314 300 L294 300 Z"/>'
+        '<path d="M156 330 L356 330 L380 384 L132 384 Z"/>'
+        '<path d="M190 392 m-26 0 a26 26 0 1 0 52 0 a26 26 0 1 0 -52 0"/>'
+        '<path d="M330 392 m-26 0 a26 26 0 1 0 52 0 a26 26 0 1 0 -52 0"/>'
+    ),
+    # 装甲分队（侧视，车头向右）：厚履带 + 车体 + 炮塔 + 主炮。
+    "armor": (
+        '<path fill-rule="evenodd" d="'
+        'M90 336 L430 336 Q470 336 470 372 Q470 410 430 410 L90 410 '
+        'Q50 410 50 372 Q50 336 90 336 Z '
+        'M110 373 m-18 0 a18 18 0 1 0 36 0 a18 18 0 1 0 -36 0 '
+        'M190 373 m-18 0 a18 18 0 1 0 36 0 a18 18 0 1 0 -36 0 '
+        'M270 373 m-18 0 a18 18 0 1 0 36 0 a18 18 0 1 0 -36 0 '
+        'M350 373 m-18 0 a18 18 0 1 0 36 0 a18 18 0 1 0 -36 0 '
+        'M420 373 m-18 0 a18 18 0 1 0 36 0 a18 18 0 1 0 -36 0"/>'
+        '<path d="M90 304 L450 304 L450 336 L90 336 Z"/>'
+        '<path fill-rule="evenodd" d="'
+        'M160 262 L330 262 L356 304 L140 304 Z '
+        'M232 276 m-12 0 a12 12 0 1 0 24 0 a12 12 0 1 0 -24 0"/>'
+        '<path d="M352 278 L500 278 L500 292 L352 292 Z"/>'
+    ),
+    # 炮兵分队：牵引炮（驻锄/大架 + 两个大车轮 + 上扬身管）。
+    "artillery": (
+        '<path d="M170 300 L380 300 L380 344 L130 344 Z"/>'
+        '<path fill-rule="evenodd" d="'
+        'M170 390 m-70 0 a70 70 0 1 0 140 0 a70 70 0 1 0 -140 0 '
+        'M170 390 m-38 0 a38 38 0 1 0 76 0 a38 38 0 1 0 -76 0"/>'
+        '<path fill-rule="evenodd" d="'
+        'M330 390 m-50 0 a50 50 0 1 0 100 0 a50 50 0 1 0 -100 0 '
+        'M330 390 m-24 0 a24 24 0 1 0 48 0 a24 24 0 1 0 -48 0"/>'
+        '<path d="M340 282 L512 160 L520 180 L352 302 Z"/>'
+        '<path d="M180 350 L50 470 L68 488 L200 372 Z"/>'
+    ),
+    # 运输/保障：厢式卡车（车头向右）+ 两轴车轮。
+    "transport": (
+        '<path d="M90 228 L340 228 L340 342 L90 342 Z"/>'
+        '<path d="M340 258 L432 258 L454 342 L340 342 Z"/>'
+        '<path fill-rule="evenodd" d="'
+        'M80 342 L454 342 L454 372 L80 372 Z"/>'
+        '<path fill-rule="evenodd" d="'
+        'M160 400 m-40 0 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0 '
+        'M160 400 m-18 0 a18 18 0 1 0 36 0 a18 18 0 1 0 -36 0"/>'
+        '<path fill-rule="evenodd" d="'
+        'M360 400 m-40 0 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0 '
+        'M360 400 m-18 0 a18 18 0 1 0 36 0 a18 18 0 1 0 -36 0"/>'
+    ),
+    # 哨所/阵地：半圆掩体 + 观察缝（镂空）+ 顶部天线。
+    "outpost": (
+        '<path fill-rule="evenodd" d="'
+        'M86 372 A170 170 0 0 1 426 372 Z '
+        'M176 332 L336 332 L336 358 L176 358 Z"/>'
+        '<path d="M70 372 L442 372 L442 416 L70 416 Z"/>'
+        '<path d="M248 120 L264 120 L264 232 L248 232 Z"/>'
+        '<path d="M200 196 L312 196 L312 232 L200 232 Z"/>'
+    ),
+    # 战斗机（俯视）：后掠翼 + 平尾，机头向上。
+    "fighter": (
+        '<path d="M256 24 L280 170 L470 300 L470 330 L282 262 L282 420 '
+        'L330 470 L330 494 L256 466 L182 494 L182 470 L230 420 L230 262 '
+        'L42 330 L42 300 L232 170 Z"/>'
+    ),
+    # 预警机：俯视飞机 + 背部圆盘雷达罩（环），与战斗机的轮廓差异在"盘"。
+    "aew": (
+        '<path d="'
         'M256 40 C270 90 274 150 274 230 L274 390 C274 435 267 465 256 478 '
         'C245 465 238 435 238 390 L238 230 C238 150 242 90 256 40 Z '
         'M256 196 L468 296 L468 326 L278 288 L278 208 Z '
@@ -159,63 +284,90 @@ CUSTOM_PARTS = {
         'M256 150 m-92 0 a92 92 0 1 0 184 0 a92 92 0 1 0 -184 0 '
         'M256 150 m-58 0 a58 58 0 1 0 116 0 a58 58 0 1 0 -116 0"/>'
     ),
-    # 登陆舰：侧视舰体 + 舰艏跳板 + 上层建筑，一眼区别于补给舰。
-    "landing_ship": (
-        '<path d="M56 300 L452 300 L438 372 Q432 418 380 420 L120 420 '
-        'Q76 418 64 372 Z"/>'
-        '<path d="M452 300 L512 226 L518 250 L470 322 Z"/>'
-        '<path d="M168 216 L286 216 L286 300 L168 300 Z"/>'
-        '<path d="M226 168 L240 168 L240 216 L226 216 Z"/>'
-        '<path d="M196 186 L214 186 L214 200 L196 200 Z"/>'
+    # 直升机（侧视，机头向右）：机身 + 尾梁 + 旋翼 + 起落橇。
+    "helicopter": (
+        '<path fill-rule="evenodd" d="'
+        'M140 300 Q140 240 210 240 L330 240 Q396 240 396 306 Q396 366 330 366 '
+        'L210 366 Q140 366 140 300 Z '
+        'M188 268 L282 268 L282 300 L188 300 Z"/>'
+        '<path d="M330 300 L480 268 L512 268 L512 286 L360 330 Z"/>'
+        '<path d="M250 240 L266 240 L266 196 L250 196 Z"/>'
+        '<path d="M110 186 L430 186 L430 200 L110 200 Z"/>'
+        '<path d="M170 392 L370 392 L370 404 L170 404 Z"/>'
+        '<path d="M208 366 L218 366 L218 392 L208 392 Z"/>'
+        '<path d="M320 366 L330 366 L330 392 L320 392 Z"/>'
+    ),
+    # 无人机（俯视）：细长机身 + 平直长翼 + V 尾 + 螺旋桨环。
+    "uav": (
+        '<path d="'
+        'M256 60 C270 80 276 120 276 170 L276 460 C276 486 268 500 256 508 '
+        'C244 500 236 486 236 460 L236 170 C236 120 242 80 256 60 Z '
+        'M256 210 L40 300 L40 320 L244 274 L268 274 L472 320 L472 300 Z '
+        'M256 446 L170 500 L170 520 L250 476 Z '
+        'M256 446 L342 500 L342 520 L262 476 Z"/>'
+        '<path fill-rule="evenodd" d="'
+        'M256 40 m-34 0 a34 34 0 1 0 68 0 a34 34 0 1 0 -68 0 '
+        'M256 40 m-14 0 a14 14 0 1 0 28 0 a14 14 0 1 0 -28 0"/>'
+    ),
+    # 通用水面：简化舰体 + 单桅 + 烟囱。
+    "generic_sea": (
+        '<path d="M60 340 L460 340 L500 366 L456 406 L100 406 Q70 402 60 380 Z"/>'
+        '<path d="M230 280 L320 280 L340 340 L210 340 Z"/>'
+        '<path d="M244 220 L258 220 L258 280 L244 280 Z"/>'
+        '<path d="M300 250 L330 250 L336 280 L294 280 Z"/>'
+    ),
+    # 通用陆上：交叉双剑。
+    "generic_land": (
+        '<path d="M96 96 L136 56 L416 416 L376 456 Z"/>'
+        '<path d="M416 96 L456 136 L136 456 L96 416 Z"/>'
+        '<path d="M96 376 L136 416 L176 376 L136 336 Z"/>'
+        '<path d="M376 376 L416 416 L456 376 L416 336 Z"/>'
+    ),
+    # 通用空中：平直翼飞机（俯视）。
+    "generic_air": (
+        '<path d="'
+        'M256 50 L276 210 L480 210 L480 240 L276 270 L276 430 L330 470 '
+        'L330 494 L256 470 L182 494 L182 470 L230 430 L230 270 L32 240 '
+        'L32 210 L236 210 Z"/>'
+    ),
+    # 未知：粗体问号。
+    "unknown": (
+        '<path d="'
+        'M256 90 C180 90 140 140 140 200 L196 200 C196 172 218 146 256 146 '
+        'C292 146 312 166 312 196 C312 226 292 240 256 262 C216 288 206 312 '
+        '206 360 L206 392 L266 392 L266 366 C266 330 278 314 312 292 '
+        'C352 266 372 236 372 194 C372 126 320 90 256 90 Z '
+        'M206 420 L266 420 L266 480 L206 480 Z"/>'
     ),
 }
 
-GAME_ICONS_TARBALL = "/tmp/iconprobe/gi.tgz"   # tools/fetch_icons.py 会下到这里
-
-# 帧内图形的方框（milsymbol 的画布坐标）。取 74×74 居中于 (100,100)：
-# 已按三种帧形验算：菱形在 y=63 处的半宽是 72-37=35 > 37? 临界，故取 74 略留余量；
-# 圆的半径 60 > 37√2≈52 —— 圆帧会限制到 ~84，但菱形更紧，所以以菱形为准。
-# 第一版取 56 偏保守，实测 20 个符号里 5 个白像素不足 16（火炮、岸舰导弹几乎看不见）。
-GLYPH_BOX = 74.0
-GLYPH_SRC = 512.0             # game-icons 的源坐标系
+# 帧内图形的方框（milsymbol 的画布坐标）。取 92×92 居中于 (100,100)：
+# 帧体约 144 宽；92 让舰体/车体占到帧宽 ~55%，34 px 图标下图形约 16 px（此前 74
+# 的版本只有 ~13 px，舰船类看上去就是一个小方块）。竖向不留满：敌方水上/陆上
+# 帧是菱形，92 方框的四个角会越出菱形，但实际图形（舰船、车辆）都是宽扁轮廓，
+# 纵向只占 25 px 左右，不会碰到边。
+GLYPH_BOX = 92.0
+GLYPH_SRC = 512.0             # GLYPH_BODIES 的源坐标系
 GLYPH_ORIGIN = 100.0 - GLYPH_BOX / 2.0
 
 
 def load_icon_bodies():
-    """从 game-icons 包里读出需要的 path 数据。只用标准库（容器无 npm）。"""
-    import tarfile
-    try:
-        tar = tarfile.open(GAME_ICONS_TARBALL)
-    except OSError:
-        raise SystemExit(
-            "[gen] 缺少图标包 %s\n"
-            "      跑 tools/fetch_icons.py 下载（容器可直连 registry.npmjs.org），"
-            "或手工把 @iconify-json/game-icons 的 tgz 放到该路径。" % GAME_ICONS_TARBALL)
-    name = [n for n in tar.getnames() if n.endswith("icons.json")][0]
-    data = json.loads(tar.extractfile(name).read())
-    icons = data.get("icons", {})
-    bodies, missing = {}, []
-    for platform, key in ICON_PARTS.items():
-        if key is None:
-            continue
-        node = icons.get(key)
-        if not node:
-            missing.append("%s(%s)" % (platform, key))
-            continue
-        bodies[platform] = node["body"]
-    # 自绘图形优先（aew / landing_ship）
-    for platform, body in CUSTOM_PARTS.items():
-        bodies[platform] = body
+    """Return icon key -> glyph body for the built-in silhouette set.
+
+    2026-10-22 起不再读 game-icons 包：所有帧内图形都是上面 GLYPH_BODIES 里的
+    自绘件，生成器因此不再依赖 /tmp 下的 npm tarball。
+    """
+    missing = sorted(set(PLATFORMS) - set(GLYPH_OF))
     if missing:
-        raise SystemExit("[gen] game-icons 里找不到：%s" % ", ".join(missing))
-    return bodies
+        raise SystemExit("[gen] GLYPH_OF 缺少平台：%s" % ", ".join(missing))
+    return {icon: GLYPH_BODIES[cat] for icon, cat in GLYPH_OF.items()}
 
 
 def inject_glyph(svg, body):
     """
     把图形塞进帧内。
 
-    game-icons 的 path 是 0 0 512 512 坐标系；用 translate+scale 映射到 GLYPH_BOX
+    GLYPH_BODIES 的 path 用 0 0 512 512 坐标系；用 translate+scale 映射到 GLYPH_BOX
     的方框里。整体一个 `<g>` 设 fill，省得逐个 path 改属性。
     """
     s = GLYPH_BOX / GLYPH_SRC
