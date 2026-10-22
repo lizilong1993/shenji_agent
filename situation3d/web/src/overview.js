@@ -418,17 +418,23 @@
     // 合并判据留 margin：红蓝避让最多把两个同色簇推近 52 px，按锚点位置
     // 提前合并可以避免"推离后又相交"的振荡。
     const mergeW = CLUSTER_ICON_PX + 8, mergeH = CLUSTER_ICON_PX + 18;
-    function sameAffBoxOverlap() {
+    function sameAffOverlap(w, h) {
       for (let i = 0; i < groups.length; i++) {
         for (let j = i + 1; j < groups.length; j++) {
           if (groups[i].affiliation !== groups[j].affiliation) continue;
-          if (Math.abs(groups[i].x - groups[j].x) < mergeW &&
-              Math.abs(groups[i].y - groups[j].y) < mergeH) return true;
+          if (Math.abs(groups[i].x - groups[j].x) < w &&
+              Math.abs(groups[i].y - groups[j].y) < h) return true;
         }
       }
       return false;
     }
-    for (let pass = 0; pass < 8; pass++) {
+    function mergeGroupPair(i, j) {
+      groups[i].members = groups[i].members.concat(groups[j].members);
+      groups[i].count = groups[i].members.length;
+      groups.splice(j, 1);
+      setGroupAnchor(groups[i]);
+    }
+    for (let pass = 0; pass < 16; pass++) {
       groups.forEach(setGroupAnchor);
       let merged = false, again = true;
       while (again) {
@@ -438,10 +444,7 @@
             if (groups[i].affiliation !== groups[j].affiliation) continue;
             if (Math.abs(groups[i].x - groups[j].x) >= mergeW ||
                 Math.abs(groups[i].y - groups[j].y) >= mergeH) continue;
-            groups[i].members = groups[i].members.concat(groups[j].members);
-            groups[i].count = groups[i].members.length;
-            groups.splice(j, 1);
-            setGroupAnchor(groups[i]);
+            mergeGroupPair(i, j);
             merged = true;
             again = true;
             break;
@@ -455,8 +458,23 @@
           w: boxW, h: boxH, maxOffset: CLUSTER_MAX_OFFSET_PX,
         });
       }
-      const overlap = sameAffBoxOverlap();
+      // 推离可能把两个同色簇挤到一起：按**推离后**的实际位置合并一对，
+      // 然后重跑一轮（合并会减少组数，必然收敛）。
+      let forced = false;
+      for (let i = 0; i < groups.length && !forced; i++) {
+        for (let j = i + 1; j < groups.length; j++) {
+          if (groups[i].affiliation !== groups[j].affiliation) continue;
+          if (Math.abs(groups[i].x - groups[j].x) >= boxW ||
+              Math.abs(groups[i].y - groups[j].y) >= boxH) continue;
+          mergeGroupPair(i, j);
+          forced = true;
+          merged = true;
+          break;
+        }
+      }
+      const overlap = sameAffOverlap(mergeW, mergeH);
       lastLayout = { pass: pass, groups: groups.length, merged: merged, overlap: overlap };
+      if (forced) continue;
       if (!merged && !overlap) break;
     }
     // 视口边界钳制：屏幕避让不能把最边缘的编队图标推出画布。
@@ -472,7 +490,7 @@
       g.x = g.ox + g.dx;
       g.y = g.oy + g.dy;
     });
-    const residual = sameAffBoxOverlap();
+    const residual = sameAffOverlap(boxW, boxH);
     lastLayout.overlap = residual;
     if (residual && global.console && console.warn) {
       console.warn('[overview] cluster layout did not converge (same-affiliation overlap)');
