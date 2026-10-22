@@ -23,9 +23,10 @@
  *
  * 视角（用户 2026-10-22 定稿）
  * ----------------------------
- * **2.5D 斜上方视角**（类英雄联盟）：基准机位在目标前右上方（方位 35°、仰角 40°），
- * 随目标转向；左键按住拖动可围绕模型旋转（仰角限制 6°–84°），滚轮缩放。
- * 取景距离按模型长宽高包围盒的屏幕投影 + 透视修正反算，保证完整且尽量占满视口。
+ * **2.5D 右舷略偏艏视角**（按用户截图）：基准方位 80°、仰角 22°，舰艏/机头
+ * 朝左、接近侧视且能看见甲板；模型整体略偏画面右 4%。左键按住拖动可围绕
+ * 模型旋转（仰角限制 6°–84°），滚轮缩放。取景距离按长宽高包围盒 + 透视
+ * 修正反算，保证完整且尽量占满视口。
  *
  * 依赖：Cesium、TargetStatus、EntityLod；TargetFx / TargetCombatFx 可选（缺省时
  * 没有关节动画，但预览仍可用）。
@@ -618,11 +619,12 @@
     var aspect = (typeof fr.aspectRatio === 'number' && fr.aspectRatio > 0) ? fr.aspectRatio : 1.8;
     var hHalf = Math.atan(Math.tan(vHalf) * aspect);
 
-    // 2.5D 机位：基准为模型前右上方（方位 35°、仰角 40°）；左键拖拽的
-    // orbitAz/orbitEl 叠加在其上，实现围绕模型的自由环绕（仰角 6°–84°）。
-    var AZ = C.Math.toRadians(35) + orbitAz;
+    // 2.5D 机位（2026-10-22 用户按截图定稿）：基准在模型右舷略偏艏、
+    // 方位 80°、仰角 22°——舰艏/机头朝左，接近侧视但能看见甲板；
+    // 左键拖拽的 orbitAz/orbitEl 叠加在其上，实现围绕模型的自由环绕。
+    var AZ = C.Math.toRadians(80) + orbitAz;
     var EL = Math.max(C.Math.toRadians(6),
-      Math.min(C.Math.toRadians(84), C.Math.toRadians(40) + orbitEl));
+      Math.min(C.Math.toRadians(84), C.Math.toRadians(22) + orbitEl));
     var cosEl = Math.cos(EL), sinEl = Math.sin(EL);
     C.Cartesian3.multiplyByScalar(scratchF, cosEl * Math.cos(AZ), scratchP);  // 单位方向
     C.Cartesian3.multiplyByScalar(scratchR, cosEl * Math.sin(AZ), scratchT);
@@ -644,26 +646,43 @@
     var dims = modelDims(rec.def, L);
     var dist;
     if (dims) {
-      function ext(axis) {
-        return Math.abs(C.Cartesian3.dot(scratchF, axis)) * dims.a
-             + Math.abs(C.Cartesian3.dot(scratchR, axis)) * dims.b
-             + Math.abs(C.Cartesian3.dot(scratchU, axis)) * dims.c;
-      }
-      var ex = ext(scratchT);          // 屏幕横向
-      var ey = ext(scratchW);          // 屏幕纵向
-      var ez = ext(scratchD);          // 深度
-      var dW = ex / Math.tan(hHalf);
-      var dH = ey / Math.tan(vHalf);
-      // 透视修正：包围盒朝向相机的一侧比中心近 ez，必须把这部分深度加上。
-      dist = Math.max(4, (Math.max(dW, dH) + ez) * 1.03) * zoom;
+      // 逐角点做透视取景：对 8 个角点分别要求
+      //   d ≥ 深度 + |屏幕横向偏移| / tan(hHalf)（横向另除以 0.94 预留右移）
+      //   d ≥ 深度 + |屏幕纵向偏移| / tan(vHalf)
+      // 取最大值。比"半宽 + 半高 + 深度"的近似更紧，模型可以更大。
+      var tanH = Math.tan(hHalf);
+      var tanV = Math.tan(vHalf);
+      var need = 0;
+      [-1, 1].forEach(function (sx) {
+        [-1, 1].forEach(function (sy) {
+          [-1, 1].forEach(function (sz) {
+            var lx = dims.a * sx, ly = dims.b * sy, lz = dims.c * sz;
+            var wv = new C.Cartesian3(
+              scratchF.x * lx + scratchR.x * ly + scratchU.x * lz,
+              scratchF.y * lx + scratchR.y * ly + scratchU.y * lz,
+              scratchF.z * lx + scratchR.z * ly + scratchU.z * lz);
+            var sxr = C.Cartesian3.dot(wv, scratchT);
+            var syr = C.Cartesian3.dot(wv, scratchW);
+            var depth = -C.Cartesian3.dot(wv, scratchD);
+            need = Math.max(need,
+              (depth + Math.abs(sxr) / tanH) / 0.94,
+              depth + Math.abs(syr) / tanV);
+          });
+        });
+      });
+      dist = Math.max(4, need * 1.02) * zoom;
     } else {
       dist = Math.max(6, R / Math.sin(Math.min(vHalf, hHalf)) * 1.06) * zoom;
     }
 
     C.Cartesian3.multiplyByScalar(scratchP, dist, scratchP);
+    // 相机沿右向量左移 6% 半幅 → 模型整体右移约 3% 画面宽
+    // （用户 2026-10-22：“图中的模型要再往右一点点”）。此时 scratchT 仍是相机右向量。
+    C.Cartesian3.multiplyByScalar(scratchT, -Math.tan(hHalf) * dist * 0.06, scratchT);
+    C.Cartesian3.add(scratchP, scratchT, scratchP);
     C.Cartesian3.add(center, scratchP, scratchP);                // camera position
 
-    // 瞄准几何中心；取景 = 完整 OBB。
+    // 瞄准几何中心；横向偏移由机位平移实现，不改变视角中心。
     C.Cartesian3.subtract(center, scratchP, scratchD);
     C.Cartesian3.normalize(scratchD, scratchD);
 
