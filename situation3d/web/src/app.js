@@ -88,7 +88,7 @@ const state = {
   tick: 0,
   tickFloat: 0,
   playing: false,
-  ticksPerSecond: 1,
+  ticksPerSecond: 1 / TICK_SECONDS, // 1x = real time: one 30 s tick per 30 real seconds
   targets: {},              // id -> { def, entity, trail: [], lastTick, sensorEntity }
   layers: { targets: true, targetsRed: true, targetsBlue: true,
             tracks: true, routes: true, hotspots: true, labels: true,
@@ -7334,7 +7334,7 @@ function bindUI() {
   });
 
   document.getElementById('speedSelect').addEventListener('change', function (e) {
-    state.ticksPerSecond = Number(e.target.value);
+    state.ticksPerSecond = Number(e.target.value) / TICK_SECONDS;
   });
 
   dom.timeline.addEventListener('input', function (e) {
