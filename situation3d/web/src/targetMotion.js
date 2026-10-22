@@ -373,6 +373,10 @@
         }
         var se = viewer.entities.getById('sensor-' + def.id);
         if (se && me.position) se.position = me.position;
+        // 血条同样是"挂在目标身上"的图元：不绑同一 motion position 就仍按整数帧
+        // 取位，高速目标播放/暂停到半帧时血条会落在图标身后几十像素。
+        var he = viewer.entities.getById('hp-' + def.id);
+        if (he && me.position) he.position = me.position;
       });
       // 时钟只作为采样查询的游标：由 app 的 tickFloat 驱动，禁掉 Cesium 自己的推进
       viewer.clock.startTime = Cesium.JulianDate.clone(start, viewer.clock.startTime);
