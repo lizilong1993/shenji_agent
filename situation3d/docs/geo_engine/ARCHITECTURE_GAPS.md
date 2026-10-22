@@ -144,6 +144,9 @@
    `crowding` 软告警。1440 tick 探针穿模/瞬移/航向跳变均为 0。详见 `P0_2_kinematics_collision.md`。
 3. **平台数据 v1**：`platforms/*.json`（尺寸/质量/功率/速度曲线/转弯/装甲面/特征/传感器/武器），
    现有 profile 常量作为默认回退；校验 schema + 单测。验收：从 JSON 能重建现有单位行为。
+   ✅ **2026-10-22 已落地**（`platforms/*.json` + `mobility/platform_data.py`）：10 个平台类，
+   JSON 逐字段重建内置 `PlatformProfile`，`profile_for` 优先读数据、常量回退；P6 envpack
+   结果与 P0.2 完全一致（407 事件 / 直瞄 66）。详见 `P0_3_platform_data.md`。
 
 ### P1 感知与火力物理（约 3–4 周）
 4. **3D 感知**：建筑体块/地形 BVH 射线、传感器视场与探测概率曲线（RCS/IR/声学特征、海况/

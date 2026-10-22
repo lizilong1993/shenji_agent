@@ -1,8 +1,8 @@
 """Platform profiles for mobility predicates (demo values, P3).
 
-Values are demonstration estimates, not real equipment data.  The plan's
-``profiles/*.json`` registry can replace this module without changing the
-mobility code.
+Values are demonstration estimates, not real equipment data.  The
+``platforms/*.json`` registry (P0.3) is the primary source; this module's
+constants remain the fallback when data is missing.
 """
 
 from __future__ import annotations
@@ -118,21 +118,32 @@ PROFILES: Dict[str, PlatformProfile] = {
 }
 
 
-def profile_for(unit_type: str, domain: str) -> PlatformProfile:
+def profile_key_for(unit_type: str, domain: str) -> str:
+    """Platform-key mapping used by scenarios (also the JSON registry key)."""
     if unit_type in ("infantry",):
-        return PROFILES["infantry"]
+        return "infantry"
     if domain in ("sea", "surface"):
-        return PROFILES["ship"]
+        return "ship"
     if domain in ("sub", "subsurface"):
-        return PROFILES["submarine"]
+        return "submarine"
     if domain == "air":
         if unit_type in ("helicopter",):
-            return PROFILES["helicopter"]
+            return "helicopter"
         if unit_type in ("uav", "cruise_missile"):
-            return PROFILES["uav"]
-        return PROFILES["aircraft"]
+            return "uav"
+        return "aircraft"
     if unit_type == "artillery":
-        return PROFILES["artillery"]
+        return "artillery"
     if unit_type == "amphibious":
-        return PROFILES["amphibious"]
-    return PROFILES["tracked"]
+        return "amphibious"
+    if unit_type == "wheeled":
+        return "wheeled"
+    return "tracked"
+
+
+def profile_for(unit_type: str, domain: str) -> PlatformProfile:
+    """Platform profile: JSON data v1 when present, constants as fallback."""
+    key = profile_key_for(unit_type, domain)
+    from mobility.platform_data import profile_by_key
+    prof = profile_by_key(key)
+    return prof if prof is not None else PROFILES[key]

@@ -1,0 +1,103 @@
+{
+  "schema": "msplatform.v1",
+  "key": "aircraft",
+  "identity": {
+    "name_zh": "作战飞机",
+    "domain": "air",
+    "size_class": "large"
+  },
+  "dimensions": {
+    "length_m": 20.0,
+    "width_m": 12.0,
+    "height_m": 0.0
+  },
+  "mass": {
+    "combat_t": 20.0
+  },
+  "power": {
+    "power_hp": 20000.0
+  },
+  "motion": {
+    "max_speed_ms": 250.0,
+    "accel_ms2": 3.0,
+    "decel_ms2": 4.0,
+    "turn_rate_dps": 5.0,
+    "min_turn_radius_m": 800.0,
+    "pivot_turn": false,
+    "terrain_factors": {
+      "open": 1.0,
+      "forest": 1.0,
+      "urban": 1.0,
+      "soft": 1.0,
+      "water": 1.0,
+      "rock": 1.0
+    },
+    "speed_curve": [
+      [
+        0.0,
+        1.0
+      ],
+      [
+        250.0,
+        1.0
+      ]
+    ]
+  },
+  "terrain": {
+    "max_gradient_deg": 30.0,
+    "max_side_slope_deg": 17.0,
+    "wading_depth_m": 1.2,
+    "swim_depth_m": 2.5,
+    "amphibious": false,
+    "road_bound": false
+  },
+  "sea": {
+    "draft_m": 0.0,
+    "ukc_m": 0.5,
+    "max_operating_depth_m": 0.0
+  },
+  "air": {
+    "min_clearance_m": 150.0,
+    "service_ceiling_m": 12000.0,
+    "agl_m": 1000.0,
+    "climb_rate_ms": 15.0,
+    "descent_rate_ms": 5.0
+  },
+  "road": {
+    "weight_t": 0.0,
+    "height_m": 0.0,
+    "beam_m": 0.0
+  },
+  "armor": {
+    "class": 0,
+    "faces_mm_rha": {
+      "front": 10,
+      "side": 5,
+      "rear": 5,
+      "top": 0
+    }
+  },
+  "signature": {
+    "rcs_m2": 5.0,
+    "ir": 1.0,
+    "acoustic": 0.9
+  },
+  "sensors": [
+    {
+      "kind": "radar",
+      "range_m": 120000
+    }
+  ],
+  "weapons": [
+    {
+      "kind": "air_air",
+      "name": "空空/空面武器",
+      "ammo": 6
+    }
+  ],
+  "provenance": {
+    "source": "demo-estimate",
+    "confidence": "low",
+    "note": "演示估计值，非真实装备数据；P0.3 v1 仅用于重建现有行为。"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "schema": "msplatform.v1",
+  "key": "amphibious",
+  "identity": {
+    "name_zh": "两栖战车",
+    "domain": "amphibious",
+    "size_class": "large"
+  },
+  "dimensions": {
+    "length_m": 7.0,
+    "width_m": 3.2,
+    "height_m": 3.0
+  },
+  "mass": {
+    "combat_t": 25.0
+  },
+  "power": {
+    "power_hp": 500.0
+  },
+  "motion": {
+    "max_speed_ms": 8.0,
+    "accel_ms2": 1.0,
+    "decel_ms2": 2.0,
+    "turn_rate_dps": 40.0,
+    "min_turn_radius_m": 6.0,
+    "pivot_turn": true,
+    "terrain_factors": {
+      "open": 1.0,
+      "forest": 0.5,
+      "urban": 0.33,
+      "soft": 0.25,
+      "water": 0.0,
+      "rock": 0.0
+    },
+    "speed_curve": [
+      [
+        0.0,
+        1.0
+      ],
+      [
+        8.0,
+        1.0
+      ]
+    ]
+  },
+  "terrain": {
+    "max_gradient_deg": 25.0,
+    "max_side_slope_deg": 17.0,
+    "wading_depth_m": 2.0,
+    "swim_depth_m": 4.0,
+    "amphibious": true,
+    "road_bound": false
+  },
+  "sea": {
+    "draft_m": 0.0,
+    "ukc_m": 0.5,
+    "max_operating_depth_m": 0.0
+  },
+  "air": {
+    "min_clearance_m": 0.0,
+    "service_ceiling_m": 0.0,
+    "agl_m": 0.0,
+    "climb_rate_ms": 5.0,
+    "descent_rate_ms": 5.0
+  },
+  "road": {
+    "weight_t": 25.0,
+    "height_m": 3.0,
+    "beam_m": 3.2
+  },
+  "armor": {
+    "class": 2,
+    "faces_mm_rha": {
+      "front": 80,
+      "side": 40,
+      "rear": 20,
+      "top": 10
+    }
+  },
+  "signature": {
+    "rcs_m2": 10.0,
+    "ir": 0.8,
+    "acoustic": 0.9
+  },
+  "sensors": [
+    {
+      "kind": "optics",
+      "range_m": 3500
+    }
+  ],
+  "weapons": [
+    {
+      "weapon_id": 54,
+      "name": "车载机关炮",
+      "ammo": 10
+    }
+  ],
+  "provenance": {
+    "source": "demo-estimate",
+    "confidence": "low",
+    "note": "演示估计值，非真实装备数据；P0.3 v1 仅用于重建现有行为。"
+  }
+}
