@@ -358,7 +358,7 @@
       var p0 = motionEntity.position.getValue(time);
       var t1 = Cesium.JulianDate.addSeconds(time, 0.5, scratchTime2);
       var p1 = motionEntity.position.getValue(t1);
-      if (!p0 || !p1) return result;
+      if (!p0 || !p1) return motionEntity.orientation.getValue(time, result);
       Cesium.Cartesian3.subtract(p1, p0, scratchDelta);
       if (Cesium.Cartesian3.magnitude(scratchDelta) < 0.05) {
         return motionEntity.orientation.getValue(time, result);
