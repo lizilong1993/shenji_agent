@@ -760,7 +760,7 @@ class World(object):
                               "%s 从 %s 下船" % (passenger.name, carrier.name))
 
     def _nearest_land(self, carrier: Entity, passenger: Entity):
-        """Nearest passable land point within 800 m (demo beach geometry)."""
+        """Nearest passable land point within 2.2 km (demo beach geometry)."""
         import math
         from geo.geodesy import haversine_m
         for radius in (100.0, 200.0, 300.0, 500.0, 800.0,

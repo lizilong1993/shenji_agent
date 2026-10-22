@@ -101,7 +101,8 @@ def _assign_orders(world, objectives) -> None:
         landing_ship = any(k in entity.name for k in ("登陆", "两栖舰"))
         for obj in candidates:
             cell = world.rule_grid.cell_of(float(obj["lon"]), float(obj["lat"]))
-            lon, lat = world.rule_grid.cell_center_lonlat(*cell)
+            center = world.rule_grid.cell_center_lonlat(*cell)
+            lon, lat = center
             if landing_ship and "BEACH" in str(obj.get("name")):
                 berth = _landing_berth(world, obj, entity)
                 if berth is not None:
@@ -109,10 +110,10 @@ def _assign_orders(world, objectives) -> None:
             ranked.append((haversine_m((entity.pose.lon, entity.pose.lat), (lon, lat)), lon, lat))
         # Spread units around an objective so they do not end up at the same
         # point (which would be inside every weapon's minimum range).
-        # Keep the offset inside the 200 m rule cell so objective capture
-        # still happens at the destination cell.
-        off_lon = ((entity.uid % 5) - 2) * 0.0004
-        off_lat = (((entity.uid // 5) % 5) - 2) * 0.0004
+        # Cell-centre goals with a <=40 m offset stay inside the 200 m rule
+        # cell so objective capture still happens at the destination cell.
+        off_lon = ((entity.uid % 5) - 2) * 0.0002
+        off_lat = (((entity.uid // 5) % 5) - 2) * 0.0002
         def preference(obj_name):
             name = entity.name
             landing = any(k in name for k in ("登陆", "两栖", "补给"))

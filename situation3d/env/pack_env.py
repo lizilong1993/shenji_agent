@@ -150,11 +150,14 @@ class EnvPackEnvironment(object):
         self._max_building_height = max(
             (float(b.get("height_m") or 6.0) for b in self._buildings),
             default=0.0)
-        max_elev = 0.0
+        max_elev = None
         if self._terrain:
             max_elev = max(v for row in self._terrain["values"] for v in row
                            if v is not None)
-        self._max_terrain_elev = float(max_elev)
+        # Without a terrain layer elevation falls back to the base map, so
+        # the building-height early-out must stay disabled.
+        self._max_terrain_elev = (None if max_elev is None
+                                  else float(max_elev))
         self._water_cache = {}
         self._los_cache = {}
         self._min_elev = None
@@ -325,7 +328,8 @@ class EnvPackEnvironment(object):
         if (max(a[0], b[0]) < bb[0] or min(a[0], b[0]) > bb[2]
                 or max(a[1], b[1]) < bb[1] or min(a[1], b[1]) > bb[3]):
             return False
-        if (min(h0, h1) > self._max_terrain_elev
+        if (self._max_terrain_elev is not None
+                and min(h0, h1) > self._max_terrain_elev
                 + self._max_building_height + 1.0):
             return False
         candidates = self._candidates_along(a, b)

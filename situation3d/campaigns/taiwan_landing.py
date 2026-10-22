@@ -45,6 +45,7 @@ P = {
     "tainan_east": 6291,    # 台南以南开阔地（反突击出发地）
     "kaohsiung": 8294,      # 高雄（居民地）
     "kaohsiung_port": 8294, # 高雄港区（陆）
+    "kaohsiung_water": 8293,  # 高雄近岸海域（水）
     "south_sea": 9190,      # 高雄西南海域（水）
     "east_land": 6797,      # 台东纵谷（内陆路网）
     "xiamen_off": 809,      # 厦门外海（水）
@@ -114,7 +115,7 @@ def scenario_dict() -> dict:
         # surface group
         _op(2001, "驱逐舰", 1, 2, 0, P["offshore_b"], 5, 50, "sea", "水面", 4, 35, "large"),
         _op(2002, "护卫舰", 1, 2, 0, P["offshore_c"], 4, 45, "sea", "水面", 3, 20, "medium"),
-        _op(2003, "巡逻舰", 1, 2, 0, P["kaohsiung_port"], 3, 55, "sea", "水面", 1, 12, "small"),
+        _op(2003, "巡逻舰", 1, 2, 0, P["kaohsiung_water"], 3, 55, "sea", "水面", 1, 12, "small"),
         _op(2004, "补给舰", 1, 2, 0, P["south_sea"], 3, 28, "sea", "水面", 1, 8, "medium"),
         # air
         _op(2010, "战斗机", 1, 3, 0, P["tainan"], 3, 1500, "air", "中空", 1, 30, "small"),
