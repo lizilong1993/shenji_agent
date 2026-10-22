@@ -81,6 +81,15 @@ class WorldRuleContext(object):
     def rule_cell(self, e) -> Tuple[int, int]:
         return self.world.rule_cell(self._entity(e))
 
+    def rule_distance_cells(self, a, b) -> int:
+        return int(self.rule_grid.distance(tuple(a), tuple(b)))
+
+    def rule_neighbor_cells(self, cell):
+        return list(self.rule_grid.neighbors(tuple(cell)))
+
+    def rule_cell_center(self, cell):
+        return self.rule_grid.cell_center_lonlat(int(cell[0]), int(cell[1]))
+
     def elevation_delta_m(self, a, b) -> float:
         ea, eb = self._entity(a), self._entity(b)
         return self.env.elevation(ea.pose.lon, ea.pose.lat) - self.env.elevation(eb.pose.lon, eb.pose.lat)

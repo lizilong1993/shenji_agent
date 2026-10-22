@@ -127,7 +127,23 @@ def resolve_direct_fire(attacker: RuleEntityView, target: RuleEntityView,
     idx = base if base is not None else 0
     elev = ctx.elevation_modifier(attacker, target)
     level = idx + elev  # terrain cover is applied once, in the correction table
+    event = resolve_crt_shot(attacker, target, ctx, level, weapon,
+                             distance=distance)
+    event["type"] = "direct_fire"
+    event["ele_diff"] = abs(ctx.elevation_grade(attacker) -
+                            ctx.elevation_grade(target))
+    if model == "shadow":
+        event["model"] = "shadow"
+    if shadow_event is not None:
+        event["shadow_physics"] = shadow_event
+    return event
 
+
+def resolve_crt_shot(attacker, target, ctx, level, weapon,
+                     distance=None, consume=True) -> dict:
+    """CRT + correction adjudication shared by direct and indirect fire."""
+    distance = (ctx.rule_distance(attacker, target)
+                if distance is None else int(distance))
     mod = 0
     if attacker.suppressed:
         mod -= 1
@@ -164,19 +180,20 @@ def resolve_direct_fire(attacker: RuleEntityView, target: RuleEntityView,
             damage = -1
         suppressed = False
 
-    ctx.consume_ammo(attacker.uid, weapon.key, 1)
-    ctx.mark_fired(attacker.uid, weapon.key, getattr(weapon, "cooldown_s", 75.0))
+    if consume:
+        ctx.consume_ammo(attacker.uid, weapon.key, 1)
+        ctx.mark_fired(attacker.uid, weapon.key,
+                       getattr(weapon, "cooldown_s", 75.0))
     if damage > 0:
         ctx.apply_damage(target.uid, damage)
     if suppressed:
         ctx.apply_suppression(target.uid, 60.0)
 
-    event = {
-        "type": "direct_fire",
+    return {
+        "type": "crt_shot",
         "actors": [attacker.uid, target.uid],
         "weapon": weapon.key,
         "distance": distance,
-        "ele_diff": abs(ctx.elevation_grade(attacker) - ctx.elevation_grade(target)),
         "att_level": level,
         "random1": random1,
         "random2": random2,
@@ -187,11 +204,6 @@ def resolve_direct_fire(attacker: RuleEntityView, target: RuleEntityView,
         "suppressed": suppressed,
         "target_blood": getattr(target, "blood", 0),
     }
-    if model == "shadow":
-        event["model"] = "shadow"
-    if shadow_event is not None:
-        event["shadow_physics"] = shadow_event
-    return event
 
 
 def best_target(attacker: RuleEntityView, entities: List[RuleEntityView],

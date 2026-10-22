@@ -25,6 +25,14 @@ def apply_action(world, action: dict) -> bool:
     elif kind == "fire":
         world.order(int(uid), {"type": "fire", "target": int(action["target"])})
         return True
+    elif kind in ("fire_indirect", "indirect_fire"):
+        target = action.get("target") or {}
+        lon = target.get("lon", action.get("lon"))
+        lat = target.get("lat", action.get("lat"))
+        if lon is not None and lat is not None:
+            world.order(int(uid), {"type": "fire_indirect",
+                                   "lon": float(lon), "lat": float(lat)})
+            return True
     return False
 
 

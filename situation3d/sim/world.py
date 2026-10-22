@@ -208,6 +208,13 @@ class World(object):
                 if target is None or not target.alive:
                     self.orders.pop(uid, None)
                     self._order_source.pop(uid, None)
+            elif kind == "fire_indirect":
+                lon = action.get("lon")
+                lat = action.get("lat")
+                if lon is not None and lat is not None:
+                    entity.aim_cell = self.rule_grid.cell_of(float(lon), float(lat))
+                self.orders.pop(uid, None)
+                self._order_source.pop(uid, None)
 
     # -- timers -------------------------------------------------------------
     def _tick_timers(self, dt: float) -> None:
@@ -476,6 +483,15 @@ class World(object):
             if target is None:
                 target = self._best_target(attacker, ctx)
             if target is None:
+                aim = getattr(attacker, "aim_cell", None)
+                if aim is not None:
+                    from rules import indirect_fire as _indirect
+                    event = _indirect.resolve_indirect_fire(
+                        ctx.view(attacker), tuple(aim), ctx, observed=False)
+                    attacker.aim_cell = None
+                    if event is not None:
+                        event["tick_s"] = round(self.time_s, 1)
+                        self._append(event)
                 continue
             if _is_ground(attacker) and _is_ground(target):
                 if attacker.marching:
@@ -483,14 +499,43 @@ class World(object):
                 if attacker.velocity_ms > 0.1 and not any(
                         getattr(w, "shoot_on_move", False) for w in attacker.weapons):
                     continue
-                event = combat.resolve_direct_fire(ctx.view(attacker), ctx.view(target), ctx)
+                direct = combat.select_weapon(ctx.view(attacker), ctx.view(target), ctx)
+                if direct is None and self._has_indirect(attacker):
+                    from rules import indirect_fire as _indirect
+                    event = _indirect.resolve_indirect_fire(
+                        ctx.view(attacker), ctx.rule_cell(ctx.view(target)), ctx,
+                        observed=ctx.can_detect(ctx.view(attacker), ctx.view(target)))
+                else:
+                    event = combat.resolve_direct_fire(
+                        ctx.view(attacker), ctx.view(target), ctx)
             else:
                 event = engagement.resolve_sea_air(ctx.view(attacker), ctx.view(target), ctx)
             if event is not None:
                 event["tick_s"] = round(self.time_s, 1)
-                event["target_blood"] = target.blood
-                event["location_geo"] = {"lon": target.pose.lon, "lat": target.pose.lat}
+                if event.get("type") == "indirect_fire":
+                    event.setdefault("target_blood", None)
+                else:
+                    event["target_blood"] = target.blood
+                event["location_geo"] = event.get("location_geo") or {
+                    "lon": target.pose.lon, "lat": target.pose.lat}
                 self._append(event)
+
+    def _has_indirect(self, attacker: Entity) -> bool:
+        return any(getattr(w, "kind", None) == "indirect"
+                   for w in attacker.weapons)
+
+    def _indirect_can_reach(self, attacker: Entity, distance: int) -> bool:
+        for w in attacker.weapons:
+            if getattr(w, "kind", None) != "indirect":
+                continue
+            if attacker.ammo.get(w.key, 0) <= 0:
+                continue
+            if not self.weapon_ready(attacker.uid, w.key):
+                continue
+            table = (w.tables or {}).get((0, 0))
+            if table is not None and table.level_at(int(distance)) is not None:
+                return True
+        return False
 
     def _best_target(self, attacker: Entity, ctx: WorldRuleContext) -> Optional[Entity]:
         best = None
@@ -537,7 +582,9 @@ class World(object):
                     event_key = (ctx.distance_m(ctx.view(attacker), ctx.view(target)),
                                  -target.value)
                 else:
-                    if combat.select_weapon(ctx.view(attacker), ctx.view(target), ctx) is None:
+                    dist = ctx.rule_distance(ctx.view(attacker), ctx.view(target))
+                    if (combat.select_weapon(ctx.view(attacker), ctx.view(target), ctx) is None
+                            and not self._indirect_can_reach(attacker, dist)):
                         continue
                     event_key = (ctx.rule_distance(ctx.view(attacker), ctx.view(target)),
                                  -target.value)

@@ -227,5 +227,103 @@ class TestMinefields(unittest.TestCase):
         self.assertIsNotNone(route)
 
 
+class TestIndirectFire(unittest.TestCase):
+    def test_scatter_table_lookup(self):
+        from rules.indirect_fire import tables
+        t = tables()
+        self.assertEqual(t.lookup(False, 10, 4), ("hit", 0))
+        self.assertEqual(t.lookup(False, 10, 2), ("scatter", 1))
+        self.assertEqual(t.lookup(False, 70, 2), ("scatter", 4))
+        self.assertEqual(t.lookup(True, 10, 5), ("hit", 0))
+        self.assertEqual(t.lookup(True, 70, 2), ("scatter", 3))
+
+    def test_hit_rate_matches_table(self):
+        import random
+        from rules.indirect_fire import tables
+        t = tables()
+        rng = random.Random(99)
+        n = 120000
+        hits = 0
+        rolls = 0
+        for roll in range(2, 13):
+            ways = roll - 1 if roll <= 7 else 13 - roll
+            rolls += ways
+        # Exact hit probability at distance 10 (0-20 band): rolls 4, 7, 10.
+        expected = (3 + 6 + 3) / 36.0
+        for _ in range(n):
+            roll = rng.randint(1, 6) + rng.randint(1, 6)
+            if t.lookup(False, 10, roll)[0] == "hit":
+                hits += 1
+        self.assertLess(abs(hits / float(n) - expected), 0.01)
+
+    def _world(self):
+        from sim.scenario import build_world
+        basic = {"map_id": 1, "ele_grade": 10,
+                 "grid": {"center_lon": 119.9, "center_lat": 23.1,
+                          "cols": 24, "rows": 24, "width_m": 200.0},
+                 "map_data": [[{"pos": r * 100 + c, "elev": 10, "cond": 0,
+                                "roads": [0] * 6, "rivers": [0] * 6}
+                               for c in range(24)] for r in range(24)]}
+        scenario = {"scenario_id": 1,
+                    "operators": [
+                        {"obj_id": 1, "color": 0, "type": 2, "name": "炮兵",
+                         "sub_type": 0, "blood": 2, "max_blood": 2, "armor": 0,
+                         "cur_hex": 505, "carry_weapon_ids": [72], "value": 10},
+                        {"obj_id": 2, "color": 1, "type": 2, "name": "重型坦克",
+                         "sub_type": 0, "blood": 3, "max_blood": 3, "armor": 3,
+                         "cur_hex": 1010, "carry_weapon_ids": [36], "value": 10}],
+                    "cities": [], "time": {"cur_step": 0, "tick": 10.0,
+                                           "max_time": 999}}
+        return build_world(scenario, basic, seed=11)
+
+    def test_engage_indirect_event(self):
+        from sim.context import WorldRuleContext
+        world = self._world()
+        ctx = WorldRuleContext(world)
+        world.seen[1] = {2}
+        ammo_before = world.entities[1].ammo["72"]
+        world._engage(ctx)
+        events = [e for e in world.events if e.get("type") == "indirect_fire"]
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertEqual(event["actors"][0], 1)
+        self.assertEqual(world.entities[1].ammo["72"], ammo_before - 1)
+        self.assertIn(event["outcome"], ("hit", "scatter"))
+        aim = tuple(event["aim_cell"])
+        impact = tuple(event["impact_cell"])
+        if event["outcome"] == "scatter":
+            self.assertLessEqual(ctx.rule_distance_cells(aim, impact),
+                                 event["scatter_cells"])
+        else:
+            self.assertEqual(aim, impact)
+
+    def test_fire_indirect_action(self):
+        from geoio.actions import apply_action
+        world = self._world()
+        target = world.entities[2].pose
+        self.assertTrue(apply_action(world, {"type": "fire_indirect", "entity": 1,
+                                             "target": {"lon": target.lon,
+                                                        "lat": target.lat}}))
+        world.step()
+        events = [e for e in world.events if e.get("type") == "indirect_fire"]
+        self.assertEqual(len(events), 1)
+
+    def test_indirect_fuzz_no_illegal_state(self):
+        import random
+        from sim.context import WorldRuleContext
+        world = self._world()
+        ctx = WorldRuleContext(world)
+        rng = random.Random(5)
+        for _ in range(2000):
+            aim = (rng.randrange(0, 24), rng.randrange(0, 24))
+            from rules.indirect_fire import resolve_indirect_fire
+            event = resolve_indirect_fire(ctx.view(world.entities[1]), aim, ctx,
+                                          observed=bool(rng.getrandbits(1)))
+            if event is not None:
+                self.assertIn("impact_cell", event)
+                self.assertLessEqual(event["scatter_cells"], 4)
+        self.assertTrue(world.entities[1].alive or not world.entities[1].alive)
+
+
 if __name__ == "__main__":
     unittest.main()
