@@ -34,6 +34,22 @@ def _point_in_ring(x: float, y: float, ring: List[List[float]]) -> bool:
     return inside
 
 
+def _point_segment_m(lon, lat, pa, pb) -> float:
+    """Approximate point-to-segment distance in metres (local plane)."""
+    kx = 111320.0 * math.cos(math.radians(lat))
+    ky = 110540.0
+    px, py = lon * kx, lat * ky
+    ax, ay = pa[0] * kx, pa[1] * ky
+    bx, by = pb[0] * kx, pb[1] * ky
+    dx, dy = bx - ax, by - ay
+    length2 = dx * dx + dy * dy
+    if length2 <= 1e-12:
+        return math.hypot(px - ax, py - ay)
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / length2))
+    cx, cy = ax + t * dx, ay + t * dy
+    return math.hypot(px - cx, py - cy)
+
+
 def _bbox(ring):
     xs = [p[0] for p in ring]
     ys = [p[1] for p in ring]
@@ -105,7 +121,7 @@ class EnvPackEnvironment(object):
         for item in self._buildings:
             self._building_index.add(item, item["_bbox"])
         self._road_index = _SpatialIndex(0.02)
-        nodes = (self._roads.get("nodes") or {})
+        nodes = self._road_nodes = (self._roads.get("nodes") or {})
         for edge in self._roads.get("edges") or []:
             pa, pb = nodes.get(edge["a"]), nodes.get(edge["b"])
             if not pa or not pb:
@@ -134,6 +150,21 @@ class EnvPackEnvironment(object):
         self._water_cache = {}
         self._los_cache = {}
         self._min_elev = None
+
+    def road_edge_at(self, lon: float, lat: float,
+                     tolerance_m: float = 25.0):
+        """Return the nearest road edge within ``tolerance_m`` (or None)."""
+        best = None
+        best_m = None
+        for edge in self._road_index.query(lon, lat):
+            pa = self._road_nodes.get(edge["a"])
+            pb = self._road_nodes.get(edge["b"])
+            if not pa or not pb:
+                continue
+            d = _point_segment_m(lon, lat, pa, pb)
+            if d <= tolerance_m and (best_m is None or d < best_m):
+                best, best_m = edge, d
+        return best
 
     def _load_json(self, layer: str):
         meta = self.layers.get(layer)

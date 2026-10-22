@@ -17,6 +17,51 @@ from mobility.profile import PlatformProfile
 INF = float("inf")
 
 
+def _measure(value) -> float:
+    """Parse ``"20"``, ``"20 t"``, ``"3.5 m"`` into a number."""
+    if value is None:
+        return 0.0
+    text = str(value).strip().lower().replace(",", ".")
+    num = ""
+    for ch in text:
+        if ch.isdigit() or ch in (".", "-"):
+            num += ch
+        elif num:
+            break
+    try:
+        return float(num)
+    except ValueError:
+        return 0.0
+
+
+def road_edge_passable(profile: PlatformProfile, edge: dict) -> bool:
+    """Check bridge/tunnel weight, height and width limits."""
+    max_weight = _measure(edge.get("maxweight"))
+    if max_weight > 0 and profile.weight_t > max_weight:
+        return False
+    max_height = _measure(edge.get("maxheight"))
+    if max_height > 0 and profile.vehicle_height_m > max_height:
+        return False
+    width = _measure(edge.get("width"))
+    if width > 0 and profile.beam_m > width:
+        return False
+    return True
+
+
+def _road_constraint_ok(profile: PlatformProfile, lon: float, lat: float,
+                        env) -> bool:
+    getter = getattr(env, "road_edge_at", None)
+    if getter is None:
+        return True
+    try:
+        edge = getter(lon, lat)
+    except TypeError:
+        edge = getter(lon, lat, 25.0)
+    if not edge:
+        return True
+    return road_edge_passable(profile, edge)
+
+
 def passable(profile: PlatformProfile, lon: float, lat: float, env,
              altitude_m: Optional[float] = None) -> bool:
     cover = env.landcover(lon, lat)
@@ -50,8 +95,10 @@ def passable(profile: PlatformProfile, lon: float, lat: float, env,
             return False
         if env.slope_deg(lon, lat) > profile.max_gradient_deg:
             return False
-        return True
-    return _land_ok(profile, lon, lat, env, cover)
+        return _road_constraint_ok(profile, lon, lat, env)
+    if not _land_ok(profile, lon, lat, env, cover):
+        return False
+    return _road_constraint_ok(profile, lon, lat, env)
 
 
 def _land_ok(profile: PlatformProfile, lon: float, lat: float, env, cover: str) -> bool:
