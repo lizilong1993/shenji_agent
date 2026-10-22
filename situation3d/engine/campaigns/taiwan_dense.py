@@ -31,6 +31,9 @@ THEATRE = "taiwan_strait"
 TICK_SECONDS = 30
 TICK_COUNT = 1440
 TERMINAL_TICK = 1000  # 战役完成/保障恢复后结束，不再固定播到 12 小时
+# 地面车辆按右侧车道偏移，避免对向车辆在路中心“穿模”。Cesium 实体本身没有
+# 物理碰撞，这里只做数据级的最小分离，不改变路线和行驶里程。
+LANE_OFFSET_M = 3.5
 START_UTC = "2026-09-15T00:00:00Z"
 GEO_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                        "data", "geo", THEATRE, "anping")
@@ -287,6 +290,17 @@ def _cum_path(path: Sequence[Tuple[float, float]]) -> Tuple[List[float], float]:
     return cum, cum[-1]
 
 
+def _offset_right(lat: float, lon: float, hdg: float,
+                  meters: float) -> Tuple[float, float]:
+    """把点向航向右侧平移 meters（米），用于车道分离。"""
+    if not meters:
+        return lat, lon
+    r = math.radians(hdg + 90.0)
+    dlat = meters * math.cos(r) / 110540.0
+    dlon = meters * math.sin(r) / (111320.0 * math.cos(math.radians(lat)))
+    return round(lat + dlat, 6), round(lon + dlon, 6)
+
+
 def _sample(path: Sequence[Tuple[float, float]], cum: Sequence[float],
             along: float, loop: bool = False) -> Tuple[float, float, float]:
     total = cum[-1]
@@ -541,6 +555,8 @@ def _state_for(e: Entity, tick: int, carrier_pos: Dict[str, Tuple[float, float, 
         lat, lon, hdg = _sample(e.path, e.cum or [0.0], along, loop=False)
         if reverse:
             hdg = (hdg + 180.0) % 360.0
+        # 右侧车道偏移：对向车流分到两侧，同向车队保持原路线间距。
+        lat, lon = _offset_right(lat, lon, hdg, LANE_OFFSET_M)
         speed_kn = e.speed_mps * 1.943844 if active else 0.0
         task = "moving" if active else "waiting"
         status = e.status

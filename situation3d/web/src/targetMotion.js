@@ -298,6 +298,10 @@
       var pos = [];
       var quat = [];
       var orient = orientationSamples(def, samples, tickSeconds);
+      // 个别资产的模型头尾与统一约定相反（见 EntityLod.modelYawOffset），
+      // 只修正姿态，不改正北/航向数据本身，标牌、关系和扫描仍用真实航向。
+      var yawFixDeg = (window.EntityLod && EntityLod.modelYawOffset)
+        ? EntityLod.modelYawOffset(def) : 0;
       var q = new Cesium.Quaternion();
       for (var i = 0; i < samples.length; i++) {
         var s = samples[i];
@@ -306,7 +310,7 @@
         var cart = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt || 0);
         pos.push(t, s.lon, s.lat, s.alt || 0);
         orientationQuat(cart,
-          compassRad(orient.headings[i]),
+          compassRad(orient.headings[i] + yawFixDeg),
           orient.pitches[i],
           orient.rolls[i],
           orient.fwdAxis, q);
