@@ -364,6 +364,7 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             entity.carrier = carrier.uid
             entity.pose = Pose(carrier.pose.lon, carrier.pose.lat, carrier.pose.alt_m)
             carrier.passengers.append(entity.uid)
+    _spread_stacked_spawns(world)
     for city in scenario.get("cities") or []:
         coord = city.get("coord")
         if coord is None:
@@ -379,6 +380,72 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
         if isinstance(sp, dict) and "lon" in sp and "lat" in sp:
             world.supply_points.append((float(sp["lon"]), float(sp["lat"])))
     return world
+
+
+def _spread_stacked_spawns(world: World) -> None:
+    """Deterministically de-overlap units whose OBBs intersect at spawn.
+
+    Only actually-overlapping units are moved (a deterministic ring search),
+    offsets stay inside the same 200 m rule cell, and the point must be
+    passable per the nav field (else the base map).  Scenario headings are
+    preserved.
+    """
+    import math
+    from sim.collision import obbs_overlap
+    from sim.motion import entity_profile
+
+    groups = {}
+    for e in world.sorted_entities():
+        if not e.alive or e.on_board or e.domain not in ("land", "amphibious"):
+            continue
+        key = world.rule_grid.cell_of(e.pose.lon, e.pose.lat)
+        groups.setdefault(key, []).append(e)
+    kx = max(1.0, 111320.0 * math.cos(math.radians(world.rule_grid.center_lat)))
+    ky = 110540.0
+    for key in sorted(groups):
+        members = groups[key]
+        if len(members) < 2:
+            continue
+        placed = [members[0]]
+        for e in members[1:]:
+            prof = entity_profile(e)
+
+            def _overlaps(lon, lat):
+                return any(obbs_overlap(
+                    prof, lon, lat, e.pose.heading_deg,
+                    entity_profile(other), other.pose.lon, other.pose.lat,
+                    other.pose.heading_deg) for other in placed)
+
+            if not _overlaps(e.pose.lon, e.pose.lat):
+                placed.append(e)
+                continue
+            seat = None
+            for radius in (12.0, 24.0, 36.0):
+                for k in range(8):
+                    angle = math.radians(45.0 * k)
+                    lon = e.pose.lon + radius * math.cos(angle) / kx
+                    lat = e.pose.lat + radius * math.sin(angle) / ky
+                    if world.rule_grid.cell_of(lon, lat) != key:
+                        continue
+                    if world.nav is not None and world.nav.covers(lon, lat):
+                        if not world.nav.motion_point_ok(prof, lon, lat):
+                            continue
+                    else:
+                        from mobility.passability import passable
+                        if not passable(prof, lon, lat, world.env,
+                                        world.env.elevation(lon, lat)):
+                            continue
+                    if _overlaps(lon, lat):
+                        continue
+                    seat = (lon, lat)
+                    break
+                if seat is not None:
+                    break
+            if seat is not None:
+                e.pose = Pose(seat[0], seat[1],
+                              world.env.elevation(seat[0], seat[1]),
+                              heading_deg=e.pose.heading_deg)
+            placed.append(e)
 
 
 def load_world(scenario_path: str, map_path: str, seed: int = 20261021,

@@ -22,6 +22,7 @@ from rules import combat, engagement
 from sim.context import WorldRuleContext
 from sim.entity import Entity, Pose
 from sim.motion import entity_profile, integrate
+from sim.collision import CollisionIndex, obbs_overlap
 from sim import spotting as spotting_model
 from sim.tactics import TacticalController
 
@@ -52,6 +53,11 @@ class World(object):
         self.planner = GridPlanner(env, self.plan_grid)
         # Fine navigation field (P0.1): single authority inside the pack.
         self.nav = nav
+        # Traffic collision index (P0.2): physical footprints replace the
+        # four-units-per-cell stop rule.
+        self.traffic = CollisionIndex()
+        self._crowd_warned: Dict[Tuple[int, int], float] = {}
+        self._yield_streak: Dict[int, int] = {}
         self.orders: Dict[int, dict] = {}
         self.cooldowns: Dict[Tuple[int, str], float] = {}
         self.weapon_states: Dict[Tuple[int, str], str] = {}
@@ -736,12 +742,42 @@ class World(object):
     def _can_enter_cell(self, entity: Entity, lon: float, lat: float) -> bool:
         if not _is_ground(entity):
             return True
-        if self._obstacle_blocks(entity, lon, lat):
+        # P0.2: cell density is no longer a passability rule; separation is
+        # handled by OBB traffic checks.  Obstacles still hard-block.
+        return not self._obstacle_blocks(entity, lon, lat)
+
+    # -- traffic collisions (P0.2) -----------------------------------------
+    def _rebuild_traffic(self) -> None:
+        self.traffic.rebuild(e for e in self.sorted_entities()
+                             if e.alive and not e.on_board and _is_ground(e))
+
+    def _traffic_clear(self, entity: Entity, lon: float, lat: float,
+                       heading: float) -> bool:
+        prof = entity_profile(entity)
+        for other in self.traffic.near(lon, lat):
+            if other.uid == entity.uid or not other.alive or other.on_board:
+                continue
+            if not _is_ground(other):
+                continue
+            oprof = entity_profile(other)
+            if not obbs_overlap(prof, lon, lat, heading,
+                                oprof, other.pose.lon, other.pose.lat,
+                                other.pose.heading_deg):
+                continue
+            if obbs_overlap(prof, entity.pose.lon, entity.pose.lat,
+                            entity.pose.heading_deg, oprof,
+                            other.pose.lon, other.pose.lat,
+                            other.pose.heading_deg):
+                # Pairs already overlapping may separate, but only when the
+                # candidate pose actually increases their separation.
+                d_new = haversine_m((lon, lat),
+                                    (other.pose.lon, other.pose.lat))
+                d_cur = haversine_m((entity.pose.lon, entity.pose.lat),
+                                    (other.pose.lon, other.pose.lat))
+                if d_new > d_cur + 0.05:
+                    continue
             return False
-        cell = self.rule_grid.cell_of(lon, lat)
-        if cell == self._cell_cache.get(entity.uid):
-            return True
-        return self._count_cache.get((cell, entity.affiliation), 0) < 4
+        return True
 
     # -- embark / disembark -------------------------------------------------
     def _sync_passengers(self) -> None:
@@ -762,30 +798,29 @@ class World(object):
                 if not can_land and carrier.velocity_ms < 0.5:
                     landing_point = self._nearest_land(carrier, passenger)
                 if (can_land or landing_point is not None) and carrier.velocity_ms < 0.5:
-                    passenger.on_board = False
-                    passenger.carrier = None
-                    carrier.passengers.remove(pid)
                     if landing_point is not None:
                         lon, lat = landing_point
                     else:
                         # disembark 150 m inland (east) if passable
                         lon = carrier.pose.lon + 0.0015
                         lat = carrier.pose.lat
-                    if (self.nav is not None
-                            and passenger.domain in ("land", "amphibious")
-                            and self.nav.covers(lon, lat)):
-                        prof = entity_profile(passenger)
-                        if not self.nav.motion_point_ok(prof, lon, lat):
-                            seat = self.nav.nearest_passable(prof, lon, lat,
-                                                             radius=8)
-                            if seat is not None:
-                                lon, lat = seat
+                    seat = self._find_seat(passenger, lon, lat)
+                    if seat is None:
+                        # No passable, collision-free seat yet: stay aboard
+                        # and retry next tick.
+                        continue
+                    lon, lat = seat
+                    passenger.on_board = False
+                    passenger.carrier = None
+                    carrier.passengers.remove(pid)
                     passenger.pose = Pose(lon, lat, self.env.elevation(lon, lat))
                     passenger.route = None
                     passenger.goal = None
                     passenger.route_s = 0.0
                     passenger.velocity_ms = 0.0
                     passenger.moving = False
+                    if _is_ground(passenger):
+                        self.traffic.insert(passenger)
                     self.emit("disembark", [pid, carrier.uid],
                               "%s 从 %s 下船" % (passenger.name, carrier.name))
 
@@ -808,21 +843,65 @@ class World(object):
                     return lon, lat
         return None
 
+    def _find_seat(self, passenger: Entity, lon: float, lat: float):
+        """Nearest passable, collision-free seat within ~40 m (P0.2).
+
+        Returns ``None`` when no seat is free yet (the unit stays aboard).
+        """
+        import math as _math
+        prof = entity_profile(passenger)
+        kx = 111320.0 * _math.cos(_math.radians(lat))
+        candidates = [(lon, lat)]
+        for radius in (12.0, 24.0, 36.0):
+            for k in range(8):
+                angle = _math.radians(45.0 * k)
+                candidates.append((lon + radius * _math.cos(angle) / kx,
+                                   lat + radius * _math.sin(angle) / 110540.0))
+        for clon, clat in candidates:
+            if self.nav is not None and self.nav.covers(clon, clat):
+                if not self.nav.motion_point_ok(prof, clon, clat):
+                    continue
+            elif not passable(prof, clon, clat, self.env,
+                              self.env.elevation(clon, clat)):
+                continue
+            clear = True
+            for other in self.traffic.near(clon, clat):
+                if (other.uid == passenger.uid or not other.alive
+                        or other.on_board or not _is_ground(other)):
+                    continue
+                if obbs_overlap(prof, clon, clat, 0.0,
+                                entity_profile(other), other.pose.lon,
+                                other.pose.lat, other.pose.heading_deg,
+                                margin=0.5):
+                    clear = False
+                    break
+            if clear:
+                return clon, clat
+        return None
+
     # -- stacking -----------------------------------------------------------
     def _enforce_stacking(self) -> None:
-        grouped: Dict[Tuple[Tuple[int, int], int], List[Entity]] = {}
+        """Soft crowding warning only (P0.2).
+
+        Physical OBB collisions (``_traffic_clear``) produce queueing; the
+        old four-per-cell stop is gone.  Keep a thinned warning for
+        rule-cell density so stacking still shows up in replays.
+        """
+        grouped: Dict[Tuple[int, int], List[Entity]] = {}
         for e in self.sorted_entities():
-            if not e.alive or e.domain != "land":
+            if not e.alive or e.on_board or not _is_ground(e):
                 continue
-            grouped.setdefault((self.rule_cell(e), e.affiliation), []).append(e)
-        for (cell, _), members in sorted(grouped.items(), key=lambda kv: str(kv[0])):
-            for extra in members[4:]:
-                extra.route = None
-                extra.goal = None
-                extra.velocity_ms = 0.0
-                extra.moving = False
-                self.emit("stack_blocked", [extra.uid],
-                          "%s 因同格堆叠上限停在 %s" % (extra.name, cell))
+            grouped.setdefault(self.rule_cell(e), []).append(e)
+        for cell in sorted(grouped):
+            members = grouped[cell]
+            if len(members) <= 4:
+                continue
+            if self.time_s - self._crowd_warned.get(cell, -1e9) < 300.0:
+                continue
+            self._crowd_warned[cell] = self.time_s
+            self.emit("crowding", [e.uid for e in members],
+                      "规则格 %s 内地面单位 %d 个（软告警）"
+                      % (cell, len(members)))
 
     # -- objectives / logistics --------------------------------------------
     def add_objective(self, cell: Tuple[int, int], value: int = 0,
@@ -874,12 +953,35 @@ class World(object):
         ctx = WorldRuleContext(self)
         self._tick_timers(dt)
         self._apply_orders()
+        self._rebuild_traffic()
         for e in self.sorted_entities():
             if e.alive and not e.on_board:
-                reason = integrate(e, dt, self.env,
-                                   cell_check=lambda lon, lat, ent=e: self._can_enter_cell(ent, lon, lat),
-                                   nav=self.nav)
-                if reason == "blocked" and e.goal is not None:
+                ground = _is_ground(e)
+                reason = integrate(
+                    e, dt, self.env,
+                    cell_check=lambda lon, lat, ent=e: self._can_enter_cell(ent, lon, lat),
+                    nav=self.nav,
+                    traffic_check=(lambda lon, lat, hd, ent=e:
+                                   self._traffic_clear(ent, lon, lat, hd))
+                    if ground else None)
+                if ground:
+                    self.traffic.refresh(e)
+                if reason == "yield":
+                    streak = self._yield_streak.get(e.uid, 0) + 1
+                    self._yield_streak[e.uid] = streak
+                    if streak >= 30:
+                        # Head-on / permanent blockage: give the goal up so
+                        # the tactical layer can re-task instead of waiting
+                        # forever.  P1 motion planning will add passing rules.
+                        self._yield_streak[e.uid] = 0
+                        e.route = None
+                        e.goal = None
+                        e.velocity_ms = 0.0
+                        e.moving = False
+                        self.emit("traffic_stuck", [e.uid],
+                                  "%s 连续让行超时，放弃当前目标" % e.name)
+                elif reason == "blocked" and e.goal is not None:
+                    self._yield_streak.pop(e.uid, None)
                     route = self.plan_route(
                         e, e.goal,
                         blocked=lambda lon, lat, ent=e:
@@ -889,6 +991,8 @@ class World(object):
                         e.route_s = 0.0
                     else:
                         e.goal = None
+                else:
+                    self._yield_streak.pop(e.uid, None)
         self._sync_passengers()
         self._refresh_cell_cache()
         self._resolve_minefields()

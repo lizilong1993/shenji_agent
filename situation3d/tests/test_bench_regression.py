@@ -2,7 +2,8 @@
 
 Measures steady-state tick times (warm-up excluded) for 300 and 500 entities
 and pins the event hash so future optimisations must preserve adjudication
-semantics (same seed -> same events).
+semantics (same seed -> same events).  The hashes were re-pinned for P0.2:
+physical spawn de-overlap and kinematic motion change adjudication ordering.
 """
 import hashlib
 import json
@@ -73,13 +74,13 @@ def run_bench(entities, ticks, warmup):
 class TestBenchRegression(unittest.TestCase):
     def test_300_entities(self):
         result = run_bench(300, ticks=40, warmup=10)
-        self.assertEqual(result["hash"], "ec7ed51e584f5caf")
+        self.assertEqual(result["hash"], "028216c732a56e0e")
         self.assertLess(result["p95"], P95_LIMIT_MS,
                         "300-entity p95 %.1f ms" % result["p95"])
 
     def test_500_entities(self):
         result = run_bench(500, ticks=40, warmup=10)
-        self.assertEqual(result["hash"], "15300b919f058b10")
+        self.assertEqual(result["hash"], "1a3b153adba16a31")
         self.assertLess(result["p95"], P95_LIMIT_MS,
                         "500-entity p95 %.1f ms" % result["p95"])
 

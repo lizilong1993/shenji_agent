@@ -60,6 +60,9 @@ python3 scripts/run_geo_demo.py --case taiwan_landing --envpack envpacks/anping_
 - **2026-10-22 P0.1 更新**：envpack 运行改用 30 m 导航场（`mobility/nav_field.py`），
   "规划-阻塞"循环消失，地面直瞄 0→23、事件 252→338、毁伤 9→14，步进 p50 574→126 ms
   （1440 tick，seed 20261021）。本节以下为改前记录，保留用于对照。详见 `P0_1_nav_field.md`。
+- **2026-10-22 P0.2 更新**：运动学与 OBB 碰撞落地后，envpack 运行地面直瞄 23→66、毁伤 18、
+  事件 407、p50 81 ms；1440 tick 不变量探针穿模/瞬移/航向跳变均为 0。详见
+  `P0_2_kinematics_collision.md`。
 - 台海：基础地图全链路（陆/海/空事件 + 归属变化）✓；envpack 版下船+夺控 ✓，地面交火被
   规划/水面一致性与城市 LOS 阻断（降级记录）。
 - 中印：想定可跑通并输出可回放 CZML ✓；事件数量偏少（接触线稀疏），后续可增加巡逻触发。

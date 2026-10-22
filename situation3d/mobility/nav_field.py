@@ -464,6 +464,27 @@ class NavField(object):
             return 0.0
         return speed / prof.max_speed_ms
 
+    def building_only_block(self, prof: PlatformProfile, lon: float,
+                            lat: float) -> bool:
+        """True when the in-pack block comes *only* from a footprint raster.
+
+        OBB footprint checks ignore these samples: building obstacles are
+        enforced at cell granularity by the centre-cell check, while water,
+        slope, landcover and bridge limits still reject the whole footprint.
+        """
+        i = self._index_of(lon, lat)
+        if i is None or self.building_h[i] <= 0.0 or self.depth[i] is not None:
+            return False
+        if self.slope[i] > prof.max_gradient_deg:
+            return False
+        factor = prof.terrain_factor(_COVER_NAMES[self.cover[i]])
+        if factor <= 0.0 and not (prof.road_bound and self.road[i] > 0):
+            return False
+        if (self.cover[i] == _COVER_CODES[LandCover.URBAN]
+                and prof.road_bound and self.road[i] == 0):
+            return False
+        return self._limits_ok(prof, i)
+
     def nearest_passable(self, prof: PlatformProfile, lon: float, lat: float,
                          radius: int = 6) -> Optional[Tuple[float, float]]:
         mask = self.profile_mask(prof)[0]

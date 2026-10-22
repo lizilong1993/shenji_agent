@@ -28,6 +28,14 @@ TURN_RATE_DEFAULT = {
     "air": 5.0,
 }
 
+# P0.2 physical footprint defaults per domain (cards may override via motion).
+FOOTPRINT_DEFAULT = {
+    "land": (6.0, 2.8, 8.0, False),
+    "surface": (120.0, 15.0, 150.0, False),
+    "subsurface": (60.0, 8.0, 120.0, False),
+    "air": (15.0, 5.0, 600.0, False),
+}
+
 
 def _f(value: Any, default: float = 0.0) -> float:
     try:
@@ -47,6 +55,8 @@ def profile_from_card(card: dict, key: Optional[str] = None) -> PlatformProfile:
     sea = motion.get("sea") or {}
     air = motion.get("air") or {}
     size = str(protection.get("size_class") or "medium")
+    length_d, width_d, turn_d, pivot_d = FOOTPRINT_DEFAULT.get(
+        domain, FOOTPRINT_DEFAULT["land"])
     return PlatformProfile(
         key=key or str(identity.get("subclass_id") or "card"),
         domain=domain,
@@ -72,4 +82,8 @@ def profile_from_card(card: dict, key: Optional[str] = None) -> PlatformProfile:
         descent_rate_ms=_f(air.get("descent_rate_ms"), 5.0),
         armor_class=int(protection.get("armor_class") or 0),
         size_class=size if size in ("small", "medium", "large") else "medium",
+        length_m=_f(motion.get("length_m"), length_d),
+        width_m=_f(motion.get("width_m"), width_d),
+        min_turn_radius_m=_f(motion.get("min_turn_radius_m"), turn_d),
+        pivot_turn=bool(motion.get("pivot_turn", pivot_d)),
     )
