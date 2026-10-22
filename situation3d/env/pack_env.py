@@ -177,6 +177,31 @@ class EnvPackEnvironment(object):
                 best, best_m = edge, d
         return best
 
+    # -- navigation support (P0.1) -----------------------------------------
+    def nav_bbox(self):
+        """Bounding box ``(lon0, lat0, lon1, lat1)`` of the pack geometry."""
+        bbox = self.manifest.get("bbox")
+        return tuple(float(v) for v in bbox)
+
+    def building_footprint_at(self, lon: float, lat: float) -> Optional[Building]:
+        """Real OSM footprint only (no coarse-map urban fallback)."""
+        item = self._polygon_at(self._building_index, lon, lat)
+        if item is None:
+            return None
+        return Building(item.get("ring") or [],
+                        float(item.get("height_m") or 6.0))
+
+    def landcover_polygon_at(self, lon: float, lat: float) -> Optional[str]:
+        """Class of the covering OSM landcover polygon (None if uncovered)."""
+        item = self._polygon_at(self._landcover_index, lon, lat)
+        if item is None:
+            return None
+        return str(item.get("class") or LandCover.OPEN)
+
+    def road_graph(self):
+        """``(nodes, edges)`` of the pack road graph (read-only use)."""
+        return self._roads.get("nodes") or {}, self._roads.get("edges") or []
+
     def _load_json(self, layer: str):
         meta = self.layers.get(layer)
         if not meta or not meta.get("path"):

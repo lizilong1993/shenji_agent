@@ -137,8 +137,7 @@ def _assign_orders(world, objectives) -> None:
                                lon + off_lon, lat + off_lat))
         ranked.sort()
         for _, lon, lat in ranked:
-            route = world.planner.plan(entity.profile, (entity.pose.lon, entity.pose.lat),
-                                       (lon, lat))
+            route = world.plan_route(entity, (lon, lat))
             if route is not None:
                 entity.goal = (lon, lat)
                 entity.route = route

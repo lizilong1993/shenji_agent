@@ -242,7 +242,14 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
         direct_fire_model = "crt"
     commander_interval_s = _as_float(engine.get("commander_interval_s"), 2.0)
     use_role_cards = _as_bool(engine.get("use_role_cards"), False)
+    nav = None
+    if envpack:
+        from mobility.nav_field import NavField
+        nav_res = _as_float(engine.get("nav_res_m"), 30.0)
+        if _as_bool(engine.get("nav_enabled"), True):
+            nav = NavField(env, res_m=nav_res)
     world = World(env, _rule_grid_for(grid), dt_s=dt_s, seed=seed, plan_grid=grid,
+                  nav=nav,
                   detection_model=detection_model,
                   direct_fire_model=direct_fire_model,
                   enable_radio_share=_as_bool(engine.get("enable_radio_share"), False),

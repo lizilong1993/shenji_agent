@@ -21,7 +21,7 @@ from mobility.profile import PlatformProfile, profile_for
 from rules import combat, engagement
 from sim.context import WorldRuleContext
 from sim.entity import Entity, Pose
-from sim.motion import integrate
+from sim.motion import entity_profile, integrate
 from sim import spotting as spotting_model
 from sim.tactics import TacticalController
 
@@ -38,7 +38,8 @@ class World(object):
                  enable_radio_share: bool = False,
                  enable_tactics: bool = False,
                  commander=None,
-                 commander_interval_s: float = 2.0):
+                 commander_interval_s: float = 2.0,
+                 nav=None):
         self.env = env
         self.rule_grid = rule_grid
         self.dt_s = float(dt_s)
@@ -49,6 +50,8 @@ class World(object):
         # stays in the 10^4-10^5 node range; rule distances still use RuleGrid.
         self.plan_grid = plan_grid or rule_grid
         self.planner = GridPlanner(env, self.plan_grid)
+        # Fine navigation field (P0.1): single authority inside the pack.
+        self.nav = nav
         self.orders: Dict[int, dict] = {}
         self.cooldowns: Dict[Tuple[int, str], float] = {}
         self.weapon_states: Dict[Tuple[int, str], str] = {}
@@ -157,6 +160,25 @@ class World(object):
     def rule_view(self, entity: Entity):
         return entity.to_rule_view(stacked=self.stacked(entity))
 
+    # -- routing ------------------------------------------------------------
+    def plan_route(self, entity: Entity, goal, blocked=None):
+        """Plan ``entity -> goal`` with the finest available authority.
+
+        Ground/amphibious units inside an envpack use the navigation field
+        (fine A* + coarse-route refinement); everything else stays on the
+        base-map grid planner.
+        """
+        prof = entity_profile(entity)
+        start = (entity.pose.lon, entity.pose.lat)
+        if self.nav is not None and entity.domain in ("land", "amphibious"):
+            # The nav field is authoritative for ground movement: a failed
+            # fine plan must surface as "no route", never as a coarse route
+            # that the pack geometry would block (the old G1 loop).
+            return self.nav.plan_hybrid(self.planner, prof, start,
+                                        (float(goal[0]), float(goal[1])),
+                                        blocked=blocked)
+        return self.planner.plan(prof, start, goal, blocked=blocked)
+
     # -- orders -------------------------------------------------------------
     def order(self, uid: int, action: dict, source: str = "manual") -> None:
         uid = int(uid)
@@ -183,9 +205,8 @@ class World(object):
                     self._order_source.pop(uid, None)
                     continue
                 entity.goal = goal
-                route = self.planner.plan(
-                    entity.profile, (entity.pose.lon, entity.pose.lat),
-                    entity.goal,
+                route = self.plan_route(
+                    entity, entity.goal,
                     blocked=lambda lon, lat, ent=entity:
                     self._obstacle_blocks(ent, lon, lat))
                 if route is not None:
@@ -750,6 +771,15 @@ class World(object):
                         # disembark 150 m inland (east) if passable
                         lon = carrier.pose.lon + 0.0015
                         lat = carrier.pose.lat
+                    if (self.nav is not None
+                            and passenger.domain in ("land", "amphibious")
+                            and self.nav.covers(lon, lat)):
+                        prof = entity_profile(passenger)
+                        if not self.nav.motion_point_ok(prof, lon, lat):
+                            seat = self.nav.nearest_passable(prof, lon, lat,
+                                                             radius=8)
+                            if seat is not None:
+                                lon, lat = seat
                     passenger.pose = Pose(lon, lat, self.env.elevation(lon, lat))
                     passenger.route = None
                     passenger.goal = None
@@ -847,10 +877,11 @@ class World(object):
         for e in self.sorted_entities():
             if e.alive and not e.on_board:
                 reason = integrate(e, dt, self.env,
-                                   cell_check=lambda lon, lat, ent=e: self._can_enter_cell(ent, lon, lat))
+                                   cell_check=lambda lon, lat, ent=e: self._can_enter_cell(ent, lon, lat),
+                                   nav=self.nav)
                 if reason == "blocked" and e.goal is not None:
-                    route = self.planner.plan(
-                        e.profile, (e.pose.lon, e.pose.lat), e.goal,
+                    route = self.plan_route(
+                        e, e.goal,
                         blocked=lambda lon, lat, ent=e:
                         self._obstacle_blocks(ent, lon, lat))
                     if route is not None:
