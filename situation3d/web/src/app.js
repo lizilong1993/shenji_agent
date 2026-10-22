@@ -723,6 +723,18 @@ function initViewer() {
     Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
   if (window.Overview) Overview.init(viewer);
+  // 编队图标：屏幕空间聚合。选中目标不聚合；红蓝分开；点击编队拉近展开。
+  if (window.TargetClusters) {
+    TargetClusters.init(viewer, {
+      getTargets: function () { return state.targets; },
+      getSelected: function () { return state.selected; },
+      labelsEnabled: function () { return !!state.layers.labels; },
+      // declutterLabels 关掉的编队标牌，下一次聚合更新不得重新点亮。
+      labelHidden: function (label) { return _declutterHidden.has(label); },
+      onUpdated: function () { markScene('target-clusters'); },
+      onZoom: function (lon, lat, height) { flyTo(lon, lat, height, -70); },
+    });
+  }
   // 目标属性面板：注册主 Viewer 与只读环境；预览 Viewer 要等
   // 「图层勾选 + 选中目标」同时成立时才惰性创建（见 targetProps.js）。
   if (window.TargetProps) TargetProps.init(viewer, targetPropsApi());
@@ -1533,6 +1545,8 @@ function teardownScene() {
   if (window.TargetMotion) TargetMotion.dispose(viewer);
   // 面板预览是独立 Viewer，不随 viewer.entities.removeAll() 清理，必须显式销毁。
   if (window.TargetProps) TargetProps.reset();
+  // 编队图标实体也在 viewer 里，先清内部表再整体 removeAll。
+  if (window.TargetClusters) TargetClusters.reset();
   viewer.entities.removeAll();
   redrawPlotsAfterClear();
   state.targets = {};
@@ -2147,11 +2161,13 @@ function applyTargetLod(force) {
     const showModel = useModel && hasModel;
     // 图标**始终显示**：切到 3D 模型后图标不再隐藏，而是抬到模型头顶上方
     // （见 applyTargetBillboardAnchor）。目标点本身仍由模型表达。
+    // 编队聚合期间成员图标/模型交给编队图标表达（见 targetClusters.js）。
+    const clustered = !!(window.TargetClusters && TargetClusters.isClustered(def.id));
     if (rec.entity.billboard) {
-      rec.entity.billboard.show = true;
+      rec.entity.billboard.show = !clustered;
       applyTargetBillboardAnchor(rec.entity, showModel);
     }
-    if (hasModel && rec.entity.model) rec.entity.model.show = showModel;
+    if (hasModel && rec.entity.model) rec.entity.model.show = showModel && !clustered;
   });
 }
 
@@ -2927,7 +2943,12 @@ function declutterLabels(force) {
   Object.keys(state.targets).forEach(function (id) {
     var rec = state.targets[id];
     var ent = rec && rec.entity;
-    if (!ent || !ent.show || !ent.label) return;
+    // Cesium 把 boolean 包成 Property：必须取值，否则被过滤的目标也会占用标牌位置。
+    var entShow = ent && ent.show;
+    entShow = (entShow && typeof entShow.getValue === 'function') ? entShow.getValue(time) : entShow;
+    if (!ent || !entShow || !ent.label) return;
+    // 编队成员不参与标牌避让：它们已被编队图标+编队标牌代表。
+    if (window.TargetClusters && TargetClusters.isClustered(id)) return;
     // ⚠ 这里**不看 label.show**：它可能正是上一轮被我们关掉的。
     var text = ent.label.text;
     text = (text && text.getValue) ? text.getValue() : text;
@@ -2951,6 +2972,11 @@ function declutterLabels(force) {
     if (!w) return;
     items.push({ label: e.label, text: text, size: 12, pri: 2, w: w, offY: 0, vc: true });
   });
+
+  // 编队标牌与目标标牌共用一套避让：否则密集区会叠出一片"红方×6 · 装甲"。
+  if (state.layers.labels && window.TargetClusters && TargetClusters.labelItems) {
+    TargetClusters.labelItems().forEach(function (it) { items.push(it); });
+  }
 
   items.sort(function (a, b) { return (b.pri - a.pri) || (a.w.y - b.w.y); });
 
@@ -3029,14 +3055,16 @@ function syncEntities() {
       && targetHasModel[id]);
 
     rec.entity.show = visible;
+    // 编队聚合：成员由编队图标代表，图标/标牌/血条/模型都隐藏。
+    const clustered = !!(window.TargetClusters && TargetClusters.isClustered(id));
     // 标签避让的隐藏是**另一层状态**：syncEntities 每次脏帧都会重写 show，
     // 不乘上它就会把隐藏的标签重新点亮（实测表现为标牌闪烁）。
-    rec.entity.label.show = visible && state.layers.labels
+    rec.entity.label.show = visible && state.layers.labels && !clustered
       && (state.selected === id || !_declutterHidden.has(rec.entity.label));
     // 图标始终显示（模型形态抬到头顶），原因见 applyTargetBillboardAnchor。
-    rec.entity.billboard.show = visible;
+    rec.entity.billboard.show = visible && !clustered;
     applyTargetBillboardAnchor(rec.entity, useModel);
-    if (rec.entity.model) rec.entity.model.show = visible && useModel;
+    if (rec.entity.model) rec.entity.model.show = visible && useModel && !clustered;
     // 传感器只在选中目标时显示，不再需要独立图层开关。
     rec.sensorEntity.show = visible && state.selected === id;
 
@@ -3052,7 +3080,7 @@ function syncEntities() {
           ? TargetStatus.barUri(hpSt.hp, hpSt.status, 34, 4)
           : undefined;
       }
-      rec.hpBar.show = visible;
+      rec.hpBar.show = visible && !clustered;
     }
 
     // 航迹单调累积。回退时不是简单清空，而是从第 0 帧重建，
@@ -3333,6 +3361,8 @@ function occupationDebug() {
 }
 
 function syncSelection() {
+  // 选中目标会被排除出编队；立即重算一次，避免"点了目标还看不见图标"等下一轮节流。
+  if (window.TargetClusters) TargetClusters.update(true);
   Object.keys(state.targets).forEach(function (id) {
     const rec = state.targets[id];
     rec.entity.billboard.image = Symbology.symbolUri(
@@ -6059,6 +6089,8 @@ function loop(nowMs) {
   if (RenderGovernor.take()) syncEntities();
   // 标签避让按时间节流（不受 RenderGovernor 的脏标记影响：相机微动也要重排）。
   declutterLabels(false);
+  // 编队聚合同样依赖屏幕距离，跟着相机/帧号变化按时间节流重算。
+  if (window.TargetClusters) TargetClusters.frame(nowMs);
 
   // 相机静止时 camera.changed 不会再触发，而它第一次触发时场景可能尚未渲染
   // （globe.pick 返回 null），所以这里兜底按秒刷新一次。
@@ -6084,6 +6116,7 @@ function reloadSituation() {
   if (!state.data || !viewer) return;
   detachFollow('TS已更新');
   clearTargetSelection();
+  if (window.TargetClusters) TargetClusters.reset();
   viewer.entities.removeAll();
   redrawPlotsAfterClear();
   state.targets = {};
@@ -6163,6 +6196,9 @@ window.SituationHost = {
   // 运动/特效取证：CZML 采样数、时钟、尾流/尾气/轮角状态。
   motionDebug: function () { return window.TargetMotion ? TargetMotion.stats() : null; },
   fxDebug: function () { return window.TargetFx ? TargetFx.debug() : null; },
+  // 编队聚合取证：簇 id/成员/类别构成、隐藏的单目标数、当前阈值。
+  clustersDebug: function () { return window.TargetClusters ? TargetClusters.debug() : null; },
+  clustersUpdate: function () { return window.TargetClusters ? TargetClusters.update(true) : null; },
   // 取证用：建筑体块的短路条件逐条报出来。`?buildings=1` 不生效时，
   // "到底卡在哪个 return"光看结果猜不出来。
   // 注意这里**从 DOM 现取**复选框，不用 dom 缓存：实测两者会不一致
@@ -7775,6 +7811,22 @@ function bindPicking() {
     }
     const picked = viewer.scene.pick(click.position);
     const id = picked && picked.id && typeof picked.id.id === 'string' ? picked.id.id : null;
+    // 编队图标：点击拉近到编队范围，放大后成员图标自然拆开（见 targetClusters.js）。
+    // 先按屏幕几何命中编队，但**点到具体目标时目标优先**——否则密集队形里
+    // 选中/取消选中一个单目标会被附近的编队抢走点击。
+    const pickedTarget = !!(id && id.indexOf('target-') === 0);
+    if (window.TargetClusters && !pickedTarget) {
+      const clusterId = TargetClusters.clusterAt(click.position);
+      if (clusterId) {
+        if (state.selected) clearTargetSelection();
+        TargetClusters.zoomTo(clusterId);
+        return;
+      }
+    }
+    if (id && id.indexOf('cluster-') === 0) {
+      if (state.selected) clearTargetSelection();
+      if (window.TargetClusters && TargetClusters.zoomToEntity(id)) return;
+    }
     if (!id) {
       // 点到空白（天空/地面）：取消目标选中，关系线随之清除。
       if (state.selected) clearTargetSelection();
