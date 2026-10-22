@@ -38,6 +38,7 @@ class World(object):
                  detection_model: str = "table",
                  direct_fire_model: str = "physics",
                  indirect_fire_model: str = "physics",
+                 missile_model: str = "flight",
                  enable_radio_share: bool = False,
                  enable_tactics: bool = False,
                  commander=None,
@@ -67,6 +68,21 @@ class World(object):
         self.tracks: Dict[int, dict] = {}
         self._phys_last_seen: Dict[Tuple[int, int], float] = {}
         self.obscurants: List[dict] = []
+        # Dynamic environment (P2): seeded from the environment; configured
+        # weather is only written back when a scenario asks for it.
+        try:
+            seeded = env.weather(0.0, 0.0)
+            self.weather = {"visibility_m": float(seeded.visibility_m),
+                            "sea_state": int(seeded.sea_state),
+                            "wind_ms": float(seeded.wind_ms)}
+        except Exception:
+            self.weather = {"visibility_m": 10000.0, "sea_state": 0,
+                            "wind_ms": 0.0}
+        self.weather_enabled = False
+        self.weather_timeline: List[dict] = []
+        self.start_hour_utc = 12.0
+        self.utc_offset_h = 0.0
+        self.effective_weather = dict(self.weather)
         self.orders: Dict[int, dict] = {}
         self.cooldowns: Dict[Tuple[int, str], float] = {}
         self.weapon_states: Dict[Tuple[int, str], str] = {}
@@ -90,6 +106,8 @@ class World(object):
         self.detection_model = str(detection_model)
         self.direct_fire_model = str(direct_fire_model)
         self.indirect_fire_model = str(indirect_fire_model)
+        self.missile_model = str(missile_model)
+        self._pending_impacts: List[dict] = []
         self.enable_radio_share = bool(enable_radio_share)
         self.detection_shadow = None
         self.tactics = TacticalController() if enable_tactics else None
@@ -175,6 +193,38 @@ class World(object):
 
     def rule_view(self, entity: Entity):
         return entity.to_rule_view(stacked=self.stacked(entity))
+
+    def _update_environment(self) -> None:
+        """Apply the scenario weather timeline and day/night visibility."""
+        if not self.weather_enabled:
+            return
+        base = dict(self.weather)
+        for entry in self.weather_timeline:
+            if float(entry.get("at_s", 0.0)) <= self.time_s:
+                for key in ("visibility_m", "sea_state", "wind_ms"):
+                    if key in entry:
+                        base[key] = entry[key]
+        hour = (float(self.start_hour_utc) + float(self.utc_offset_h)
+                + self.time_s / 3600.0) % 24.0
+        if 8.0 <= hour < 18.0:
+            daylight = 1.0
+        elif 6.0 <= hour < 8.0 or 18.0 <= hour < 20.0:
+            daylight = 0.6
+        else:
+            daylight = 0.2
+        visibility = float(base.get("visibility_m", 10000.0)) * daylight
+        sea_state = int(base.get("sea_state", 0) or 0)
+        wind = float(base.get("wind_ms", 0.0) or 0.0)
+        try:
+            weather = self.env.weather(0.0, 0.0)
+            weather.visibility_m = visibility
+            weather.sea_state = sea_state
+            weather.wind_ms = wind
+        except Exception:
+            pass
+        self.effective_weather = {"visibility_m": visibility,
+                                  "sea_state": sea_state,
+                                  "wind_ms": wind}
 
     # -- routing ------------------------------------------------------------
     def assign_intent(self, entity: Entity, intent) -> bool:
@@ -636,9 +686,30 @@ class World(object):
                     event = combat.resolve_direct_fire(
                         ctx.view(attacker), ctx.view(target), ctx)
             else:
-                event = engagement.resolve_sea_air(ctx.view(attacker), ctx.view(target), ctx)
+                event = engagement.resolve_sea_air(
+                    ctx.view(attacker), ctx.view(target), ctx,
+                    flight_model=self.missile_model, now_s=self.time_s)
             if event is not None:
                 event["tick_s"] = round(self.time_s, 1)
+                if event.get("impact_at_s") is not None:
+                    # Missile in flight: damage and interception resolve at
+                    # the scheduled impact tick, not at launch.
+                    self._pending_impacts.append({
+                        "due_s": float(event["impact_at_s"]),
+                        "attacker": attacker.uid,
+                        "target": target.uid,
+                        "weapon": event.get("weapon"),
+                        "kind": event.get("weapon_kind"),
+                        "damage": int(event.get("planned_damage") or 0),
+                        "suppress_s": float(event.get("suppress_s") or 0.0),
+                        "intercepted": bool(event.get("intercepted")),
+                        "planned_hit": bool(event.get("planned_hit")),
+                        "pk": event.get("pk"),
+                        "intercept_pk": event.get("intercept_pk"),
+                        "impact_at_s": event.get("impact_at_s"),
+                        "model": event.get("model"),
+                        "launch_tick_s": self.time_s,
+                    })
                 if event.get("type") == "indirect_fire":
                     event.setdefault("target_blood", None)
                 else:
@@ -973,6 +1044,49 @@ class World(object):
         # handled by OBB traffic checks.  Obstacles still hard-block.
         return not self._obstacle_blocks(entity, lon, lat)
 
+    def _resolve_pending_impacts(self) -> None:
+        """Apply missile impacts whose flight time has elapsed (P2)."""
+        if not self._pending_impacts:
+            return
+        remaining = []
+        for item in sorted(self._pending_impacts,
+                           key=lambda x: (x["due_s"], x["attacker"],
+                                          x["target"])):
+            if item["due_s"] > self.time_s:
+                remaining.append(item)
+                continue
+            target = self.entities.get(item["target"])
+            if target is None or not target.alive:
+                continue
+            intercepted = bool(item.get("intercepted"))
+            hit = bool(item.get("planned_hit")) and not intercepted
+            result = ("intercepted" if intercepted
+                      else ("hit" if hit and item["damage"] > 0 else "miss"))
+            if result == "hit":
+                self.apply_damage(target.uid, int(item["damage"]))
+                if item.get("suppress_s"):
+                    self.apply_suppression(target.uid,
+                                           float(item["suppress_s"]))
+            self._append({
+                "type": "missile_impact",
+                "actors": [item["attacker"], item["target"]],
+                "weapon": item.get("weapon"),
+                "weapon_kind": item.get("kind"),
+                "result": result,
+                "intercepted": intercepted,
+                "damage": int(item["damage"]) if result == "hit" else 0,
+                "tof_s": round(item["due_s"] - item["launch_tick_s"], 1),
+                "pk": item.get("pk"),
+                "intercept_pk": item.get("intercept_pk"),
+                "impact_at_s": item.get("impact_at_s"),
+                "model": item.get("model"),
+                "target_blood": target.blood,
+                "location_geo": {"lon": target.pose.lon,
+                                 "lat": target.pose.lat},
+                "tick_s": round(self.time_s, 1),
+            })
+        self._pending_impacts = remaining
+
     # -- traffic collisions (P0.2) -----------------------------------------
     def _rebuild_traffic(self) -> None:
         self.traffic.rebuild(e for e in self.sorted_entities()
@@ -1178,6 +1292,8 @@ class World(object):
         dt = self.dt_s if dt is None else float(dt)
         before = len(self.events)
         ctx = WorldRuleContext(self)
+        self._resolve_pending_impacts()
+        self._update_environment()
         self._tick_timers(dt)
         self._apply_orders()
         self._rebuild_traffic()

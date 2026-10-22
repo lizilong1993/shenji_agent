@@ -35,6 +35,7 @@ DEFAULT_ANCHOR = (119.9, 23.1)
 DETECTION_MODELS = ("table", "spotting", "shadow", "physical")
 DIRECT_FIRE_MODELS = ("crt", "physics", "shadow")
 INDIRECT_FIRE_MODELS = ("table", "physics")
+MISSILE_MODELS = ("instant", "flight")
 
 
 def _engine_section(value) -> dict:
@@ -244,6 +245,9 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
     indirect_fire_model = str(engine.get("indirect_fire_model") or "physics").lower()
     if indirect_fire_model not in INDIRECT_FIRE_MODELS:
         indirect_fire_model = "physics"
+    missile_model = str(engine.get("missile_model") or "flight").lower()
+    if missile_model not in MISSILE_MODELS:
+        missile_model = "flight"
     commander_interval_s = _as_float(engine.get("commander_interval_s"), 2.0)
     use_role_cards = _as_bool(engine.get("use_role_cards"), False)
     nav = None
@@ -257,9 +261,38 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
                   detection_model=detection_model,
                   direct_fire_model=direct_fire_model,
                   indirect_fire_model=indirect_fire_model,
+                  missile_model=missile_model,
                   enable_radio_share=_as_bool(engine.get("enable_radio_share"), False),
                   enable_tactics=_as_bool(engine.get("enable_tactics"), False),
                   commander_interval_s=commander_interval_s)
+    weather_base = scenario.get("weather_base")
+    weather_timeline = scenario.get("weather")
+    start_hour = scenario.get("start_hour_utc")
+    utc_offset = scenario.get("utc_offset_h")
+    if (isinstance(weather_base, dict) or isinstance(weather_timeline, list)
+            or start_hour is not None or utc_offset is not None):
+        world.weather_enabled = True
+    world.start_hour_utc = _as_float(start_hour, 12.0)
+    world.utc_offset_h = _as_float(utc_offset, 0.0)
+    base = weather_base if isinstance(weather_base, dict) else {}
+    for key in ("visibility_m", "sea_state", "wind_ms"):
+        if base.get(key) is not None:
+            try:
+                world.weather[key] = float(base[key])
+            except (TypeError, ValueError):
+                pass
+    for item in (weather_timeline if isinstance(weather_timeline, list) else []):
+        if not isinstance(item, dict):
+            continue
+        entry = {"at_s": _as_float(item.get("at_s"), 0.0)}
+        for key in ("visibility_m", "sea_state", "wind_ms"):
+            if item.get(key) is not None:
+                try:
+                    entry[key] = float(item[key])
+                except (TypeError, ValueError):
+                    continue
+        world.weather_timeline.append(entry)
+    world.weather_timeline.sort(key=lambda e: e["at_s"])
     if _as_bool(engine.get("enable_commander"), False):
         from sim.commander import RuleCommander
         world.set_commander(RuleCommander(), commander_interval_s)

@@ -112,7 +112,8 @@ def weapons_for(name: str, domain: str) -> List[SeaAirWeapon]:
 
 
 def resolve_sea_air(attacker: RuleEntityView, target: RuleEntityView,
-                    ctx: RuleContext) -> Optional[dict]:
+                    ctx: RuleContext, flight_model: str = "instant",
+                    now_s: Optional[float] = None) -> Optional[dict]:
     kinds = allowed_kinds(attacker.domain, target.domain)
     if not kinds or attacker.affiliation == target.affiliation:
         return None
@@ -135,15 +136,48 @@ def resolve_sea_air(attacker: RuleEntityView, target: RuleEntityView,
     damage = best.damage if hit else 0
     ctx.consume_ammo(attacker.uid, best.key, 1)
     ctx.mark_fired(attacker.uid, best.key, best.cooldown_s)
+    if flight_model == "flight":
+        if now_s is None:
+            raise ValueError("flight_model='flight' requires now_s")
+        from rules import missile
+        tof = missile.tof_s(best.kind, distance_km)
+        intercept_pk = missile.intercept_probability(
+            target, best.kind, distance_km, ctx)
+        intercepted = missile.terminal_roll(ctx, intercept_pk)
+        final_hit = hit and not intercepted
+        return {
+            "type": "sea_air_fire",
+            "model": "flight",
+            "actors": [attacker.uid, target.uid],
+            "domain": "%s->%s" % (_norm(attacker.domain), _norm(target.domain)),
+            "weapon": best.key,
+            "weapon_kind": best.kind,
+            "range_km": round(distance_km, 1),
+            "pk": round(pk, 3),
+            "roll": round(roll, 3),
+            "result": "launched",
+            "planned_hit": bool(hit),
+            "intercepted": bool(intercepted),
+            "intercept_pk": round(intercept_pk, 3),
+            "tof_s": round(tof, 1),
+            "impact_at_s": (None if now_s is None else round(now_s + tof, 1)),
+            "planned_damage": int(damage if final_hit else 0),
+            "suppress_s": 60.0 if final_hit and best.kind in (
+                "asm", "torpedo", "air_ground") else 0.0,
+            "damage": 0,
+            "target_blood": getattr(target, "blood", 0),
+        }
     if hit:
         ctx.apply_damage(target.uid, damage)
         if best.kind in ("asm", "torpedo", "air_ground"):
             ctx.apply_suppression(target.uid, 60.0)
     return {
         "type": "sea_air_fire",
+        "model": "instant",
         "actors": [attacker.uid, target.uid],
         "domain": "%s->%s" % (_norm(attacker.domain), _norm(target.domain)),
         "weapon": best.key,
+        "weapon_kind": best.kind,
         "range_km": round(distance_km, 1),
         "pk": round(pk, 3),
         "roll": round(roll, 3),

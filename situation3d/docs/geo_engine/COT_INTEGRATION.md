@@ -21,9 +21,10 @@
 }
 ```
 
-默认值与 P1.5 后的语义：`detection_model=table`、`direct_fire_model=physics`、
-`indirect_fire_model=physics`、`enable_radio_share=false`、`enable_tactics=false`。
-CRT/散布表可通过 `direct_fire_model=crt`、`indirect_fire_model=table` 切回校准/兼容模式。
+默认值与 P2 后的语义：`detection_model=table`、`direct_fire_model=physics`、
+`indirect_fire_model=physics`、`missile_model=flight`、`enable_radio_share=false`、
+`enable_tactics=false`。CRT/散布表/即时导弹可通过
+`direct_fire_model=crt`、`indirect_fire_model=table`、`missile_model=instant` 切回兼容模式。
 
 `detection_model=physical`（P1.4，可选，默认不启用）：3D 地形/建筑/烟幕射线 + 传感器视场/探测概率 + 分方航迹，详见 `P1_4_perception.md`；该模式按 `enable_radio_share` 决定是否共享。
 

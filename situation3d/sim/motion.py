@@ -78,6 +78,7 @@ def integrate(entity, dt_s: float, env, cell_check=None, nav=None,
     p = route.pose_at(entity.route_s)
     nav_here = nav_domain and nav.covers(p.lon, p.lat)
     escaping = (nav_here and not nav.motion_point_ok(prof, p.lon, p.lat))
+    is_air = entity.domain == "air"
 
     v_target = kinematics.cap_at(route, caps, entity.route_s, prof.decel_ms2)
     # Discrete guard: the speed at the end of this tick must be brakeable
@@ -90,6 +91,37 @@ def integrate(entity, dt_s: float, env, cell_check=None, nav=None,
         + 2.0 * prof.decel_ms2 * max(0.0, entity.velocity_ms) * dt_s))
     if escaping:
         v_target = max(v_target, prof.max_speed_ms * 0.2)
+    if is_air:
+        # Vertical dynamics (P2): climb/descent rate limited, not a pose jump.
+        if entity.route_s <= 1e-6 and entity.pose.alt_m < p.alt_m:
+            entity.pose.alt_m = p.alt_m  # airborne at the planned altitude
+        target_alt = p.alt_m
+        error = target_alt - entity.pose.alt_m
+        if abs(error) < 0.2:
+            desired_rate = 0.0
+        elif error > 0.0:
+            desired_rate = prof.climb_rate_ms
+        else:
+            desired_rate = -prof.descent_rate_ms
+        entity.vertical_ms = _approach(entity.vertical_ms, desired_rate,
+                                       prof.accel_ms2 * dt_s)
+        delta = entity.vertical_ms * dt_s
+        if error > 0.0:
+            entity.pose.alt_m = min(target_alt,
+                                    entity.pose.alt_m + max(0.0, delta))
+        elif error < 0.0:
+            entity.pose.alt_m = max(target_alt,
+                                    entity.pose.alt_m + min(0.0, delta))
+        if entity.vertical_ms > 0.2:
+            v_target *= max(0.6, 1.0 - 0.25 * entity.vertical_ms
+                            / max(0.1, prof.climb_rate_ms))
+    if entity.domain == "surface":
+        try:
+            sea_state = int(getattr(env.weather(p.lon, p.lat), "sea_state", 0)
+                            or 0)
+        except Exception:
+            sea_state = 0
+        v_target *= max(0.5, 1.0 - 0.04 * sea_state)
     try:
         raw_mobility = float((entity.components or {}).get("mobility", 1.0))
     except (AttributeError, TypeError, ValueError):
@@ -135,11 +167,17 @@ def integrate(entity, dt_s: float, env, cell_check=None, nav=None,
                     blocked = not _footprint_ok(nav, prof, p_next.lon,
                                                 p_next.lat, proposed, env)
         else:
-            blocked = not passable(prof, p_next.lon, p_next.lat, env, p_next.alt_m)
+            # Air routes are planned at terrain+AGL; the actual altitude lags
+            # for presentation/energy but does not hard-block the sortie.
+            blocked = not passable(prof, p_next.lon, p_next.lat, env,
+                                   p_next.alt_m)
         if not blocked and cell_check is not None:
             blocked = not cell_check(p_next.lon, p_next.lat)
         if blocked:
+            keep_alt = entity.pose.alt_m if is_air else None
             entity.pose = route.pose_at(entity.route_s)
+            if is_air:
+                entity.pose.alt_m = keep_alt
             entity.pose.heading_deg = heading
             entity.velocity_ms = 0.0
             entity.moving = False
@@ -150,7 +188,10 @@ def integrate(entity, dt_s: float, env, cell_check=None, nav=None,
                 and not traffic_check(p_next.lon, p_next.lat, proposed)):
             # Rejected move: keep the last committed heading (an un-checked
             # in-place rotation could itself cause an overlap).
+            keep_alt = entity.pose.alt_m if is_air else None
             entity.pose = route.pose_at(entity.route_s)
+            if is_air:
+                entity.pose.alt_m = keep_alt
             entity.pose.heading_deg = heading
             entity.velocity_ms = 0.0
             entity.moving = False
@@ -166,7 +207,10 @@ def integrate(entity, dt_s: float, env, cell_check=None, nav=None,
     if entity.route is not None:
         remaining = route.total_m - entity.route_s
         if reason is None and remaining <= 1.0:
+            keep_alt = entity.pose.alt_m if is_air else None
             entity.pose = route.pose_at(route.total_m)
+            if is_air:
+                entity.pose.alt_m = keep_alt
             entity.pose.heading_deg = heading
             entity.route = None
             entity.route_s = 0.0
@@ -174,6 +218,9 @@ def integrate(entity, dt_s: float, env, cell_check=None, nav=None,
             entity.moving = False
             entity.pace_scale = 1.0
         else:
+            keep_alt = entity.pose.alt_m if is_air else None
             entity.pose = route.pose_at(entity.route_s)
+            if is_air:
+                entity.pose.alt_m = keep_alt
             entity.pose.heading_deg = heading
     return reason
