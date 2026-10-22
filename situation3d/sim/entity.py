@@ -179,6 +179,8 @@ class Entity(object):
     components: Dict[str, float] = field(
         default_factory=lambda: {"mobility": 1.0, "firepower": 1.0,
                                  "sensors": 1.0})
+    # P1.6 intent pace (dash/normal/cautious), applied by motion.
+    pace_scale: float = 1.0
 
     def to_rule_view(self, stacked: Optional[bool] = None) -> EntityRuleView:
         """Project to the read-only view consumed by ``rules``.

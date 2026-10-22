@@ -73,6 +73,9 @@ def _landing_berth(world, obj, entity):
 
 
 def _assign_orders(world, objectives) -> None:
+    """Behaviour layer (P1.6): pick an objective cell/pace, not coordinates."""
+    from sim.intent import Intent
+
     for entity in world.sorted_entities():
         if not entity.alive or entity.on_board:
             continue
@@ -85,35 +88,23 @@ def _assign_orders(world, objectives) -> None:
                 entity.goal = None
                 entity.route_s = 0.0
                 entity.moving = False
+                entity.pace_scale = 1.0
             else:
                 continue
         live = []
         for o in objectives:
             cell = world.rule_grid.cell_of(float(o["lon"]), float(o["lat"]))
             owner = world.objectives.get(cell, {}).get("owner", o["owner"])
-            live.append(dict(o, owner=owner))
+            live.append(dict(o, owner=owner, cell=cell))
         candidates = [o for o in live if o["owner"] != entity.affiliation]
         if not candidates:
             candidates = list(live)
         if not candidates:
             continue
-        ranked = []
         landing_ship = any(k in entity.name for k in ("登陆", "两栖舰"))
-        for obj in candidates:
-            cell = world.rule_grid.cell_of(float(obj["lon"]), float(obj["lat"]))
-            center = world.rule_grid.cell_center_lonlat(*cell)
-            lon, lat = center
-            if landing_ship and "BEACH" in str(obj.get("name")):
-                berth = _landing_berth(world, obj, entity)
-                if berth is not None:
-                    lon, lat = berth
-            ranked.append((haversine_m((entity.pose.lon, entity.pose.lat), (lon, lat)), lon, lat))
-        # Spread units around an objective so they do not end up at the same
-        # point (which would be inside every weapon's minimum range).
-        # Cell-centre goals with a <=40 m offset stay inside the 200 m rule
-        # cell so objective capture still happens at the destination cell.
-        off_lon = ((entity.uid % 5) - 2) * 0.0002
-        off_lat = (((entity.uid // 5) % 5) - 2) * 0.0002
+        pace = ("dash" if entity.domain in ("land", "amphibious")
+                and entity.unit_type != "infantry" else "normal")
+
         def preference(obj_name):
             name = entity.name
             landing = any(k in name for k in ("登陆", "两栖", "补给"))
@@ -127,22 +118,28 @@ def _assign_orders(world, objectives) -> None:
                 return -1e6
             return 0.0
 
-        base_ranked = ranked
         ranked = []
-        for (d, lon, lat), o in zip(base_ranked, candidates):
-            if landing_ship and "BEACH" in str(o.get("name")):
-                ranked.append((d + preference(o["name"]), lon, lat))
+        for obj in candidates:
+            cell = obj["cell"]
+            lon, lat = world.rule_grid.cell_center_lonlat(*cell)
+            berth = None
+            if landing_ship and "BEACH" in str(obj.get("name")):
+                berth = _landing_berth(world, obj, entity)
+                if berth is not None:
+                    lon, lat = berth
+            score = (haversine_m((entity.pose.lon, entity.pose.lat),
+                                 (lon, lat))
+                     + preference(str(obj.get("name") or "")))
+            ranked.append((score, obj, cell, lon, lat, berth))
+        ranked.sort(key=lambda row: row[0])
+        for _, obj, cell, lon, lat, berth in ranked:
+            if berth is not None:
+                intent = Intent(lon=lon, lat=lat, pace=pace,
+                                objective=str(obj.get("name") or ""))
             else:
-                ranked.append((d + preference(o["name"]),
-                               lon + off_lon, lat + off_lat))
-        ranked.sort()
-        for _, lon, lat in ranked:
-            route = world.plan_route(entity, (lon, lat))
-            if route is not None:
-                entity.goal = (lon, lat)
-                entity.route = route
-                entity.route_s = 0.0
-                entity.moving = True
+                intent = Intent(cell=cell, pace=pace,
+                                objective=str(obj.get("name") or ""))
+            if world.assign_intent(entity, intent):
                 break
 
 

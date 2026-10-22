@@ -96,6 +96,13 @@ def integrate(entity, dt_s: float, env, cell_check=None, nav=None,
         raw_mobility = 1.0
     mobility = 0.0 if raw_mobility <= 0.05 else max(0.2, raw_mobility)
     v_target *= mobility
+    try:
+        pace = max(0.3, min(1.0, float(getattr(entity, "pace_scale", 1.0))))
+    except (TypeError, ValueError):
+        pace = 1.0
+    # Pace is a fraction of the allowed cap: it may slow the unit but never
+    # overrides terrain/curvature/braking limits.
+    v_target = min(v_target, v_target * pace)
     rate = prof.accel_ms2 if v_target > entity.velocity_ms else prof.decel_ms2
     entity.velocity_ms = _approach(entity.velocity_ms, v_target, rate * dt_s)
     entity.moving = entity.velocity_ms > 0.05
@@ -165,6 +172,7 @@ def integrate(entity, dt_s: float, env, cell_check=None, nav=None,
             entity.route_s = 0.0
             entity.velocity_ms = 0.0
             entity.moving = False
+            entity.pace_scale = 1.0
         else:
             entity.pose = route.pose_at(entity.route_s)
             entity.pose.heading_deg = heading

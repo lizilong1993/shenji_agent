@@ -25,14 +25,14 @@ import pickle
 from typing import Dict, List, Optional, Tuple
 
 from env.service import LandCover
-from geo.geodesy import haversine_m
+from geo.geodesy import haversine_m, initial_bearing_deg
 from mobility.passability import effective_speed_ms, passable
 from mobility.profile import PlatformProfile
 from sim.entity import Pose, Route
 
 RES_M = 30.0
 MAX_CELLS = 250000
-CACHE_VERSION = 5
+CACHE_VERSION = 6
 _MAX_SNAP_CELLS = 5      # start snap radius; route still begins at the entity pose
 _MAX_GOAL_SNAP_CELLS = 2  # goal snap radius keeps objectives in their rule cell
 
@@ -199,6 +199,8 @@ class NavField(object):
         n = self.rows * self.cols
         self.road = bytearray(n)          # 0 none, 1..3 class rank
         self.bridge = bytearray(n)        # 1 = bridge/tunnel deck
+        # 0 = no one-way info; 1..255 = edge bearing (a->b) quantised.
+        self.oneway = bytearray(n)
         self.limits: Dict[int, dict] = {}
         graph = getattr(self.env, "road_graph", None)
         if graph is None:
@@ -222,6 +224,9 @@ class NavField(object):
             if width > 0:
                 limits["width"] = width
             length = haversine_m(pa, pb)
+            bearing = initial_bearing_deg(pa, pb)
+            dir_code = int(round(bearing / 360.0 * 254.0)) + 1
+            oneway = rank > 0 and bool(edge.get("oneway"))
             steps = max(1, int(math.ceil(length / step)))
             for k in range(steps + 1):
                 f = k / float(steps)
@@ -232,6 +237,18 @@ class NavField(object):
                     continue
                 if rank > self.road[i]:
                     self.road[i] = rank
+                    self.oneway[i] = dir_code if oneway else 0
+                elif rank == self.road[i] and rank > 0:
+                    if not oneway:
+                        self.oneway[i] = 0  # bidirectional road wins
+                    elif self.oneway[i] == 0:
+                        self.oneway[i] = dir_code
+                    elif self.oneway[i] != 255:
+                        prev_deg = (self.oneway[i] - 1) / 254.0 * 360.0
+                        diff = abs((bearing - prev_deg + 180.0) % 360.0
+                                   - 180.0)
+                        if diff > 90.0:
+                            self.oneway[i] = 255  # junction: no enforcement
                 if deck:
                     # Thicken to a plus pad so diagonal bridges are not
                     # severed by the A* no-corner-cutting rule.
@@ -299,7 +316,8 @@ class NavField(object):
                     or len(data["cover"]) != size
                     or len(data["building_h"]) != size
                     or len(data["road"]) != size
-                    or len(data["bridge"]) != size):
+                    or len(data["bridge"]) != size
+                    or len(data["oneway"]) != size):
                 return False
         except (OSError, EOFError, ImportError, AttributeError, KeyError,
                 TypeError, ValueError, pickle.PickleError):
@@ -318,6 +336,7 @@ class NavField(object):
         self.building_h = data["building_h"]
         self.road = data["road"]
         self.bridge = data["bridge"]
+        self.oneway = data["oneway"]
         self.limits = data["limits"]
         self._cache_hit = True
         return True
@@ -333,7 +352,8 @@ class NavField(object):
             "m_lon": self.m_lon, "m_lat": self.m_lat,
             "elev": self.elev, "slope": self.slope, "depth": self.depth,
             "cover": self.cover, "building_h": self.building_h,
-            "road": self.road, "bridge": self.bridge, "limits": self.limits,
+            "road": self.road, "bridge": self.bridge, "oneway": self.oneway,
+            "limits": self.limits,
         }
         tmp = path + ".tmp"
         try:
@@ -592,7 +612,10 @@ class NavField(object):
                     if not mask[base + nc] or not mask[nr * cols + col]:
                         continue
                 step = self.res_m * cost
-                tentative = g + step / speed[ni]
+                oneway_factor = self._oneway_factor(prof, i, ni)
+                if oneway_factor <= 0.0:
+                    continue
+                tentative = g + step / speed[ni] * oneway_factor
                 if tentative >= g_score.get(ni, float("inf")) - 1e-9:
                     continue
                 if blocked is not None and ni != goal_i:
@@ -631,7 +654,15 @@ class NavField(object):
                                self.env.elevation(last_lon, last_lat)))
         if len(points) < 2:
             return None
+        raw_points = list(points)
         points = self._smooth(points, prof, mask, blocked)
+        points = self._fillet(prof, points, mask, blocked)
+        if prof.road_bound and not self._points_oneway_ok(prof, points):
+            # Smoothing/fillets must not bypass a one-way restriction.
+            if self._points_oneway_ok(prof, raw_points):
+                points = raw_points
+            else:
+                return None
         return self._route(prof, points)
 
     def _segment_clear(self, a: Pose, b: Pose, mask, blocked) -> bool:
@@ -692,6 +723,50 @@ class NavField(object):
                 return False
         return True
 
+    def _points_oneway_ok(self, prof, points: List[Pose]) -> bool:
+        if not prof.road_bound:
+            return True
+        for i in range(1, len(points)):
+            a, b = points[i - 1], points[i]
+            total = haversine_m((a.lon, a.lat), (b.lon, b.lat))
+            n = max(1, int(math.ceil(total / (self.res_m * 0.5))))
+            prev_cell = None
+            for k in range(n + 1):
+                f = k / float(n)
+                cell = self._index_of(a.lon + (b.lon - a.lon) * f,
+                                      a.lat + (b.lat - a.lat) * f)
+                if cell is None:
+                    continue
+                if prev_cell is not None and cell != prev_cell:
+                    if self._oneway_factor(prof, prev_cell, cell) <= 0.0:
+                        return False
+                prev_cell = cell
+        return True
+
+    def _oneway_factor(self, prof: PlatformProfile, from_i: int,
+                       to_i: int) -> float:
+        """Cost multiplier for travelling against a one-way road.
+
+        Road-bound platforms are blocked; others pay a heavy detour penalty
+        (they may still cross kerbs/off-road, but prefer legal direction).
+        """
+        a = self.oneway[from_i]
+        b = self.oneway[to_i]
+        if (not a and not b) or a == 255 or b == 255:
+            return 1.0
+        r0, c0 = divmod(from_i, self.cols)
+        r1, c1 = divmod(to_i, self.cols)
+        bearing = initial_bearing_deg(self._center(r0, c0),
+                                      self._center(r1, c1))
+        ref_code = a if a not in (0, 255) else b
+        if ref_code in (0, 255):
+            return 1.0
+        ref = float(ref_code - 1) / 254.0 * 360.0
+        delta = abs((bearing - ref + 180.0) % 360.0 - 180.0)
+        if delta > 90.0:
+            return 0.0 if prof.road_bound else 3.0
+        return 1.0
+
     def _smooth(self, points: List[Pose], prof, mask, blocked) -> List[Pose]:
         out = [points[0]]
         i = 0
@@ -702,6 +777,123 @@ class NavField(object):
                 j -= 1
             out.append(points[j])
             i = j
+        return out
+
+    def _segment_clear_wide(self, a: Pose, b: Pose, prof, mask,
+                            blocked) -> bool:
+        """Centreline plus ±half-width samples (planner/motion agreement)."""
+        if not self._segment_clear(a, b, mask, blocked):
+            return False
+        half = max(1.0, float(getattr(prof, "width_m", 2.5)) / 2.0)
+        total = haversine_m((a.lon, a.lat), (b.lon, b.lat))
+        if total < 1.0:
+            return True
+        bearing = math.radians(initial_bearing_deg((a.lon, a.lat),
+                                                   (b.lon, b.lat)))
+        east = math.sin(bearing)
+        north = math.cos(bearing)
+        kx = 111320.0 * math.cos(math.radians((a.lat + b.lat) / 2.0))
+        ky = 110540.0
+        n = max(1, int(math.ceil(total / (self.res_m * 0.5))))
+        for k in range(n + 1):
+            f = k / float(n)
+            lon = a.lon + (b.lon - a.lon) * f
+            lat = a.lat + (b.lat - a.lat) * f
+            for side in (-1.0, 1.0):
+                olon = lon + side * half * (-north) / kx
+                olat = lat + side * half * east / ky
+                i = self._index_of(olon, olat)
+                if i is None:
+                    continue
+                if not mask[i] and not self.building_only_block(prof, olon, olat):
+                    return False
+                if blocked is not None and blocked(olon, olat):
+                    return False
+        return True
+
+    def _fillet(self, prof, points: List[Pose], mask, blocked) -> List[Pose]:
+        """Replace sharp corners with circular arcs of radius R_min.
+
+        Only non-pivot platforms need this; tracked/infantry keep their
+        vertices (they can turn in place or at high yaw rate).  Every arc is
+        validated against the same raster/collision authority, falling back
+        to the original vertex when the fillet would leave passable space.
+        """
+        radius = float(getattr(prof, "min_turn_radius_m", 0.0) or 0.0)
+        if getattr(prof, "pivot_turn", False) or radius <= 0.0 or len(points) < 3:
+            return points
+        out = [points[0]]
+        for i in range(1, len(points) - 1):
+            a, b, c = points[i - 1], points[i], points[i + 1]
+            kx = 111320.0 * math.cos(math.radians(b.lat))
+            ky = 110540.0
+            bx, by = b.lon * kx, b.lat * ky
+            ax, ay = a.lon * kx, a.lat * ky
+            cx, cy = c.lon * kx, c.lat * ky
+            d1 = math.hypot(ax - bx, ay - by)
+            d2 = math.hypot(cx - bx, cy - by)
+            if d1 < 1.0 or d2 < 1.0:
+                out.append(b)
+                continue
+            u1 = ((ax - bx) / d1, (ay - by) / d1)
+            u2 = ((cx - bx) / d2, (cy - by) / d2)
+            dot = max(-1.0, min(1.0, u1[0] * u2[0] + u1[1] * u2[1]))
+            interior = math.acos(dot)          # straight = pi
+            deflection = math.pi - interior    # straight = 0
+            if (deflection < math.radians(15.0)
+                    or deflection > math.radians(150.0)):
+                out.append(b)  # gentle corner or U-turn (multi-point turn)
+                continue
+            theta = interior
+            # Circular fillet: tangent length t = r / tan(interior/2)
+            # (equivalent to r*tan(deflection/2)).
+            cot_half = 1.0 / math.tan(theta / 2.0)
+            r = min(radius, 0.45 * d1, 0.45 * d2)
+            t = r * cot_half
+            if t > 0.45 * d1 or t > 0.45 * d2:
+                r = min(r, 0.45 * d1 / max(1e-6, cot_half),
+                        0.45 * d2 / max(1e-6, cot_half))
+                t = r * cot_half
+            if r < 1.0:
+                out.append(b)
+                continue
+            p1 = Pose(b.lon + u1[0] * t / kx, b.lat + u1[1] * t / ky,
+                      b.alt_m)
+            p2 = Pose(b.lon + u2[0] * t / kx, b.lat + u2[1] * t / ky,
+                      b.alt_m)
+            bis_raw = (u1[0] + u2[0], u1[1] + u2[1])
+            bl = math.hypot(bis_raw[0], bis_raw[1])
+            if bl < 1e-6:
+                out.append(b)
+                continue
+            bis = (bis_raw[0] / bl, bis_raw[1] / bl)
+            dist = r / math.sin(theta / 2.0)
+            center = (bx + bis[0] * dist, by + bis[1] * dist)
+            v1 = (p1.lon * kx - center[0], p1.lat * ky - center[1])
+            v2 = (p2.lon * kx - center[0], p2.lat * ky - center[1])
+            a1 = math.atan2(v1[1], v1[0])
+            a2 = math.atan2(v2[1], v2[0])
+            delta = (a2 - a1 + math.pi) % (2.0 * math.pi) - math.pi
+            samples = max(3, int(math.ceil(abs(delta) / math.radians(30.0))))
+            candidate = [p1]
+            for k in range(1, samples):
+                ang = a1 + delta * k / samples
+                candidate.append(Pose(
+                    (center[0] + r * math.cos(ang)) / kx,
+                    (center[1] + r * math.sin(ang)) / ky, b.alt_m))
+            candidate.append(p2)
+            prev = out[-1]
+            ok = True
+            for p in candidate + [c]:
+                if not self._segment_clear_wide(prev, p, prof, mask, blocked):
+                    ok = False
+                    break
+                prev = p
+            if ok:
+                out.extend(candidate)
+            else:
+                out.append(b)
+        out.append(points[-1])
         return out
 
     def _segment_speed(self, prof: PlatformProfile, a: Pose, b: Pose) -> float:

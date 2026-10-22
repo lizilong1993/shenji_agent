@@ -61,6 +61,8 @@ class World(object):
         self.traffic = CollisionIndex()
         self._crowd_warned: Dict[Tuple[int, int], float] = {}
         self._yield_streak: Dict[int, int] = {}
+        # P1.6 behaviour intents (objective + pace/risk).
+        self.intents: Dict[int, object] = {}
         # Physical perception state (P1.4).
         self.tracks: Dict[int, dict] = {}
         self._phys_last_seen: Dict[Tuple[int, int], float] = {}
@@ -175,6 +177,33 @@ class World(object):
         return entity.to_rule_view(stacked=self.stacked(entity))
 
     # -- routing ------------------------------------------------------------
+    def assign_intent(self, entity: Entity, intent) -> bool:
+        """Resolve an intent (objective cell / pace) into a planned route."""
+        try:
+            goal = intent.point(self.rule_grid)
+        except (ValueError, TypeError, AttributeError, IndexError):
+            return False
+        if intent.cell is not None:
+            # Deterministic small formation offset so several units sent to
+            # one objective do not share the exact same point (~20 m).
+            goal = (goal[0] + ((entity.uid % 5) - 2) * 0.0002,
+                    goal[1] + (((entity.uid // 5) % 5) - 2) * 0.0002)
+        route = self.plan_route(
+            entity, goal,
+            blocked=lambda lon, lat, ent=entity:
+            self._obstacle_blocks(ent, lon, lat))
+        if route is None:
+            self.intents.pop(entity.uid, None)
+            entity.pace_scale = 1.0
+            return False
+        entity.goal = (float(goal[0]), float(goal[1]))
+        entity.route = route
+        entity.route_s = 0.0
+        entity.moving = True
+        entity.pace_scale = float(intent.speed_scale())
+        self.intents[entity.uid] = intent
+        return True
+
     def plan_route(self, entity: Entity, goal, blocked=None):
         """Plan ``entity -> goal`` with the finest available authority.
 
@@ -237,6 +266,7 @@ class World(object):
                 entity.goal = None
                 entity.velocity_ms = 0.0
                 entity.moving = False
+                entity.pace_scale = 1.0
                 self.orders.pop(uid, None)
                 self._order_source.pop(uid, None)
             elif kind == "fire":
@@ -1175,6 +1205,7 @@ class World(object):
                         e.goal = None
                         e.velocity_ms = 0.0
                         e.moving = False
+                        e.pace_scale = 1.0
                         self.emit("traffic_stuck", [e.uid],
                                   "%s 连续让行超时，放弃当前目标" % e.name)
                 elif reason == "blocked" and e.goal is not None:
