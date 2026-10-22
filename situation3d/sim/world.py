@@ -273,6 +273,11 @@ class World(object):
         entities = [e for e in self.sorted_entities() if e.alive and not e.on_board]
         cells = self._cell_cache
         kind_of = {e.uid: ctx.view(e).unit_kind for e in entities}
+        det_meta = {}
+        for e in entities:
+            view = ctx.view(e)
+            det_meta[e.uid] = (int(ctx.cover_at(view)),
+                               ctx.elevation_grade(view))
         table = __import__("rules.detection", fromlist=["observation_doc"]).observation_doc()["table"]
         # For large forces, scan observers round-robin (full picture every
         # ``slice_count`` seconds) so the per-tick sensor cost stays bounded.
@@ -309,11 +314,16 @@ class World(object):
                 land_pair = (observer.domain in ("land", "amphibious")
                              and target.domain in ("land", "amphibious"))
                 if land_pair:
-                    # Terrain/observation results depend only on the cell
-                    # pair and the target's concealment; keep the cache
-                    # across scan slices so stationary forces are free.
+                    # Land observation depends on the cell pair, the target
+                    # concealment AND sub-cell data: cover polygons and the
+                    # continuous elevation grade.  Key on all of them so a
+                    # unit crossing a forest edge inside one cell is not
+                    # served a stale result.
                     key = (observer.uid, target.uid, co, ct,
-                           bool(target.concealed))
+                           bool(target.concealed),
+                           det_meta[target.uid][0],
+                           det_meta[observer.uid][1],
+                           det_meta[target.uid][1])
                     visible = self._detect_cache.get(key)
                     if visible is None:
                         visible = ctx.can_detect(observer, target,
@@ -321,13 +331,10 @@ class World(object):
                         if len(self._detect_cache) < 500000:
                             self._detect_cache[key] = visible
                 else:
-                    key = (observer.uid, target.uid, co, ct)
-                    visible = self._detect_cache.get(key)
-                    if visible is None:
-                        visible = ctx.can_detect(observer, target,
-                                                 distance=distance)
-                        if len(self._detect_cache) < 500000:
-                            self._detect_cache[key] = visible
+                    # Sea/air detection uses continuous positions and
+                    # pointwise LOS; never reuse across ticks.
+                    visible = ctx.can_detect(observer, target,
+                                             distance=distance)
                 if visible:
                     seen.add(target.uid)
         return result
