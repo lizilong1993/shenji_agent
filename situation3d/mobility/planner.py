@@ -31,13 +31,15 @@ class GridPlanner(object):
 
     def plan(self, prof: PlatformProfile, start: Tuple[float, float],
              goal: Tuple[float, float],
-             mode: Optional[str] = None) -> Optional[Route]:
+             mode: Optional[str] = None, blocked=None) -> Optional[Route]:
         start_cell = self.grid.cell_of(start[0], start[1])
         goal_cell = self.grid.cell_of(goal[0], goal[1])
         if not self.grid.in_bounds(start_cell) or not self.grid.in_bounds(goal_cell):
             return None
         if not passable(prof, goal[0], goal[1], self.env,
                         self._alt(prof, goal[0], goal[1])):
+            return None
+        if blocked is not None and blocked(goal[0], goal[1]):
             return None
 
         open_heap = []
@@ -67,6 +69,8 @@ class GridPlanner(object):
                 nlon, nlat = self.grid.cell_center_lonlat(*nb)
                 alt = self._alt(prof, nlon, nlat)
                 if not passable(prof, nlon, nlat, self.env, alt):
+                    continue
+                if blocked is not None and blocked(nlon, nlat):
                     continue
                 step_m = haversine_m((cx, cy), (nlon, nlat))
                 speed = effective_speed_ms(prof, nlon, nlat, self.env, alt)

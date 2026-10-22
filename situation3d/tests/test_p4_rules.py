@@ -107,5 +107,125 @@ class TestBridgeConstraints(unittest.TestCase):
                                       env))
 
 
+class TestMinefields(unittest.TestCase):
+    def test_damage_distribution_matches_table(self):
+        import random
+        from rules.minefield import MinefieldTables
+        tables = MinefieldTables()
+        rng = random.Random(4242)
+        n = 120000
+        counts = {}
+        for _ in range(n):
+            d = tables.resolve("vehicle", 2, rng)["damage"]
+            counts[d] = counts.get(d, 0) + 1
+        # Exact distribution: 2d6 counts × 中型装甲 correction.
+        base = {2: 0, 3: 0, 4: 0, 5: 0, 6: 1, 7: 1, 8: 0, 9: 0, 10: 0, 11: 2, 12: 1}
+        rect = {2: -1, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 1}
+        expected = {}
+        total = 36.0
+        for roll in range(2, 13):
+            ways = roll - 1 if roll <= 7 else 13 - roll
+            damage = max(0, base[roll] + rect[roll])
+            expected[damage] = expected.get(damage, 0.0) + ways / total
+        for damage, prob in expected.items():
+            observed = counts.get(damage, 0) / float(n)
+            self.assertLess(abs(observed - prob), 0.01,
+                            "damage %s: %.3f vs %.3f" % (damage, observed, prob))
+
+    def test_armour_calibration_changes_damage(self):
+        from rules.minefield import MinefieldTables
+
+        class FixedRng(object):
+            def __init__(self):
+                self.calls = 0
+
+            def randint(self, a, b):
+                self.calls += 1
+                return 5 if self.calls % 2 else 6   # 5 + 6 = 11
+
+        tables = MinefieldTables()
+        heavy = tables.resolve("vehicle", 4, FixedRng())
+        light = tables.resolve("vehicle", 0, FixedRng())
+        self.assertEqual(heavy["roll"], 11)
+        self.assertLess(heavy["damage"], light["damage"])
+        inf = tables.resolve("infantry", 0, FixedRng())
+        self.assertEqual(inf["damage"], 2)
+
+    def _world_with_field(self, obstacle=None):
+        from sim.scenario import build_world
+        basic = {"map_id": 1, "ele_grade": 10,
+                 "grid": {"center_lon": 119.9, "center_lat": 23.1,
+                          "cols": 24, "rows": 24, "width_m": 200.0},
+                 "map_data": [[{"pos": r * 100 + c, "elev": 10, "cond": 0,
+                                "roads": [0] * 6, "rivers": [0] * 6}
+                               for c in range(24)] for r in range(24)]}
+        grid_lon, grid_lat = 119.9, 23.1
+        field = {"name": "MF-1", "kind": "临时雷场", "owner": -1,
+                 "ring": [[grid_lon - 0.02, grid_lat - 0.02],
+                          [grid_lon + 0.02, grid_lat - 0.02],
+                          [grid_lon + 0.02, grid_lat + 0.02],
+                          [grid_lon - 0.02, grid_lat + 0.02],
+                          [grid_lon - 0.02, grid_lat - 0.02]]}
+        scenario = {"scenario_id": 1,
+                    "operators": [{"obj_id": 1, "color": 0, "type": 2, "name": "重型坦克",
+                                   "sub_type": 0, "blood": 5, "max_blood": 5, "armor": 3,
+                                   "cur_hex": 505, "carry_weapon_ids": [36], "value": 10}],
+                    "cities": [], "time": {"cur_step": 0, "tick": 10.0, "max_time": 999},
+                    "minefields": [field]}
+        if obstacle:
+            scenario["obstacles"] = [obstacle]
+        return build_world(scenario, basic, seed=7)
+
+    def test_minefield_triggers_once(self):
+        world = self._world_with_field()
+        events = world.step()
+        strikes = [e for e in events if e.get("type") == "mine_strike"]
+        self.assertEqual(len(strikes), 1)
+        self.assertIn(strikes[0]["roll"], range(2, 13))
+        events2 = world.step()
+        self.assertFalse([e for e in events2 if e.get("type") == "mine_strike"])
+
+    def test_obstacles_block_ground(self):
+        ring = [[119.88, 23.08], [119.92, 23.08],
+                [119.92, 23.12], [119.88, 23.12], [119.88, 23.08]]
+        world = self._world_with_field(
+            {"name": "RB-1", "kind": "roadblock", "ring": ring})
+        ent = world.entities[1]
+        self.assertFalse(world._can_enter_cell(ent, 119.90, 23.10))
+        self.assertTrue(world._can_enter_cell(ent, 119.95, 23.10))
+
+    def test_fortification_blocks_vehicles_only(self):
+        ring = [[119.88, 23.08], [119.92, 23.08],
+                [119.92, 23.12], [119.88, 23.12], [119.88, 23.08]]
+        world = self._world_with_field(
+            {"name": "FT-1", "kind": "fortification", "ring": ring})
+        ent = world.entities[1]
+        self.assertFalse(world._can_enter_cell(ent, 119.90, 23.10))
+        ent.unit_type = "infantry"
+        self.assertTrue(world._can_enter_cell(ent, 119.90, 23.10))
+
+    def test_planner_respects_blocked(self):
+        from compat.legacy import LegacyHexGrid
+        from env.grid import MapGridEnvironment
+        from mobility.planner import GridPlanner
+        from mobility.profile import PROFILES
+        basic = {"map_id": 1, "ele_grade": 10,
+                 "grid": {"center_lon": 119.9, "center_lat": 23.1,
+                          "cols": 24, "rows": 24, "width_m": 200.0},
+                 "map_data": [[{"pos": r * 100 + c, "elev": 10, "cond": 0,
+                                "roads": [0] * 6, "rivers": [0] * 6}
+                               for c in range(24)] for r in range(24)]}
+        grid = LegacyHexGrid.from_grid_meta(basic["grid"])
+        env = MapGridEnvironment(basic, grid)
+        planner = GridPlanner(env, grid)
+        start = grid.cell_center_lonlat(1, 1)
+        goal = grid.cell_center_lonlat(10, 10)
+        self.assertIsNone(planner.plan(PROFILES["tracked"], start, goal,
+                                       blocked=lambda lon, lat: True))
+        route = planner.plan(PROFILES["tracked"], start, goal,
+                             blocked=lambda lon, lat: False)
+        self.assertIsNotNone(route)
+
+
 if __name__ == "__main__":
     unittest.main()

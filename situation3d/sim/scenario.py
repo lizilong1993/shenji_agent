@@ -203,6 +203,27 @@ def _weapon_views(op: dict) -> Tuple[list, dict]:
     return views, ammo
 
 
+def _region_ring(item: dict):
+    ring = item.get("ring")
+    if ring:
+        return [[float(p[0]), float(p[1])] for p in ring]
+    center = item.get("center") or [item.get("lon"), item.get("lat")]
+    if center[0] is None or center[1] is None:
+        return []
+    import math as _math
+    radius = _as_float(item.get("radius_m"), 300.0)
+    lat0 = float(center[1])
+    kx = 111320.0 * _math.cos(_math.radians(lat0))
+    ky = 110540.0
+    pts = []
+    for i in range(24):
+        ang = 2.0 * _math.pi * i / 24.0
+        pts.append([float(center[0]) + radius * _math.cos(ang) / kx,
+                    lat0 + radius * _math.sin(ang) / ky])
+    pts.append(pts[0])
+    return pts
+
+
 def build_world(scenario: dict, basic: dict, seed: int = 20261021,
                 dt_s: float = 1.0, envpack: Optional[str] = None) -> World:
     if envpack:
@@ -230,6 +251,21 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
     if _as_bool(engine.get("enable_commander"), False):
         from sim.commander import RuleCommander
         world.set_commander(RuleCommander(), commander_interval_s)
+    for item in scenario.get("minefields") or []:
+        ring = _region_ring(item)
+        if ring:
+            world.minefields.append({
+                "name": str(item.get("name") or "minefield"),
+                "kind": str(item.get("kind") or "临时雷场"),
+                "owner": int(item.get("owner", -1)),
+                "ring": ring})
+    for item in scenario.get("obstacles") or []:
+        ring = _region_ring(item)
+        if ring:
+            world.obstacles.append({
+                "name": str(item.get("name") or "obstacle"),
+                "kind": str(item.get("kind") or "roadblock"),
+                "ring": ring})
     for op in scenario.get("operators") or []:
         unit_type = _unit_type(op)
         domain = _domain(str(op.get("name") or ""), int(op.get("type") or 2), unit_type)

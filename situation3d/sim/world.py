@@ -55,6 +55,9 @@ class World(object):
         self.seen: Dict[int, set] = {}
         self.objectives: Dict[Tuple[int, int], dict] = {}
         self.supply_points: List[Tuple[float, float]] = []
+        self.minefields: List[dict] = []
+        self.obstacles: List[dict] = []
+        self._mine_hits: set = set()
         self.events: List[dict] = []
         self._event_id = 0
         self.intel: Dict[int, dict] = {}
@@ -179,8 +182,11 @@ class World(object):
                     self._order_source.pop(uid, None)
                     continue
                 entity.goal = goal
-                route = self.planner.plan(entity.profile, (entity.pose.lon, entity.pose.lat),
-                                          entity.goal)
+                route = self.planner.plan(
+                    entity.profile, (entity.pose.lon, entity.pose.lat),
+                    entity.goal,
+                    blocked=lambda lon, lat, ent=entity:
+                    self._obstacle_blocks(ent, lon, lat))
                 if route is not None:
                     entity.route = route
                     entity.route_s = 0.0
@@ -567,9 +573,82 @@ class World(object):
                 self.apply_damage(pid, passenger.blood + 1)
         entity.passengers = []
 
+    @staticmethod
+    def _point_in_ring(lon: float, lat: float, ring: List[List[float]]) -> bool:
+        inside = False
+        j = len(ring) - 1
+        for i in range(len(ring)):
+            xi, yi = ring[i][0], ring[i][1]
+            xj, yj = ring[j][0], ring[j][1]
+            if (yi > lat) != (yj > lat) and lon < xi + (lat - yi) * (xj - xi) / (yj - yi):
+                inside = not inside
+            j = i
+        return inside
+
+    @staticmethod
+    def _inside_regions(lon: float, lat: float, regions) -> List[dict]:
+        return [r for r in regions or []
+                if r.get("ring") and World._point_in_ring(lon, lat, r["ring"])]
+
+    def _obstacle_blocks(self, entity: Entity, lon: float, lat: float) -> bool:
+        """Roadblocks stop all ground movement; fortifications stop vehicles."""
+        if not _is_ground(entity) or not self.obstacles:
+            return False
+        for item in self._inside_regions(lon, lat, self.obstacles):
+            kind = item.get("kind") or "roadblock"
+            if kind == "fortification":
+                if entity.unit_type != "infantry":
+                    return True
+            else:
+                return True
+        return False
+
+    def _resolve_minefields(self) -> None:
+        if not self.minefields:
+            return
+        from rules.minefield import tables as mine_tables
+        for entity in self.sorted_entities():
+            if not entity.alive or entity.on_board or not _is_ground(entity):
+                continue
+            kind = "infantry" if entity.unit_type == "infantry" else "vehicle"
+            for field in self.minefields:
+                ring = field.get("ring") or []
+                if len(ring) < 3:
+                    continue
+                owner = field.get("owner", -1)
+                if owner is not None and int(owner) == entity.affiliation:
+                    continue
+                key = (entity.uid, field.get("name") or "")
+                if key in self._mine_hits:
+                    continue
+                if not self._point_in_ring(entity.pose.lon, entity.pose.lat, ring):
+                    continue
+                self._mine_hits.add(key)
+                result = mine_tables().resolve(
+                    kind, entity.armor, self.rng,
+                    field_type=field.get("kind") or "临时雷场")
+                event = {
+                    "type": "mine_strike",
+                    "actors": [entity.uid],
+                    "field": field.get("name"),
+                    "field_type": result["field_type"],
+                    "roll": result["roll"],
+                    "base_damage": result["base"],
+                    "armor": result["armor"],
+                    "rect_damage": result["rect"],
+                    "damage": result["damage"],
+                    "tick_s": round(self.time_s, 1),
+                    "location_geo": {"lon": entity.pose.lon, "lat": entity.pose.lat},
+                }
+                if result["damage"] > 0:
+                    self.apply_damage(entity.uid, result["damage"])
+                self._append(event)
+
     def _can_enter_cell(self, entity: Entity, lon: float, lat: float) -> bool:
         if not _is_ground(entity):
             return True
+        if self._obstacle_blocks(entity, lon, lat):
+            return False
         cell = self.rule_grid.cell_of(lon, lat)
         if cell == self._cell_cache.get(entity.uid):
             return True
@@ -696,7 +775,10 @@ class World(object):
                 reason = integrate(e, dt, self.env,
                                    cell_check=lambda lon, lat, ent=e: self._can_enter_cell(ent, lon, lat))
                 if reason == "blocked" and e.goal is not None:
-                    route = self.planner.plan(e.profile, (e.pose.lon, e.pose.lat), e.goal)
+                    route = self.planner.plan(
+                        e.profile, (e.pose.lon, e.pose.lat), e.goal,
+                        blocked=lambda lon, lat, ent=e:
+                        self._obstacle_blocks(ent, lon, lat))
                     if route is not None:
                         e.route = route
                         e.route_s = 0.0
@@ -704,6 +786,7 @@ class World(object):
                         e.goal = None
         self._sync_passengers()
         self._refresh_cell_cache()
+        self._resolve_minefields()
         self._enforce_stacking()
         self._refresh_cell_cache()
         ctx.refresh()
