@@ -193,7 +193,10 @@ PROBE = r"""
   out.tickEnd = snapshot();
   out.posErrEndM = 0;
   var posEnd = {};
-  ((data.frames[data.frames.length - 1] || {}).targets || []).forEach(function (p) { posEnd[p.id] = p; });
+  // 用应用实际落到的 tick：活动案例可能把终点截在 frames 末尾之前
+  // （TW2 推演在第 1000 tick 结束，而 frames 有 1441 帧）。
+  ((data.frames[state.tick] || { targets: [] }).targets || []).forEach(function (p) { posEnd[p.id] = p; });
+  out.posEndCount = Object.keys(posEnd).length;
   Object.keys(out.tickEnd.targets).forEach(function (id) {
     var p = posEnd[id];
     var v = out.tickEnd.targets[id].view;
@@ -201,6 +204,18 @@ PROBE = r"""
       out.posErrEndM = Math.max(out.posErrEndM, distanceM(p.lon, p.lat, v.lon, v.lat));
     }
   });
+  // 同一 tick 再跑一次 updateSituation：编队成员/数量不得因重复更新而变化。
+  var sigOnce = JSON.stringify((out.tickEnd.clusters || []).map(function (c) {
+    return (c.ids || []).slice().sort();
+  }));
+  Overview.updateSituation(data, state.tick);
+  var tdRepeat = Overview.targetDebug();
+  var sigTwice = JSON.stringify((tdRepeat.clusters || []).map(function (c) {
+    return (c.ids || []).slice().sort();
+  }));
+  out.repeatStable = sigOnce === sigTwice;
+  out.repeatClusters = (tdRepeat.clusters || []).length;
+  out.layoutConverged = !(tdRepeat.layout && tdRepeat.layout.overlap);
   out.endByStatus = { normal: [], damaged: [], severe: [], destroyed: [] };
   var names = ['normal', 'damaged', 'severe', 'destroyed'];
   Object.keys(out.tickEnd.targets).forEach(function (id) {
@@ -223,7 +238,10 @@ PROBE = r"""
   // ---- 选中同步 ----
   var selId = moveId;
   SituationHost.selectTarget(selId, false);
-  await sleep(600);
+  // 选中会改变主图的编队成员；无头 SwiftShader 下一帧可能超过 1 s，
+  // 显式标脏并多等一会儿，保证 HP 条的显隐已经按新成员关系同步。
+  if (window.RenderGovernor) RenderGovernor.mark('selftest-selection');
+  await sleep(2500);
   out.selectSync = (function () {
     var td = Overview.targetDebug();
     var rec = td.targets[selId] || {};
@@ -232,19 +250,27 @@ PROBE = r"""
 
   // 主 3D 图每个目标 icon 底部都应有一条血条。
   out.mainHp = (function () {
-    var n = 0, shown = 0, missing = [];
+    var n = 0, shown = 0, missing = [], hiddenUnexpected = [];
+    var isClustered = (window.TargetClusters && TargetClusters.isClustered)
+      ? TargetClusters.isClustered : function () { return false; };
     Object.keys(state.targets).forEach(function (id) {
       var r = state.targets[id];
       if (!r.hpBar) { missing.push(id); return; }
       n++;
       if (r.hpBar.show) shown++;
+      else if (!isClustered(id)) hiddenUnexpected.push(id);
     });
     var r = state.targets[selId];
     var st = TargetStatus.at(data, selId, state.tick);
-    var exp = TargetStatus.barUri(st.hp, st.status, 30, 4);
+    // 主图目标血条宽度是 34（见 createTargetEntities），不是鸟瞰图的 24。
+    var exp = TargetStatus.barUri(st.hp, st.status, 34, 4);
     var img = (r && r.hpBar && r.hpBar.billboard.image)
       ? String(r.hpBar.billboard.image.getValue()) : '';
-    return { bars: n, shown: shown, missing: missing, selectedBarMatches: img === exp };
+    var cd = (window.SituationHost && SituationHost.clustersDebug)
+      ? SituationHost.clustersDebug() : null;
+    return { bars: n, shown: shown, missing: missing,
+             hiddenUnexpected: hiddenUnexpected, selectedBarMatches: img === exp,
+             mainClusters: cd ? cd.clusters.length : null };
   })();
   out.targetHeadHp = (function () {
     var b = document.querySelector('.ts-head .ts-hp b');
@@ -408,6 +434,15 @@ def main() -> int:
     check("destroyed targets visible (X or destroyed cluster)",
           all(destroyed_visible(i) for i in dist.get("destroyed", [])),
           "some destroyed target is neither shown nor in a destroyed cluster")
+    bad_dead_badge = [c for c in clusters if c.get("deadCount") and not c.get("deadBadge")]
+    check("clusters with casualties carry the dead badge", not bad_dead_badge,
+          "missing badge: %s" % [(c.get("ids"), c.get("deadCount")) for c in bad_dead_badge][:4])
+    check("final tick frame found for position check", d.get("posEndCount", 0) > 0,
+          "posEndCount=%s" % d.get("posEndCount"))
+    check("overview cluster layout converged", bool(d.get("layoutConverged")),
+          "layout overlap after repeat update")
+    check("repeated update keeps fleet membership", bool(d.get("repeatStable")),
+          "clusters=%s" % d.get("repeatClusters"))
     if args.case == "taiwan_dense_transfer_v1":
         check("dense case uses clustering", len(clusters) > 0, "no clusters at final tick")
         singles = sum(1 for v in tk.values()
@@ -422,7 +457,9 @@ def main() -> int:
     # 去重叠：同类显示项（单目标之间、聚合图标之间）不得相交。
     items = (d.get("tickEnd") or {}).get("items") or []
     def rect(it):
-        return (it["x"] - it["w"] / 2.0, it["y"] - it["h"],
+        # h 已经把下方 8 px（血条/留白）算进去了，所以顶边是 y-(h-8)，
+        # 不能再用 y-h 重复扣一次。
+        return (it["x"] - it["w"] / 2.0, it["y"] - it["h"] + 8,
                 it["x"] + it["w"] / 2.0, it["y"] + 8)
     overlaps = []
     for i in range(len(items)):
@@ -485,11 +522,15 @@ def main() -> int:
     check("selection ring shown", bool((d.get("selectSync") or {}).get("ringShown")),
           "%s" % d.get("selectSync"))
     mh = d.get("mainHp") or {}
-    check("main map has HP bar per target",
-          mh.get("bars") == d.get("targetCount") and mh.get("shown") == d.get("targetCount"),
+    check("main map has HP bar per target (clustered members excepted)",
+          mh.get("bars") == d.get("targetCount") and not mh.get("missing")
+          and not mh.get("hiddenUnexpected"),
           "mainHp=%s" % mh)
     check("main map selected HP bar matches status", bool(mh.get("selectedBarMatches")),
           "mainHp=%s" % mh)
+    if mh.get("shown", 0) < d.get("targetCount", 0):
+        check("hidden HP bars are represented by main-map fleet icons",
+              (mh.get("mainClusters") or 0) > 0, "mainHp=%s" % mh)
     th = d.get("targetHeadHp")
     check("targetTS header has HP bar", bool(th and th.get("width")),
           "targetHeadHp=%s" % th)

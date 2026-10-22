@@ -333,41 +333,8 @@
     return barCache[key];
   }
 
-  // 聚合图标：把数量**画进图标内部**，不再外挂角标——外挂标签宽度约 30px，
-  // 两个相邻聚合的标签必然互压，还会抢点击。圆形底色按阵营：
-  //   red/blue 纯色；mixed 红蓝各半；mixeddead 红蓝各半 + 右上红角；
-  //   destroyed 深灰 + 白色 X + 数量。
-  var clusterCache = Object.create(null);
-  function clusterUri(faction, count) {
-    var key = (faction || 'neutral') + '|' + (count | 0);
-    if (clusterCache[key]) return clusterCache[key];
-    var kind = (faction === 'red' || faction === 'blue' || faction === 'mixed' ||
-                faction === 'mixeddead' || faction === 'destroyed') ? faction : 'neutral';
-    var base;
-    if (kind === 'red') base = '<circle cx="17" cy="17" r="15" fill="#C0392B"/>';
-    else if (kind === 'blue') base = '<circle cx="17" cy="17" r="15" fill="#2471A3"/>';
-    else if (kind === 'destroyed') base = '<circle cx="17" cy="17" r="15" fill="#4B5563"/>';
-    else if (kind === 'mixed' || kind === 'mixeddead') {
-      base = '<circle cx="17" cy="17" r="15" fill="#2471A3"/>'
-        + '<path d="M17 2 A15 15 0 0 0 17 32 Z" fill="#C0392B"/>';
-    } else base = '<circle cx="17" cy="17" r="15" fill="#34495E"/>';
-    var corners = (kind === 'mixeddead')
-      ? '<path d="M31 2 L34 2 L34 15 Z" fill="#B91C1C"/>'
-        + '<path d="M28.5 4.5 L32 8 M32 4.5 L28.5 8" stroke="#FFFFFF" '
-        + 'stroke-width="1.8" stroke-linecap="round"/>'
-      : '';
-    var n = Math.max(1, count | 0);
-    var label = kind === 'destroyed' ? ('✕' + n) : String(n);
-    var font = label.length >= 3 ? 10 : 12;
-    var text = '<text x="17" y="21" text-anchor="middle" font-family="sans-serif" '
-      + 'font-size="' + font + '" font-weight="700" fill="#FFFFFF">' + label + '</text>';
-    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34">'
-      + base
-      + '<circle cx="17" cy="17" r="15" fill="none" stroke="#FFFFFF" stroke-width="2"/>'
-      + corners + text + '</svg>';
-    clusterCache[key] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    return clusterCache[key];
-  }
+  // 目标/编队图标均由 web/src/symbology.js 统一负责（含编队计数与损毁角标）。
+  // 旧版鸟瞰专用的圆形聚合图标 clusterUri 已删除（2026-10-22 鸟瞰改用编队图标）。
 
   // 选中目标的黄色定位环：聚合图标可能压住选中目标，这个环最后绘制、永远可见。
   var selectionCache = null;
@@ -447,7 +414,6 @@
     counts: counts,
     barUri: barUri,
     markerUri: markerUri,
-    clusterUri: clusterUri,
     selectionUri: selectionUri,
     debug: debug,
     reset: function () {

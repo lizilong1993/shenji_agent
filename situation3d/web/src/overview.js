@@ -9,9 +9,9 @@
  * 三个关键行为（2026-10-21 第二轮反馈）
  * -------------------------------------
  * 1. **未加载案例时是世界视图**，不预设台海；加载后 `setData()` 才按案例取景。
- * 2. **密集目标聚合**：屏幕距离 <= CLUSTER_PX 的目标合并成一个图标，数量画在图标内，
- *    避免 80 个图标叠成一团；单个目标仍按原图标显示。选中目标不参与聚合，
- *    保证当前目标始终可见。
+ * 2. **密集目标聚合**：与主图共用 `web/src/targetClusters.js` 的屏幕空间聚类，
+ *    同一阵营目标合并成一个编队图标（阵营帧 + 数量 + 主类别），红蓝不混聚；
+ *    选中目标不参与聚合，保证当前目标始终可见。
  * 3. 原来的"主视窗黄色视野框"已移除：它是旧缩略图时代用来表示主相机范围的，
  *    在全局态势图里既遮挡目标又容易被误读成战场边界。
  *
@@ -44,10 +44,14 @@
   const ICON_CENTER_Y = ICON_OFFSET_Y - ICON_PX / 2;
   const BAR_OFFSET_Y = -2;          // 让血条顶到军标可见底边（图标资产底部有 ~2px 透明留白）
 
-  // 聚合阈值：屏幕距离小于该值的目标显示为一个图标 + 数量角标。
-  const CLUSTER_PX = 34;   // 聚合图标 34px：组内任意两个聚合图标不重叠
+  // 聚合阈值：与主图同一套屏幕空间聚类（见 web/src/targetClusters.js）。
+  // 鸟瞰图的单目标图标只有 24 px，所以阈值比主图小一档；编队图标 34 px。
+  const CLUSTER_JOIN_PX = 34;       // 新成员加入簇的距离（到簇心）
+  const CLUSTER_SPLIT_PX = 42;      // 已有成员离簇心超过该值拆散（滞回）
+  const CLUSTER_SPREAD_PX = 56;     // 簇内最大半径，防止链式串联
   const CLUSTER_ICON_PX = 34;
   const CLUSTER_BAR_W = 30;
+  const CLUSTER_MAX_OFFSET_PX = 26; // 红蓝编队图标的屏幕避让上限
 
   let viewer = null;          // 鸟瞰图 Viewer
   let mainViewer = null;      // 主 3D Viewer
@@ -60,6 +64,8 @@
   let targetEnts = {};        // 目标 id -> { def, icon, mark, bar, status, hpBucket, barKey }
   let clusterSlots = [];      // [{ main, bar }]
   let clusterState = [];      // 当前帧的聚合结果（诊断/自检用）
+  let prevClusters = [];      // 上一轮聚合（滞回 + 稳定 id，来自 TargetClusters）
+  let lastLayout = null;      // 最近一次聚合/避让迭代的诊断
   let selectionEnt = null;    // 选中目标的黄色定位环（最后绘制，压住聚合也不怕）
 
   // 损毁目标的图标压暗色。只压暗、不改色相，兵种图形仍然可辨。
@@ -156,6 +162,8 @@
     });
     clusterSlots = [];
     clusterState = [];
+    prevClusters = [];
+    lastLayout = null;
     if (selectionEnt) {
       try { viewer.entities.remove(selectionEnt); } catch (err) { /* already gone */ }
       selectionEnt = null;
@@ -251,7 +259,7 @@
         position: Cesium.Cartesian3.fromDegrees(0, 0, 0),
         show: false,
         billboard: {
-          image: _statusApi() ? _statusApi().clusterUri('neutral', 2) : undefined,
+          image: Symbology.clusterUri({ affiliation: 'blue', count: 2, icon: 'unknown' }),
           width: CLUSTER_ICON_PX, height: CLUSTER_ICON_PX,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, 0),
@@ -289,71 +297,32 @@
   }
 
   // ── 聚合 ────────────────────────────────────────────────────────────
+  //
+  // 2026-10-22：改用与主图同一套屏幕空间聚类（web/src/targetClusters.js）：
+  //   * 先按阵营分组，红蓝永不混聚；
+  //   * 滞回（join 34 / split 42）+ spread 上限 56，避免链式串联与边界闪烁；
+  //   * 稳定 id/成员由上一轮继承，播放时不会整组跳变；
+  //   * 红蓝编队图标重叠时用 TargetClusters.separateClusters 做屏幕避让。
+  // 旧的完整链接分组、mixed 组与圆形聚合图标已删除。
 
-  /**
-   * 完整链接聚合：一个目标加入某组的前提是它与**组内每个成员**的屏幕距离都
-   * <= CLUSTER_PX。不能用普通连通分量（并查集）——那会把"每隔 20px 一个"
-   * 的一长串目标串成一个巨大组（实测台海 31 个目标被并成 17 个一组）。
-   * 目标数最多几十个，O(n^3) 完全可接受。
-   */
-  function groupByScreen(ids, screen) {
-    const groups = [];
+  /** 编队的大类构成：dominant/mixed/domain 与主图完全同口径。 */
+  function clusterComposition(ids) {
+    const counts = {}, domains = {};
     ids.forEach(function (id) {
-      const p = screen[id];
-      if (!p) return;
-      for (let gi = 0; gi < groups.length; gi++) {
-        const g = groups[gi];
-        let fits = true;
-        for (let k = 0; k < g.length; k++) {
-          const q = screen[g[k]];
-          // 用切比雪夫距离（方形包围盒）而不是欧氏距离：斜向排列时欧氏
-          // <=34 仍会允许两个 24px 图标在单轴上重叠数像素。
-          if (Math.max(Math.abs(p.x - q.x), Math.abs(p.y - q.y)) > CLUSTER_PX) {
-            fits = false; break;
-          }
-        }
-        if (fits) { g.push(id); return; }
-      }
-      groups.push([id]);
+      const def = targetEnts[id] && targetEnts[id].def;
+      if (!def) return;
+      const cat = Symbology.categoryOf(def.icon, def.domain);
+      counts[cat] = (counts[cat] || 0) + 1;
+      if (def.domain) domains[def.domain] = true;
     });
-    return groups;
-  }
-
-  /** 组质心（屏幕坐标），用于把互相压住的聚合图标再合并。 */
-  function groupCentroid(g, screen) {
-    let x = 0, y = 0, n = 0;
-    g.forEach(function (id) {
-      const p = screen[id];
-      if (p) { x += p.x; y += p.y; n++; }
-    });
-    return n ? { x: x / n, y: y / n } : null;
-  }
-
-  /**
-   * 合并质心距离 <= CLUSTER_ICON_PX 的组：完整链接分组后仍可能留下几个
-   * 相邻 20px 的组，它们的聚合图标会互相压住（实测登台2 的 ×30/×24 标签
-   * 叠在一起）。同状态类别的组再合并一层，保证聚合图标之间不重叠。
-   */
-  function mergeCloseGroups(groups, screen) {
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (let i = 0; i < groups.length && !changed; i++) {
-        const ci = groupCentroid(groups[i], screen);
-        if (!ci) continue;
-        for (let j = i + 1; j < groups.length; j++) {
-          const cj = groupCentroid(groups[j], screen);
-          if (!cj) continue;
-          if (Math.max(Math.abs(ci.x - cj.x), Math.abs(ci.y - cj.y)) <= CLUSTER_ICON_PX) {
-            groups[i] = groups[i].concat(groups[j]);
-            groups.splice(j, 1);
-            changed = true;
-            break;
-          }
-        }
-      }
-    }
-    return groups;
+    const list = Object.keys(counts).map(function (k) {
+      return { key: k, count: counts[k], label: Symbology.categoryLabel(k) };
+    }).sort(function (a, b) { return (b.count - a.count) || (a.key < b.key ? -1 : 1); });
+    const dk = Object.keys(domains);
+    return {
+      list: list, dominant: list.length ? list[0].key : 'unknown',
+      mixed: list.length > 1, domain: dk.length === 1 ? dk[0] : null,
+    };
   }
 
   /**
@@ -395,14 +364,121 @@
     });
 
     // 选中目标不参与聚合（始终单独可见，并用最后绘制的黄环标记）。
-    // 存活与损毁**统一分组**：同一团目标只画一个聚合图标，图标内部同时表达
-    // 数量与"其中有损毁"（红角/整组损毁），避免两个聚合图标互相压盖。
+    // 聚类与主图同一纯函数：先按阵营分组（红蓝不混聚），滞回 + spread 上限；
+    // 上一轮成员用于稳定 id，避免播放时整组跳变。
     const clusterCandidates = Object.keys(screen).filter(function (id) { return id !== selected; });
-    const multi = mergeCloseGroups(
-      groupByScreen(clusterCandidates, screen).filter(function (g) { return g.length > 1; }), screen)
-      .sort(function (a, b) { return b.length - a.length; });
+    const items = clusterCandidates.map(function (id) {
+      return {
+        id: id, affiliation: targetEnts[id].def.affiliation,
+        x: screen[id].x, y: screen[id].y,
+      };
+    });
+    const clusterApi = global.TargetClusters || null;
+    const clusterOpts = {
+      joinPx: CLUSTER_JOIN_PX,
+      splitPx: CLUSTER_SPLIT_PX,
+      maxSpreadPx: CLUSTER_SPREAD_PX,
+      sizePx: CLUSTER_ICON_PX,
+    };
+    let groups = (clusterApi && clusterApi.computeClusters)
+      ? clusterApi.computeClusters(items, prevClusters, clusterOpts)
+      : [];
+    // 两遍收敛：第一遍结果作为第二遍的 prev，保证同一帧重复更新得到同一分组。
+    if (clusterApi && clusterApi.computeClusters) {
+      groups = clusterApi.computeClusters(items, groups, clusterOpts);
+    }
+    // 滞回/稳定 id 以**纯函数的输出**为准（不含下面的矩形布局合并），
+    // 否则按投影矩形补做的合并会让下一轮 sticky 判据把大队丢弃重算。
+    prevClusters = groups.map(function (g) {
+      return { id: g.id, affiliation: g.affiliation, members: g.members.slice() };
+    });
+    groups.sort(function (a, b) { return (b.count - a.count) || (a.id < b.id ? -1 : 1); });
+    // 编队图标画在**平均经纬度**的投影处（不是成员屏幕坐标的均值）；成员跨
+    // 大范围时两者可能差几十像素，避让/取证/合并都必须以图标实际位置为准。
+    function setGroupAnchor(g) {
+      let lon = 0, lat = 0, n = 0;
+      g.members.forEach(function (id) {
+        const p = pos[id];
+        if (p) { lon += p.lon; lat += p.lat; n++; }
+      });
+      g.lon = n ? lon / n : 0;
+      g.lat = n ? lat / n : 0;
+      if (n) {
+        const c = Cesium.Cartesian3.fromDegrees(g.lon, g.lat, 0);
+        const w = Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, c);
+        if (w && isFinite(w.x)) { g.x = w.x; g.y = w.y; }
+      }
+    }
+    groups.forEach(setGroupAnchor);
+    // 布局收敛：同阵营按**图标实际矩形**合并，红蓝按矩形推离。两步会互相影响
+    // （推离可能把红簇推进另一个红簇），所以合并/推离迭代到稳定为止。
+    // 避让框比图标本身多 4/12 px：34×42 的图标之间至少留 2 px 间隙，
+    // 避免"刚好贴边"被自检的 +1 px 容差判成相交。
+    const boxW = CLUSTER_ICON_PX + 4, boxH = CLUSTER_ICON_PX + 12;
+    // 合并判据留 margin：红蓝避让最多把两个同色簇推近 52 px，按锚点位置
+    // 提前合并可以避免"推离后又相交"的振荡。
+    const mergeW = CLUSTER_ICON_PX + 8, mergeH = CLUSTER_ICON_PX + 18;
+    function sameAffBoxOverlap() {
+      for (let i = 0; i < groups.length; i++) {
+        for (let j = i + 1; j < groups.length; j++) {
+          if (groups[i].affiliation !== groups[j].affiliation) continue;
+          if (Math.abs(groups[i].x - groups[j].x) < mergeW &&
+              Math.abs(groups[i].y - groups[j].y) < mergeH) return true;
+        }
+      }
+      return false;
+    }
+    for (let pass = 0; pass < 8; pass++) {
+      groups.forEach(setGroupAnchor);
+      let merged = false, again = true;
+      while (again) {
+        again = false;
+        for (let i = 0; i < groups.length && !again; i++) {
+          for (let j = i + 1; j < groups.length; j++) {
+            if (groups[i].affiliation !== groups[j].affiliation) continue;
+            if (Math.abs(groups[i].x - groups[j].x) >= mergeW ||
+                Math.abs(groups[i].y - groups[j].y) >= mergeH) continue;
+            groups[i].members = groups[i].members.concat(groups[j].members);
+            groups[i].count = groups[i].members.length;
+            groups.splice(j, 1);
+            setGroupAnchor(groups[i]);
+            merged = true;
+            again = true;
+            break;
+          }
+        }
+      }
+      // 红蓝编队图标不合并（语义上必须分开），但要在屏幕上推离，避免互相压住。
+      // 矩形按 34×42（图标 + 下方血条）判定；斜向排列时圆距离判据不够。
+      if (clusterApi && clusterApi.separateClusters) {
+        clusterApi.separateClusters(groups, {
+          w: boxW, h: boxH, maxOffset: CLUSTER_MAX_OFFSET_PX,
+        });
+      }
+      const overlap = sameAffBoxOverlap();
+      lastLayout = { pass: pass, groups: groups.length, merged: merged, overlap: overlap };
+      if (!merged && !overlap) break;
+    }
+    // 视口边界钳制：屏幕避让不能把最边缘的编队图标推出画布。
+    const cw = viewer.scene.canvas.clientWidth, ch = viewer.scene.canvas.clientHeight;
+    const halfW = CLUSTER_ICON_PX / 2 + 2;
+    groups.forEach(function (g) {
+      if (!isFinite(g.ox)) return;
+      const minDx = halfW + 1 - g.ox, maxDx = cw - halfW - 1 - g.ox;
+      const minDy = CLUSTER_ICON_PX + 4 - g.oy;
+      const maxDy = ch - 12 - g.oy;
+      if (minDx <= maxDx) g.dx = Math.max(minDx, Math.min(maxDx, g.dx));
+      if (minDy <= maxDy) g.dy = Math.max(minDy, Math.min(maxDy, g.dy));
+      g.x = g.ox + g.dx;
+      g.y = g.oy + g.dy;
+    });
+    const residual = sameAffBoxOverlap();
+    lastLayout.overlap = residual;
+    if (residual && global.console && console.warn) {
+      console.warn('[overview] cluster layout did not converge (same-affiliation overlap)');
+    }
     const clustered = {};
-    multi.forEach(function (g) { g.forEach(function (id) { clustered[id] = true; }); });
+    groups.forEach(function (g) { g.members.forEach(function (id) { clustered[id] = true; }); });
 
     // 更新个体目标。
     Object.keys(targetEnts).forEach(function (id) {
@@ -444,7 +520,8 @@
 
     // 更新聚合槽（按组大小降序，大组优先占槽）。
     clusterState = [];
-    multi.forEach(function (ids, i) {
+    groups.forEach(function (g, i) {
+      const ids = g.members;
       const slot = clusterSlots[i];
       if (!slot) {
         // 池不够时不能把成员静默藏掉：恢复成员个体显示并留痕。
@@ -458,41 +535,35 @@
         });
         return;
       }
-      let lon = 0, lat = 0, hpSum = 0, statusWorst = 0, deadN = 0;
-      let redN = 0, blueN = 0;
-      const keys = {};
+      let lon = g.lon, lat = g.lat, hpSum = 0, statusWorst = 0, deadN = 0;
       ids.forEach(function (id) {
-        const p = pos[id];
-        if (p) { lon += p.lon; lat += p.lat; }
-        const rec = targetEnts[id];
         const st = statusNow[id] || { hp: 100, status: 0 };
         hpSum += st.hp;
         statusWorst = Math.max(statusWorst, st.status);
         if (st.status === 3) deadN++;
-        keys[rec.def.icon + '|' + rec.def.affiliation] = rec.def;
-        if (rec.def.affiliation === 'red') redN++;
-        else if (rec.def.affiliation === 'blue') blueN++;
       });
-      lon /= ids.length; lat /= ids.length;
       const allDead = deadN === ids.length;
-      const mixedDead = deadN > 0 && !allDead;
       const avgHp = allDead ? 0 : hpSum / ids.length;
       const avgStatus = allDead ? 3 : (api ? api.statusOf(avgHp) : 0);
-      const uniq = Object.keys(keys);
-      const rep = keys[uniq[0]];
-      const mixed = redN > 0 && blueN > 0;
-      const majority = redN > blueN ? 'red' : (blueN > redN ? 'blue' : 'neutral');
-      const kind = allDead ? 'destroyed'
-                 : (mixedDead ? 'mixeddead'
-                    : (uniq.length === 1 ? null : (mixed ? 'mixed' : majority)));
-      const image = (kind === null)
-        ? Symbology.symbolUri(rep.icon, rep.affiliation, { domain: rep.domain })
-        : (api ? api.clusterUri(kind, ids.length) : undefined);
+      const comp = clusterComposition(ids);
+      // 编队图标：阵营帧 + 数量 + 主类别（与主图同一种图标）。
+      const image = Symbology.clusterUri({
+        affiliation: g.affiliation, count: ids.length,
+        icon: comp.dominant, mixed: comp.mixed, domain: comp.domain,
+        deadCount: deadN,
+      });
 
       const c = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
       slot.main.position = c;
       slot.bar.position = c;
       slot.main.billboard.image = image;
+      // 整组损毁与单目标同口径：压暗色（颜色不改计数/类别）。
+      slot.main.billboard.color = allDead ? DESTROYED_TINT : Cesium.Color.WHITE;
+      // 红蓝编队图标的屏幕避让量；标牌/血条跟着图标一起偏。
+      // 不取整：避让量可能正是"刚好 44 px"的临界值，取整会留下 1 px 相交。
+      const dx = g.dx || 0, dy = g.dy || 0;
+      slot.main.billboard.pixelOffset = new Cesium.Cartesian2(dx, dy);
+      slot.bar.billboard.pixelOffset = new Cesium.Cartesian2(dx, BAR_OFFSET_Y + dy);
       slot.main.ovTargetId = ids[0];
       slot.main.ovClusterIds = ids.slice();
       slot.bar.ovTargetId = ids[0];
@@ -505,14 +576,16 @@
       slot.bar.show = true;
 
       clusterState.push({
-        ids: ids.slice(), count: ids.length, lon: lon, lat: lat,
+        ids: ids.slice(), count: ids.length, affiliation: g.affiliation,
+        lon: lon, lat: lat, dx: dx, dy: dy,
+        categories: comp.list, dominant: comp.dominant, domain: comp.domain,
         hp: Math.round(avgHp * 10) / 10, status: avgStatus,
-        worstStatus: statusWorst, mixed: uniq.length > 1, destroyed: allDead,
-        deadCount: deadN,
+        worstStatus: statusWorst, mixed: comp.mixed, destroyed: allDead,
+        deadCount: deadN, deadBadge: deadN > 0,
         deadIds: ids.filter(function (id) { return (statusNow[id] || {}).status === 3; }),
       });
     });
-    for (let i = multi.length; i < clusterSlots.length; i++) {
+    for (let i = groups.length; i < clusterSlots.length; i++) {
       clusterSlots[i].main.show = false;
       clusterSlots[i].bar.show = false;
     }
@@ -704,6 +777,7 @@
   function targetDebug() {
     const out = { caseId: data ? data.case_id : null, tick: lastTick, extent: extent,
                   targets: {}, clusters: clusterState.slice(),
+                  layout: lastLayout,
                   selectionShown: !!(selectionEnt && selectionEnt.show) };
     if (!viewer || !data) return out;
     const cam = viewer.camera.positionCartographic;
@@ -739,10 +813,13 @@
     (fr.targets || []).forEach(function (p) { pos[p.id] = p; });
     // 显示项矩形（屏幕像素）：供自检断言去重叠。
     out.items = [];
-    function pushItem(kind, idOrIds, lon, lat, w, h) {
+    function pushItem(kind, idOrIds, lon, lat, w, h, dx, dy) {
       const c = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
       const sp = Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, c);
-      if (sp) out.items.push({ kind: kind, id: idOrIds, x: sp.x, y: sp.y, w: w, h: h });
+      if (sp) out.items.push({
+        kind: kind, id: idOrIds,
+        x: sp.x + (dx || 0), y: sp.y + (dy || 0), w: w, h: h,
+      });
     }
     Object.keys(targetEnts).forEach(function (id) {
       const rec = targetEnts[id];
@@ -771,7 +848,7 @@
       };
     });
     clusterState.forEach(function (c) {
-      pushItem('cluster', c.ids, c.lon, c.lat, CLUSTER_ICON_PX, CLUSTER_ICON_PX + 8);
+      pushItem('cluster', c.ids, c.lon, c.lat, CLUSTER_ICON_PX, CLUSTER_ICON_PX + 8, c.dx, c.dy);
     });
     return out;
   }

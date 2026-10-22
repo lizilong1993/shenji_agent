@@ -132,9 +132,9 @@ function item(id, aff, x, y) { return { id: id, affiliation: aff, x: x, y: y }; 
     { id: 'b', affiliation: 'blue', x: 108, y: 100 },
     { id: 'c', affiliation: 'blue', x: 300, y: 100 },
   ];
-  T.separateClusters(list, 46, 30);
+  T.separateClusters(list, { w: 46, h: 46, maxOffset: 30 });
   const dx = list[1].x - list[0].x, dy = list[1].y - list[0].y;
-  ok(Math.sqrt(dx * dx + dy * dy) >= 45.9, '红蓝编队图标应被推到不重叠');
+  ok(Math.abs(dx) >= 45.9 || Math.abs(dy) >= 45.9, '红蓝编队矩形应被推到不重叠');
   ok(list[2].x === 300 && list[2].y === 100, '互不重叠的编队不应移动');
   list.forEach(function (c) {
     ok(Math.abs(c.dx) <= 30 && Math.abs(c.dy) <= 30, '位移不得超过 maxOffset');

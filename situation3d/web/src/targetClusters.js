@@ -111,6 +111,10 @@
       var clusters = [];
       var assigned = {};
 
+      // 簇半径上限不能超过拆散阈值：否则贪心刚建出的簇会在下一轮被
+      // sticky 判据（spread <= splitPx）丢弃，表现为成员/数量反复跳变。
+      var maxSpread = Math.min(o.maxSpreadPx, o.splitPx);
+
       // 1) 上一轮成员优先：只受 splitPx 约束（滞回）。
       prev.forEach(function (pc) {
         if (pc.affiliation !== aff) return;
@@ -132,7 +136,7 @@
           if (d > o.joinPx || d >= bestD) return;
           var all = cl.members.concat([it.id]);
           var c = centroid(all.map(function (id) { return present[id]; }));
-          if (spread(all.map(function (id) { return present[id]; }), c) > o.maxSpreadPx) return;
+          if (spread(all.map(function (id) { return present[id]; }), c) > maxSpread) return;
           best = cl; bestD = d;
         });
         if (best) {
@@ -147,9 +151,8 @@
       });
 
       // 3) 合并靠得很近的簇（只合并已经成形的簇；单个目标之间仍按 joinPx 判）。
-      //    阈值取编队图标直径：两个簇心相距小于 44 px 时，两个编队图标本身就会
-      //    叠在一起，必须合掉。
-      var mergePx = Math.max(o.joinPx, DEFAULTS.sizePx);
+      //    阈值取编队图标直径；合并后同样不能超过拆散半径，否则下一轮会被丢弃。
+      var mergePx = Math.max(o.joinPx, o.sizePx || DEFAULTS.sizePx);
       var merged = true, guard = 0;
       while (merged && guard++ < 16) {
         merged = false;
@@ -161,7 +164,7 @@
             var all = clusters[i].members.concat(clusters[j].members);
             var its = all.map(function (id) { return present[id]; });
             var c = centroid(its);
-            if (spread(its, c) > o.maxSpreadPx) continue;
+            if (spread(its, c) > maxSpread) continue;
             clusters[i].members = all;
             recompute(clusters[i], present);
             clusters[j].members = [];
@@ -212,26 +215,41 @@
    * 红蓝不能合并成一个图标（语义上必须分开），但两个编队图标在接触区可以完全
    * 叠在一起，后画的那个会把另一个的数量盖住。这里只改动图标的屏幕偏移
    * （pixelOffset），不改变编队的地理锚点；每个簇最多偏移 maxOffset px。
-   * 同阵营的簇已经在 clusterer 里按图标直径合并过，不再处理。
+   * 判定用矩形（宽 w、高 h）而不是圆形距离：斜向 45° 时圆距离够远、
+   * 两个 34×42 的图标仍会相交。
+   *
+   * @param {Array} list clusters with x/y (+id/affiliation)
+   * @param {{w?:number,h?:number,maxOffset?:number}} [opts]
    */
-  function separateClusters(list, minDist, maxOffset) {
-    var maxOff = maxOffset || 30;
+  function separateClusters(list, opts) {
+    opts = opts || {};
+    var w = opts.w || (DEFAULTS.sizePx + 2);
+    var h = opts.h || w;
+    var maxOff = opts.maxOffset || 30;
     list.forEach(function (cl) {
       cl.ox = cl.x; cl.oy = cl.y; cl.dx = 0; cl.dy = 0;
     });
-    for (var iter = 0; iter < 12; iter++) {
+    for (var iter = 0; iter < 16; iter++) {
       var moved = false;
       for (var i = 0; i < list.length; i++) {
         for (var j = i + 1; j < list.length; j++) {
           var a = list[i], b = list[j];
           if (a.affiliation === b.affiliation) continue;
           var dx = b.x - a.x, dy = b.y - a.y;
-          var d = Math.sqrt(dx * dx + dy * dy);
-          if (d >= minDist) continue;
-          if (d < 1e-3) { dx = (a.id < b.id ? -1 : 1); dy = 0; d = 1; }
-          var push = (minDist - d) / 2;
-          a.dx -= dx / d * push; a.dy -= dy / d * push;
-          b.dx += dx / d * push; b.dy += dy / d * push;
+          var penX = w - Math.abs(dx), penY = h - Math.abs(dy);
+          if (penX <= 0 || penY <= 0) continue;      // 矩形不相交
+          // 沿"穿透更浅"的轴推开，位移最小。
+          if (penX < penY) {
+            var sx = dx >= 0 ? 1 : -1;
+            if (Math.abs(dx) < 1e-3) sx = (a.id < b.id ? -1 : 1);
+            a.dx -= sx * penX / 2;
+            b.dx += sx * penX / 2;
+          } else {
+            var sy = dy >= 0 ? 1 : -1;
+            if (Math.abs(dy) < 1e-3) sy = (a.id < b.id ? -1 : 1);
+            a.dy -= sy * penY / 2;
+            b.dy += sy * penY / 2;
+          }
           [a, b].forEach(function (cl) {
             cl.dx = Math.max(-maxOff, Math.min(maxOff, cl.dx));
             cl.dy = Math.max(-maxOff, Math.min(maxOff, cl.dy));
@@ -402,7 +420,10 @@
       });
     });
 
+    // 两遍收敛：第一遍的结果直接作为第二遍的 prev，消除"第一次遇到新布局
+    // 时归并顺序不同"带来的成员抖动（第二次起已是固定点，Node 实测 0 漂移）。
     var next = computeClusters(items, clusters, DEFAULTS);
+    next = computeClusters(items, next, DEFAULTS);
 
     // 位置缓存：成员的地理位置随帧变化，聚合每 120 ms 才重算一次。
     var geo = {};
@@ -446,7 +467,9 @@
       cl.x = (screen && isFinite(screen.x)) ? screen.x : cl.x;
       cl.y = (screen && isFinite(screen.y)) ? screen.y : cl.y;
     });
-    separateClusters(next, DEFAULTS.sizePx + 2, 30);
+    separateClusters(next, {
+      w: DEFAULTS.sizePx + 2, h: DEFAULTS.sizePx + 2, maxOffset: 30,
+    });
 
     var newByTarget = {};
     next.forEach(function (cl) {
@@ -518,8 +541,10 @@
     stats.viewport = [cw, ch];
 
     if (sig !== lastSig) {
-      lastSig = sig;
       if (cfg.onUpdated) cfg.onUpdated();
+      // 回调成功后才记签名：若 syncEntities 抛异常，下一帧还会重试，
+      // 不会出现"显示状态没同步、却以为已经处理过"的静默窗口。
+      lastSig = sig;
     }
     return clusters;
   }
