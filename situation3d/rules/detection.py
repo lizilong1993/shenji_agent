@@ -59,7 +59,7 @@ def observe_range(observer: RuleEntityView, target: RuleEntityView,
 
 
 def can_observe(observer: RuleEntityView, target: RuleEntityView,
-                ctx: RuleContext) -> bool:
+                ctx: RuleContext, distance: Optional[int] = None) -> bool:
     if observer.uid == target.uid or not target.alive:
         return False
     # Sea/air domains are covered by the radar/IR/sonar/ESM model, not the
@@ -71,7 +71,8 @@ def can_observe(observer: RuleEntityView, target: RuleEntityView,
     # upper bound, so anything farther cannot be observed.
     table = observation_doc()["table"]
     max_range = int(table.get(_kind(observer), {}).get(_kind(target), 0))
-    distance = ctx.rule_distance(observer, target)
+    if distance is None:
+        distance = ctx.rule_distance(observer, target)
     if max_range <= 0 or distance > max_range:
         return False
     rng = observe_range(observer, target, ctx)

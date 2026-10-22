@@ -63,6 +63,7 @@ class World(object):
         self.intel: Dict[int, dict] = {}
         self._cell_cache: Dict[int, Tuple[int, int]] = {}
         self._detect_cache: Dict[Tuple[int, int], tuple] = {}
+        self._los_cell_cache: Dict[tuple, bool] = {}
         self._scan_slice = 0
         self._stack_cache: Dict[int, bool] = {}
         self._friendly_cache: Dict[int, int] = {}
@@ -283,9 +284,6 @@ class World(object):
             self._scan_slice = (self._scan_slice + 1) % slice_count
         if slice_count == 1:
             self._scan_slice = 0
-            self._detect_cache.clear()
-        elif self._scan_slice == 0:
-            self._detect_cache.clear()
         result: Dict[int, set] = dict(self.seen)
         for uid, entity in self.entities.items():
             if not entity.alive or entity.on_board:
@@ -304,16 +302,32 @@ class World(object):
                 if target.uid == observer.uid or target.affiliation == observer.affiliation:
                     continue
                 # Cubic-cell prefilter before terrain/cover work.
-                if cube_distance(cells[observer.uid], cells[target.uid]) > max_cells:
-                    continue
-                key = (observer.uid, target.uid)
                 co, ct = cells[observer.uid], cells[target.uid]
-                cached = self._detect_cache.get(key)
-                if cached is not None and cached[0] == co and cached[1] == ct:
-                    visible = cached[2]
+                distance = cube_distance(co, ct)
+                if distance > max_cells:
+                    continue
+                land_pair = (observer.domain in ("land", "amphibious")
+                             and target.domain in ("land", "amphibious"))
+                if land_pair:
+                    # Terrain/observation results depend only on the cell
+                    # pair and the target's concealment; keep the cache
+                    # across scan slices so stationary forces are free.
+                    key = (observer.uid, target.uid, co, ct,
+                           bool(target.concealed))
+                    visible = self._detect_cache.get(key)
+                    if visible is None:
+                        visible = ctx.can_detect(observer, target,
+                                                 distance=distance)
+                        if len(self._detect_cache) < 500000:
+                            self._detect_cache[key] = visible
                 else:
-                    visible = ctx.can_detect(observer, target)
-                    self._detect_cache[key] = (co, ct, visible)
+                    key = (observer.uid, target.uid, co, ct)
+                    visible = self._detect_cache.get(key)
+                    if visible is None:
+                        visible = ctx.can_detect(observer, target,
+                                                 distance=distance)
+                        if len(self._detect_cache) < 500000:
+                            self._detect_cache[key] = visible
                 if visible:
                     seen.add(target.uid)
         return result

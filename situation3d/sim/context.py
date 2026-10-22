@@ -50,6 +50,8 @@ class WorldRuleContext(object):
         self._elev_doc = _elevation_doc()
         self._views: Dict[int, EntityRuleView] = {}
         self._grades: Dict[int, int] = {}
+        self._cover_cache: Dict[int, object] = {}
+        self._env_cells: Dict[int, tuple] = {}
 
     # -- views -------------------------------------------------------------
     def view(self, entity: Entity) -> EntityRuleView:
@@ -63,6 +65,8 @@ class WorldRuleContext(object):
         self.now_s = self.world.time_s
         self._views.clear()
         self._grades.clear()
+        self._cover_cache.clear()
+        self._env_cells.clear()
 
     # -- spatial -----------------------------------------------------------
     def distance_m(self, a, b) -> float:
@@ -104,19 +108,38 @@ class WorldRuleContext(object):
     def ele_grade(self) -> float:
         return self.env.ele_grade
 
+    def _env_cell(self, entity) -> tuple:
+        cell = self._env_cells.get(entity.uid)
+        if cell is None:
+            cell = self.env.grid.cell_of(entity.pose.lon, entity.pose.lat)
+            self._env_cells[entity.uid] = cell
+        return cell
+
     def line_of_sight(self, a, b) -> bool:
         ea, eb = self._entity(a), self._entity(b)
         if ea.domain in ("land", "amphibious") and eb.domain in ("land", "amphibious"):
-            ca = self.env.grid.cell_of(ea.pose.lon, ea.pose.lat)
-            cb = self.env.grid.cell_of(eb.pose.lon, eb.pose.lat)
-            return self.env.cell_line_of_sight(ca, cb)
+            ca = self._env_cell(ea)
+            cb = self._env_cell(eb)
+            key = (ca, cb) if ca <= cb else (cb, ca)
+            cache = self.world._los_cell_cache
+            visible = cache.get(key)
+            if visible is None:
+                visible = self.env.cell_line_of_sight(ca, cb)
+                if len(cache) < 500000:
+                    cache[key] = visible
+            return visible
         ha = ea.pose.alt_m + 2.0
         hb = eb.pose.alt_m + 1.5
         return self.env.line_of_sight((ea.pose.lon, ea.pose.lat), ha,
                                       (eb.pose.lon, eb.pose.lat), hb)
 
     def cover_at(self, e) -> Cover:
-        return _cover(self.env, self._entity(e))
+        ent = self._entity(e)
+        value = self._cover_cache.get(ent.uid)
+        if value is None:
+            value = _cover(self.env, ent)
+            self._cover_cache[ent.uid] = value
+        return value
 
     def target_kind(self, e) -> str:
         ent = self._entity(e)
@@ -138,7 +161,7 @@ class WorldRuleContext(object):
                                   self.target_kind(target))
 
     # -- state -------------------------------------------------------------
-    def can_detect(self, observer, target) -> bool:
+    def can_detect(self, observer, target, distance=None) -> bool:
         if self.detection_model == "spotting":
             from sim import spotting
             obs = self._entity(observer)
@@ -150,7 +173,8 @@ class WorldRuleContext(object):
                     float(getattr(self.rule_grid, "cell_m", 200.0)),
                     line_of_sight=lambda a, b: self.line_of_sight(a, b))
         return detection.can_observe(self.view(self._entity(observer)),
-                                     self.view(self._entity(target)), self)
+                                     self.view(self._entity(target)), self,
+                                     distance=distance)
 
     def sensor_detect(self, observer, target) -> bool:
         from sim import sensors
