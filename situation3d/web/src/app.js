@@ -2178,6 +2178,31 @@ function applyTargetBillboardAnchor(entity, modelMode) {
   bb.disableDepthTestDistance = Number.POSITIVE_INFINITY;
 }
 
+/**
+ * 轨迹绘制点：整数帧采样（全量或最近 N 帧）+ **当前连续位置**。
+ *
+ * CZML 运动（targetMotion.js）把目标/传感器实体的 position 换成
+ * SampledPositionProperty，由 tickFloat 插值；而 rec.trail 只有整数帧采样点。
+ * 高速目标一个 tick（30 s）内能走数公里（截图里 F-16/E-2D 轨迹末端与图标之间
+ * 的空档），只画整数点就会让轨迹停在目标身后。这里把实体当前插值位置追加为
+ * 末端点：历史线与近期线共享同一个末端，二者始终与图标相接。
+ */
+function trailPointsFor(id, sliceTicks) {
+  const rec = state.targets[id];
+  if (!rec) return [];
+  let pts = sliceTicks > 0 ? rec.trail.slice(-sliceTicks) : rec.trail;
+  const prop = rec.entity && rec.entity.position;
+  if (prop && prop.getValue) {
+    let live;
+    try { live = prop.getValue(viewer.clock.currentTime); } catch (e) { live = undefined; }
+    const last = pts[pts.length - 1];
+    if (live && (!last || Cesium.Cartesian3.distance(last, live) > 0.5)) {
+      pts = pts.concat([live]);
+    }
+  }
+  return pts;
+}
+
 function createTargetEntities() {
   state.data.targets.forEach(function (def) {
     const color = colorFor(def.affiliation);
@@ -2252,9 +2277,8 @@ function createTargetEntities() {
     // 历史轨迹：截至当前帧，目标已经走过的航迹。
     entity.polyline = {
       positions: new Cesium.CallbackProperty(function () {
-        const rec = state.targets[def.id];
         // 完整历史（第 0 帧 → 当前帧）。窗口只影响掩码/取证读数，不影响绘制。
-        return rec ? rec.trail : [];
+        return trailPointsFor(def.id, 0);
       }, false),
       width: 1,
       // 中性浅灰、低不透明度：历史全程线只是底噪，不与阵营色/近期白线抢视线。
@@ -2270,8 +2294,7 @@ function createTargetEntities() {
       show: false,
       polyline: {
         positions: new Cesium.CallbackProperty(function () {
-          const rec = state.targets[def.id];
-          return rec ? rec.trail.slice(-RECENT_TRAIL_TICKS) : [];
+          return trailPointsFor(def.id, RECENT_TRAIL_TICKS);
         }, false),
         width: 2.5,
         material: Cesium.Color.WHITE.withAlpha(0.95),
