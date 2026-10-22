@@ -2457,6 +2457,10 @@ function attachMotionAndFx(data) {
     try { TargetCombatFx.init(viewer, data, targetFxApi()); }
     catch (e) { console.warn("[combat-fx] 初始化失败：", e); }
   }
+  if (window.TargetCollision) {
+    try { TargetCollision.init(viewer, data, targetFxApi()); }
+    catch (e) { console.warn("[collision] 初始化失败：", e); }
+  }
   if (window.TargetMotion) {
     TargetMotion.load(viewer, data).then(function (st) {
       if (!st || state.data !== data) return;
@@ -6083,6 +6087,7 @@ function loop(nowMs) {
   // 时刻插值；特效在同一帧读取同一个时钟。
   if (window.TargetMotion) TargetMotion.syncClock(state.tickFloat);
   if (window.TargetFx) TargetFx.frame(dt);
+  if (window.TargetCollision) TargetCollision.tick(nowMs);
   if (window.TargetCombatFx) TargetCombatFx.frame(dt);
   // 属性面板的侧视相机与实时字段：只在图层勾选且有选中目标时工作，
   // 内部自带节流；预览 Viewer 用 requestRenderMode，暂停时不渲染。

@@ -119,74 +119,88 @@
       <!-- 地图上的「区域级TS」横幅已移除：内容全部移到右栏「区域TS」栏。
            同一个读数不该有两份显示——地图上那份还占地、挡住地图本身。 -->
 
-      <!-- 目标属性（图层管理「目标图层 · 目标属性」勾选后生效）：
-           右下角 Legend 上方。上半部是选中目标的 3D 侧视预览（第二 Viewer，
-           与主实体同模型/同姿态/同战损），下半部是实时属性与战损状态。
-           内容与显隐由 src/targetProps.js 驱动，这里只留骨架。 -->
-      <div id="targetProps" class="target-props hidden" aria-label="目标属性">
-        <div class="tpr-head">
-          <div class="tpr-title">
-            <b id="tprName">目标属性</b>
-            <span id="tprId" class="tpr-id"></span>
+      <!-- 右侧叠加组件统一由 .map-rail 排布（2026-10-22）：
+           顶部组自上而下是鸟瞰图 → 指南针 → 复位视角；底部组自下而上是
+           图例 → 目标属性。任何组件加 .hidden 后其余组件由 flex 自动补位，
+           不再为每种显隐组合写死 top/bottom，目标属性面板吃掉剩余高度。 -->
+      <div class="map-rail" role="region" aria-label="右侧地图组件">
+        <div class="map-rail-top">
+
+          <!-- 加载进度徽标（"正在加载瓦片… 剩余 N"）已按需求删除（2026-10-17） -->
+
+          <!-- 全局鸟瞰：第二个 Cesium 2D 视图，按案例战场范围自动取景，
+               显示红蓝全部目标与战损状态（图标 + 紧贴底部的血条）。
+               组件上方不写标题/说明文字；Cesium 学分标识在 overview.js 里隐藏。 -->
+          <div id="overviewWrap" class="overview-wrap hidden">
+            <button id="ovHide" type="button" class="ov-btn ov-close" aria-label="隐藏">×</button>
+            <div id="overviewContainer" class="ov-canvas"></div>
+            <div class="ov-legend">
+              <span><i class="ov-sw os-s0"></i>正常</span>
+              <span><i class="ov-sw os-s1"></i>受损</span>
+              <span><i class="ov-sw os-s2"></i>严重受损</span>
+              <span><i class="ov-sw os-s3"></i>损毁</span>
+              <span class="ov-note">相对战损</span>
+            </div>
           </div>
-        </div>
-        <div id="tprEmpty" class="tpr-empty">点击场景中的目标查看属性</div>
-        <div id="tprBody" class="tpr-body hidden">
-          <div id="tprBadges" class="tpr-badges"></div>
-          <div id="tprView" class="tpr-view"></div>
-          <div id="tprState" class="tpr-state"></div>
-          <div id="tprFields" class="tpr-fields"></div>
-        </div>
-      </div>
 
-      <div id="legend" class="legend">
-        <span><i class="swatch red"></i>红方</span>
-        <span><i class="swatch blue"></i>蓝方</span>
-        <!-- 占领区域已下线（2026-10-20）：<span><i class="swatch hotspot"></i>占领区域</span> -->
-        <span><i class="swatch hotspot"></i>热点区域</span>
-      </div>
+          <!-- 地图组件：Cesium 1.145 无内置指南针与比例尺，三项均为自建。
+               角位：鸟瞰图右上、指南针其下、复位视角再下、比例尺左下、视点底部居中。 -->
+          <div id="mapCompass" class="map-comp" title="点击复位正北（相机航向归零）">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <circle cx="50" cy="50" r="46" fill="rgba(255,255,255,.92)" stroke="#b9c6d8"/>
+              <g id="compRose">
+                <line x1="50" y1="12" x2="50" y2="88" stroke="#c9d2de" stroke-width="1"/>
+                <line x1="12" y1="50" x2="88" y2="50" stroke="#c9d2de" stroke-width="1"/>
+                <path d="M50 8 L55 20 L45 20 Z" fill="#c8352c"/>
+                <path d="M50 92 L55 80 L45 80 Z" fill="#8a94a6"/>
+                <text x="50" y="31" text-anchor="middle" font-size="15" fill="#c8352c">N</text>
+                <text x="50" y="80" text-anchor="middle" font-size="12" fill="#6b7688">S</text>
+                <text x="81" y="55" text-anchor="middle" font-size="12" fill="#6b7688">E</text>
+                <text x="19" y="55" text-anchor="middle" font-size="12" fill="#6b7688">W</text>
+                <circle cx="50" cy="50" r="2.5" fill="#4c5866"/>
+              </g>
+              <path d="M50 1 L56 13 L44 13 Z" fill="#1668dc"/>
+            </svg>
+          </div>
 
-      <!-- 加载进度徽标（"正在加载瓦片… 剩余 N"）已按需求删除（2026-10-17） -->
+          <!-- 顶栏「视图」菜单已移除，复位视角就近放在指南针下方；保留原 id，
+               app.js 里的绑定不变。 -->
+          <button id="btnLocate" type="button" class="map-locate"
+                  title="回到案例默认机位，并解除热点锁定与目标跟随">复位视角</button>
 
-      <!-- 全局鸟瞰：第二个 Cesium 2D 视图，按案例战场范围自动取景，
-           显示红蓝全部目标与战损状态（图标 + 紧贴底部的血条）。
-           组件上方不写标题/说明文字；Cesium 学分标识在 overview.js 里隐藏。 -->
-      <div id="overviewWrap" class="overview-wrap hidden">
-        <button id="ovHide" type="button" class="ov-btn ov-close" aria-label="隐藏">×</button>
-        <div id="overviewContainer" class="ov-canvas"></div>
-        <div class="ov-legend">
-          <span><i class="ov-sw os-s0"></i>正常</span>
-          <span><i class="ov-sw os-s1"></i>受损</span>
-          <span><i class="ov-sw os-s2"></i>严重受损</span>
-          <span><i class="ov-sw os-s3"></i>损毁</span>
-          <span class="ov-note">相对战损</span>
-        </div>
-      </div>
+        </div><!-- /map-rail-top -->
 
-      <!-- 地图组件：Cesium 1.145 无内置指南针与比例尺，三项均为自建。
-           角位：鸟瞰图右上、指南针其下、复位视角再下、比例尺左下、视点底部居中。 -->
-      <div id="mapCompass" class="map-comp" title="点击复位正北（相机航向归零）">
-        <svg viewBox="0 0 100 100" aria-hidden="true">
-          <circle cx="50" cy="50" r="46" fill="rgba(255,255,255,.92)" stroke="#b9c6d8"/>
-          <g id="compRose">
-            <line x1="50" y1="12" x2="50" y2="88" stroke="#c9d2de" stroke-width="1"/>
-            <line x1="12" y1="50" x2="88" y2="50" stroke="#c9d2de" stroke-width="1"/>
-            <path d="M50 8 L55 20 L45 20 Z" fill="#c8352c"/>
-            <path d="M50 92 L55 80 L45 80 Z" fill="#8a94a6"/>
-            <text x="50" y="31" text-anchor="middle" font-size="15" fill="#c8352c">N</text>
-            <text x="50" y="80" text-anchor="middle" font-size="12" fill="#6b7688">S</text>
-            <text x="81" y="55" text-anchor="middle" font-size="12" fill="#6b7688">E</text>
-            <text x="19" y="55" text-anchor="middle" font-size="12" fill="#6b7688">W</text>
-            <circle cx="50" cy="50" r="2.5" fill="#4c5866"/>
-          </g>
-          <path d="M50 1 L56 13 L44 13 Z" fill="#1668dc"/>
-        </svg>
-      </div>
+        <div class="map-rail-bottom">
+          <!-- 目标属性（图层管理「目标图层 · 目标属性」勾选后生效）：
+               右下角图例上方。上半部是选中目标的 3D 侧视预览（第二 Viewer，
+               与主实体同模型/同姿态/同战损），下半部是实时属性与战损状态。
+               高度由 .map-rail 分配：选中目标后吃掉顶部组与图例之外的剩余
+               空间，字段区内部滚动。内容与显隐由 src/targetProps.js 驱动，
+               这里只留骨架。 -->
+          <div id="targetProps" class="target-props hidden" aria-label="目标属性">
+            <div class="tpr-head">
+              <div class="tpr-title">
+                <b id="tprName">目标属性</b>
+                <span id="tprId" class="tpr-id"></span>
+              </div>
+            </div>
+            <div id="tprEmpty" class="tpr-empty">点击场景中的目标查看属性</div>
+            <div id="tprBody" class="tpr-body hidden">
+              <div id="tprBadges" class="tpr-badges"></div>
+              <div id="tprView" class="tpr-view"></div>
+              <div id="tprState" class="tpr-state"></div>
+              <div id="tprFields" class="tpr-fields"></div>
+            </div>
+          </div>
 
-      <!-- 顶栏「视图」菜单已移除，复位视角就近放在指南针下方；保留原 id，
-           app.js 里的绑定不变。 -->
-      <button id="btnLocate" type="button" class="map-locate"
-              title="回到案例默认机位，并解除热点锁定与目标跟随">复位视角</button>
+          <div id="legend" class="legend">
+            <span><i class="swatch red"></i>红方</span>
+            <span><i class="swatch blue"></i>蓝方</span>
+            <!-- 占领区域已下线（2026-10-20）：<span><i class="swatch hotspot"></i>占领区域</span> -->
+            <span><i class="swatch hotspot"></i>热点区域</span>
+          </div>
+        </div><!-- /map-rail-bottom -->
+      </div><!-- /map-rail -->
 
       <div id="mapViewpoint" class="map-viewpoint">
         <span>视点经纬高：</span><b id="mvAll">—</b>
@@ -286,6 +300,7 @@
   <script src="./src/entityLod.js"></script>
   <script src="./src/targetClusters.js"></script>
   <script src="./src/targetMotion.js"></script>
+  <script src="./src/targetCollision.js"></script>
   <script src="./src/targetFx.js"></script>
   <script src="./src/targetCombatFx.js"></script>
   <script src="./src/targetProps.js"></script>
