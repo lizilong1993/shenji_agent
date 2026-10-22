@@ -988,12 +988,28 @@
     scan = { entity: ent, id: null, range: 0 };
   }
 
+  /**
+   * 扫描扇区只属于有侦察/警戒任务的目标。运输车、工程车、转运平台等
+   * 纯保障单位没有“扫描”语义，选中时不再画扇区。
+   */
+  function scanEligible(def) {
+    if (!def) return false;
+    var role = String(def.role || '');
+    var form = window.EntityLod ? window.EntityLod.formClassOf(def) : '';
+    if (form === 'truck') return false;
+    if (/运输|保障|等待|补给|转运|后勤/.test(role)) return false;
+    return true;
+  }
+
   function updateScan(tick) {
     var id = apiSelected();
     if (!id) { if (scan) scan.entity.show = false; return; }
     var def = defById[id];
     var rangeKm = Number(def && def.sensor_range_km) || 0;
-    if (!def || rangeKm <= 0) { if (scan) scan.entity.show = false; return; }
+    if (!def || rangeKm <= 0 || !scanEligible(def)) {
+      if (scan) scan.entity.show = false;
+      return;
+    }
     ensureScan();
     if (scan.id !== id) {
       scan.id = id;
@@ -1003,7 +1019,8 @@
     }
     var s = currentGeo(id);
     if (!s) { scan.entity.show = false; return; }
-    var alt = (s.alt || 0) + (def.domain === 'air' ? 0 : 40);
+    // 扇区顶点必须在平台身上，而不是悬在树冠/建筑上面 40 m。
+    var alt = (s.alt || 0) + (def.domain === 'air' ? 0 : 1.5);
     scan.entity.position = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, alt);
     scan.entity.show = true;
     scan.alt = alt;

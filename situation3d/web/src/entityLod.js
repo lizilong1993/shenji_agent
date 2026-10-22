@@ -226,6 +226,26 @@
     return '-X';
   }
 
+  /**
+   * 资产自身艏/头朝向修正（度，绕模型竖轴；正=顺时针）。
+   *
+   * 归一化管线按“Blender +Y 为头”导出，但个别 Sketchfab/自建资产导入时
+   * 车头落在 Blender -Y（导出后 glTF +Z），与统一约定相反。实测：
+   *   · type_ztd05（ZTD-05）：炮管朝 +Z；
+   *   · type_eq240（东风 EQ240）：驾驶室朝 +Z。
+   * 两者在 Cesium 局部系里都对应 +X，因此姿态需要额外转 180°。
+   * 其余资产保持 0；新增资产如看着倒着走，在这里登记 URL 即可。
+   */
+  var MODEL_YAW_FIX_DEG = {
+    './assets/models/type_ztd05.glb': 180,
+    './assets/models/type_eq240.glb': 180,
+  };
+
+  function modelYawOffset(def) {
+    var url = exactModelUrl(def) || modelUrlFor(def);
+    return (url && MODEL_YAW_FIX_DEG[url]) || 0;
+  }
+
   /** 新资产没有可命名的轮节点（轮子烘焙在车身网格里），返回空表。 */
   function wheelNodes() {
     return [];
@@ -255,6 +275,7 @@
     scaleFor: scaleFor,
     formClassOf: formClassOf,
     forwardAxis: forwardAxis,
+    modelYawOffset: modelYawOffset,
     wheelNodes: wheelNodes,
     MODEL_MAP: MODEL_MAP,
     TYPE_RULES: TYPE_RULES,
