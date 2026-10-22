@@ -73,6 +73,12 @@ def view_range_m(observer, cell_m: float = 200.0, target=None) -> float:
     otherwise the largest available row is used for prefiltering.
     """
     target_key = _target_key(target) if target is not None else None
+    try:
+        sensor_health = float((getattr(observer, "components", {}) or {}).get(
+            "sensors", 1.0))
+    except (TypeError, ValueError):
+        sensor_health = 1.0
+    sensor_health = 0.0 if sensor_health <= 0.05 else max(0.2, sensor_health)
     ranges = []
     for sensor in getattr(observer, "sensors", None) or []:
         kind = str(getattr(sensor, "kind", ""))
@@ -81,7 +87,7 @@ def view_range_m(observer, cell_m: float = 200.0, target=None) -> float:
         km = float(getattr(sensor, "range_km", 0.0) or 0.0)
         quality = float(getattr(sensor, "quality", 1.0) or 1.0)
         if km > 0.0:
-            ranges.append(km * 1000.0 * quality)
+            ranges.append(km * 1000.0 * quality * sensor_health)
     observe = getattr(observer, "observe_distance", None) or {}
     if target_key is not None and target_key in observe:
         try:
@@ -101,7 +107,10 @@ def view_range_m(observer, cell_m: float = 200.0, target=None) -> float:
         ranges.append(row[target_key] * float(cell_m))
     elif row:
         ranges.append(max(row.values()) * float(cell_m))
-    return _clamp(max(ranges) if ranges else 2000.0, 500.0, MAX_VIEW_RANGE_M)
+    base = max(ranges) if ranges else 2000.0
+    if getattr(observer, "sensors", None):
+        base *= sensor_health
+    return _clamp(base, 200.0, MAX_VIEW_RANGE_M)
 
 
 def base_concealment(target) -> float:

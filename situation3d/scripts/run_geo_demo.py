@@ -160,6 +160,8 @@ def main() -> int:
                     choices=("table", "spotting", "shadow", "physical"))
     ap.add_argument("--direct-fire-model",
                     choices=("crt", "physics", "shadow"))
+    ap.add_argument("--indirect-fire-model",
+                    choices=("table", "physics"))
     ap.add_argument("--tactics", action="store_true")
     ap.add_argument("--radio-share", action="store_true")
     ap.add_argument("--commander", action="store_true")
@@ -176,6 +178,7 @@ def main() -> int:
         raw_objs = scenario.get("cities") or []
 
     if (args.detection_model or args.direct_fire_model
+            or args.indirect_fire_model
             or args.tactics or args.radio_share or args.commander):
         engine = scenario.get("engine")
         if not isinstance(engine, dict):
@@ -185,6 +188,8 @@ def main() -> int:
             engine["detection_model"] = args.detection_model
         if args.direct_fire_model:
             engine["direct_fire_model"] = args.direct_fire_model
+        if args.indirect_fire_model:
+            engine["indirect_fire_model"] = args.indirect_fire_model
         if args.tactics:
             engine["enable_tactics"] = True
         if args.radio_share:
@@ -251,6 +256,7 @@ def main() -> int:
         "ticks": args.ticks,
         "detection_model": world.detection_model,
         "direct_fire_model": world.direct_fire_model,
+        "indirect_fire_model": world.indirect_fire_model,
         "detection_shadow": (None if world.detection_shadow is None else {
             k: v for k, v in world.detection_shadow.items() if k != "samples"}),
         "elapsed_s": round(elapsed, 2),

@@ -95,6 +95,14 @@ def specs_for(entity) -> List[SensorSpec]:
     """Sensor specs: entity sensors first, platform data v1 as fallback."""
     specs: List[SensorSpec] = []
     seen = set()
+    try:
+        sensor_health = float((getattr(entity, "components", {}) or {}).get(
+            "sensors", 1.0))
+    except (TypeError, ValueError):
+        sensor_health = 1.0
+    if sensor_health <= 0.05:
+        return []
+    sensor_health = max(0.2, sensor_health)
 
     def _key(kind, range_m):
         return (kind, round(float(range_m) / 100.0))
@@ -103,7 +111,7 @@ def specs_for(entity) -> List[SensorSpec]:
         kind = _kind(getattr(sensor, "kind", ""))
         range_km = float(getattr(sensor, "range_km", 0.0) or 0.0)
         quality = float(getattr(sensor, "quality", 1.0) or 1.0)
-        range_m = range_km * 1000.0 * max(0.0, quality)
+        range_m = range_km * 1000.0 * max(0.0, quality) * sensor_health
         key = _key(kind, range_m)
         if range_m <= 0.0 or key in seen:
             continue
@@ -125,6 +133,7 @@ def specs_for(entity) -> List[SensorSpec]:
         range_m = float(item.get("range_m") or 0.0)
         if range_m <= 0.0:
             range_m = float(item.get("range_km") or 0.0) * 1000.0
+        range_m *= sensor_health
         key = _key(kind, range_m)
         if range_m <= 0.0 or key in seen:
             continue

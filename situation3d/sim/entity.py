@@ -118,6 +118,7 @@ class EntityRuleView(object):
     comms_range_m: float = 600.0
     last_fired_s: float = -1.0
     armor_profile: Dict[str, float] = field(default_factory=dict)
+    components: Dict[str, float] = field(default_factory=dict)
 
     def ammo_count(self, key: str) -> int:
         return int(self.ammo.get(key, 0))
@@ -174,6 +175,10 @@ class Entity(object):
     last_fired_s: float = -1.0
     role_card: Optional[dict] = None
     aim_cell: Optional[Tuple[int, int]] = None
+    # P1.5 component damage: 1.0 = healthy, 0.0 = destroyed subsystem.
+    components: Dict[str, float] = field(
+        default_factory=lambda: {"mobility": 1.0, "firepower": 1.0,
+                                 "sensors": 1.0})
 
     def to_rule_view(self, stacked: Optional[bool] = None) -> EntityRuleView:
         """Project to the read-only view consumed by ``rules``.
@@ -211,4 +216,5 @@ class Entity(object):
             comms_range_m=float(self.comms_range_m),
             last_fired_s=float(self.last_fired_s),
             armor_profile=dict(self.armor_profile),
+            components=dict(self.components),
         )

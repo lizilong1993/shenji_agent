@@ -165,9 +165,18 @@ def _aim_error_m(profile: dict, distance_m: float, rng) -> float:
 
 def _select_weapon(attacker: RuleEntityView, target: RuleEntityView,
                    ctx: RuleContext, distance_m: float, weapon=None):
+    try:
+        firepower = float((getattr(attacker, "components", {}) or {}).get(
+            "firepower", 1.0))
+    except (TypeError, ValueError):
+        firepower = 1.0
+    if firepower <= 0.05:
+        return None  # fire-control/firepower destroyed
     if weapon is not None:
         profile = profile_for_weapon(weapon)
         if profile is None:
+            return None
+        if not _ground_capable(weapon):
             return None
         max_range = _num(profile.get("max_range_m"), 3000.0)
         return (weapon, profile) if distance_m <= max_range else None
@@ -175,6 +184,8 @@ def _select_weapon(attacker: RuleEntityView, target: RuleEntityView,
     best_pen = -1.0
     for candidate in getattr(attacker, "weapons", []) or []:
         if candidate.kind != "direct":
+            continue
+        if not _ground_capable(candidate):
             continue
         if attacker.moving and not getattr(candidate, "shoot_on_move", False):
             continue
@@ -193,6 +204,18 @@ def _select_weapon(attacker: RuleEntityView, target: RuleEntityView,
             best_pen = pen
             best = (candidate, profile)
     return best
+
+
+def _ground_capable(weapon) -> bool:
+    """AA-only weapons (WpData without ground TarType) cannot fire direct."""
+    tables = getattr(weapon, "tables", None)
+    if not tables:
+        return True
+    target_types = set()
+    for key in tables.keys():
+        if isinstance(key, tuple) and key:
+            target_types.add(key[0])
+    return bool(target_types & {1, 2})
 
 
 def resolve_physics_direct_fire(attacker: RuleEntityView, target: RuleEntityView,
@@ -214,6 +237,13 @@ def resolve_physics_direct_fire(attacker: RuleEntityView, target: RuleEntityView
 
     rng = rng or ctx.rng
     target_radius = SIZE_RADIUS_M.get(str(getattr(target, "size_class", "medium")), 3.0)
+    try:
+        from rules.context import Cover
+        cover = ctx.cover_at(target)
+        target_radius *= {Cover.URBAN: 0.7, Cover.FOREST: 0.6,
+                          Cover.BUILDING: 0.5}.get(cover, 1.0)
+    except Exception:
+        pass
     aim_error = _aim_error_m(profile, distance_m, rng)
     hit = aim_error <= target_radius
     velocity = max(1.0, _num(profile.get("velocity_mps"), 800.0))
@@ -234,6 +264,8 @@ def resolve_physics_direct_fire(attacker: RuleEntityView, target: RuleEntityView
 
     penetrated = hit and not ricochet and (thickness <= 0.0 or pen_mm > effective_mm)
     damage = 0
+    component = None
+    component_health = None
     result = "miss"
     if hit:
         if ricochet:
@@ -245,9 +277,28 @@ def resolve_physics_direct_fire(attacker: RuleEntityView, target: RuleEntityView
         else:
             result = "penetration"
     if penetrated:
+        firepower = 1.0
+        try:
+            firepower = max(0.2, float((attacker.components or {}).get(
+                "firepower", 1.0)))
+        except (AttributeError, TypeError, ValueError):
+            firepower = 1.0
         base_damage = max(0.0, _num(profile.get("blood_damage"), 1.0))
         ratio = pen_mm / max(1.0, effective_mm)
-        damage = max(1, int(round(base_damage * min(2.0, ratio))))
+        damage = max(1, int(round(
+            base_damage * firepower * min(2.0, ratio))))
+        # Component hit (P1.5): mobility / firepower / sensors / structural.
+        roll = rng.random()
+        if roll < 0.35:
+            component = "mobility"
+        elif roll < 0.65:
+            component = "firepower"
+        elif roll < 0.80:
+            component = "sensors"
+        apply = getattr(ctx, "apply_component_damage", None)
+        if component is not None and apply is not None and not dry_run:
+            component_health = apply(target.uid, component,
+                                     min(1.0, 0.35 * damage))
 
     if not dry_run:
         ctx.consume_ammo(attacker.uid, weapon.key, 1)
@@ -278,6 +329,9 @@ def resolve_physics_direct_fire(attacker: RuleEntityView, target: RuleEntityView
         "ricochet": ricochet,
         "result": result,
         "damage": damage,
+        "component": component,
+        "component_health": (None if component_health is None
+                             else round(float(component_health), 3)),
         "suppressed": behavior["kind"] == "HE" and hit and not penetrated,
         "target_blood": getattr(target, "blood", 0),
         "dry_run": bool(dry_run),

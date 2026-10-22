@@ -10,10 +10,11 @@ Rules are reached only through ``WorldRuleContext``; ``rules/`` never imports
 
 from __future__ import annotations
 
+import math
 import random
 from typing import Dict, List, Optional, Tuple
 
-from geo.geodesy import haversine_m
+from geo.geodesy import haversine_m, initial_bearing_deg
 from geo.rule_grid import RuleGrid, cube_distance
 from mobility.passability import passable
 from mobility.planner import GridPlanner
@@ -35,7 +36,8 @@ class World(object):
     def __init__(self, env, rule_grid: RuleGrid, dt_s: float = 1.0,
                  seed: int = 20261021, plan_grid=None,
                  detection_model: str = "table",
-                 direct_fire_model: str = "crt",
+                 direct_fire_model: str = "physics",
+                 indirect_fire_model: str = "physics",
                  enable_radio_share: bool = False,
                  enable_tactics: bool = False,
                  commander=None,
@@ -85,6 +87,7 @@ class World(object):
         self.winner: Optional[str] = None
         self.detection_model = str(detection_model)
         self.direct_fire_model = str(direct_fire_model)
+        self.indirect_fire_model = str(indirect_fire_model)
         self.enable_radio_share = bool(enable_radio_share)
         self.detection_shadow = None
         self.tactics = TacticalController() if enable_tactics else None
@@ -298,6 +301,19 @@ class World(object):
             e.suppressed = True
             e.suppressed_s = max(e.suppressed_s, float(seconds))
 
+    def apply_component_damage(self, uid: int, component: str,
+                               fraction: float) -> float:
+        """Degrade a subsystem (mobility/firepower/sensors); returns health."""
+        e = self.entities[int(uid)]
+        if not e.alive:
+            return 0.0
+        key = str(component)
+        if key not in e.components:
+            return 1.0
+        e.components[key] = max(0.0, float(e.components[key])
+                                - max(0.0, float(fraction)))
+        return float(e.components[key])
+
     # -- sensors ------------------------------------------------------------
     def _compute_table_seen(self, ctx: WorldRuleContext, full: bool = False) -> Dict[int, set]:
         for dead_uid in [uid for uid, e in self.entities.items() if not e.alive]:
@@ -330,9 +346,19 @@ class World(object):
             result[observer.uid] = seen
             o_kind = kind_of[observer.uid]
             max_cells = int(table.get(o_kind, {}).get("vehicle", 0))
+            health = 1.0
             if observer.sensors:
-                km = max(float(getattr(s, "range_km", 0.0)) for s in observer.sensors)
-                max_cells = max(max_cells, int(km * 1000.0 / self.rule_grid.cell_m) + 1)
+                try:
+                    health = float((observer.components or {}).get(
+                        "sensors", 1.0))
+                except (TypeError, ValueError):
+                    health = 1.0
+                health = 0.0 if health <= 0.05 else max(0.2, health)
+                km = max(float(getattr(s, "range_km", 0.0))
+                         for s in observer.sensors) * health
+                max_cells = max(max_cells,
+                                int(km * 1000.0 / self.rule_grid.cell_m) + 1)
+                max_cells = int(max_cells * health)
             if max_cells <= 0:
                 continue
             for target in entities:
@@ -551,8 +577,7 @@ class World(object):
             if target is None:
                 aim = getattr(attacker, "aim_cell", None)
                 if aim is not None:
-                    from rules import indirect_fire as _indirect
-                    event = _indirect.resolve_indirect_fire(
+                    event = self._resolve_indirect(
                         ctx.view(attacker), tuple(aim), ctx, observed=False)
                     attacker.aim_cell = None
                     if event is not None:
@@ -565,12 +590,18 @@ class World(object):
                 if attacker.velocity_ms > 0.1 and not any(
                         getattr(w, "shoot_on_move", False) for w in attacker.weapons):
                     continue
-                direct = combat.select_weapon(ctx.view(attacker), ctx.view(target), ctx)
-                if direct is None and self._has_indirect(attacker):
-                    from rules import indirect_fire as _indirect
-                    event = _indirect.resolve_indirect_fire(
+                if self.direct_fire_model == "physics":
+                    from rules import physics_direct_fire as _phys
+                    direct_ok = _phys.can_engage(
+                        ctx.view(attacker), ctx.view(target), ctx)
+                else:
+                    direct_ok = combat.select_weapon(
+                        ctx.view(attacker), ctx.view(target), ctx) is not None
+                if not direct_ok and self._has_indirect(attacker):
+                    event = self._resolve_indirect(
                         ctx.view(attacker), ctx.rule_cell(ctx.view(target)), ctx,
-                        observed=ctx.can_detect(ctx.view(attacker), ctx.view(target)))
+                        observed=self.detected_by(attacker.affiliation,
+                                                  target.uid))
                 else:
                     event = combat.resolve_direct_fire(
                         ctx.view(attacker), ctx.view(target), ctx)
@@ -603,11 +634,141 @@ class World(object):
                 return True
         return False
 
+    # -- indirect fire (P1.5: physics default, table compatibility) ---------
+    def _resolve_indirect(self, attacker_view, aim_cell, ctx,
+                          observed: bool = False):
+        if self.indirect_fire_model == "physics":
+            event = self._resolve_indirect_physics(
+                attacker_view, aim_cell, ctx, observed)
+            if event is not None:
+                return event
+            # Profiled guns that are out of range / not ready must not fall
+            # back to the scatter table (that would bypass physical limits).
+            from rules import physics_indirect
+            if any(physics_indirect.has_profile(w)
+                   for w in getattr(attacker_view, "weapons", []) or []):
+                return None
+        from rules import indirect_fire
+        event = indirect_fire.resolve_indirect_fire(
+            attacker_view, aim_cell, ctx, observed=observed)
+        if event is not None:
+            event.setdefault("model", "table")
+        return event
+
+    def _resolve_indirect_physics(self, attacker_view, aim_cell, ctx,
+                                  observed: bool):
+        from rules import physics_indirect
+        attacker = self.entities.get(int(attacker_view.uid))
+        if attacker is None or not attacker.alive:
+            return None
+        aim_lon, aim_lat = ctx.rule_cell_center(tuple(aim_cell))
+        distance = haversine_m((attacker.pose.lon, attacker.pose.lat),
+                               (aim_lon, aim_lat))
+        picked = physics_indirect.select_weapon(
+            attacker_view, distance,
+            ready=lambda w: self.weapon_ready(attacker.uid, w.key))
+        if picked is None:
+            return None
+        weapon, profile = picked
+        impact = physics_indirect.solve_impact(
+            profile, distance, observed, ctx.rng)
+        if impact is None:
+            return None
+        bearing = initial_bearing_deg(
+            (attacker.pose.lon, attacker.pose.lat), (aim_lon, aim_lat))
+        br = math.radians(bearing)
+        east = (impact["along_m"] * math.sin(br)
+                + impact["across_m"] * math.cos(br))
+        north = (impact["along_m"] * math.cos(br)
+                 - impact["across_m"] * math.sin(br))
+        kx = 111320.0 * math.cos(math.radians(aim_lat))
+        lon = aim_lon + east / kx
+        lat = aim_lat + north / 110540.0
+        radius = float(profile.get("blast_radius_m", 50.0) or 50.0)
+        targets = []
+        total = 0
+        for target in self.sorted_entities():
+            if (not target.alive or target.on_board
+                    or target.affiliation == attacker.affiliation):
+                continue
+            if not _is_ground(target):
+                continue
+            d = haversine_m((lon, lat), (target.pose.lon, target.pose.lat))
+            if d > radius:
+                continue
+            kind = "infantry" if target.unit_type == "infantry" else "vehicle"
+            damage = physics_indirect.blast_damage(
+                profile, d, kind, target.armor)
+            entry = {"uid": target.uid, "distance_m": round(d, 1),
+                     "damage": damage, "hit": True}
+            if damage > 0:
+                total += damage
+                self.apply_damage(target.uid, damage)
+                entry["target_blood"] = target.blood
+                if target.alive:
+                    if kind == "infantry":
+                        self.apply_suppression(target.uid, 45.0)
+                    else:
+                        comp = ctx.rng.choice(("mobility", "firepower",
+                                               "sensors"))
+                        frac = physics_indirect.component_fraction(profile,
+                                                                   damage)
+                        entry["component"] = comp
+                        entry["component_health"] = round(
+                            self.apply_component_damage(target.uid, comp, frac),
+                            3)
+            targets.append(entry)
+        ctx.consume_ammo(attacker.uid, weapon.key, 1)
+        ctx.mark_fired(attacker.uid, weapon.key,
+                       getattr(weapon, "cooldown_s", 75.0))
+        impact_cell = self.rule_grid.cell_of(lon, lat)
+        scatter = ctx.rule_distance_cells(tuple(aim_cell), impact_cell)
+        return {
+            "type": "indirect_fire",
+            "model": "physics",
+            "actors": [attacker.uid] + [t["uid"] for t in targets
+                                        if t["damage"] > 0],
+            "weapon": weapon.key,
+            "aim_cell": [int(aim_cell[0]), int(aim_cell[1])],
+            "impact_cell": [int(impact_cell[0]), int(impact_cell[1])],
+            "outcome": "hit" if scatter == 0 else "scatter",
+            "scatter_cells": int(scatter),
+            "att_level": None,
+            "distance_m": round(distance, 1),
+            "tof_s": round(impact["tof_s"], 2),
+            "cep_m": round(impact["cep_m"], 1),
+            "sigma_m": round(impact["sigma_m"], 1),
+            "observed": bool(observed),
+            "impact_geo": {"lon": round(lon, 7), "lat": round(lat, 7)},
+            "blast_radius_m": radius,
+            "targets": targets,
+            "damage": total,
+            "location_geo": {"lon": lon, "lat": lat},
+        }
+
+    def _indirect_reachable_physics(self, attacker,
+                                    distance_m: float) -> bool:
+        if self.indirect_fire_model != "physics":
+            return False
+        from rules import physics_indirect
+        return physics_indirect.select_weapon(
+            attacker, distance_m,
+            ready=lambda w: self.weapon_ready(attacker.uid, w.key)) is not None
+
     def _best_target(self, attacker: Entity, ctx: WorldRuleContext) -> Optional[Entity]:
         best = None
         best_key = None
         candidates = []
-        for target_uid in sorted(self.seen.get(attacker.uid, ())):
+        contacts = set(self.seen.get(attacker.uid, ()))
+        if self._has_indirect(attacker):
+            # Indirect fire can use the side's fused picture, not only the
+            # gunner's own sensors (forward observers, battery FDC).
+            for uid, seen in self.seen.items():
+                observer = self.entities.get(uid)
+                if (observer is not None
+                        and observer.affiliation == attacker.affiliation):
+                    contacts |= seen
+        for target_uid in sorted(contacts):
             target = self.entities.get(target_uid)
             if target is None or not target.alive or target.on_board:
                 continue
@@ -624,7 +785,14 @@ class World(object):
                             max_range_m = max(max_range_m, physics_direct_fire._num(
                                 profile.get("max_range_m"), 3000.0))
                     if max_range_m and distance_m > max_range_m:
-                        continue
+                        rule_dist = ctx.rule_distance(ctx.view(attacker),
+                                                      ctx.view(target))
+                        if not (self._indirect_reachable_physics(
+                                    attacker, distance_m)
+                                or (self._has_indirect(attacker)
+                                    and self._indirect_can_reach(
+                                        attacker, rule_dist))):
+                            continue
                     candidates.append((distance_m, -target.value, target))
                 else:
                     dist = self.rule_grid.distance(self.rule_cell(attacker), self.rule_cell(target))
@@ -644,7 +812,18 @@ class World(object):
                     from rules import physics_direct_fire
                     if not physics_direct_fire.can_engage(
                             ctx.view(attacker), ctx.view(target), ctx):
-                        continue
+                        distance_m = ctx.distance_m(ctx.view(attacker),
+                                                    ctx.view(target))
+                        reach = self._indirect_reachable_physics(
+                            attacker, distance_m)
+                        if not reach:
+                            dist_cells = ctx.rule_distance(
+                                ctx.view(attacker), ctx.view(target))
+                            reach = (self._has_indirect(attacker)
+                                     and self._indirect_can_reach(
+                                         attacker, dist_cells))
+                        if not reach:
+                            continue
                     event_key = (ctx.distance_m(ctx.view(attacker), ctx.view(target)),
                                  -target.value)
                 else:

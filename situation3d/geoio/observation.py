@@ -44,6 +44,8 @@ def _entity_dict(entity, legacy_grid=None) -> dict:
         "value": entity.value,
         "stacked": entity.stacked,
         "concealed": entity.concealed,
+        "components": {str(k): round(float(v), 2)
+                       for k, v in (getattr(entity, "components", {}) or {}).items()},
     }
     if legacy_grid is not None:
         pos = legacy_grid.from_lonlat(entity.pose.lon, entity.pose.lat)

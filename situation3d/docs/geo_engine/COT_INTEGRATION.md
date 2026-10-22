@@ -21,7 +21,9 @@
 }
 ```
 
-默认值与集成前完全一致：`detection_model=table`、`direct_fire_model=crt`、`enable_radio_share=false`、`enable_tactics=false`。因此现有想定、golden replay 和庙算对拍不受影响。
+默认值与 P1.5 后的语义：`detection_model=table`、`direct_fire_model=physics`、
+`indirect_fire_model=physics`、`enable_radio_share=false`、`enable_tactics=false`。
+CRT/散布表可通过 `direct_fire_model=crt`、`indirect_fire_model=table` 切回校准/兼容模式。
 
 `detection_model=physical`（P1.4，可选，默认不启用）：3D 地形/建筑/烟幕射线 + 传感器视场/探测概率 + 分方航迹，详见 `P1_4_perception.md`；该模式按 `enable_radio_share` 决定是否共享。
 

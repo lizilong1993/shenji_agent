@@ -135,7 +135,8 @@ class TestSpottingModel(unittest.TestCase):
     def test_shadow_does_not_consume_rng(self):
         basic = make_basic()
         base = scenario([operator(1, 0, 1010),
-                         operator(2, 1, 1011, blood=5)])
+                         operator(2, 1, 1011, blood=5)],
+                        engine={"direct_fire_model": "crt"})
         shadow_sc = scenario([operator(1, 0, 1010),
                               operator(2, 1, 1011, blood=5)],
                              engine={"direct_fire_model": "shadow"})
@@ -218,7 +219,7 @@ class TestPhysicsDirectFire(unittest.TestCase):
                     "effective_mm", "pen_mm", "result"):
             self.assertIn(key, ev)
 
-    def test_default_is_crt(self):
+    def test_default_is_physics(self):
         basic = make_basic()
         world = build_world(scenario([operator(1, 0, 1010),
                                       operator(2, 1, 1011, blood=5)]), basic, seed=1)
@@ -226,7 +227,7 @@ class TestPhysicsDirectFire(unittest.TestCase):
             world.step()
         fire = [e for e in world.events if e["type"] == "direct_fire"]
         self.assertTrue(fire)
-        self.assertIsNone(fire[0].get("model"))
+        self.assertEqual(fire[0].get("model"), "physics")
 
 
 class TestCommanderAndTactics(unittest.TestCase):
@@ -302,7 +303,7 @@ class TestCommanderAndTactics(unittest.TestCase):
             "commander_interval_s": None,
         }), basic, seed=1)
         self.assertEqual(world.detection_model, "table")
-        self.assertEqual(world.direct_fire_model, "crt")
+        self.assertEqual(world.direct_fire_model, "physics")
         self.assertIsNone(world.tactics)
         self.assertEqual(world.commander_interval_s, 2.0)
 

@@ -74,13 +74,13 @@ def run_bench(entities, ticks, warmup):
 class TestBenchRegression(unittest.TestCase):
     def test_300_entities(self):
         result = run_bench(300, ticks=40, warmup=10)
-        self.assertEqual(result["hash"], "028216c732a56e0e")
+        self.assertEqual(result["hash"], "9e4e3d68467494e7")
         self.assertLess(result["p95"], P95_LIMIT_MS,
                         "300-entity p95 %.1f ms" % result["p95"])
 
     def test_500_entities(self):
         result = run_bench(500, ticks=40, warmup=10)
-        self.assertEqual(result["hash"], "1a3b153adba16a31")
+        self.assertEqual(result["hash"], "3590d3e46d1a37b1")
         self.assertLess(result["p95"], P95_LIMIT_MS,
                         "500-entity p95 %.1f ms" % result["p95"])
 

@@ -364,10 +364,12 @@ class TestEnvPackPipeline(unittest.TestCase):
 class TestWorldAndRules(unittest.TestCase):
     def test_direct_fire_event(self):
         basic = make_basic()
-        world = build_world(scenario([
+        sc = scenario([
             operator(1, 0, 1010, blood=3),
             operator(2, 1, 1011, blood=5),
-        ]), basic, seed=20261021)
+        ])
+        sc["engine"] = {"direct_fire_model": "crt"}
+        world = build_world(sc, basic, seed=20261021)
         events = []
         for _ in range(3):
             events.extend(world.step())
@@ -410,8 +412,10 @@ class TestWorldAndRules(unittest.TestCase):
 
     def test_observation_filters_enemies(self):
         basic = make_basic()
-        world = build_world(scenario([operator(1, 0, 1010),
-                                      operator(2, 1, 1011, blood=5)]), basic, seed=1)
+        sc = scenario([operator(1, 0, 1010),
+                       operator(2, 1, 1011, blood=5)])
+        sc["engine"] = {"direct_fire_model": "crt"}
+        world = build_world(sc, basic, seed=1)
         world.step()
         red = observation(world, seat=0)
         ids = {e["id"] for e in red["entities"]}
@@ -420,7 +424,9 @@ class TestWorldAndRules(unittest.TestCase):
         # A far enemy is not visible.
         far = operator(3, 1, 2323, blood=5)
         far["move_state"] = 4  # concealed: observation range halves
-        world2 = build_world(scenario([operator(1, 0, 1010), far]), basic, seed=1)
+        sc2 = scenario([operator(1, 0, 1010), far])
+        sc2["engine"] = {"direct_fire_model": "crt"}
+        world2 = build_world(sc2, basic, seed=1)
         world2.step()
         red2 = observation(world2, seat=0)
         self.assertNotIn(3, {e["id"] for e in red2["entities"]})
@@ -450,8 +456,10 @@ class TestWorldAndRules(unittest.TestCase):
 
     def test_forest_cover_applied_only_in_correction(self):
         basic = make_basic(forest_cols=(11,))
-        world = build_world(scenario([operator(1, 0, 1010),
-                                      operator(2, 1, 1011, blood=5)]), basic, seed=7)
+        sc = scenario([operator(1, 0, 1010),
+                       operator(2, 1, 1011, blood=5)])
+        sc["engine"] = {"direct_fire_model": "crt"}
+        world = build_world(sc, basic, seed=7)
         for _ in range(3):
             world.step()
         fires = [e for e in world.events if e["type"] == "direct_fire"]

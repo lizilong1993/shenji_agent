@@ -90,6 +90,12 @@ def integrate(entity, dt_s: float, env, cell_check=None, nav=None,
         + 2.0 * prof.decel_ms2 * max(0.0, entity.velocity_ms) * dt_s))
     if escaping:
         v_target = max(v_target, prof.max_speed_ms * 0.2)
+    try:
+        raw_mobility = float((entity.components or {}).get("mobility", 1.0))
+    except (AttributeError, TypeError, ValueError):
+        raw_mobility = 1.0
+    mobility = 0.0 if raw_mobility <= 0.05 else max(0.2, raw_mobility)
+    v_target *= mobility
     rate = prof.accel_ms2 if v_target > entity.velocity_ms else prof.decel_ms2
     entity.velocity_ms = _approach(entity.velocity_ms, v_target, rate * dt_s)
     entity.moving = entity.velocity_ms > 0.05

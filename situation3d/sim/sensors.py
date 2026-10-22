@@ -81,7 +81,13 @@ def sensors_for(name: str, domain: str) -> List[Sensor]:
 def detects(sensor: Sensor, observer, target, env) -> bool:
     if not getattr(target, "alive", True):
         return False
-    rng_km = sensor.effective_km(target)
+    try:
+        health = float((getattr(observer, "components", {}) or {}).get(
+            "sensors", 1.0))
+    except (TypeError, ValueError):
+        health = 1.0
+    health = 0.0 if health <= 0.05 else max(0.2, health)
+    rng_km = sensor.effective_km(target) * health
     if rng_km <= 0.0:
         return False
     from geo.geodesy import haversine_m

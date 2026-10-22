@@ -34,6 +34,7 @@ from mobility.profile import profile_for
 DEFAULT_ANCHOR = (119.9, 23.1)
 DETECTION_MODELS = ("table", "spotting", "shadow", "physical")
 DIRECT_FIRE_MODELS = ("crt", "physics", "shadow")
+INDIRECT_FIRE_MODELS = ("table", "physics")
 
 
 def _engine_section(value) -> dict:
@@ -237,9 +238,12 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
     detection_model = str(engine.get("detection_model") or "table").lower()
     if detection_model not in DETECTION_MODELS:
         detection_model = "table"
-    direct_fire_model = str(engine.get("direct_fire_model") or "crt").lower()
+    direct_fire_model = str(engine.get("direct_fire_model") or "physics").lower()
     if direct_fire_model not in DIRECT_FIRE_MODELS:
-        direct_fire_model = "crt"
+        direct_fire_model = "physics"
+    indirect_fire_model = str(engine.get("indirect_fire_model") or "physics").lower()
+    if indirect_fire_model not in INDIRECT_FIRE_MODELS:
+        indirect_fire_model = "physics"
     commander_interval_s = _as_float(engine.get("commander_interval_s"), 2.0)
     use_role_cards = _as_bool(engine.get("use_role_cards"), False)
     nav = None
@@ -252,6 +256,7 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
                   nav=nav,
                   detection_model=detection_model,
                   direct_fire_model=direct_fire_model,
+                  indirect_fire_model=indirect_fire_model,
                   enable_radio_share=_as_bool(engine.get("enable_radio_share"), False),
                   enable_tactics=_as_bool(engine.get("enable_tactics"), False),
                   commander_interval_s=commander_interval_s)

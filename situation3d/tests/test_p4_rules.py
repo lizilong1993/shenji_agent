@@ -308,8 +308,9 @@ class TestIndirectFire(unittest.TestCase):
                         {"obj_id": 2, "color": 1, "type": 2, "name": "重型坦克",
                          "sub_type": 0, "blood": 3, "max_blood": 3, "armor": 3,
                          "cur_hex": 1010, "carry_weapon_ids": [36], "value": 10}],
-                    "cities": [], "time": {"cur_step": 0, "tick": 10.0,
-                                           "max_time": 999}}
+                    "cities": [], "engine": {"indirect_fire_model": "table"},
+                    "time": {"cur_step": 0, "tick": 10.0,
+                             "max_time": 999}}
         return build_world(scenario, basic, seed=11)
 
     def test_engage_indirect_event(self):

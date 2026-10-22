@@ -45,7 +45,7 @@ class WorldRuleContext(object):
         self.now_s = world.time_s
         self.rng = rng or world.rng
         self.jam = 0.0
-        self.direct_fire_model = getattr(world, "direct_fire_model", "crt")
+        self.direct_fire_model = getattr(world, "direct_fire_model", "physics")
         self.detection_model = getattr(world, "detection_model", "table")
         self._elev_doc = _elevation_doc()
         self._views: Dict[int, EntityRuleView] = {}
@@ -203,6 +203,12 @@ class WorldRuleContext(object):
 
     def apply_suppression(self, uid: int, seconds: float) -> None:
         self.world.apply_suppression(uid, seconds)
+
+    def apply_component_damage(self, uid: int, component: str,
+                               fraction: float) -> float:
+        health = self.world.apply_component_damage(uid, component, fraction)
+        self.refresh()
+        return health
 
     def side_jam(self, affiliation: int) -> float:
         return 0.0
