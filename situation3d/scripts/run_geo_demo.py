@@ -44,24 +44,75 @@ def _case_inputs(name: str):
     return scenario, basic, getattr(spec, "objectives", []) or []
 
 
+def _landing_berth(world, obj, entity):
+    """Nearest water cell within 8 cells of an objective (landing berth)."""
+    start = world.rule_grid.cell_of(float(obj["lon"]), float(obj["lat"]))
+    frontier = [start]
+    seen = {start}
+    for radius in range(1, 9):
+        next_frontier = []
+        best = None
+        for cell in frontier:
+            for nb in world.rule_grid.neighbors(cell):
+                if nb in seen:
+                    continue
+                seen.add(nb)
+                next_frontier.append(nb)
+                lon, lat = world.rule_grid.cell_center_lonlat(*nb)
+                if world.env.water_depth(lon, lat) is None:
+                    continue
+                d = haversine_m((entity.pose.lon, entity.pose.lat), (lon, lat))
+                if best is None or d < best[0]:
+                    best = (d, lon, lat)
+        if best is not None:
+            return (best[1], best[2])
+        frontier = next_frontier
+        if not frontier:
+            break
+    return None
+
+
 def _assign_orders(world, objectives) -> None:
     for entity in world.sorted_entities():
-        if not entity.alive or entity.route is not None:
+        if not entity.alive or entity.on_board:
             continue
-        candidates = [o for o in objectives if o["owner"] != entity.affiliation]
+        if entity.route is not None:
+            # Clear routes that already arrived, so staged orders can advance.
+            if (entity.goal is not None
+                    and haversine_m((entity.pose.lon, entity.pose.lat),
+                                    entity.goal) < 200.0):
+                entity.route = None
+                entity.goal = None
+                entity.route_s = 0.0
+                entity.moving = False
+            else:
+                continue
+        live = []
+        for o in objectives:
+            cell = world.rule_grid.cell_of(float(o["lon"]), float(o["lat"]))
+            owner = world.objectives.get(cell, {}).get("owner", o["owner"])
+            live.append(dict(o, owner=owner))
+        candidates = [o for o in live if o["owner"] != entity.affiliation]
         if not candidates:
-            candidates = list(objectives)
+            candidates = list(live)
         if not candidates:
             continue
         ranked = []
+        landing_ship = any(k in entity.name for k in ("登陆", "两栖舰"))
         for obj in candidates:
             cell = world.rule_grid.cell_of(float(obj["lon"]), float(obj["lat"]))
             lon, lat = world.rule_grid.cell_center_lonlat(*cell)
+            if landing_ship and "BEACH" in str(obj.get("name")):
+                berth = _landing_berth(world, obj, entity)
+                if berth is not None:
+                    lon, lat = berth
             ranked.append((haversine_m((entity.pose.lon, entity.pose.lat), (lon, lat)), lon, lat))
         # Spread units around an objective so they do not end up at the same
         # point (which would be inside every weapon's minimum range).
-        off_lon = ((entity.uid % 5) - 2) * 0.01
-        off_lat = (((entity.uid // 5) % 5) - 2) * 0.01
+        # Keep the offset inside the 200 m rule cell so objective capture
+        # still happens at the destination cell.
+        off_lon = ((entity.uid % 5) - 2) * 0.0004
+        off_lat = (((entity.uid // 5) % 5) - 2) * 0.0004
         def preference(obj_name):
             name = entity.name
             landing = any(k in name for k in ("登陆", "两栖", "补给"))
@@ -70,12 +121,19 @@ def _assign_orders(world, objectives) -> None:
                 return -1e9
             if landing and "BEACH" in obj_name:
                 return -1e9
-            if entity.domain == "land" and obj_name in ("OBJ-BEACH", "OBJ-TAINAN"):
+            if entity.domain in ("land", "amphibious") and obj_name in (
+                    "OBJ-BEACH", "OBJ-TAINAN"):
                 return -1e6
             return 0.0
 
-        ranked = [(d + preference(o["name"]), lon + off_lon, lat + off_lat)
-                  for (d, lon, lat), o in zip(ranked, candidates)]
+        base_ranked = ranked
+        ranked = []
+        for (d, lon, lat), o in zip(base_ranked, candidates):
+            if landing_ship and "BEACH" in str(o.get("name")):
+                ranked.append((d + preference(o["name"]), lon, lat))
+            else:
+                ranked.append((d + preference(o["name"]),
+                               lon + off_lon, lat + off_lat))
         ranked.sort()
         for _, lon, lat in ranked:
             route = world.planner.plan(entity.profile, (entity.pose.lon, entity.pose.lat),
@@ -181,7 +239,7 @@ def main() -> int:
         events = world.step()
         step_ms.append((time.perf_counter() - t) * 1000.0)
         fired.extend(events)
-        if i % 120 == 59 and objectives:
+        if i % 30 == 29 and objectives:
             _assign_orders(world, objectives)
     elapsed = time.time() - t0
 

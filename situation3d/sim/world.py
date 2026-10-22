@@ -751,6 +751,11 @@ class World(object):
                         lon = carrier.pose.lon + 0.0015
                         lat = carrier.pose.lat
                     passenger.pose = Pose(lon, lat, self.env.elevation(lon, lat))
+                    passenger.route = None
+                    passenger.goal = None
+                    passenger.route_s = 0.0
+                    passenger.velocity_ms = 0.0
+                    passenger.moving = False
                     self.emit("disembark", [pid, carrier.uid],
                               "%s 从 %s 下船" % (passenger.name, carrier.name))
 
@@ -758,7 +763,8 @@ class World(object):
         """Nearest passable land point within 800 m (demo beach geometry)."""
         import math
         from geo.geodesy import haversine_m
-        for radius in (100.0, 200.0, 300.0, 500.0, 800.0):
+        for radius in (100.0, 200.0, 300.0, 500.0, 800.0,
+                       1200.0, 1600.0, 2200.0):
             for k in range(16):
                 bearing = math.radians(k * 22.5)
                 east = radius * math.sin(bearing)

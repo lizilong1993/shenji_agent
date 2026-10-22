@@ -147,6 +147,14 @@ class EnvPackEnvironment(object):
             ys2 = [item["_bbox"][3] for item in self._buildings]
             self._building_bbox = (min(xs), min(ys), max(xs2), max(ys2))
         self._landcover_cache = {}
+        self._max_building_height = max(
+            (float(b.get("height_m") or 6.0) for b in self._buildings),
+            default=0.0)
+        max_elev = 0.0
+        if self._terrain:
+            max_elev = max(v for row in self._terrain["values"] for v in row
+                           if v is not None)
+        self._max_terrain_elev = float(max_elev)
         self._water_cache = {}
         self._los_cache = {}
         self._min_elev = None
@@ -317,13 +325,17 @@ class EnvPackEnvironment(object):
         if (max(a[0], b[0]) < bb[0] or min(a[0], b[0]) > bb[2]
                 or max(a[1], b[1]) < bb[1] or min(a[1], b[1]) > bb[3]):
             return False
-        candidates = self._building_index.query_bbox(
-            min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1]))
+        if (min(h0, h1) > self._max_terrain_elev
+                + self._max_building_height + 1.0):
+            return False
+        candidates = self._candidates_along(a, b)
         for item in candidates:
             ring = item.get("ring") or []
             x0, y0, x1, y1 = item.get("_bbox")
             if (max(a[0], b[0]) < x0 or min(a[0], b[0]) > x1
                     or max(a[1], b[1]) < y0 or min(a[1], b[1]) > y1):
+                continue
+            if not _segment_hits_aabb(a, b, x0, y0, x1, y1):
                 continue
             if not _segment_intersects_ring(a, b, ring):
                 continue
@@ -334,6 +346,51 @@ class EnvPackEnvironment(object):
             if top > h0 + (h1 - h0) * f:
                 return True
         return False
+
+    def _candidates_along(self, a, b):
+        """Buildings in every index cell the segment crosses (exact DDA)."""
+        cell = self._building_index.cell
+        x0, y0 = a[0], a[1]
+        x1, y1 = b[0], b[1]
+        ix, iy = int(math.floor(x0 / cell)), int(math.floor(y0 / cell))
+        ex, ey = int(math.floor(x1 / cell)), int(math.floor(y1 / cell))
+        dx, dy = x1 - x0, y1 - y0
+        stepx = 1 if dx > 0 else -1
+        stepy = 1 if dy > 0 else -1
+        inf = float("inf")
+        if abs(dx) < 1e-15:
+            tmax_x, tdelta_x = inf, inf
+        else:
+            boundary = (ix + (1 if dx > 0 else 0)) * cell
+            tmax_x = (boundary - x0) / dx
+            tdelta_x = cell / abs(dx)
+        if abs(dy) < 1e-15:
+            tmax_y, tdelta_y = inf, inf
+        else:
+            boundary = (iy + (1 if dy > 0 else 0)) * cell
+            tmax_y = (boundary - y0) / dy
+            tdelta_y = cell / abs(dy)
+        seen = set()
+        out = []
+        guard = 0
+        while guard < 100000:
+            guard += 1
+            for item in self._building_index.query(
+                    (ix + 0.5) * cell, (iy + 0.5) * cell):
+                key = id(item)
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(item)
+            if ix == ex and iy == ey:
+                break
+            if tmax_x < tmax_y:
+                ix += stepx
+                tmax_x += tdelta_x
+            else:
+                iy += stepy
+                tmax_y += tdelta_y
+        return out
 
     def weather(self, lon: float, lat: float) -> Weather:
         return self._weather
@@ -460,6 +517,30 @@ def _segments_cross(p1, p2, p3, p4) -> bool:
     o1, o2 = orient(p1, p2, p3), orient(p1, p2, p4)
     o3, o4 = orient(p3, p4, p1), orient(p3, p4, p2)
     return (o1 * o2 < 0) and (o3 * o4 < 0)
+
+
+def _segment_hits_aabb(a, b, x0, y0, x1, y1) -> bool:
+    """Liang-Barsky segment/AABB overlap (cheap prefilter)."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, a[0] - x0), (dx, x1 - a[0]),
+                 (-dy, a[1] - y0), (dy, y1 - a[1])):
+        if abs(p) < 1e-15:
+            if q < 0:
+                return False
+            continue
+        t = q / p
+        if p < 0:
+            if t > t1:
+                return False
+            if t > t0:
+                t0 = t
+        else:
+            if t < t0:
+                return False
+            if t < t1:
+                t1 = t
+    return True
 
 
 def _segment_intersects_ring(a, b, ring) -> bool:

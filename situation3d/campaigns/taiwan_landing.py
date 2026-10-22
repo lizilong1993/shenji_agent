@@ -33,23 +33,23 @@ MAP_PATH = os.path.join(REPO, "situation3d", "web", "data",
 # Hex anchors (row, col) verified against the generated theatre map.
 P = {
     # 局部战场 A：澎湖以西（海上拦截）
-    "mid_strait": 3030,     # 海峡中段（水）
-    "penghu": 1024,         # 澎湖（陆）
-    "penghu_w": 1020,       # 澎湖以西（水）
+    "mid_strait": 2139,     # 海峡中段（水）
+    "penghu": 2358,         # 澎湖（陆）
+    "penghu_w": 2357,       # 澎湖以西（水）
     # 局部战场 B：台南—高雄（登陆与地面）
-    "beach": 5865,          # 安平滩头（陆，紧邻水道）
-    "beach_water": 5862,    # 换乘海域（水）
-    "offshore_b": 5860,     # 安平外海（水）
-    "offshore_c": 5760,     # 外海（水）
-    "tainan": 5967,         # 台南（居民地）
-    "tainan_east": 6066,    # 台南以东（路网）
-    "kaohsiung": 9075,      # 高雄（居民地）
-    "kaohsiung_port": 9074, # 高雄港区（陆）
-    "south_sea": 9268,      # 高雄西南海域（水）
-    "east_land": 1086,      # 台东纵谷（内陆路网）
-    "xiamen_off": 0,        # 厦门外海（水）
-    "pingtan_off": 1096,    # 北侧空域
-    "kinmen": 1085,         # 金门（陆，路网）
+    "beach": 5688,          # 安平滩头（陆，紧邻水道）
+    "beach_water": 5788,    # 换乘海域（水，紧邻滩头）
+    "offshore_b": 5784,     # 安平外海（水）
+    "offshore_c": 5785,     # 外海（水）
+    "tainan": 6091,         # 台南（居民地）
+    "tainan_east": 6291,    # 台南以南开阔地（反突击出发地）
+    "kaohsiung": 8294,      # 高雄（居民地）
+    "kaohsiung_port": 8294, # 高雄港区（陆）
+    "south_sea": 9190,      # 高雄西南海域（水）
+    "east_land": 6797,      # 台东纵谷（内陆路网）
+    "xiamen_off": 809,      # 厦门外海（水）
+    "pingtan_off": 529,     # 北侧空域
+    "kinmen": 1855,         # 金门/西侧陆地（陆）
 }
 
 
@@ -98,9 +98,12 @@ def scenario_dict() -> dict:
         _op(1023, "电子战飞机", 0, 3, 0, P["xiamen_off"], 2, 800, "air", "高空", 1, 18, "medium"),
         _op(1024, "武装直升机", 0, 3, 0, P["beach_water"], 2, 250, "air", "低空", 1, 12, "small"),
         # landing force: starts embarked as amphibious vehicles afloat
-        _op(1030, "两栖战车", 0, 2, 4, P["offshore_b"], 3, 12, "sea", "水面", 2, 15, "small", beaching=True),
-        _op(1031, "两栖战车", 0, 2, 4, P["offshore_b"], 3, 12, "sea", "水面", 2, 15, "small", beaching=True),
-        _op(1032, "两栖步兵", 0, 1, 2, P["offshore_c"], 4, 10, "sea", "水面", 0, 8, "small", beaching=True),
+        _op(1030, "两栖战车", 0, 2, 4, P["offshore_b"], 3, 12,
+            "amphibious", "地面", 2, 15, "small", beaching=True),
+        _op(1031, "两栖战车", 0, 2, 4, P["offshore_b"], 3, 12,
+            "amphibious", "地面", 2, 15, "small", beaching=True),
+        _op(1032, "两栖步兵", 0, 1, 2, P["offshore_c"], 4, 10,
+            "amphibious", "地面", 0, 8, "small", beaching=True),
         # coastal defence / air defence (onshore, far west)
         _op(1040, "岸舰导弹营", 0, 2, 0, P["kinmen"], 3, 20, "land", "ground", 1, 18),
         _op(1041, "防空导弹排", 0, 1, 16, P["kinmen"], 2, 10, "land", "ground", 0, 15),

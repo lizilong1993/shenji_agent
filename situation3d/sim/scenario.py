@@ -331,13 +331,17 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             role_card=card,
         )
         world.add_entity(entity)
-    # Units that start on water ride a friendly ship until it reaches land.
+    # Ground and amphibious units that start in deep water ride a friendly
+    # ship until it can put them ashore (landing craft chain).
     ships = [e for e in world.entities.values() if e.domain == "surface"]
     for entity in world.entities.values():
-        if entity.domain != "land":
+        if entity.domain not in ("land", "amphibious"):
             continue
         depth = env.water_depth(entity.pose.lon, entity.pose.lat)
-        if depth is None or depth <= entity.profile.wading_depth_m:
+        max_depth = (entity.profile.swim_depth_m
+                     if entity.domain == "amphibious"
+                     else entity.profile.wading_depth_m)
+        if depth is None or depth <= max_depth:
             continue
         carrier = None
         for ship in ships:
