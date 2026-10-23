@@ -630,18 +630,21 @@ class World(object):
         # Start from the observers' own (pre radio-share) views so relayed
         # contacts cannot be re-broadcast hop by hop on later ticks.
         source = self._seen_own or self.seen
-        result: Dict[int, set] = {uid: set(viewed)
-                                  for uid, viewed in source.items()}
+        # Shallow copy: non-due observer sets are immutable until rescanned,
+        # so only the dirty cleanup below needs fresh sets.
+        result: Dict[int, set] = dict(source)
         for uid, entity in self.entities.items():
             if not entity.alive or entity.on_board:
                 result.pop(uid, None)
                 self._seen_own.pop(uid, None)
-        # Drop dead/embarked targets from the held views immediately.
-        for uid in list(result):
-            result[uid] = {t for t in result[uid]
-                           if (self.entities.get(t) is not None
-                               and self.entities[t].alive
-                               and not self.entities[t].on_board)}
+        # Drop dead/embarked targets from the held views only when the
+        # roster changed; this loop dominates steady-state cost otherwise.
+        if self._seen_dirty:
+            for uid in list(result):
+                result[uid] = {t for t in result[uid]
+                               if (self.entities.get(t) is not None
+                                   and self.entities[t].alive
+                                   and not self.entities[t].on_board)}
         for uid in [u for u in self._scan_due
                     if u not in self.entities or not self.entities[u].alive
                     or self.entities[u].on_board]:
