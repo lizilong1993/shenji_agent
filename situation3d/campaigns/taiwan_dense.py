@@ -24,6 +24,7 @@ from geo.geodesy import haversine_m  # noqa: E402
 
 CASE_ID = "taiwan_dense_transfer_v1"
 _BUILT = None
+_OBJ_CACHE = None
 THEATRE = "taiwan_strait"
 TICK_SECONDS = 30
 TICK_COUNT = 1440
@@ -168,6 +169,16 @@ def _road_nodes(net, lon, lat, count, radius_m=900.0):
     return out
 
 
+def objective_points():
+    """Objective points snapped to the road network (convoy-strict TW2)."""
+    global _OBJ_CACHE
+    if _OBJ_CACHE is None:
+        net = roads.load(THEATRE)
+        _OBJ_CACHE = {k: _road_nodes(net, a["lon"], a["lat"], 1)[0]
+                      for k, a in AREAS.items()}
+    return _OBJ_CACHE
+
+
 def _op(uid, case_id, cls_key, color, domain, lon, lat, alt=0.0,
         heading=90.0, blood=2, carrier=None, group="", task=""):
     cls = CLASSES[cls_key]
@@ -183,6 +194,9 @@ def _op(uid, case_id, cls_key, color, domain, lon, lat, alt=0.0,
         "alt_m": float(alt),
         "heading_deg": float(heading),
         "subclass_id": cls["subclass"],
+        "length_m": float(cls["length_m"]),
+        "width_m": float(cls["width_m"]),
+        "height_m": float(cls["height_m"]),
         "blood": int(blood),
         "max_blood": int(blood),
         "value": 40 if domain == "air" else (30 if domain == "surface" else 10),
@@ -333,7 +347,10 @@ def build():
             "indirect_fire_model": "physics",
             "missile_model": "flight",
             "scan_interval_s": 180,
+            "max_ineffective_shots": 8,
+            "ineffective_block_s": 1800.0,
             "nav_res_m": 30,
+            "strict_roads": False,
             "use_role_cards": True,
             "enable_radio_share": True,
             "enable_commander": False,
@@ -341,8 +358,8 @@ def build():
         },
         "operators": operators,
         "objectives": [
-            {"name": AREAS[k]["name"], "lon": AREAS[k]["lon"],
-             "lat": AREAS[k]["lat"], "owner": -1, "value": 10}
+            {"name": AREAS[k]["name"], "lon": objective_points()[k][0],
+             "lat": objective_points()[k][1], "owner": -1, "value": 10}
             for k in sorted(AREAS)
         ],
         "missions": missions(),
@@ -353,22 +370,29 @@ def build():
     return _BUILT
 
 
+def patrol_point(key, dlon, dlat):
+    net = roads.load(THEATRE)
+    base = objective_points()[key]
+    return _road_nodes(net, base[0] + dlon, base[1] + dlat, 1)[0]
+
+
 def missions():
-    red_d = ["TRV%03d" % i for i in range(1, 9)] + ["TRV%03d" % i for i in range(23, 29)]
-    red_e = ["TRV%03d" % i for i in range(9, 17)] + ["TRV%03d" % i for i in range(17, 23)]
-    red_f = ["TRV%03d" % i for i in range(29, 37)]
-    blue_d = ["TBV%03d" % i for i in range(1, 9)]
-    blue_e = ["TBV%03d" % i for i in range(9, 15)]
-    blue_f = ["TBV%03d" % i for i in range(15, 25)]
+    red_d_combat = ["TRV%03d" % i for i in range(1, 9)] + ["TRV%03d" % i for i in range(23, 27)]
+    red_d_support = ["TRV%03d" % i for i in range(27, 29)]
+    red_e_combat = ["TRV%03d" % i for i in range(9, 17)] + ["TRV%03d" % i for i in range(17, 21)]
+    red_e_support = ["TRV%03d" % i for i in range(21, 23)]
+    red_f_support = ["TRV%03d" % i for i in range(29, 37)]
+    blue_d_combat = ["TBV%03d" % i for i in range(1, 5)]
+    blue_d_support = ["TBV%03d" % i for i in range(5, 9)]
+    blue_e_combat = ["TBV%03d" % i for i in range(9, 13)]
+    blue_e_support = ["TBV%03d" % i for i in range(13, 15)]
+    blue_f_combat = ["TBV%03d" % i for i in range(15, 19)]
+    blue_f_support = ["TBV%03d" % i for i in range(19, 25)]
     by_id = {}
     for i in range(1, 37):
         by_id["TRV%03d" % i] = 2000 + i
     for i in range(1, 25):
         by_id["TBV%03d" % i] = 3000 + i
-    for i in range(1, 5):
-        by_id["TRS%03d" % i] = 1000 + i
-    for i in range(1, 7):
-        by_id["TBS%03d" % i] = 1100 + i
 
     def units(ids):
         return [by_id[x] for x in ids]
@@ -380,40 +404,55 @@ def missions():
                     "objective": "岸海衔接泊位 %d" % (i + 1),
                     "lon": lon, "lat": lat, "start_s": 0 if i == 0 else 3600 * i,
                     "pace": "normal", "arrive_m": 300.0})
-    out.append({"id": "R-SEIZE-D", "side": 0, "units": units(red_d),
-                "task": "seize", "objective": AREAS["D"]["name"],
-                "lon": AREAS["D"]["lon"], "lat": AREAS["D"]["lat"],
-                "after": ["R-CARRIER-1"], "pace": "dash"})
-    out.append({"id": "R-SEIZE-E", "side": 0, "units": units(red_e),
-                "task": "seize", "objective": AREAS["E"]["name"],
-                "lon": AREAS["E"]["lon"], "lat": AREAS["E"]["lat"],
-                "after": ["R-CARRIER-2"], "pace": "normal"})
-    out.append({"id": "R-SEIZE-F", "side": 0, "units": units(red_f),
-                "task": "seize", "objective": AREAS["F"]["name"],
-                "lon": AREAS["F"]["lon"], "lat": AREAS["F"]["lat"],
-                "pace": "cautious"})
+
+    def add_mission(mid, side, ids, task, obj_key, lon, lat,
+                    after=None, pace="normal"):
+        item = {"id": mid, "side": side, "units": units(ids), "task": task,
+                "objective": AREAS[obj_key]["name"], "lon": lon, "lat": lat,
+                "pace": pace}
+        if after:
+            item["after"] = after
+        out.append(item)
+
+    d_lon, d_lat = objective_points()["D"]
+    e_lon, e_lat = objective_points()["E"]
+    f_lon, f_lat = objective_points()["F"]
+    add_mission("R-SEIZE-D", 0, red_d_combat, "seize", "D", d_lon, d_lat,
+                after=["R-CARRIER-1"], pace="dash")
+    add_mission("R-SUPPORT-D", 0, red_d_support, "hold", "D",
+                *patrol_point("D", -0.0020, -0.0040), after=["R-CARRIER-1"])
+    add_mission("R-SEIZE-E", 0, red_e_combat, "seize", "E", e_lon, e_lat,
+                after=["R-CARRIER-2"])
+    add_mission("R-SUPPORT-E", 0, red_e_support, "hold", "E",
+                *patrol_point("E", -0.0020, -0.0040), after=["R-CARRIER-2"])
+    add_mission("R-SUPPORT-F", 0, red_f_support, "hold", "F",
+                *patrol_point("F", -0.0020, -0.0040), pace="cautious")
+
+    add_mission("B-HOLD-D", 1, blue_d_combat, "hold", "D",
+                *patrol_point("D", 0.0030, 0.0025))
+    add_mission("B-SUPPORT-D", 1, blue_d_support, "hold", "D",
+                *patrol_point("D", 0.0020, 0.0055))
+    add_mission("B-HOLD-E", 1, blue_e_combat, "hold", "E",
+                *patrol_point("E", 0.0030, 0.0025))
+    add_mission("B-SUPPORT-E", 1, blue_e_support, "hold", "E",
+                *patrol_point("E", 0.0020, 0.0055))
+    add_mission("B-HOLD-F", 1, blue_f_combat, "hold", "F",
+                *patrol_point("F", 0.0030, 0.0025))
+    add_mission("B-SUPPORT-F", 1, blue_f_support, "hold", "F",
+                *patrol_point("F", 0.0020, 0.0055))
+
     out.append({"id": "R-SEA", "side": 0, "units": [1005, 1006],
                 "task": "hold", "objective": "海上警戒区",
                 "lon": 120.085, "lat": 22.945, "pace": "normal"})
     out.append({"id": "R-AIR", "side": 0, "units": [4001, 4002, 4003, 4004],
                 "task": "hold", "objective": "北部空域",
                 "lon": 120.150, "lat": 23.000, "pace": "normal"})
-    out.append({"id": "B-HOLD-D", "side": 1, "units": units(blue_d),
-                "task": "hold", "objective": AREAS["D"]["name"],
-                "lon": AREAS["D"]["lon"], "lat": AREAS["D"]["lat"],
-                "pace": "normal"})
-    out.append({"id": "B-HOLD-E", "side": 1, "units": units(blue_e),
-                "task": "hold", "objective": AREAS["E"]["name"],
-                "lon": AREAS["E"]["lon"], "lat": AREAS["E"]["lat"],
-                "pace": "normal"})
-    out.append({"id": "B-HOLD-F", "side": 1, "units": units(blue_f),
-                "task": "hold", "objective": AREAS["F"]["name"],
-                "lon": AREAS["F"]["lon"], "lat": AREAS["F"]["lat"],
-                "pace": "normal"})
-    out.append({"id": "B-SEA", "side": 1, "units": [1101, 1102, 1103, 1104, 1105, 1106],
+    out.append({"id": "B-SEA", "side": 1,
+                "units": [1101, 1102, 1103, 1104, 1105, 1106],
                 "task": "hold", "objective": "南部海区",
                 "lon": 120.080, "lat": 22.940, "pace": "normal"})
-    out.append({"id": "B-AIR", "side": 1, "units": [4005, 4006, 4007, 4008],
+    out.append({"id": "B-AIR", "side": 1,
+                "units": [4005, 4006, 4007, 4008],
                 "task": "hold", "objective": "东南空域",
                 "lon": 120.215, "lat": 22.940, "pace": "normal"})
     return out
@@ -458,6 +497,6 @@ def case_meta():
 
 
 def objectives():
-    return [{"name": AREAS[k]["name"], "lon": AREAS[k]["lon"],
-             "lat": AREAS[k]["lat"], "owner": -1, "value": 10}
+    return [{"name": AREAS[k]["name"], "lon": objective_points()[k][0],
+             "lat": objective_points()[k][1], "owner": -1, "value": 10}
             for k in sorted(AREAS)]

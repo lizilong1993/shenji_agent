@@ -26,6 +26,7 @@ import math
 
 from geo.geodesy import haversine_m
 from sim.intent import Intent
+from sim.collision import obbs_overlap
 from sim.motion import entity_profile
 
 
@@ -173,6 +174,26 @@ class MissionRunner(object):
             limit = getattr(entity.profile, "wading_depth_m", 1.2)
             if depth > limit:
                 return False
+        # Strict convoy case: stay on the road network.
+        if (getattr(entity.profile, "road_bound", False)
+                and not self.world.env.on_road(lon, lat, 22.0)):
+            return False
+        # Do not teleport a stopping unit into another vehicle.
+        try:
+            prof = entity_profile(entity)
+            # Use the live entity poses, not the traffic index: stop orders can
+            # move several units in one update before the index is refreshed.
+            for other in self.world.sorted_entities():
+                if other.uid == entity.uid or other.on_board:
+                    continue
+                if other.domain not in ("land", "amphibious"):
+                    continue
+                if obbs_overlap(prof, lon, lat, entity.pose.heading_deg,
+                                entity_profile(other), other.pose.lon,
+                                other.pose.lat, other.pose.heading_deg):
+                    return False
+        except Exception:  # noqa: BLE001 - traffic index is best-effort
+            pass
         return True
 
     # -- contact rules ------------------------------------------------------

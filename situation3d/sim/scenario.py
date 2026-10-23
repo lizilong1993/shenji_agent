@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import replace
 from typing import Optional, Tuple
 
 from compat.legacy import LegacyHexGrid
@@ -268,6 +269,7 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
         nav_res = _as_float(engine.get("nav_res_m"), 30.0)
         if _as_bool(engine.get("nav_enabled"), True):
             nav = NavField(env, res_m=nav_res)
+            nav.strict_roads = _as_bool(engine.get("strict_roads"), False)
     world = World(env, _rule_grid_for(grid), dt_s=dt_s, seed=seed, plan_grid=grid,
                   nav=nav,
                   detection_model=detection_model,
@@ -278,6 +280,8 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
                   enable_tactics=_as_bool(engine.get("enable_tactics"), False),
                   commander_interval_s=commander_interval_s,
                   scan_interval_s=scan_interval_s)
+    world.max_ineffective_shots = int(_as_float(engine.get("max_ineffective_shots"), 0))
+    world.ineffective_block_s = _as_float(engine.get("ineffective_block_s"), 1800.0)
     weather_base = scenario.get("weather_base")
     weather_timeline = scenario.get("weather")
     start_hour = scenario.get("start_hour_utc")
@@ -360,6 +364,15 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             profile = profile_from_card(card, key=card_id)
         else:
             profile = profile_for(unit_type, domain)
+        # Scenario-declared GLB footprint wins over the card defaults, so the
+        # collision body and the rendered model agree.
+        if op.get("length_m") is not None:
+            try:
+                profile = replace(profile,
+                                  length_m=float(op["length_m"]),
+                                  width_m=float(op.get("width_m") or profile.width_m))
+            except (TypeError, ValueError):
+                pass
         armor = op.get("armor")
         armor = int(armor) if armor is not None else int(profile.armor_class)
         if card:

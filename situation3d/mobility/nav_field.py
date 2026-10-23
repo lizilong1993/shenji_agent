@@ -410,6 +410,12 @@ class NavField(object):
 
     def _land_ok(self, prof: PlatformProfile, i: int,
                  factors: List[float]) -> bool:
+        # Optional per-scenario strict mode (TW2 convoy demo): ground platforms
+        # may only move on road cells. Default off keeps P6 cases unchanged.
+        if (getattr(self, "strict_roads", False)
+                and prof.domain in ("land", "amphibious")
+                and self.road[i] == 0):
+            return False
         factor = factors[self.cover[i]]
         if factor <= 0.0:
             return prof.road_bound and self.road[i] > 0
@@ -615,7 +621,12 @@ class NavField(object):
                 oneway_factor = self._oneway_factor(prof, i, ni)
                 if oneway_factor <= 0.0:
                     continue
-                tentative = g + step / speed[ni] * oneway_factor
+                # Road-bound convoys should not shortcut through open ground.
+                # A hard block is too slow at 30 m resolution, so pay a strong
+                # detour penalty instead (still finite if a road is missing).
+                offroad = (4.0 if (prof.road_bound and self.road[ni] == 0)
+                           else 1.0)
+                tentative = g + step / speed[ni] * oneway_factor * offroad
                 if tentative >= g_score.get(ni, float("inf")) - 1e-9:
                     continue
                 if blocked is not None and ni != goal_i:

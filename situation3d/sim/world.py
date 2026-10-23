@@ -62,6 +62,12 @@ class World(object):
         self.traffic = CollisionIndex()
         self._crowd_warned: Dict[Tuple[int, int], float] = {}
         self._yield_streak: Dict[int, int] = {}
+        # Optional engagement discipline (TW2): stop shooting at a target that
+        # has absorbed N shots without damage, and look for another target.
+        self.max_ineffective_shots = 0
+        self.ineffective_block_s = 1800.0
+        self._ineffective_shots: Dict[Tuple[int, int], int] = {}
+        self._target_block: Dict[Tuple[int, int], float] = {}
         # P1.6 behaviour intents (objective + pace/risk).
         self.intents: Dict[int, object] = {}
         # Physical perception state (P1.4).
@@ -426,6 +432,7 @@ class World(object):
         if not e.alive:
             return
         e.blood = max(0, e.blood - int(damage))
+        e.last_damaged_s = self.time_s
         if e.blood <= 0:
             self._on_destroyed(e)
 
@@ -434,6 +441,7 @@ class World(object):
         if e.alive:
             e.suppressed = True
             e.suppressed_s = max(e.suppressed_s, float(seconds))
+            e.last_damaged_s = self.time_s
 
     def apply_component_damage(self, uid: int, component: str,
                                fraction: float) -> float:
@@ -446,6 +454,7 @@ class World(object):
             return 1.0
         e.components[key] = max(0.0, float(e.components[key])
                                 - max(0.0, float(fraction)))
+        e.last_damaged_s = self.time_s
         return float(e.components[key])
 
     # -- sensors ------------------------------------------------------------
@@ -934,6 +943,15 @@ class World(object):
             if not any(self.weapon_ready(attacker.uid, key) for key in attacker.ammo):
                 continue
             order = self.orders.get(attacker.uid) or {}
+            # Non-combat platforms (trucks/engineers, role card "avoid") only
+            # return fire when hit; they do not initiate engagements. A manual
+            # fire order still overrides.
+            policy = ((attacker.role_card or {}).get("behavior") or {}).get("engage_policy")
+            if (policy in ("avoid", "hold_fire")
+                    and order.get("type") != "fire"
+                    and (attacker.last_damaged_s < 0.0
+                         or self.time_s - attacker.last_damaged_s > 300.0)):
+                continue
             target = None
             if order.get("type") == "fire":
                 candidate = self.entities.get(int(order.get("target", -1)))
@@ -1007,6 +1025,18 @@ class World(object):
                     event["target_blood"] = target.blood
                 event["location_geo"] = event.get("location_geo") or {
                     "lon": target.pose.lon, "lat": target.pose.lat}
+                if (self.max_ineffective_shots > 0
+                        and event.get("type") == "direct_fire"):
+                    damage = int(event.get("damage") or 0)
+                    key = (attacker.uid, target.uid)
+                    if damage > 0:
+                        self._ineffective_shots.pop(key, None)
+                    else:
+                        count = self._ineffective_shots.get(key, 0) + 1
+                        self._ineffective_shots[key] = count
+                        if count >= self.max_ineffective_shots:
+                            self._target_block[key] = self.time_s + self.ineffective_block_s
+                            self._ineffective_shots.pop(key, None)
                 self._append(event)
 
     def _has_indirect(self, attacker: Entity) -> bool:
@@ -1165,6 +1195,9 @@ class World(object):
             if target is None or not target.alive or target.on_board:
                 continue
             if target.affiliation == attacker.affiliation:
+                continue
+            block_until = self._target_block.get((attacker.uid, target_uid), 0.0)
+            if block_until > self.time_s:
                 continue
             if _is_ground(attacker) and _is_ground(target):
                 if self.direct_fire_model == "physics":

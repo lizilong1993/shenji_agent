@@ -37,6 +37,8 @@ from engine import symbology  # noqa: E402
 from geo.geodesy import haversine_m  # noqa: E402
 from sim.mission import MissionRunner  # noqa: E402
 from sim.scenario import build_world  # noqa: E402
+from sim.collision import obbs_overlap  # noqa: E402
+from sim.motion import entity_profile  # noqa: E402
 from run_store import RunStore  # noqa: E402
 
 CASE_MODULES = {"taiwan_dense_transfer_v1": "taiwan_dense"}
@@ -132,6 +134,25 @@ def _clear_subcell_buildings(world):
                     road = bool(world.env.on_road(lon, lat, 25.0))
                 except AttributeError:
                     road = True
+                if getattr(entity.profile, "road_bound", False) and not road:
+                    continue
+                blocked = False
+                try:
+                    prof = entity_profile(entity)
+                    for other in world.sorted_entities():
+                        if other.uid == entity.uid or other.on_board:
+                            continue
+                        if other.domain not in ("land", "amphibious"):
+                            continue
+                        if obbs_overlap(prof, lon, lat, entity.pose.heading_deg,
+                                        entity_profile(other), other.pose.lon,
+                                        other.pose.lat, other.pose.heading_deg):
+                            blocked = True
+                            break
+                except Exception:  # noqa: BLE001
+                    blocked = False
+                if blocked:
+                    continue
                 score = radius + (0.0 if road else 30.0)
                 if best is None or score < best[0]:
                     best = (score, lon, lat)

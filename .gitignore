@@ -30,6 +30,6 @@ venv/
 .tools/
 
 # TW2 双模式：测试端运行库与发布备份（运行时产物，不入库）
-situation3d/var/sim_runs/
+situation3d/var/
 situation3d/web/data/situations/demo_release.json
 situation3d/web/data/situations/*.bak_prev_*

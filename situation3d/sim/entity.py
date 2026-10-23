@@ -173,6 +173,8 @@ class Entity(object):
     concealment: Optional[float] = None
     comms_range_m: float = 600.0
     last_fired_s: float = -1.0
+    # Last time this entity took damage (used for non-combat ROE/self-defence).
+    last_damaged_s: float = -1.0
     role_card: Optional[dict] = None
     aim_cell: Optional[Tuple[int, int]] = None
     # P1.5 component damage: 1.0 = healthy, 0.0 = destroyed subsystem.
