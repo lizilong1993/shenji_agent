@@ -84,7 +84,11 @@
       actions += '<button class="ghost" data-act="best" data-id="' + esc(run.run_id) + '"' + (done && !best ? '' : ' disabled') + '>设为最优</button>';
       if (!pinned) actions += '<button class="ghost" data-act="pin" data-id="' + esc(run.run_id) + '"' + (done ? '' : ' disabled') + '>指定保留</button>';
       else actions += '<button class="ghost" data-act="unpin" data-id="' + esc(run.run_id) + '">取消保留</button>';
-      actions += '<button class="danger" data-act="delete" data-id="' + esc(run.run_id) + '"' + (best || pinned || run.status === 'queued' || run.status === 'running' ? ' disabled' : '') + '>删除</button>';
+      if (run.status === 'queued' || run.status === 'running') {
+        actions += '<button class="danger" data-act="cancel" data-id="' + esc(run.run_id) + '">取消</button>';
+      } else {
+        actions += '<button class="danger" data-act="delete" data-id="' + esc(run.run_id) + '"' + (best || pinned ? ' disabled' : '') + '>删除</button>';
+      }
       actions += '</div>';
       return '<tr>' +
         '<td><code>' + esc(run.run_id) + '</code><div class="hint">' + esc(run.created_at || '') + '</div></td>' +
@@ -182,6 +186,13 @@
       postRun(runId, 'unpin', {})
         .then(function () { setStatus('已取消指定保留'); return refresh(); })
         .catch(function (err) { setStatus('操作失败：' + err.message, true); });
+      return;
+    }
+    if (act === 'cancel') {
+      if (!confirm('取消运行 ' + runId + '？')) return;
+      postRun(runId, 'cancel', {})
+        .then(function () { setStatus('已取消'); return refresh(); })
+        .catch(function (err) { setStatus('取消失败：' + err.message, true); });
       return;
     }
     if (act === 'delete') {

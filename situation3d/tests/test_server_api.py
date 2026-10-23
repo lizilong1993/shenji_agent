@@ -122,6 +122,20 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(status, 409)
         self.assertIn("active", body)
 
+    def test_startup_fails_stale_active_run(self):
+        stale = self.store.create_run(CASE, seed=11)
+        self.store.update_run(CASE, stale, status="running")
+        self._start("test")
+        self.assertEqual(self.store.get_run(CASE, stale)["status"], "failed")
+
+    def test_cancel_active_run(self):
+        port = self._start("test")
+        queued = self.store.create_run(CASE, seed=9)
+        status, _body = request(port, "/api/sim/runs/%s/cancel" % queued,
+                                "POST", {"case_id": CASE})
+        self.assertEqual(status, 200)
+        self.assertEqual(self.store.get_run(CASE, queued)["status"], "failed")
+
     def test_demo_mode_blocks_simulation(self):
         port = self._start("demo")
         status, _body = request(port, "/api/sim/runs?case_id=" + CASE)

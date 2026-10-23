@@ -44,6 +44,21 @@ if [ "$yes" != 1 ]; then
   exit 3
 fi
 
+# 2.5) 数据发布清单预检：必须在 fast-forward 之前失败，避免“代码已更新、数据未校验”
+if [ "$with_data" = 1 ]; then
+  pre_release=$DEMO_WT/situation3d/web/data/demo_release.json
+  if [ -f "$pre_release" ]; then
+    pre_case=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("case_id") or "")' "$pre_release") \
+      || die "读取 demo_release.json 失败"
+    pre_hash=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("trajectory_sha256") or "")' "$pre_release") \
+      || die "读取 demo_release.json 失败"
+    [ -n "$pre_case" ] && [ -n "$pre_hash" ] || die "demo_release.json 缺少 case_id/trajectory_sha256"
+    pre_actual=$(sha256sum "$DEMO_WT/situation3d/web/data/situations/$pre_case.json" 2>/dev/null | cut -d" " -f1)
+    [ "$pre_actual" = "$pre_hash" ] || die "演示端 $pre_case 与 demo_release.json 哈希不一致（未更新）"
+    echo "发布产物预检通过: $pre_case"
+  fi
+fi
+
 # 3) 备份当前稳定版本，更新，重启，冒烟；失败自动回退
 backup="demo-backup-$(date +%Y%m%d_%H%M%S)"
 git -C "$DEMO_WT" tag "$backup" demo

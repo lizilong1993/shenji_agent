@@ -57,7 +57,7 @@ python3 scripts/run_situation_case.py --case taiwan_dense_transfer_v1 \
 | 损失 | 红 14 / 蓝 6 |
 | 目标归属 | D 红，E/F 蓝（partial） |
 | 产物 | trajectory.json 约 32.3 MB |
-| 耗时 | 501 s（p50 284 ms / p95 510 ms per tick） |
+| 耗时 | 501 s（p50 327 ms / p95 510 ms per tick） |
 | 校验 | 通过：finite；water_hits=2（瞬态）、building_hits=1（瞬态） |
 
 `validation` 规则：位置有限；停驻单位由子格清障移到最近空地；移动中的亚单元

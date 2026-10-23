@@ -341,7 +341,8 @@ def _convert_events(world, uid_to_cid, frames, tick_seconds, tick_count, stages)
                         "result": "hit" if hit else "miss",
                         "result_detail": detail, "damage": ev.get("damage")})
             events.append(imp)
-            last_impact[target] = imp["id"]
+            if hit:
+                last_impact[target] = imp["id"]
         elif typ == "indirect_fire":
             if not actors:
                 continue
@@ -363,7 +364,8 @@ def _convert_events(world, uid_to_cid, frames, tick_seconds, tick_count, stages)
                             "result": "hit" if (ev.get("damage") or 0) > 0 else "miss",
                             "damage": ev.get("damage")})
                 events.append(imp)
-                last_impact[target] = imp["id"]
+                if (ev.get("damage") or 0) > 0:
+                    last_impact[target] = imp["id"]
         elif typ == "sea_air_fire":
             shooter, target = (actors + [None, None])[:2]
             if not shooter or not target:
@@ -393,7 +395,8 @@ def _convert_events(world, uid_to_cid, frames, tick_seconds, tick_count, stages)
                         "result_detail": detail, "damage": ev.get("damage"),
                         "intercepted": ev.get("intercepted")})
             events.append(imp)
-            last_impact[target] = imp["id"]
+            if detail == "hit":
+                last_impact[target] = imp["id"]
         elif typ == "destroyed":
             target = actors[0] if actors else None
             if not target:

@@ -29,7 +29,8 @@ python3 server/serve.py --port 8876 --mode test --runs-dir var/sim_runs
 | POST | `/api/sim/runs/<id>/select` | `{confirm:true, note}` 设为最优 |
 | POST | `/api/sim/runs/<id>/pin` | `{replace?}` 指定保留（第二份需替换） |
 | POST | `/api/sim/runs/<id>/unpin` | 取消指定保留 |
-| POST | `/api/sim/runs/<id>/delete` | `{confirm:true}` 删除（best/pinned 受保护） |
+| POST | `/api/sim/runs/<id>/cancel` | 终止运行（SIGTERM，状态转 failed） |
+| POST | `/api/sim/runs/<id>/delete` | `{confirm:true}` 删除（best/pinned/运行中受保护） |
 
 同一案例同时只允许一个 queued/running；`_watch_run` 监督子进程，异常退出时写 failed。
 演示端静态 `/sim.html`、`/src/simConsole.js` 在 demo 模式返回 404。
@@ -64,7 +65,7 @@ python3 scripts/promote_run.py --case taiwan_dense_transfer_v1 \
 
 ## 4. 验证
 
-- 全量 `pytest situation3d/tests`：**340 passed / 14 skipped**；
+- 全量 `pytest situation3d/tests`：**342 passed / 14 skipped**；
 - 新增 `tests/test_run_store.py`（显式 run_id、审计）、`tests/test_promote.py`（选定/校验/
   篡改/备份）、`tests/test_server_api.py`（test 列表/选定/钉住；demo 403/404）；
 - 手动：测试端发起 10 tick 推演（~30 s 含建库），列表/选定/钉住/取消全通；

@@ -271,6 +271,38 @@ def _run_log_path(case_id, run_id):
     return os.path.join(RUNS_DIR, case_id, run_id, "run.log")
 
 
+def _pid_alive(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def _cleanup_stale_runs():
+    """At test-server startup, fail runs whose subprocess is gone."""
+    for case_id in sorted(ENGINE_CASES):
+        try:
+            rows = RUN_STORE.list_runs(case_id)
+        except RunError:
+            continue
+        for row in rows:
+            if row.get("status") not in ("queued", "running"):
+                continue
+            try:
+                run = RUN_STORE.get_run(case_id, row["run_id"])
+            except RunError:
+                continue
+            pid = run.get("pid")
+            if pid and _pid_alive(pid):
+                continue
+            try:
+                RUN_STORE.fail_run(case_id, row["run_id"],
+                                   "stale active run (no live process)")
+            except RunError:
+                pass
+
+
 def _watch_run(case_id, run_id, proc, log_fh):
     try:
         rc = proc.wait()
@@ -323,6 +355,7 @@ def _launch_run(body):
         proc = subprocess.Popen(cmd, cwd=_PKG_ROOT, stdout=log_fh,
                                 stderr=subprocess.STDOUT,
                                 env=dict(os.environ, PYTHONUNBUFFERED="1"))
+        RUN_STORE.update_run(case_id, run_id, pid=proc.pid)
     except Exception as exc:  # noqa: BLE001
         if log_fh is not None:
             log_fh.close()
@@ -1593,6 +1626,17 @@ class Handler(SimpleHTTPRequestHandler):
                         run = RUN_STORE.unpin(cid, run_id)
                         self._send_json({"run": run})
                         return
+                    if action == "cancel":
+                        run = RUN_STORE.get_run(cid, run_id)
+                        pid = run.get("pid")
+                        if pid:
+                            try:
+                                os.kill(int(pid), 15)
+                            except OSError:
+                                pass
+                        RUN_STORE.fail_run(cid, run_id, "cancelled by user")
+                        self._send_json({"cancelled": run_id})
+                        return
                     if action == "delete":
                         if not body.get("confirm"):
                             self._send_json({"error": "confirm=true 必填"}, 400)
@@ -1993,6 +2037,7 @@ def main() -> int:
             return 3
     else:
         RUN_STORE = RunStore(RUNS_DIR)
+        _cleanup_stale_runs()
 
     if not os.path.isdir(WEB_ROOT):
         sys.stderr.write("web root not found: %s\n" % WEB_ROOT)
