@@ -161,6 +161,7 @@ def main() -> int:
                     choices=("table", "physics"))
     ap.add_argument("--missile-model",
                     choices=("instant", "flight"))
+    ap.add_argument("--scan-interval", type=float, default=None)
     ap.add_argument("--tactics", action="store_true")
     ap.add_argument("--radio-share", action="store_true")
     ap.add_argument("--commander", action="store_true")
@@ -178,6 +179,7 @@ def main() -> int:
 
     if (args.detection_model or args.direct_fire_model
             or args.indirect_fire_model or args.missile_model
+            or args.scan_interval is not None
             or args.tactics or args.radio_share or args.commander):
         engine = scenario.get("engine")
         if not isinstance(engine, dict):
@@ -191,6 +193,8 @@ def main() -> int:
             engine["indirect_fire_model"] = args.indirect_fire_model
         if args.missile_model:
             engine["missile_model"] = args.missile_model
+        if args.scan_interval is not None:
+            engine["scan_interval_s"] = args.scan_interval
         if args.tactics:
             engine["enable_tactics"] = True
         if args.radio_share:
@@ -259,6 +263,7 @@ def main() -> int:
         "direct_fire_model": world.direct_fire_model,
         "indirect_fire_model": world.indirect_fire_model,
         "missile_model": world.missile_model,
+        "scan_interval_s": world.scan_interval_s,
         "detection_shadow": (None if world.detection_shadow is None else {
             k: v for k, v in world.detection_shadow.items() if k != "samples"}),
         "elapsed_s": round(elapsed, 2),

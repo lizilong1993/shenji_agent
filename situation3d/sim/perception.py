@@ -12,7 +12,9 @@ Replaces the observation-table/ad-hoc spotting chain when
   detection, with a short hold so contacts do not flicker every tick;
 * detections feed simple per-side tracks (fusion by target, TTL, confidence).
 
-The legacy table/spotting models stay untouched and remain the default.
+The legacy table/spotting models stay untouched and remain the default; this
+module shares the world's fixed per-observer scan cadence (P3), so an
+observer that is not due keeps its previous view.
 """
 
 from __future__ import annotations
@@ -387,21 +389,56 @@ def detection_roll(seed, bucket: int, observer_uid: int, target_uid: int) -> flo
 
 
 # -- world integration ----------------------------------------------------
-def compute_seen(world) -> Dict[int, set]:
-    """Per-observer seen sets for the physical model (updates tracks)."""
+def compute_seen(world, interval_s: Optional[float] = None) -> Dict[int, set]:
+    """Per-observer seen sets for the physical model (updates tracks).
+
+    ``interval_s`` gives each observer a fixed scan cadence independent of
+    the number of entities; observers not yet due keep their previous view.
+    """
     entities = [e for e in world.sorted_entities()
                 if e.alive and not e.on_board]
-    seen: Dict[int, set] = {}
     now = float(world.time_s)
+    interval = float(interval_s or 0.0)
+    due = getattr(world, "_phys_scan_due", {})
+    if interval <= 0.0:
+        due.clear()                      # per-tick scanning: no clock state
+    else:
+        limit = now + interval
+        for uid, due_t in list(due.items()):
+            if due_t > limit:            # time jumped backwards: re-anchor
+                due[uid] = limit
+    if interval > 0.0 and due:
+        observers = [e for e in entities
+                     if due.get(e.uid, 0.0) <= now + 1e-9]
+    elif interval > 0.0:
+        observers = list(entities)
+    else:
+        observers = entities
+    live = {e.uid for e in entities}
+    seen: Dict[int, set] = {}
+    for uid, viewed in world.seen.items():
+        if uid in live:
+            seen[uid] = {t for t in viewed
+                         if (world.entities.get(t) is not None
+                             and world.entities[t].alive
+                             and not world.entities[t].on_board)}
+    for uid in [u for u in due
+                if u not in world.entities or not world.entities[u].alive
+                or world.entities[u].on_board]:
+        due.pop(uid, None)
+    hold_s = max(_HOLD_S, 2.0 * interval)
     seed = getattr(world, "seed", 0)
     bucket = int(now // 10.0)
     last_seen: Dict[Tuple[int, int], float] = world._phys_last_seen
     tracks: Dict[int, dict] = world.tracks
     obscurants = getattr(world, "obscurants", ())
-    for observer in entities:
+    for observer in observers:
         specs = specs_for(observer)
         if not specs:
             seen[observer.uid] = set()
+            if interval > 0.0:
+                world._advance_scan_due(observer.uid, due_map=due,
+                                        interval=interval)
             continue
         max_range = max(spec.range_m for spec in specs)
         visible = set()
@@ -445,7 +482,7 @@ def compute_seen(world) -> Dict[int, set]:
                      and detection_roll(seed, bucket, observer.uid,
                                         target.uid) < p_total)
             held = (p_total > 0.0 and last_seen.get(key) is not None
-                    and now - last_seen[key] <= _HOLD_S)
+                    and now - last_seen[key] <= hold_s)
             if not fresh and not held:
                 continue
             visible.add(target.uid)
@@ -454,7 +491,10 @@ def compute_seen(world) -> Dict[int, set]:
                 _update_track(tracks, observer.affiliation, target, now,
                               p_total, kinds)
         seen[observer.uid] = visible
-    for key in [k for k, ts in last_seen.items() if now - ts > _HOLD_S * 2]:
+        if interval > 0.0:
+            world._advance_scan_due(observer.uid, due_map=due,
+                                    interval=interval)
+    for key in [k for k, ts in last_seen.items() if now - ts > hold_s * 2]:
         del last_seen[key]
     _prune_tracks(tracks, now)
     return seen

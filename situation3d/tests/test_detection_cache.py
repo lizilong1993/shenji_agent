@@ -84,6 +84,7 @@ class TestDetectionCacheSubCell(unittest.TestCase):
                         "cities": [],
                         "time": {"cur_step": 0, "tick": 10.0, "max_time": 999}}
             world = build_world(scenario, basic, seed=1, envpack=out)
+            world.scan_interval_s = 0.0  # rescan on every _update_sensors call
             target = world.entities[2]
             # Same rule/env cell, different sub-cell cover.
             target.pose = Pose(open_lon, open_lat,

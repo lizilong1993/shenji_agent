@@ -25,7 +25,9 @@ GRID = {"center_lon": 119.9, "center_lat": 23.1, "cols": 60, "rows": 60,
         "width_m": 200.0}
 # Acceptance target is 100 ms; shared-host scheduling noise pushes 500-entity
 # p95 into the 90-110 ms range, so the gate allows a small margin.
-P95_LIMIT_MS = 120.0
+P95_LIMIT_MS = 80.0   # standalone ~25-49 ms; shared-host scheduling noise
+P99_LIMIT_MS = 150.0  # covers the lockstep scan spikes p95 skips
+TICKS = 70  # covers >=2 scan periods so the periodic scan spike is gated
 
 
 def make_basic():
@@ -67,22 +69,29 @@ def run_bench(entities, ticks, warmup):
     ).hexdigest()[:16]
     times.sort()
     p95 = times[min(len(times) - 1, int(len(times) * 0.95))]
-    return {"p50": statistics.median(times), "p95": p95,
+    # p95 deliberately excludes the two lockstep scan spikes in a 60-sample
+    # window; p99 keeps the worst step so a spike regression is gated.
+    p99 = times[min(len(times) - 1, int(len(times) * 0.99))]
+    return {"p50": statistics.median(times), "p95": p95, "p99": p99,
             "events": len(world.events), "hash": digest}
 
 
 class TestBenchRegression(unittest.TestCase):
     def test_300_entities(self):
-        result = run_bench(300, ticks=40, warmup=10)
-        self.assertEqual(result["hash"], "9e4e3d68467494e7")
+        result = run_bench(300, ticks=TICKS, warmup=10)
+        self.assertEqual(result["hash"], "ca6dc98b93194982")
         self.assertLess(result["p95"], P95_LIMIT_MS,
                         "300-entity p95 %.1f ms" % result["p95"])
+        self.assertLess(result["p99"], P99_LIMIT_MS,
+                        "300-entity p99 %.1f ms" % result["p99"])
 
     def test_500_entities(self):
-        result = run_bench(500, ticks=40, warmup=10)
-        self.assertEqual(result["hash"], "3590d3e46d1a37b1")
+        result = run_bench(500, ticks=TICKS, warmup=10)
+        self.assertEqual(result["hash"], "6f92ee20e2982bae")
         self.assertLess(result["p95"], P95_LIMIT_MS,
                         "500-entity p95 %.1f ms" % result["p95"])
+        self.assertLess(result["p99"], P99_LIMIT_MS,
+                        "500-entity p99 %.1f ms" % result["p99"])
 
 
 if __name__ == "__main__":

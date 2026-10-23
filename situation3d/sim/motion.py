@@ -89,6 +89,13 @@ def integrate(entity, dt_s: float, env, cell_check=None, nav=None,
     v_target = min(v_target, math.sqrt(
         look_cap * look_cap
         + 2.0 * prof.decel_ms2 * max(0.0, entity.velocity_ms) * dt_s))
+    # Reserve the distance covered during the final decel tick: without it a
+    # coarse dt lands on the route end while still >1 m/s, forcing a stop
+    # spike.  Braking one tick earlier makes the terminal residual tiny.
+    remaining_end = max(0.0, route.total_m - entity.route_s)
+    stop_margin = 0.5 * max(0.0, entity.velocity_ms) * dt_s
+    v_target = min(v_target, math.sqrt(max(
+        0.0, 2.0 * prof.decel_ms2 * (remaining_end - stop_margin))))
     if escaping:
         v_target = max(v_target, prof.max_speed_ms * 0.2)
     if is_air:
@@ -206,7 +213,9 @@ def integrate(entity, dt_s: float, env, cell_check=None, nav=None,
 
     if entity.route is not None:
         remaining = route.total_m - entity.route_s
-        if reason is None and remaining <= 1.0:
+        if reason is None and (remaining <= 1e-6
+                               or (remaining <= 0.5
+                                   and entity.velocity_ms <= 1.0)):
             keep_alt = entity.pose.alt_m if is_air else None
             entity.pose = route.pose_at(route.total_m)
             if is_air:

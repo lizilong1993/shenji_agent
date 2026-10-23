@@ -9,6 +9,7 @@ block use their real metadata.
 from __future__ import annotations
 
 import json
+import math
 from typing import Optional, Tuple
 
 from compat.legacy import LegacyHexGrid
@@ -249,6 +250,10 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
     if missile_model not in MISSILE_MODELS:
         missile_model = "flight"
     commander_interval_s = _as_float(engine.get("commander_interval_s"), 2.0)
+    scan_interval_s = _as_float(engine.get("scan_interval_s"), 30.0)
+    if not math.isfinite(scan_interval_s) or scan_interval_s < 0.0:
+        scan_interval_s = 30.0
+    scan_interval_s = min(86400.0, scan_interval_s)
     use_role_cards = _as_bool(engine.get("use_role_cards"), False)
     nav = None
     if envpack:
@@ -264,7 +269,8 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
                   missile_model=missile_model,
                   enable_radio_share=_as_bool(engine.get("enable_radio_share"), False),
                   enable_tactics=_as_bool(engine.get("enable_tactics"), False),
-                  commander_interval_s=commander_interval_s)
+                  commander_interval_s=commander_interval_s,
+                  scan_interval_s=scan_interval_s)
     weather_base = scenario.get("weather_base")
     weather_timeline = scenario.get("weather")
     start_hour = scenario.get("start_hour_utc")

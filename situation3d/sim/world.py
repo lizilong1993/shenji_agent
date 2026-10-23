@@ -43,7 +43,7 @@ class World(object):
                  enable_tactics: bool = False,
                  commander=None,
                  commander_interval_s: float = 2.0,
-                 nav=None):
+                 nav=None, scan_interval_s: float = 30.0):
         self.env = env
         self.rule_grid = rule_grid
         self.dt_s = float(dt_s)
@@ -98,7 +98,16 @@ class World(object):
         self._cell_cache: Dict[int, Tuple[int, int]] = {}
         self._detect_cache: Dict[Tuple[int, int], tuple] = {}
         self._los_cell_cache: Dict[tuple, bool] = {}
-        self._scan_slice = 0
+        # P3: fixed per-observer sensor cadence, independent of force size.
+        try:
+            interval = float(scan_interval_s)
+            if not math.isfinite(interval) or interval < 0.0:
+                interval = 30.0
+        except (TypeError, ValueError):
+            interval = 30.0
+        self.scan_interval_s = min(86400.0, interval)
+        self._scan_due: Dict[int, float] = {}
+        self._phys_scan_due: Dict[int, float] = {}
         self._stack_cache: Dict[int, bool] = {}
         self._friendly_cache: Dict[int, int] = {}
         self._count_cache: Dict[Tuple[Tuple[int, int], int], int] = {}
@@ -407,23 +416,48 @@ class World(object):
             det_meta[e.uid] = (int(ctx.cover_at(view)),
                                ctx.elevation_grade(view))
         table = __import__("rules.detection", fromlist=["observation_doc"]).observation_doc()["table"]
-        # For large forces, scan observers round-robin (full picture every
-        # ``slice_count`` seconds) so the per-tick sensor cost stays bounded.
-        slice_count = 1 if full or len(entities) <= 50 else 5
-        observers = entities
-        if slice_count > 1:
-            observers = [e for i, e in enumerate(entities)
-                         if i % slice_count == self._scan_slice]
-            self._scan_slice = (self._scan_slice + 1) % slice_count
-        if slice_count == 1:
-            self._scan_slice = 0
+        # P3: fixed per-observer scan cadence.  The refresh rhythm depends on
+        # ``scan_interval_s`` only, never on the number of entities.
+        interval = self.scan_interval_s
+        if interval <= 0.0:
+            self._scan_due.clear()       # per-tick scanning: no clock state
+        else:
+            limit = self.time_s + interval
+            for uid, due_t in list(self._scan_due.items()):
+                if due_t > limit:        # time jumped backwards: re-anchor
+                    self._scan_due[uid] = limit
+        if full or interval <= 0.0:
+            observers = entities
+        else:
+            observers = [e for e in entities
+                         if self._scan_due.get(e.uid, 0.0)
+                         <= self.time_s + 1e-9]
         result: Dict[int, set] = dict(self.seen)
         for uid, entity in self.entities.items():
             if not entity.alive or entity.on_board:
                 result.pop(uid, None)
+        # Drop dead/embarked targets from the held views immediately.
+        for uid in list(result):
+            result[uid] = {t for t in result[uid]
+                           if (self.entities.get(t) is not None
+                               and self.entities[t].alive
+                               and not self.entities[t].on_board)}
+        for uid in [u for u in self._scan_due
+                    if u not in self.entities or not self.entities[u].alive
+                    or self.entities[u].on_board]:
+            self._scan_due.pop(uid, None)
         for observer in observers:
             seen = set()
             result[observer.uid] = seen
+            if full:
+                # Shadow mode rescans everyone every tick; pin the clock to
+                # "now + interval" instead of letting due times run away.
+                if interval > 0.0:
+                    self._scan_due[observer.uid] = self.time_s + interval
+                else:
+                    self._scan_due.pop(observer.uid, None)
+            else:
+                self._advance_scan_due(observer.uid)
             o_kind = kind_of[observer.uid]
             max_cells = int(table.get(o_kind, {}).get("vehicle", 0))
             health = 1.0
@@ -477,6 +511,18 @@ class World(object):
                     seen.add(target.uid)
         return result
 
+    def _advance_scan_due(self, uid: int,
+                          due_map: Optional[Dict[int, float]] = None,
+                          interval: Optional[float] = None) -> None:
+        due_map = self._scan_due if due_map is None else due_map
+        interval = (self.scan_interval_s if interval is None
+                    else float(interval))
+        if interval <= 0.0:
+            due_map.pop(int(uid), None)
+            return
+        base = max(due_map.get(int(uid), 0.0), self.time_s)
+        due_map[int(uid)] = base + interval
+
     def _compute_spotting_seen(self, ctx: WorldRuleContext) -> Dict[int, set]:
         return spotting_model.compute_seen(self, ctx)
 
@@ -485,7 +531,8 @@ class World(object):
         self.detection_shadow_error = None
         if model == "physical":
             from sim import perception
-            seen = perception.compute_seen(self)
+            seen = perception.compute_seen(
+                self, interval_s=self.scan_interval_s)
         elif model == "spotting":
             entities = [e for e in self.entities.values() if e.alive and not e.on_board]
             needs_table = any(e.domain not in ("land", "amphibious") for e in entities)

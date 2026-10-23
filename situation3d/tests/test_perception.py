@@ -335,13 +335,18 @@ class WorldPerceptionTest(unittest.TestCase):
         world.obscurants = [{"lon": 120.0, "lat": 23.0005, "radius_m": 300.0,
                              "top_m": 100.0, "from_s": 0.0, "to_s": 1e18,
                              "attenuation": 0.0}]
-        for _ in range(3):
+        original = perception.detection_roll
+        perception.detection_roll = lambda *args: 0.0
+        try:
+            for _ in range(3):
+                world.step()
+            self.assertNotIn(tgt.uid, world.seen.get(obs.uid, set()))
+            world.obscurants = []
+            world.time_s = max(world.time_s, world.scan_interval_s)
             world.step()
-        self.assertNotIn(tgt.uid, world.seen.get(obs.uid, set()))
-        world.obscurants = []
-        world.time_s += 20.0
-        world.step()
-        self.assertIn(tgt.uid, world.seen.get(obs.uid, set()))
+            self.assertIn(tgt.uid, world.seen.get(obs.uid, set()))
+        finally:
+            perception.detection_roll = original
 
 
 if __name__ == "__main__":

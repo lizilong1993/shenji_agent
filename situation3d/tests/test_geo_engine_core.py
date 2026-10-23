@@ -506,6 +506,8 @@ class TestWorldAndRules(unittest.TestCase):
         far = world.env.grid.cell_center_lonlat(23, 23)
         world.entities[2].pose = Pose(far[0], far[1], world.env.elevation(*far))
         world.entities[2].concealed = True
+        # P3 cadence: the next observer scan is due after one scan interval.
+        world.time_s = max(world.time_s, world.scan_interval_s)
         world.step()
         self.assertNotIn(2, world.seen.get(1, set()))
 
@@ -545,7 +547,7 @@ class TestWorldAndRules(unittest.TestCase):
             out = os.path.join(tmp, "pack")
             self.assertEqual(mod.main(["--basic", basic_path, "--out", out,
                                        "--theatre", "test",
-                                       "--no-dem", "--no-osm"]), 0)
+                                       "--no-dem", "--no-osm", "--no-bath"]), 0)
             pack = EnvPack.load(out)
             self.assertEqual(pack.manifest["theatre"], "test")
             self.assertEqual(pack.manifest["layers"]["terrain"]["format"], "grid-json")
