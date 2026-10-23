@@ -29,9 +29,14 @@ start() {
   local pid
   pid=$(port_pid)
   if [ -n "$pid" ]; then echo "[$role] 已在运行 (pid $pid, :$PORT)"; return 0; fi
+  local mode_args=""
+  if [ "$role" = "dev" ]; then
+    # 8858 是测试端：开启真实推演 API 与运行库；8848 保持只读 demo。
+    mode_args="--mode test --runs-dir $WT/situation3d/var/sim_runs"
+  fi
   ( cd "$WT/situation3d" || exit 1
     TILE_DB_DIR="$TILE_DB_DIR" TILES3D_DIR="$TILES3D_DIR" \
-    setsid nohup nice -n 10 ionice -c3 python3 server/serve.py --port "$PORT" \
+    setsid nohup nice -n 10 ionice -c3 python3 server/serve.py --port "$PORT" $mode_args \
       > "$LOG" 2>&1 < /dev/null &
     disown )
   for _ in $(seq 1 20); do
