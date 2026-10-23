@@ -4,14 +4,31 @@
     {
       "id": "johnson1958",
       "citation": "Johnson, J., Analysis of Image Forming Systems, Proc. Image Intensifier Symposium, 1958",
-      "note": "Target-acquisition cycle criteria (50% probability): detection 2, recognition 4, identification 8 cycles across the target critical dimension."
+      "note": "Target-acquisition cycle criteria (50% probability): detection 2, recognition 4, identification 8 cycles across the target critical dimension.",
+      "url": "https://en.wikipedia.org/wiki/Johnson%27s_criteria"
     },
     {
       "id": "niirs_gique",
       "citation": "Leachtenauer et al., General Image Quality Equation, Optical Engineering 36(10), 1997",
-      "note": "NIIRS-based empirical image-quality scaling consistent with the Johnson cycle convention."
+      "note": "NIIRS-based empirical image-quality scaling consistent with the Johnson cycle convention.",
+      "url": "https://en.wikipedia.org/wiki/National_Imagery_Interpretability_Rating_Scale"
+    },
+    {
+      "id": "stanag4347",
+      "citation": "NATO STANAG 4347, Definition of Nominal Range Performance for Thermal Imaging Systems",
+      "note": "Defines thermal imager range performance in terms of 50% detection/recognition/identification probabilities and MRTD."
     }
   ],
-  "criteria_cycles": {"detection": 2.0, "recognition": 4.0, "identification": 8.0},
-  "kinds": {"optics": 0.9, "ir": 0.85, "radar": 0.95, "sonar": 0.8, "esm": 0.7}
+  "criteria_cycles": {
+    "detection": 2.0,
+    "recognition": 4.0,
+    "identification": 8.0
+  },
+  "kinds": {
+    "optics": 0.9,
+    "ir": 0.85,
+    "radar": 0.95,
+    "sonar": 0.8,
+    "esm": 0.7
+  }
 }

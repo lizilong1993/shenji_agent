@@ -118,6 +118,31 @@ class EventTimeTest(unittest.TestCase):
         self.assertTrue(any(e.get("type") == "missile_impact"
                             for e in world.events))
 
+    def test_advance_matches_fixed_step_motion(self):
+        def make():
+            world = build([operator(1, 1000)])
+            world.step()
+            lon, lat = world.rule_grid.cell_center_lonlat(10, 20)
+            world.order(1, {"type": "move_to", "lon": lon, "lat": lat})
+            return world
+
+        fast = make()
+        slow = make()
+        fast.advance_to(6.0)
+        for _ in range(5):
+            slow.step()
+        a, b = fast.entities[1], slow.entities[1]
+        self.assertAlmostEqual(a.pose.lon, b.pose.lon, places=7)
+        self.assertAlmostEqual(a.pose.lat, b.pose.lat, places=7)
+        self.assertAlmostEqual(a.velocity_ms, b.velocity_ms, places=5)
+        self.assertEqual(a.route_s, b.route_s)
+
+    def test_advance_reaches_scan_event_and_detects(self):
+        world = build([operator(1, 1000), operator(2, 1001, color=1)])
+        world.step()
+        world.advance_to(world._scan_due[1] + 1.0)
+        self.assertIn(2, world.seen.get(1, set()))
+
     def test_orders_disable_fast_forward(self):
         world = self._world()
         world.step()

@@ -1605,6 +1605,12 @@ class World(object):
             candidates.append(self._next_env_s)
         if self.commander is not None:
             candidates.append(self._commander_next_s)
+        if self.cooldowns:
+            candidates.append(self.time_s + min(self.cooldowns.values()))
+        suppressed = [e.suppressed_s for e in self.entities.values()
+                      if e.alive and getattr(e, "suppressed", False)]
+        if suppressed:
+            candidates.append(self.time_s + min(suppressed))
         candidates = [c for c in candidates
                       if c is not None and math.isfinite(c)]
         return min(candidates) if candidates else None
@@ -1649,11 +1655,75 @@ class World(object):
                     continue
                 self.step(0.0)          # process the due event in place
                 continue
-            self.step(min(step_cap, end - self.time_s))
+            nxt = self.next_event_s()
+            target = end if nxt is None else min(end, nxt)
+            if target <= self.time_s + 1e-9:
+                self.step(0.0)
+                continue
+            self._motion_advance(target - self.time_s)
+            self.step(0.0)              # rules only at event boundaries
         # Events exactly at ``end_s`` still fire before returning.
         nxt = self.next_event_s()
         if nxt is not None and nxt <= self.time_s + 1e-9:
             self.step(0.0)
+
+    def _step_motion(self, dt: float) -> None:
+        """Advance every entity and handle yield/blocked outcomes."""
+        for e in self.sorted_entities():
+            if not e.alive or e.on_board:
+                continue
+            ground = _is_ground(e)
+            reason = integrate(
+                e, dt, self.env,
+                cell_check=lambda lon, lat, ent=e:
+                self._can_enter_cell(ent, lon, lat),
+                nav=self.nav,
+                traffic_check=(lambda lon, lat, hd, ent=e:
+                               self._traffic_clear(ent, lon, lat, hd))
+                if ground else None)
+            if ground:
+                self.traffic.refresh(e)
+            if reason == "yield":
+                streak = self._yield_streak.get(e.uid, 0) + 1
+                self._yield_streak[e.uid] = streak
+                if streak >= 30:
+                    self._yield_streak[e.uid] = 0
+                    e.route = None
+                    e.goal = None
+                    e.velocity_ms = 0.0
+                    e.moving = False
+                    e.pace_scale = 1.0
+                    self.emit("traffic_stuck", [e.uid],
+                              "%s 连续让行超时，放弃当前目标" % e.name)
+            elif reason == "blocked" and e.goal is not None:
+                self._yield_streak.pop(e.uid, None)
+                route = self.plan_route(
+                    e, e.goal,
+                    blocked=lambda lon, lat, ent=e:
+                    self._obstacle_blocks(ent, lon, lat))
+                if route is not None:
+                    e.route = route
+                    e.route_s = 0.0
+                else:
+                    e.goal = None
+            else:
+                self._yield_streak.pop(e.uid, None)
+
+    def _motion_advance(self, duration_s: float) -> None:
+        """Advance moving entities in safe micro-steps without rule ticks."""
+        self._apply_orders()
+        remaining = float(duration_s)
+        while remaining > 1e-9:
+            d = min(self.dt_s, remaining)
+            self._tick_timers(d)
+            self._logistics(d)
+            self._rebuild_traffic()
+            self._step_motion(d)
+            self._sync_passengers()
+            self._refresh_cell_cache()
+            self._resolve_minefields()
+            self.time_s += d
+            remaining -= d
 
     # -- step ---------------------------------------------------------------
     def step(self, dt: Optional[float] = None) -> List[dict]:
@@ -1665,46 +1735,7 @@ class World(object):
         self._tick_timers(dt)
         self._apply_orders()
         self._rebuild_traffic()
-        for e in self.sorted_entities():
-            if e.alive and not e.on_board:
-                ground = _is_ground(e)
-                reason = integrate(
-                    e, dt, self.env,
-                    cell_check=lambda lon, lat, ent=e: self._can_enter_cell(ent, lon, lat),
-                    nav=self.nav,
-                    traffic_check=(lambda lon, lat, hd, ent=e:
-                                   self._traffic_clear(ent, lon, lat, hd))
-                    if ground else None)
-                if ground:
-                    self.traffic.refresh(e)
-                if reason == "yield":
-                    streak = self._yield_streak.get(e.uid, 0) + 1
-                    self._yield_streak[e.uid] = streak
-                    if streak >= 30:
-                        # Head-on / permanent blockage: give the goal up so
-                        # the tactical layer can re-task instead of waiting
-                        # forever.  P1 motion planning will add passing rules.
-                        self._yield_streak[e.uid] = 0
-                        e.route = None
-                        e.goal = None
-                        e.velocity_ms = 0.0
-                        e.moving = False
-                        e.pace_scale = 1.0
-                        self.emit("traffic_stuck", [e.uid],
-                                  "%s 连续让行超时，放弃当前目标" % e.name)
-                elif reason == "blocked" and e.goal is not None:
-                    self._yield_streak.pop(e.uid, None)
-                    route = self.plan_route(
-                        e, e.goal,
-                        blocked=lambda lon, lat, ent=e:
-                        self._obstacle_blocks(ent, lon, lat))
-                    if route is not None:
-                        e.route = route
-                        e.route_s = 0.0
-                    else:
-                        e.goal = None
-                else:
-                    self._yield_streak.pop(e.uid, None)
+        self._step_motion(dt)
         self._sync_passengers()
         self._refresh_cell_cache()
         self._resolve_minefields()
