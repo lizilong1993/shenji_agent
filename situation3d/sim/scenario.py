@@ -61,6 +61,13 @@ def _as_float(value, default: float) -> float:
 
 INDIRECT_IDS = {72, 88, 89}
 
+
+def _op_lonlat(op, grid):
+    """Real WGS84 when the scenario carries it; hex otherwise."""
+    if op.get("lon") is not None and op.get("lat") is not None:
+        return float(op["lon"]), float(op["lat"])
+    return grid.to_lonlat(int(op["cur_hex"]))
+
 # Platform-name fallback when a scenario omits carry_weapon_ids (campaign
 # scenarios rely on the legacy name mapping).
 NAME_WEAPONS = {
@@ -345,7 +352,7 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
                 domain = "surface"
             elif domain == "sub":
                 domain = "subsurface"
-        lon, lat = grid.to_lonlat(int(op["cur_hex"]))
+        lon, lat = _op_lonlat(op, grid)
         card_id, card = card_for_operator(op, domain, infer=use_role_cards)
         if card:
             domain = domain_from_card(card) or domain
@@ -374,7 +381,8 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             domain=domain,
             profile_id=card_id or unit_type,
             profile=profile,
-            pose=Pose(lon, lat, env.elevation(lon, lat),
+            pose=Pose(lon, lat,
+                      _as_float(op.get("alt_m"), env.elevation(lon, lat)),
                       heading_deg=_as_float(op.get("heading_deg"), 0.0)),
             unit_type=unit_type,
             unit_kind=(unit_kind_from_card(card_id) if card
@@ -401,10 +409,37 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             role_card=card,
         )
         world.add_entity(entity)
+    # Explicit carrier assignment (new-engine scenarios).  This is the
+    # authoritative path for "loaded on ship X"; the depth heuristic below only
+    # fills in legacy fixtures that do not declare it.
+    explicit_carriers = {}
+    for op in scenario.get("operators") or []:
+        if op.get("carrier") is None:
+            continue
+        explicit_carriers[int(op["obj_id"])] = int(op["carrier"])
+    for uid, cuid in sorted(explicit_carriers.items()):
+        passenger = world.entities.get(uid)
+        carrier = world.entities.get(cuid)
+        if passenger is None or carrier is None:
+            raise ValueError("carrier reference %s -> %s not resolvable" % (uid, cuid))
+        if carrier.domain != "surface":
+            raise ValueError("carrier %s is not a surface ship" % cuid)
+        if passenger.affiliation != carrier.affiliation:
+            raise ValueError("carrier %s and passenger %s have different sides" % (cuid, uid))
+        passenger.on_board = True
+        passenger.carrier = cuid
+        passenger.pose = Pose(carrier.pose.lon, carrier.pose.lat, carrier.pose.alt_m,
+                              heading_deg=carrier.pose.heading_deg)
+        carrier.passengers.append(uid)
+
     # Ground and amphibious units that start in deep water ride a friendly
     # ship until it can put them ashore (landing craft chain).
     ships = [e for e in world.entities.values() if e.domain == "surface"]
     for entity in world.entities.values():
+        if entity.uid in explicit_carriers:
+            continue
+        if entity.on_board:
+            continue
         if entity.domain not in ("land", "amphibious"):
             continue
         depth = env.water_depth(entity.pose.lon, entity.pose.lat)
@@ -431,16 +466,38 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
     world._refresh_cell_cache()
     world.prepare_first_scan()
     for city in scenario.get("cities") or []:
-        coord = city.get("coord")
-        if coord is None:
-            continue
+        if city.get("lon") is not None and city.get("lat") is not None:
+            lon, lat = float(city["lon"]), float(city["lat"])
+        else:
+            coord = city.get("coord")
+            if coord is None:
+                continue
+            try:
+                lon, lat = grid.to_lonlat(int(coord))
+            except (TypeError, ValueError):
+                continue
+        owner = city.get("owner", -1)
         try:
-            lon, lat = grid.to_lonlat(int(coord))
+            owner = int(owner)
         except (TypeError, ValueError):
-            continue
+            owner = -1
+        if owner not in (0, 1):
+            owner = -1
         world.add_objective(world.rule_grid.cell_of(lon, lat),
                             value=int(city.get("value") or 0),
-                            name=str(city.get("name") or ""))
+                            name=str(city.get("name") or ""), owner=owner)
+    for obj in scenario.get("objectives") or []:
+        if obj.get("lon") is None or obj.get("lat") is None:
+            continue
+        try:
+            owner = int(obj.get("owner", -1))
+        except (TypeError, ValueError):
+            owner = -1
+        if owner not in (0, 1):
+            owner = -1
+        world.add_objective(world.rule_grid.cell_of(float(obj["lon"]), float(obj["lat"])),
+                            value=int(obj.get("value") or 0),
+                            name=str(obj.get("name") or ""), owner=owner)
     for sp in scenario.get("supply_points") or []:
         if isinstance(sp, dict) and "lon" in sp and "lat" in sp:
             world.supply_points.append((float(sp["lon"]), float(sp["lat"])))

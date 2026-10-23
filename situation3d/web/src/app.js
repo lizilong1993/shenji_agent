@@ -945,17 +945,27 @@ function loadCaseIndex() {
     });
 }
 
+function runIdFor(caseId) {
+  // 测试端专用：?case=<id>&run=<run_id> 从运行库回放一次推演结果。
+  // 菜单切到别的案例时不再沿用旧 run id。
+  const run = params.get('run');
+  if (!run) return null;
+  return params.get('case') === caseId ? run : null;
+}
+
 function loadCase(caseId) {
   const entry = state.caseIndex.cases.find(function (c) { return c.id === caseId; });
-  if (!entry) throw new Error('未知案例: ' + caseId);
+  const runId = runIdFor(caseId);
+  if (!entry && !runId) throw new Error('未知案例: ' + caseId);
 
-  setStatus('加载TS数据…');
+  setStatus(runId ? '加载推演结果…' : '加载TS数据…');
   // 2026-10-19：案例拆成 core / inference 两个分片（见 serve.py 的 _case_parts）。
   // taiwan_landing.json 39.6 MB 里 inference_frames 占 35 MB / 1441 帧，而首屏
   // 渲染只需要 targets/frames。先拿 core 立即出场景，inference 在后台补进右栏；
   // 接口不可用时（旧服务、直接开静态文件）回退整包，行为与以前一致。
-  return fetch('/api/situation?id=' + encodeURIComponent(caseId) + '&part=core',
-               { cache: 'no-store' })
+  const coreUrl = '/api/situation?id=' + encodeURIComponent(caseId) + '&part=core'
+    + (runId ? '&run=' + encodeURIComponent(runId) : '');
+  return fetch(coreUrl, { cache: 'no-store' })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -969,6 +979,7 @@ function loadCase(caseId) {
       return data;
     })
     .catch(function (splitErr) {
+      if (runId) throw splitErr;   // 运行库结果没有整包回退
       console.warn('[situations] 分片接口不可用，回退整包：', splitErr);
       return fetch('./' + entry.file, { cache: 'no-store' })
         .then(function (r) {
@@ -986,8 +997,10 @@ function loadCase(caseId) {
  * 目标状态面板。切走案例时（state.caseId 变了）丢弃晚到的结果。
  */
 function loadCaseInference(caseId) {
-  return fetch('/api/situation?id=' + encodeURIComponent(caseId) + '&part=inference',
-               { cache: 'no-store' })
+  const runId = runIdFor(caseId);
+  const url = '/api/situation?id=' + encodeURIComponent(caseId) + '&part=inference'
+    + (runId ? '&run=' + encodeURIComponent(runId) : '');
+  return fetch(url, { cache: 'no-store' })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();

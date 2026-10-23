@@ -1133,10 +1133,22 @@ class Handler(SimpleHTTPRequestHandler):
             # 首屏不再等整包 39.6 MB（inference_frames 占 35 MB）。
             cid = (query or {}).get("id") or ""
             part = (query or {}).get("part") or "core"
+            run_id = (query or {}).get("run") or ""
             if part not in ("core", "inference"):
                 self._send_json({"error": "part 只能是 core 或 inference"}, 400)
                 return
-            full = _case_file_for_id(cid)
+            if run_id:
+                # 测试端专用：?run= 读取运行库里的 trajectory.json。
+                if SERVER_MODE != "test" or RUN_STORE is None:
+                    self._send_json({"error": "run playback is disabled in demo mode"}, 400)
+                    return
+                try:
+                    full = RUN_STORE.read_artifact(cid, run_id, "trajectory.json")
+                except RunError as exc:
+                    self._send_json({"error": str(exc)}, 404)
+                    return
+            else:
+                full = _case_file_for_id(cid)
             if not full:
                 self._send_json({"error": "未知案例：%s" % cid}, 404)
                 return
