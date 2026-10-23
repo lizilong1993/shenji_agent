@@ -120,7 +120,7 @@ class WorldRuleContext(object):
         if ea.domain in ("land", "amphibious") and eb.domain in ("land", "amphibious"):
             ca = self._env_cell(ea)
             cb = self._env_cell(eb)
-            key = (ca, cb) if ca <= cb else (cb, ca)
+            key = (ca, cb)   # directional (observer vs target heights)
             cache = self.world._los_cell_cache
             visible = cache.get(key)
             if visible is None:

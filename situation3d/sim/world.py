@@ -462,6 +462,7 @@ class World(object):
             from sim import perception
             seen = perception.compute_seen(self, interval_s=0.0)
         else:
+            self._warm_los_cache()
             seen = self._compute_table_seen(ctx, full=True)
         from sim import spotting as spotting_model
         source = self._seen_own if self._seen_own else seen
@@ -476,6 +477,51 @@ class World(object):
         self._scan_due = {e.uid: self.time_s + offset + self._scan_phase(e.uid)
                           for e in alive}
         self._phys_scan_due = dict(self._scan_due)
+
+    def _warm_los_cache(self, radius_cells: int = 25) -> None:
+        """Parallel, deterministic warm-up of static cell-pair LOS."""
+        try:
+            import os
+            if os.name != "posix":
+                return
+            workers = min(4, os.cpu_count() or 1)
+            if workers <= 1:
+                return
+            grid = self.env.grid
+            cells = set()
+            for e in self.entities.values():
+                if e.alive and not e.on_board:
+                    cells.add(grid.cell_of(e.pose.lon, e.pose.lat))
+            cells = sorted(cells)
+            if len(cells) < 400:
+                return
+            pairs = []
+            for i, ca in enumerate(cells):
+                for cb in cells[i + 1:]:
+                    if grid.distance(ca, cb) <= radius_cells:
+                        pairs.append((ca, cb))
+            if not pairs:
+                return
+            from sim import los_warm
+            import multiprocessing as mp
+            los_warm._ENV = self.env
+            chunks = [pairs[i::workers] for i in range(workers)]
+            pool = mp.get_context("fork").Pool(processes=workers)
+            try:
+                parts = pool.map(los_warm._warm, chunks)
+            finally:
+                pool.close()
+                pool.join()
+            cache = getattr(self.env, "_los_cache", None)
+            if not isinstance(cache, dict):
+                return
+            for part in parts:
+                for key, value in part.items():
+                    if len(cache) >= 500000:
+                        break
+                    cache[key] = value
+        except Exception:
+            return
 
     def _scan_phase(self, uid: int) -> float:
         """Deterministic per-observer phase offset inside one interval."""

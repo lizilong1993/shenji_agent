@@ -185,8 +185,13 @@ class MapGridEnvironment(object):
         return True
 
     def cell_line_of_sight(self, ca: Tuple[int, int], cb: Tuple[int, int]) -> bool:
-        """Cached ground-level LOS between two cells (static terrain)."""
-        key = (ca, cb) if ca <= cb else (cb, ca)
+        """Cached ground-level LOS between two cells (static terrain).
+
+        The observer/target heights differ (2.0 m vs 1.5 m plus elevation
+        grade), so the result is directional and the cache key must keep the
+        argument order.
+        """
+        key = (ca, cb)
         if key in self._los_cache:
             return self._los_cache[key]
         ea = self._cell_elev(ca)

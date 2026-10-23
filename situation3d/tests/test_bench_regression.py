@@ -79,7 +79,7 @@ def run_bench(entities, ticks, warmup):
 class TestBenchRegression(unittest.TestCase):
     def test_300_entities(self):
         result = run_bench(300, ticks=TICKS, warmup=10)
-        self.assertEqual(result["hash"], "ca6dc98b93194982")
+        self.assertEqual(result["hash"], "628135508d4b7f18")
         self.assertLess(result["p95"], P95_LIMIT_MS,
                         "300-entity p95 %.1f ms" % result["p95"])
         self.assertLess(result["p99"], P99_LIMIT_MS,
@@ -87,7 +87,7 @@ class TestBenchRegression(unittest.TestCase):
 
     def test_500_entities(self):
         result = run_bench(500, ticks=TICKS, warmup=10)
-        self.assertEqual(result["hash"], "6f92ee20e2982bae")
+        self.assertEqual(result["hash"], "e72dcc0f9f349180")
         self.assertLess(result["p95"], P95_LIMIT_MS,
                         "500-entity p95 %.1f ms" % result["p95"])
         self.assertLess(result["p99"], P99_LIMIT_MS,
@@ -95,7 +95,7 @@ class TestBenchRegression(unittest.TestCase):
 
     def test_800_entities(self):
         result = run_bench(800, ticks=TICKS, warmup=10)
-        self.assertEqual(result["hash"], "7d9e9cfbd18758d3")
+        self.assertEqual(result["hash"], "6f07cad39f8c94bc")
         self.assertLess(result["p95"], P95_LIMIT_MS,
                         "800-entity p95 %.1f ms" % result["p95"])
         self.assertLess(result["p99"], P99_LIMIT_MS,
