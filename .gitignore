@@ -28,3 +28,8 @@ venv/
 
 # I08/I09 运行时测试用的 JS 引擎（pip --target，13MB 二进制，不入库）
 .tools/
+
+# TW2 双模式：测试端运行库与发布备份（运行时产物，不入库）
+situation3d/var/sim_runs/
+situation3d/web/data/situations/demo_release.json
+situation3d/web/data/situations/*.bak_prev_*

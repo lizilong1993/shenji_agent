@@ -54,6 +54,16 @@ _PKG_ROOT = os.path.dirname(HERE)
 if _PKG_ROOT not in sys.path:
     sys.path.insert(0, _PKG_ROOT)
 
+# Server-side mode and run store live beside this file.  `serve.py` is run as a
+# script, so the server directory is on sys.path at runtime; tests add it too.
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+from modes import (  # noqa: E402
+    DEFAULT_MODE, MODES, assert_no_simulation, capabilities as mode_capabilities,
+    normalize_mode,
+)
+from run_store import RunError, RunStore  # noqa: E402
+
 EXTRA_TYPES = {
     ".js": "application/javascript; charset=utf-8",
     ".mjs": "application/javascript; charset=utf-8",
@@ -241,6 +251,12 @@ SITUATIONS_DIR = env("SITUATION_DIR") or os.path.join(WEB_ROOT, "data", "situati
 
 # 默认案例：环境变量 SITUATION_DEFAULT 指定；不在扫描结果里时退回按 id 排序的第一个。
 SITUATION_DEFAULT = env("SITUATION_DEFAULT") or None
+
+# 测试端/演示端模式。默认 demo 是安全默认：未显式开启就没有推演能力。
+SERVER_MODE = normalize_mode(env("SITUATION_MODE") or DEFAULT_MODE)
+# 运行库只属于测试端；演示端即使目录存在也不会被创建/读取。
+RUNS_DIR = env("SITUATION_RUNS_DIR") or os.path.join(_PKG_ROOT, "var", "sim_runs")
+RUN_STORE = None
 
 # `_api_situations` 的索引缓存：键 = 目录里各 .json 的 (名字, 大小, mtime_ns)，值 = 响应体。
 # 见该方法的注释：不缓存的话，每次进系统都要白白解析 53.6 MB 的案例数据（10.5 s）。
@@ -1135,6 +1151,22 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json_bytes(parts["inference"],
                                       gz_body=parts["inference_gz"])
             return
+        if path == "/api/sim/runs":
+            # 只在测试端存在；演示端连路由都不暴露。
+            if SERVER_MODE != "test" or RUN_STORE is None:
+                self._send_json({"error": "not found"}, 404)
+                return
+            cid = (query or {}).get("case_id") or ""
+            if not cid:
+                self._send_json({"error": "case_id 必填"}, 400)
+                return
+            try:
+                runs = RUN_STORE.list_runs(cid)
+            except RunError as exc:
+                self._send_json({"error": str(exc)}, 400)
+                return
+            self._send_json({"mode": "test", "case_id": cid, "runs": runs})
+            return
         if path == "/api/health":
             self._api_health()
             return
@@ -1381,6 +1413,8 @@ class Handler(SimpleHTTPRequestHandler):
         self._send_json({
             # ── 原有字段（**保持不变**，扩展不破坏既有调用方）──
             "ok": True,
+            "mode": SERVER_MODE,
+            "capabilities": mode_capabilities(SERVER_MODE),
             "ion_configured": read_ion_token() is not None,
             "tianditu_configured": tianditu_key() is not None,
             "env_file": ENV_PATH,
@@ -1402,6 +1436,12 @@ class Handler(SimpleHTTPRequestHandler):
         })
 
     def _api_post(self, path):
+        if path.startswith("/api/sim/"):
+            if SERVER_MODE != "test" or RUN_STORE is None:
+                self._send_json({"error": "simulation API is disabled in demo mode"}, 403)
+                return
+            self._send_json({"error": "simulation runner not implemented yet"}, 501)
+            return
         # 令牌写入接口已移除：ion token 现在只从 `.env` 的 CESIUM_ION_TOKEN 读取，
         # 界面上那个输入框与「保存令牌」按钮也已删掉。唯一的调用方消失后，这条写入
         # 路径就是死代码——留着它等于留一个能改凭据的接口，没有必要。
@@ -1746,7 +1786,28 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="situation3d static server")
     ap.add_argument("--port", type=int, default=8848)
     ap.add_argument("--host", default="0.0.0.0")
+    ap.add_argument("--mode", choices=MODES, default=None,
+                    help="test = live simulation + run store; demo = read-only replay")
+    ap.add_argument("--runs-dir", default=None,
+                    help="run store root (test mode); default var/sim_runs")
     args = ap.parse_args()
+
+    global SERVER_MODE, RUNS_DIR, RUN_STORE
+    try:
+        SERVER_MODE = normalize_mode(args.mode or env("SITUATION_MODE") or DEFAULT_MODE)
+    except ValueError as exc:
+        sys.stderr.write("%s\n" % exc)
+        return 2
+    RUNS_DIR = (args.runs_dir or env("SITUATION_RUNS_DIR")
+                or os.path.join(_PKG_ROOT, "var", "sim_runs"))
+    if SERVER_MODE == "demo":
+        try:
+            assert_no_simulation(SERVER_MODE)
+        except RuntimeError as exc:
+            sys.stderr.write("refusing to start: %s\n" % exc)
+            return 3
+    else:
+        RUN_STORE = RunStore(RUNS_DIR)
 
     if not os.path.isdir(WEB_ROOT):
         sys.stderr.write("web root not found: %s\n" % WEB_ROOT)
@@ -1780,8 +1841,9 @@ def main() -> int:
     except Exception as exc:            # noqa: BLE001
         print("[tiles3d] 预热线程未启动：%s" % exc, flush=True)
 
-    sys.stderr.write("serving %s on http://%s:%d/  (started %s)\n"
-                     % (WEB_ROOT, args.host, args.port,
+    sys.stderr.write("serving %s on http://%s:%d/  mode=%s%s  (started %s)\n"
+                     % (WEB_ROOT, args.host, args.port, SERVER_MODE,
+                        ("  runs=%s" % RUNS_DIR) if SERVER_MODE == "test" else "",
                         time.strftime("%Y-%m-%d %H:%M:%S")))
     sys.stderr.flush()
     try:
