@@ -1,7 +1,7 @@
 # TW2 双模式 D2–D4：控制台、选定发布、引擎战损与节点（2026-10-23）
 
-> 承接 `TW2_dual_mode_D1.md`。分支 `feat/tw2-dual-mode`，worktree
-> `/remote-home/lizilong/shenji_agent_tw2`；8848 演示端未改动。
+> 承接 `TW2_dual_mode_D1.md`。分支 `feat/tw2-dual-mode` 已合并 main
+> (`57d424c`) 并推送；8858 已切到 `--mode test`。8848 演示端未改动，待选定结果后发布。
 
 ## 1. 测试端控制台（D2）
 
