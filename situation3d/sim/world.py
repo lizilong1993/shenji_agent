@@ -96,6 +96,7 @@ class World(object):
         self._event_id = 0
         self.intel: Dict[int, dict] = {}
         self._cell_cache: Dict[int, Tuple[int, int]] = {}
+        self._cell_members: Dict[Tuple[int, int], List[Entity]] = {}
         self._detect_cache: Dict[Tuple[int, int], tuple] = {}
         self._los_cell_cache: Dict[tuple, bool] = {}
         # P3: fixed per-observer sensor cadence, independent of force size.
@@ -108,6 +109,10 @@ class World(object):
         self.scan_interval_s = min(86400.0, interval)
         self._scan_due: Dict[int, float] = {}
         self._phys_scan_due: Dict[int, float] = {}
+        self._seen_dirty = False
+        self._seen_own: Dict[int, set] = {}
+        self._sensor_time_s: Optional[float] = None
+        self._env_time_s: Optional[float] = None
         self._stack_cache: Dict[int, bool] = {}
         self._friendly_cache: Dict[int, int] = {}
         self._count_cache: Dict[Tuple[Tuple[int, int], int], int] = {}
@@ -117,6 +122,8 @@ class World(object):
         self.indirect_fire_model = str(indirect_fire_model)
         self.missile_model = str(missile_model)
         self._pending_impacts: List[dict] = []
+        self._next_impact_s = math.inf
+        self._next_env_s: Optional[float] = None
         self.enable_radio_share = bool(enable_radio_share)
         self.detection_shadow = None
         self.tactics = TacticalController() if enable_tactics else None
@@ -166,18 +173,22 @@ class World(object):
         self._cell_cache = {}
         counts: Dict[Tuple[Tuple[int, int], int], int] = {}
         any_counts: Dict[Tuple[int, int], int] = {}
-        for e in self.sorted_entities():
+        entities = self.sorted_entities()
+        members: Dict[Tuple[int, int], List[Entity]] = {}
+        for e in entities:
             if not e.alive or e.on_board:
                 continue
             cell = self.rule_grid.cell_of(e.pose.lon, e.pose.lat)
             self._cell_cache[e.uid] = cell
+            members.setdefault(cell, []).append(e)
             if _is_ground(e):
                 counts[(cell, e.affiliation)] = counts.get((cell, e.affiliation), 0) + 1
                 any_counts[cell] = any_counts.get(cell, 0) + 1
+        self._cell_members = members
         self._stack_cache = {}
         self._friendly_cache = {}
         self._count_cache = counts
-        for e in self.sorted_entities():
+        for e in entities:
             cell = self._cell_cache.get(e.uid)
             if cell is None:
                 continue
@@ -186,8 +197,12 @@ class World(object):
 
     def entities_in_cell(self, cell: Tuple[int, int],
                          side: Optional[int] = None) -> List[Entity]:
-        return [e for e in self.sorted_entities(side)
-                if e.alive and not e.on_board and self.rule_cell(e) == cell]
+        members = self._cell_members.get(cell)
+        if members is None:
+            return []
+        if side is None:
+            return list(members)
+        return [e for e in members if e.affiliation == side]
 
     def stacked(self, entity: Entity) -> bool:
         if not _is_ground(entity):
@@ -206,6 +221,13 @@ class World(object):
     def _update_environment(self) -> None:
         """Apply the scenario weather timeline and day/night visibility."""
         if not self.weather_enabled:
+            return
+        if (self._env_time_s is not None
+                and self.time_s < self._env_time_s - 1e-9):
+            self._next_env_s = None      # time moved backwards: re-anchor
+        self._env_time_s = self.time_s
+        if (self._next_env_s is not None
+                and self.time_s < self._next_env_s - 1e-9):
             return
         base = dict(self.weather)
         for entry in self.weather_timeline:
@@ -234,6 +256,21 @@ class World(object):
         self.effective_weather = {"visibility_m": visibility,
                                   "sea_state": sea_state,
                                   "wind_ms": wind}
+        # Event-driven gate: next timeline entry or daylight boundary.
+        nxt = None
+        for entry in self.weather_timeline:
+            at = float(entry.get("at_s", 0.0))
+            if at > self.time_s:
+                nxt = at if nxt is None else min(nxt, at)
+        hour = (float(self.start_hour_utc) + float(self.utc_offset_h)
+                + self.time_s / 3600.0) % 24.0
+        for boundary in (6.0, 8.0, 18.0, 20.0, 24.0):
+            delta = (boundary - hour) % 24.0
+            if delta <= 1e-9:
+                delta = 24.0
+            at = self.time_s + delta * 3600.0
+            nxt = at if nxt is None else min(nxt, at)
+        self._next_env_s = nxt
 
     # -- routing ------------------------------------------------------------
     def assign_intent(self, entity: Entity, intent) -> bool:
@@ -404,7 +441,36 @@ class World(object):
         return float(e.components[key])
 
     # -- sensors ------------------------------------------------------------
+    def _scan_phase(self, uid: int) -> float:
+        """Deterministic per-observer phase offset inside one interval."""
+        interval = self.scan_interval_s
+        if interval <= 0.0:
+            return 0.0
+        hashed = (int(uid) * 2654435761) & 0xFFFFFFFF
+        return interval * (hashed % 1000) / 1000.0
+
+    def _scan_due_now(self, due_map: Dict[int, float]) -> bool:
+        if not due_map:
+            return True
+        return min(due_map.values()) <= self.time_s + 1e-9
+
+    def _reanchor_scan_due(self, due_map: Dict[int, float], now: float,
+                           interval: float) -> None:
+        last = self._sensor_time_s
+        if last is not None and now < last - 1e-9:
+            limit = now + interval
+            for uid, due_t in list(due_map.items()):
+                if due_t > limit:
+                    due_map[uid] = limit
+        self._sensor_time_s = now
+
     def _compute_table_seen(self, ctx: WorldRuleContext, full: bool = False) -> Dict[int, set]:
+        interval = self.scan_interval_s
+        if interval > 0.0:
+            self._reanchor_scan_due(self._scan_due, self.time_s, interval)
+        if (not full and interval > 0.0 and not self._seen_dirty
+                and not self._scan_due_now(self._scan_due)):
+            return self.seen
         for dead_uid in [uid for uid, e in self.entities.items() if not e.alive]:
             self.seen.pop(dead_uid, None)
         entities = [e for e in self.sorted_entities() if e.alive and not e.on_board]
@@ -418,24 +484,23 @@ class World(object):
         table = __import__("rules.detection", fromlist=["observation_doc"]).observation_doc()["table"]
         # P3: fixed per-observer scan cadence.  The refresh rhythm depends on
         # ``scan_interval_s`` only, never on the number of entities.
-        interval = self.scan_interval_s
         if interval <= 0.0:
             self._scan_due.clear()       # per-tick scanning: no clock state
-        else:
-            limit = self.time_s + interval
-            for uid, due_t in list(self._scan_due.items()):
-                if due_t > limit:        # time jumped backwards: re-anchor
-                    self._scan_due[uid] = limit
         if full or interval <= 0.0:
             observers = entities
         else:
             observers = [e for e in entities
                          if self._scan_due.get(e.uid, 0.0)
                          <= self.time_s + 1e-9]
-        result: Dict[int, set] = dict(self.seen)
+        # Start from the observers' own (pre radio-share) views so relayed
+        # contacts cannot be re-broadcast hop by hop on later ticks.
+        source = self._seen_own or self.seen
+        result: Dict[int, set] = {uid: set(viewed)
+                                  for uid, viewed in source.items()}
         for uid, entity in self.entities.items():
             if not entity.alive or entity.on_board:
                 result.pop(uid, None)
+                self._seen_own.pop(uid, None)
         # Drop dead/embarked targets from the held views immediately.
         for uid in list(result):
             result[uid] = {t for t in result[uid]
@@ -449,6 +514,7 @@ class World(object):
         for observer in observers:
             seen = set()
             result[observer.uid] = seen
+            self._seen_own[observer.uid] = seen
             if full:
                 # Shadow mode rescans everyone every tick; pin the clock to
                 # "now + interval" instead of letting due times run away.
@@ -520,8 +586,20 @@ class World(object):
         if interval <= 0.0:
             due_map.pop(int(uid), None)
             return
-        base = max(due_map.get(int(uid), 0.0), self.time_s)
-        due_map[int(uid)] = base + interval
+        phase = self._scan_phase(uid)
+        if int(uid) not in due_map:
+            # First schedule after the initial full sweep: one interval plus
+            # this observer's deterministic phase.
+            due_map[int(uid)] = self.time_s + interval + phase
+            return
+        base = max(due_map[int(uid)], self.time_s)
+        # Keep the phase on every later scan, even when a time jump or a
+        # large dt makes several observers due in the same tick.
+        k = math.floor((base - phase) / interval) + 1
+        due = phase + k * interval
+        if due <= base + 1e-9:
+            due += interval
+        due_map[int(uid)] = due
 
     def _compute_spotting_seen(self, ctx: WorldRuleContext) -> Dict[int, set]:
         return spotting_model.compute_seen(self, ctx)
@@ -537,6 +615,8 @@ class World(object):
             entities = [e for e in self.entities.values() if e.alive and not e.on_board]
             needs_table = any(e.domain not in ("land", "amphibious") for e in entities)
             table_seen = self._compute_table_seen(ctx) if needs_table else {}
+            if not needs_table:
+                self._scan_due.clear()   # no table observer: avoid stale events
             try:
                 spotting_seen = self._compute_spotting_seen(ctx)
                 seen = spotting_model.merge_seen(table_seen, spotting_seen, self)
@@ -554,9 +634,18 @@ class World(object):
             seen = table_seen
         else:
             seen = self._compute_table_seen(ctx)
+        if model not in ("table", "physical"):
+            # Spotting/shadow rebuild their picture every tick, so keep the
+            # pre-radio-share snapshot here; table/physical maintain their
+            # own raw views inside the scan functions.
+            self._seen_own = {uid: set(viewed) for uid, viewed in seen.items()}
         if self.enable_radio_share or model == "spotting":
-            seen = spotting_model.radio_share(self, seen)
+            # Share only observers' own (pre-share) contacts; otherwise a
+            # relayed contact would be re-broadcast one hop per tick.
+            source = self._seen_own if self._seen_own else seen
+            seen = spotting_model.radio_share(self, source)
         self.seen = seen
+        self._seen_dirty = False
 
     def tracks_for(self, side: int) -> List[dict]:
         """Fused target tracks for one side (physical model)."""
@@ -741,6 +830,8 @@ class World(object):
                 if event.get("impact_at_s") is not None:
                     # Missile in flight: damage and interception resolve at
                     # the scheduled impact tick, not at launch.
+                    self._next_impact_s = min(
+                        self._next_impact_s, float(event["impact_at_s"]))
                     self._pending_impacts.append({
                         "due_s": float(event["impact_at_s"]),
                         "attacker": attacker.uid,
@@ -1004,6 +1095,9 @@ class World(object):
         entity.alive = False
         entity.route = None
         entity.velocity_ms = 0.0
+        self._seen_dirty = True
+        self._scan_due.pop(entity.uid, None)
+        self._phys_scan_due.pop(entity.uid, None)
         self.emit("destroyed", [entity.uid], "%s 被摧毁" % entity.name)
         for pid in list(entity.passengers):
             passenger = self.entities.get(pid)
@@ -1095,6 +1189,8 @@ class World(object):
         """Apply missile impacts whose flight time has elapsed (P2)."""
         if not self._pending_impacts:
             return
+        if self.time_s < self._next_impact_s - 1e-9:
+            return
         remaining = []
         for item in sorted(self._pending_impacts,
                            key=lambda x: (x["due_s"], x["attacker"],
@@ -1133,6 +1229,8 @@ class World(object):
                 "tick_s": round(self.time_s, 1),
             })
         self._pending_impacts = remaining
+        self._next_impact_s = min(
+            (item["due_s"] for item in remaining), default=math.inf)
 
     # -- traffic collisions (P0.2) -----------------------------------------
     def _rebuild_traffic(self) -> None:
@@ -1200,6 +1298,9 @@ class World(object):
                     lon, lat = seat
                     passenger.on_board = False
                     passenger.carrier = None
+                    self._seen_dirty = True
+                    self._scan_due.pop(pid, None)
+                    self._phys_scan_due.pop(pid, None)
                     carrier.passengers.remove(pid)
                     passenger.pose = Pose(lon, lat, self.env.elevation(lon, lat))
                     passenger.route = None
@@ -1334,6 +1435,74 @@ class World(object):
         self._append(event)
         return event
 
+    # -- event-driven time --------------------------------------------------
+    def next_event_s(self) -> Optional[float]:
+        """Earliest scheduled event time (None when nothing is pending)."""
+        candidates: List[float] = []
+        if self.scan_interval_s > 0.0 and self._sensor_time_s is None:
+            candidates.append(self.time_s)   # initial full sweep
+        if self.weather_enabled and self._next_env_s is None:
+            candidates.append(self.time_s)   # first weather/daylight pass
+        if self.scan_interval_s > 0.0 and self._scan_due:
+            candidates.append(min(self._scan_due.values()))
+        if self.scan_interval_s > 0.0 and self._phys_scan_due:
+            candidates.append(min(self._phys_scan_due.values()))
+        if self._pending_impacts:
+            candidates.append(self._next_impact_s)
+        if self.weather_enabled and self._next_env_s is not None:
+            candidates.append(self._next_env_s)
+        if self.commander is not None:
+            candidates.append(self._commander_next_s)
+        candidates = [c for c in candidates
+                      if c is not None and math.isfinite(c)]
+        return min(candidates) if candidates else None
+
+    def idle(self) -> bool:
+        """True when no movement, orders, intents or impacts are pending."""
+        if self.scan_interval_s <= 0.0:
+            return False                    # per-tick sensors: never skip
+        if self.orders or self.intents:
+            return False
+        for e in self.entities.values():
+            if e.alive and not e.on_board and e.route is not None:
+                return False
+        return True
+
+    def advance_to(self, end_s: float,
+                   max_step_s: Optional[float] = None) -> None:
+        """Advance to ``end_s``, jumping straight to the next event when idle.
+
+        Continuous motion (routes/orders) still integrates with fixed dt;
+        an idle world skips empty ticks and wakes exactly at scan, impact,
+        weather or commander events.  This is the event-driven fast path,
+        not a replacement for the fixed-step motion integrator.
+        """
+        end = float(end_s)
+        step_cap = self.dt_s if max_step_s is None else float(max_step_s)
+        if step_cap <= 0.0:
+            step_cap = self.dt_s
+        guard = 0
+        while self.time_s < end - 1e-9:
+            guard += 1
+            if guard > 10000000:
+                raise RuntimeError("advance_to made no progress")
+            if self.idle():
+                nxt = self.next_event_s()
+                target = end if nxt is None else min(end, nxt)
+                if target > self.time_s + 1e-9:
+                    delta = target - self.time_s
+                    self._tick_timers(delta)
+                    self._logistics(delta)
+                    self.time_s = target
+                    continue
+                self.step(0.0)          # process the due event in place
+                continue
+            self.step(min(step_cap, end - self.time_s))
+        # Events exactly at ``end_s`` still fire before returning.
+        nxt = self.next_event_s()
+        if nxt is not None and nxt <= self.time_s + 1e-9:
+            self.step(0.0)
+
     # -- step ---------------------------------------------------------------
     def step(self, dt: Optional[float] = None) -> List[dict]:
         dt = self.dt_s if dt is None else float(dt)
@@ -1388,7 +1557,6 @@ class World(object):
         self._refresh_cell_cache()
         self._resolve_minefields()
         self._enforce_stacking()
-        self._refresh_cell_cache()
         ctx.refresh()
         self._update_sensors(ctx)
         if self.tactics is not None:

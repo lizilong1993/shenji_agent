@@ -342,7 +342,8 @@ class WorldPerceptionTest(unittest.TestCase):
                 world.step()
             self.assertNotIn(tgt.uid, world.seen.get(obs.uid, set()))
             world.obscurants = []
-            world.time_s = max(world.time_s, world.scan_interval_s)
+            world.time_s = max(world.time_s,
+                               world._phys_scan_due.get(obs.uid, 0.0))
             world.step()
             self.assertIn(tgt.uid, world.seen.get(obs.uid, set()))
         finally:

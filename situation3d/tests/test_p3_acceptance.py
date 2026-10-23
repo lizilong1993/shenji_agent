@@ -120,18 +120,21 @@ class CadenceTest(unittest.TestCase):
         shared = set(due_small) & set(due_large)
         self.assertEqual(shared, set(range(1, 11)))
         for uid in shared:
-            self.assertEqual(due_small[uid], 30.0)
-            self.assertEqual(due_large[uid], 30.0)
-        for _ in range(29):
+            # Same per-observer phase regardless of force size; the first
+            # full sweep is followed by a phase offset below one interval.
+            self.assertEqual(due_small[uid], due_large[uid])
+            self.assertGreaterEqual(due_small[uid], 30.0)
+            self.assertLess(due_small[uid], 60.0)
+        for _ in range(60):
             small.step()
             large.step()
         for uid in shared:
-            self.assertEqual(small._scan_due[uid], 30.0)
-        small.step()
-        large.step()
-        for uid in shared:
-            self.assertEqual(small._scan_due[uid], 60.0)
-            self.assertEqual(large._scan_due[uid], 60.0)
+            # Rescan happens on the first tick at/after the phase due; the
+            # next due is anchored to that tick plus exactly one interval.
+            self.assertGreaterEqual(small._scan_due[uid], due_small[uid] + 30.0)
+            self.assertLess(small._scan_due[uid], due_small[uid] + 31.0)
+            self.assertGreaterEqual(large._scan_due[uid], due_large[uid] + 30.0)
+            self.assertLess(large._scan_due[uid], due_large[uid] + 31.0)
 
 
 class InvariantTest(unittest.TestCase):
@@ -293,16 +296,17 @@ class CadenceSemanticsTest(unittest.TestCase):
 
     def test_unexpired_observer_keeps_prior_seen(self):
         world = self._world()
-        world.step()                      # t=1, fresh scan, due t=30
+        world.step()                      # t=1, first full scan
         self.assertIn(2, world.seen.get(1, set()))
         world.entities[2].pose.lon += 1.0  # moved far out of sight
         world.step()                      # t=2, observer not due
         self.assertIn(2, world.seen.get(1, set()))
-        while world.time_s < 29.0:
+        due = world._scan_due[1]
+        while world.time_s < due - 1.0:
             world.step()
         world.entities[2].pose.lon += 1.0  # still out of sight at rescan
-        world.step()                      # processes t=29: not yet due
-        world.step()                      # processes t=30: observer due
+        world.time_s = due
+        world.step()                      # processes at the observer due
         self.assertNotIn(2, world.seen.get(1, set()))
 
     def test_time_jump_scans_once_and_reanchors_due(self):
@@ -319,7 +323,12 @@ class CadenceSemanticsTest(unittest.TestCase):
         world.time_s = 100.0
         world.step()                      # jump across 3 periods -> one scan
         self.assertEqual(sorted(calls), [1, 2, 3])
-        self.assertEqual(world._scan_due[1], 130.0)
+        due = world._scan_due[1]
+        phase = world._scan_phase(1)
+        self.assertGreater(due, 100.0)
+        self.assertLessEqual(due, 130.0 + 1e-9)
+        # Phase survives the jump: the next due is phase-aligned.
+        self.assertAlmostEqual((due - phase) % 30.0, 0.0, places=6)
 
     def test_zero_interval_rescans_every_step(self):
         self.assertEqual(self._world(engine={"scan_interval_s": -1})
@@ -335,7 +344,7 @@ class CadenceSemanticsTest(unittest.TestCase):
         world = self._world()
         world.step()
         self.assertIn(3, world._scan_due)
-        world.entities[3].alive = False
+        world._on_destroyed(world.entities[3])
         world.step()
         self.assertNotIn(3, world._scan_due)
         self.assertNotIn(3, world.seen)
@@ -345,6 +354,7 @@ class CadenceSemanticsTest(unittest.TestCase):
         world.step()
         self.assertIn(3, world._scan_due)
         world.entities[3].on_board = True
+        world._seen_dirty = True
         world.step()
         self.assertNotIn(3, world._scan_due)
         self.assertNotIn(3, world.seen)
@@ -364,16 +374,42 @@ class CadenceSemanticsTest(unittest.TestCase):
             world._advance_scan_due = wrapped
             for _ in range(31):
                 world.step()
-            counts[interval] = len(calls)
-        self.assertEqual(counts[3.0], 33)   # 11 scans x 3 observers
-        self.assertEqual(counts[30.0], 6)   # 2 scans x 3 observers
+            counts[interval] = calls.count(1)
+        self.assertGreaterEqual(counts[3.0], 9)
+        self.assertLessEqual(counts[3.0], 11)
+        self.assertEqual(counts[30.0], 1)   # only the initial full sweep
+
+    def test_physical_roll_bucket_follows_interval(self):
+        seen = []
+        original = perception.detection_roll
+
+        def fake(seed, bucket, observer_uid, target_uid):
+            seen.append(bucket)
+            return 1.0
+
+        original_specs = perception.specs_for
+        perception.detection_roll = fake
+        perception.specs_for = lambda entity: [perception.SensorSpec(
+            "radar", 5000.0, 360.0, 90.0, 0.95, 100.0)]
+        try:
+            ops = [operator(1, 1000), operator(2, 1001, color=1)]
+            world = build(ops, engine={"detection_model": "physical",
+                                        "scan_interval_s": 3.0})
+            for _ in range(7):
+                world.step()
+        finally:
+            perception.detection_roll = original
+            perception.specs_for = original_specs
+        self.assertGreaterEqual(len(set(seen)), 2)
 
     def test_physical_scan_due_tracks_interval(self):
         world = self._world(engine={"detection_model": "physical",
                                      "scan_interval_s": 12.0})
         world.step()
         self.assertTrue(world._phys_scan_due)
-        self.assertEqual(world._phys_scan_due.get(1), 12.0)
+        due = world._phys_scan_due.get(1)
+        self.assertGreaterEqual(due, 12.0)
+        self.assertLess(due, 24.0)
         world.step()
         self.assertGreater(world._phys_scan_due.get(1), world.time_s)
 

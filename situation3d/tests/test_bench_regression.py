@@ -1,6 +1,6 @@
 """Regression gate for engine throughput (TODO #3).
 
-Measures steady-state tick times (warm-up excluded) for 300 and 500 entities
+Measures steady-state tick times (warm-up excluded) for 300, 500 and 800 entities
 and pins the event hash so future optimisations must preserve adjudication
 semantics (same seed -> same events).  The hashes were re-pinned for P0.2:
 physical spawn de-overlap and kinematic motion change adjudication ordering.
@@ -92,6 +92,14 @@ class TestBenchRegression(unittest.TestCase):
                         "500-entity p95 %.1f ms" % result["p95"])
         self.assertLess(result["p99"], P99_LIMIT_MS,
                         "500-entity p99 %.1f ms" % result["p99"])
+
+    def test_800_entities(self):
+        result = run_bench(800, ticks=TICKS, warmup=10)
+        self.assertEqual(result["hash"], "7d9e9cfbd18758d3")
+        self.assertLess(result["p95"], P95_LIMIT_MS,
+                        "800-entity p95 %.1f ms" % result["p95"])
+        self.assertLess(result["p99"], P99_LIMIT_MS,
+                        "800-entity p99 %.1f ms" % result["p99"])
 
 
 if __name__ == "__main__":

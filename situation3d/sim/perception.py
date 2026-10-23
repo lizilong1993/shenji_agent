@@ -28,6 +28,7 @@ from env.service import LandCover
 from geo.geodesy import haversine_m, initial_bearing_deg
 
 from mobility.kinematics import wrap180 as _wrap180
+from sim.calibration import nominal_scale_frac as _scale_frac
 
 
 _KIND_ALIAS = {
@@ -36,12 +37,19 @@ _KIND_ALIAS = {
     "esm": "esm",
 }
 
+# ``scale_frac`` is calibrated so P(nominal range) = 0.5 (public
+# Johnson/NIIRS 50% convention); see ``sim/calibration.py``.
 _KINDS = {
-    "optics": dict(fov_deg=60.0, elev_fov_deg=35.0, p0=0.90, scale_frac=0.8),
-    "ir": dict(fov_deg=45.0, elev_fov_deg=30.0, p0=0.85, scale_frac=0.9),
-    "radar": dict(fov_deg=360.0, elev_fov_deg=90.0, p0=0.95, scale_frac=1.0),
-    "sonar": dict(fov_deg=360.0, elev_fov_deg=90.0, p0=0.80, scale_frac=0.9),
-    "esm": dict(fov_deg=360.0, elev_fov_deg=90.0, p0=0.70, scale_frac=1.0),
+    "optics": dict(fov_deg=60.0, elev_fov_deg=35.0, p0=0.90,
+                   scale_frac=_scale_frac(0.90)),
+    "ir": dict(fov_deg=45.0, elev_fov_deg=30.0, p0=0.85,
+               scale_frac=_scale_frac(0.85)),
+    "radar": dict(fov_deg=360.0, elev_fov_deg=90.0, p0=0.95,
+                  scale_frac=_scale_frac(0.95)),
+    "sonar": dict(fov_deg=360.0, elev_fov_deg=90.0, p0=0.80,
+                  scale_frac=_scale_frac(0.80)),
+    "esm": dict(fov_deg=360.0, elev_fov_deg=90.0, p0=0.70,
+                scale_frac=_scale_frac(0.70)),
 }
 
 _SMOKE_ATTENUATION = 0.02
@@ -372,7 +380,8 @@ def detection_probability(spec: SensorSpec, observer, target,
                 skip_terrain=_skip_terrain(observer, target, distance_m))
         if not geometry_ok:
             return 0.0
-    p = spec.p0 * math.exp(-max(1.0, distance_m) / max(1.0, spec.scale_m))
+    p = spec.p0 * math.exp(-max(1e-3, distance_m)
+                           / max(1e-3, spec.scale_m))
     p *= _signature_factor(spec.kind, target)
     p *= _env_factor(spec.kind, distance_m, env, observer)
     p *= _smoke_factor(spec.kind, a, ha, b, hb, obscurants, now_s)
@@ -402,11 +411,17 @@ def compute_seen(world, interval_s: Optional[float] = None) -> Dict[int, set]:
     due = getattr(world, "_phys_scan_due", {})
     if interval <= 0.0:
         due.clear()                      # per-tick scanning: no clock state
+    elif hasattr(world, "_reanchor_scan_due"):
+        world._reanchor_scan_due(due, now, interval)
     else:
         limit = now + interval
         for uid, due_t in list(due.items()):
             if due_t > limit:            # time jumped backwards: re-anchor
                 due[uid] = limit
+    if (interval > 0.0 and due
+            and not getattr(world, "_seen_dirty", False)
+            and min(due.values()) > now + 1e-9):
+        return world.seen
     if interval > 0.0 and due:
         observers = [e for e in entities
                      if due.get(e.uid, 0.0) <= now + 1e-9]
@@ -416,7 +431,8 @@ def compute_seen(world, interval_s: Optional[float] = None) -> Dict[int, set]:
         observers = entities
     live = {e.uid for e in entities}
     seen: Dict[int, set] = {}
-    for uid, viewed in world.seen.items():
+    source = getattr(world, "_seen_own", None) or world.seen
+    for uid, viewed in source.items():
         if uid in live:
             seen[uid] = {t for t in viewed
                          if (world.entities.get(t) is not None
@@ -428,7 +444,11 @@ def compute_seen(world, interval_s: Optional[float] = None) -> Dict[int, set]:
         due.pop(uid, None)
     hold_s = max(_HOLD_S, 2.0 * interval)
     seed = getattr(world, "seed", 0)
-    bucket = int(now // 10.0)
+    # Rolls refresh at the sensor cadence, capped at the documented 10 s
+    # bucket; a sub-10 s interval therefore gets fresh rolls each scan.
+    bucket_s = (min(10.0, interval) if interval > 0.0
+                else max(0.1, float(getattr(world, "dt_s", 1.0))))
+    bucket = int(now // max(0.1, bucket_s))
     last_seen: Dict[Tuple[int, int], float] = world._phys_last_seen
     tracks: Dict[int, dict] = world.tracks
     obscurants = getattr(world, "obscurants", ())
@@ -491,6 +511,8 @@ def compute_seen(world, interval_s: Optional[float] = None) -> Dict[int, set]:
                 _update_track(tracks, observer.affiliation, target, now,
                               p_total, kinds)
         seen[observer.uid] = visible
+        if hasattr(world, "_seen_own"):
+            world._seen_own[observer.uid] = set(visible)
         if interval > 0.0:
             world._advance_scan_due(observer.uid, due_map=due,
                                     interval=interval)

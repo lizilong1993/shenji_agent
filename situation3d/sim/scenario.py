@@ -428,6 +428,7 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             entity.pose = Pose(carrier.pose.lon, carrier.pose.lat, carrier.pose.alt_m)
             carrier.passengers.append(entity.uid)
     _spread_stacked_spawns(world)
+    world._refresh_cell_cache()
     for city in scenario.get("cities") or []:
         coord = city.get("coord")
         if coord is None:
