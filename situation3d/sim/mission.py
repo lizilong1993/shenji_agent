@@ -38,6 +38,7 @@ class MissionRunner(object):
         self.halt_on_contact = bool(self.roe.get("halt_on_contact", True))
         self.engage_m = float(self.roe.get("engage_m", 2500.0))
         self.resume_after_s = float(self.roe.get("resume_after_s", 60.0))
+        self.separation_m = float(self.roe.get("separation_m", 150.0))
         self.missions = {}
         for raw in missions or []:
             mid = str(raw.get("id") or ("M%d" % (len(self.missions) + 1)))
@@ -260,16 +261,21 @@ class MissionRunner(object):
             return None
         contacts = self.world.seen.get(uid) or set()
         best = None
-        for other_uid in sorted(contacts):
-            other = self.world.entities.get(other_uid)
-            if other is None or not other.alive or other.affiliation == entity.affiliation:
+        for other in self.world.sorted_entities():
+            if (other.uid == entity.uid or not other.alive or other.on_board
+                    or other.affiliation == entity.affiliation):
+                continue
+            if other.domain not in ("land", "amphibious"):
                 continue
             distance = haversine_m((entity.pose.lon, entity.pose.lat),
                                    (other.pose.lon, other.pose.lat))
-            if distance > self.engage_m:
-                continue
-            if best is None or distance < best[0]:
-                best = (distance, other)
+            # Account for one tick of travel: a 30 s step at 15 m/s covers
+            # 450 m, so a fixed 150 m bubble is too late.
+            separation = self.separation_m + max(0.0, float(entity.velocity_ms)) * float(self.world.dt_s)
+            if distance <= separation or (
+                    other.uid in contacts and distance <= self.engage_m):
+                if best is None or distance < best[0]:
+                    best = (distance, other)
         return best[1] if best else None
 
     # -- maintenance / completion ------------------------------------------

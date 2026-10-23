@@ -364,7 +364,7 @@ def build():
         ],
         "missions": missions(),
         "roe": {"halt_on_contact": True, "engage_m": 2500.0,
-                "resume_after_s": 60.0},
+                "separation_m": 150.0, "resume_after_s": 60.0},
     }
     _BUILT = (scenario, meta, scenario["missions"])
     return _BUILT
