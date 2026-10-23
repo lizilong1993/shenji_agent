@@ -463,12 +463,15 @@ class World(object):
             seen = perception.compute_seen(self, interval_s=0.0)
         else:
             self._warm_los_cache()
-            seen = self._compute_table_seen(ctx, full=True)
+            seen = self._prepare_table_seen(ctx)
         from sim import spotting as spotting_model
         source = self._seen_own if self._seen_own else seen
         if self.enable_radio_share or self.detection_model == "spotting":
             seen = spotting_model.radio_share(self, source)
         self.seen = seen
+        if self.detection_model != "physical":
+            self._seen_own = {uid: set(viewed)
+                              for uid, viewed in seen.items()}
         self._seen_dirty = False
         self._sensor_time_s = self.time_s
         alive = [e for e in self.entities.values()
@@ -477,6 +480,29 @@ class World(object):
         self._scan_due = {e.uid: self.time_s + offset + self._scan_phase(e.uid)
                           for e in alive}
         self._phys_scan_due = dict(self._scan_due)
+
+    def _prepare_table_seen(self, ctx: WorldRuleContext) -> Dict[int, set]:
+        alive = [e for e in self.entities.values()
+                 if e.alive and not e.on_board]
+        if len(alive) < 400 or not self._can_scan_parallel():
+            return self._compute_table_seen(ctx, full=True)
+        import os
+        import multiprocessing as mp
+        from sim import scan_pool
+        workers = min(4, os.cpu_count() or 1)
+        uids = sorted(e.uid for e in alive)
+        chunks = [uids[i::workers] for i in range(workers)]
+        scan_pool._WORLD = self
+        pool = mp.get_context("fork").Pool(processes=workers)
+        try:
+            parts = pool.map(scan_pool._scan_chunk, chunks)
+        finally:
+            pool.close()
+            pool.join()
+        merged: Dict[int, set] = {}
+        for part in parts:
+            merged.update(part)
+        return merged
 
     def _warm_los_cache(self, radius_cells: int = 25) -> None:
         """Parallel, deterministic warm-up of static cell-pair LOS."""
@@ -531,6 +557,29 @@ class World(object):
         hashed = (int(uid) * 2654435761) & 0xFFFFFFFF
         return interval * (hashed % 1000) / 1000.0
 
+    @staticmethod
+    def _can_scan_parallel() -> bool:
+        try:
+            import os
+            return os.name == "posix" and (os.cpu_count() or 1) > 1
+        except Exception:
+            return False
+
+    def _parallel_scan(self, observers, result) -> List[dict]:
+        import os
+        import multiprocessing as mp
+        from sim import scan_pool
+        workers = min(4, os.cpu_count() or 1)
+        uids = sorted(e.uid for e in observers)
+        chunks = [uids[i::workers] for i in range(workers)]
+        scan_pool._WORLD = self
+        pool = mp.get_context("fork").Pool(processes=workers)
+        try:
+            return pool.map(scan_pool._scan_chunk, chunks)
+        finally:
+            pool.close()
+            pool.join()
+
     def _scan_due_now(self, due_map: Dict[int, float]) -> bool:
         if not due_map:
             return True
@@ -546,11 +595,13 @@ class World(object):
                     due_map[uid] = limit
         self._sensor_time_s = now
 
-    def _compute_table_seen(self, ctx: WorldRuleContext, full: bool = False) -> Dict[int, set]:
+    def _compute_table_seen(self, ctx: WorldRuleContext, full: bool = False,
+                            only_uids: Optional[set] = None) -> Dict[int, set]:
         interval = self.scan_interval_s
         if interval > 0.0:
             self._reanchor_scan_due(self._scan_due, self.time_s, interval)
-        if (not full and interval > 0.0 and not self._seen_dirty
+        if (not full and only_uids is None and interval > 0.0
+                and not self._seen_dirty
                 and not self._scan_due_now(self._scan_due)):
             return self.seen
         for dead_uid in [uid for uid, e in self.entities.items() if not e.alive]:
@@ -568,7 +619,9 @@ class World(object):
         # ``scan_interval_s`` only, never on the number of entities.
         if interval <= 0.0:
             self._scan_due.clear()       # per-tick scanning: no clock state
-        if full or interval <= 0.0:
+        if only_uids is not None:
+            observers = [e for e in entities if e.uid in only_uids]
+        elif full or interval <= 0.0:
             observers = entities
         else:
             observers = [e for e in entities
