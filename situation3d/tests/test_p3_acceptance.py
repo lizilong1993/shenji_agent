@@ -120,8 +120,8 @@ class CadenceTest(unittest.TestCase):
         shared = set(due_small) & set(due_large)
         self.assertEqual(shared, set(range(1, 11)))
         for uid in shared:
-            # Same per-observer phase regardless of force size; the first
-            # full sweep is followed by a phase offset below one interval.
+            # Same per-observer phase regardless of force size.  The build
+            # time full sweep is followed by one interval + phase.
             self.assertEqual(due_small[uid], due_large[uid])
             self.assertGreaterEqual(due_small[uid], 30.0)
             self.assertLess(due_small[uid], 60.0)
@@ -131,10 +131,10 @@ class CadenceTest(unittest.TestCase):
         for uid in shared:
             # Rescan happens on the first tick at/after the phase due; the
             # next due is anchored to that tick plus exactly one interval.
-            self.assertGreaterEqual(small._scan_due[uid], due_small[uid] + 30.0)
-            self.assertLess(small._scan_due[uid], due_small[uid] + 31.0)
-            self.assertGreaterEqual(large._scan_due[uid], due_large[uid] + 30.0)
-            self.assertLess(large._scan_due[uid], due_large[uid] + 31.0)
+            self.assertAlmostEqual(small._scan_due[uid],
+                                   due_small[uid] + 30.0, places=6)
+            self.assertAlmostEqual(large._scan_due[uid],
+                                   due_large[uid] + 30.0, places=6)
 
 
 class InvariantTest(unittest.TestCase):
@@ -296,7 +296,9 @@ class CadenceSemanticsTest(unittest.TestCase):
 
     def test_unexpired_observer_keeps_prior_seen(self):
         world = self._world()
-        world.step()                      # t=1, first full scan
+        world.step()
+        world.time_s = world._scan_due[1]   # first phase-offset scan
+        world.step()
         self.assertIn(2, world.seen.get(1, set()))
         world.entities[2].pose.lon += 1.0  # moved far out of sight
         world.step()                      # t=2, observer not due
@@ -372,12 +374,12 @@ class CadenceSemanticsTest(unittest.TestCase):
                 return _orig(uid, due_map, interval)
 
             world._advance_scan_due = wrapped
-            for _ in range(31):
+            for _ in range(70):
                 world.step()
             counts[interval] = calls.count(1)
-        self.assertGreaterEqual(counts[3.0], 9)
-        self.assertLessEqual(counts[3.0], 11)
-        self.assertEqual(counts[30.0], 1)   # only the initial full sweep
+        self.assertGreaterEqual(counts[3.0], 20)
+        self.assertLessEqual(counts[3.0], 24)
+        self.assertEqual(counts[30.0], 1)
 
     def test_physical_roll_bucket_follows_interval(self):
         seen = []

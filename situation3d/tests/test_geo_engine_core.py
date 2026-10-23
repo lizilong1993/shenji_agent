@@ -79,6 +79,14 @@ def make_env(basic=None, water_depth=20.0):
     return MapGridEnvironment(basic, grid, default_water_depth_m=water_depth), grid
 
 
+
+def prime_sensors(world):
+    """Advance to the first phase-offset scan and run one adjudication tick."""
+    dues = list(world._scan_due.values()) + list(world._phys_scan_due.values())
+    if dues:
+        world.time_s = max(world.time_s, max(dues))
+    world.step()
+
 class TestEnvironment(unittest.TestCase):
     def test_elevation_landcover_water(self):
         env, grid = make_env(make_basic(water_cols=(5,), forest_cols=(6,),
@@ -280,8 +288,7 @@ class TestEnvPackPipeline(unittest.TestCase):
             world = build_world(scenario([operator(1, 0, 1010),
                                           operator(2, 1, 1011, blood=5)]),
                                 basic, seed=5, envpack=out)
-            for _ in range(3):
-                world.step()
+            prime_sensors(world)
             self.assertTrue(any(e["type"] == "direct_fire" for e in world.events))
 
     def test_envpack_building_los_and_water_landcover(self):
@@ -371,8 +378,8 @@ class TestWorldAndRules(unittest.TestCase):
         sc["engine"] = {"direct_fire_model": "crt"}
         world = build_world(sc, basic, seed=20261021)
         events = []
-        for _ in range(3):
-            events.extend(world.step())
+        prime_sensors(world)
+        events.extend(world.events)
         fires = [e for e in events if e["type"] == "direct_fire"]
         self.assertTrue(fires)
         ev = fires[0]
@@ -416,7 +423,7 @@ class TestWorldAndRules(unittest.TestCase):
                        operator(2, 1, 1011, blood=5)])
         sc["engine"] = {"direct_fire_model": "crt"}
         world = build_world(sc, basic, seed=1)
-        world.step()
+        prime_sensors(world)
         red = observation(world, seat=0)
         ids = {e["id"] for e in red["entities"]}
         self.assertIn(1, ids)
@@ -427,7 +434,7 @@ class TestWorldAndRules(unittest.TestCase):
         sc2 = scenario([operator(1, 0, 1010), far])
         sc2["engine"] = {"direct_fire_model": "crt"}
         world2 = build_world(sc2, basic, seed=1)
-        world2.step()
+        prime_sensors(world2)
         red2 = observation(world2, seat=0)
         self.assertNotIn(3, {e["id"] for e in red2["entities"]})
 
@@ -460,8 +467,7 @@ class TestWorldAndRules(unittest.TestCase):
                        operator(2, 1, 1011, blood=5)])
         sc["engine"] = {"direct_fire_model": "crt"}
         world = build_world(sc, basic, seed=7)
-        for _ in range(3):
-            world.step()
+        prime_sensors(world)
         fires = [e for e in world.events if e["type"] == "direct_fire"]
         self.assertTrue(fires)
         self.assertEqual(fires[0]["att_level"], 10)  # no attack-level cover double count
@@ -482,8 +488,7 @@ class TestWorldAndRules(unittest.TestCase):
         op["name"] = "两栖战车"
         world = build_world(scenario([op, operator(2, 1, 1011, blood=5)]), make_basic(), seed=5)
         self.assertEqual(world.entities[1].domain, "amphibious")
-        for _ in range(2):
-            world.step()
+        prime_sensors(world)
         self.assertTrue(any(e["type"] == "direct_fire" for e in world.events))
 
     def test_carrier_loss_kills_passengers(self):
@@ -501,13 +506,13 @@ class TestWorldAndRules(unittest.TestCase):
         basic = make_basic()
         world = build_world(scenario([operator(1, 0, 1010),
                                       operator(2, 1, 1011, blood=5)]), basic, seed=1)
-        world.step()
+        prime_sensors(world)
         self.assertIn(2, world.seen[1])
         far = world.env.grid.cell_center_lonlat(23, 23)
         world.entities[2].pose = Pose(far[0], far[1], world.env.elevation(*far))
         world.entities[2].concealed = True
-        # P3 cadence: the next observer scan is due after one scan interval.
-        world.time_s = max(world.time_s, world.scan_interval_s)
+        # Phase cadence: the next observer scan is its own phase due.
+        world.time_s = max(world.time_s, world._scan_due[1])
         world.step()
         self.assertNotIn(2, world.seen.get(1, set()))
 
@@ -565,8 +570,7 @@ class TestWorldAndRules(unittest.TestCase):
         world.step()
         self.assertIsNone(world.entities[1].route)
         self.assertTrue(apply_action(world, {"type": "fire", "entity": 1, "target": 2}))
-        for _ in range(2):
-            world.step()
+        prime_sensors(world)
         self.assertTrue(any(e["type"] == "direct_fire" for e in world.events))
 
     def test_czml_packets(self):

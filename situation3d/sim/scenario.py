@@ -429,6 +429,7 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             carrier.passengers.append(entity.uid)
     _spread_stacked_spawns(world)
     world._refresh_cell_cache()
+    world.prepare_first_scan()
     for city in scenario.get("cities") or []:
         coord = city.get("coord")
         if coord is None:

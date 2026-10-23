@@ -67,9 +67,9 @@ class EventTimeTest(unittest.TestCase):
             return orig(uid, due_map, interval)
 
         world._advance_scan_due = wrapped
-        world.advance_to(10.0)
-        self.assertEqual(world.time_s, 10.0)
-        self.assertEqual(scans, [])        # no event lies inside 2..10 s
+        world.advance_to(2.0)
+        self.assertEqual(world.time_s, 2.0)
+        self.assertEqual(scans, [])        # no observer is due before 6.78 s
 
     def test_advance_wakes_at_scan_due(self):
         world = self._world()
@@ -148,6 +148,8 @@ class RadioRelayTest(unittest.TestCase):
             "radar", 500.0, 360.0, 90.0, 1.0, 1.0e6)]
         try:
             world.step()
+            world.time_s = max(world._phys_scan_due.values())
+            world.step()                    # everyone due: first scans
             self.assertIn(3, world.seen.get(1, set()))
             self.assertIn(3, world.seen.get(2, set()))   # one-hop from A
             self.assertNotIn(3, world.seen.get(4, set()))

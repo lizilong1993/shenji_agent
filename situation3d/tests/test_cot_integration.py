@@ -73,6 +73,13 @@ def lonlat(hexpos):
         hexpos // 100, hexpos % 100)
 
 
+
+def prime_sensors(world):
+    dues = list(world._scan_due.values()) + list(world._phys_scan_due.values())
+    if dues:
+        world.time_s = max(world.time_s, max(dues))
+    world.step()
+
 class TestSpottingModel(unittest.TestCase):
     def test_view_range_uses_observe_distance(self):
         e = Entity(1, "A", 0, "land", "tracked", Pose(*lonlat(1010)))
@@ -178,7 +185,7 @@ class TestSpottingModel(unittest.TestCase):
             operator(1, 0, 1010, name="驱逐舰"),
             operator(2, 1, 1012, name="无人机", type_=3, armor=0, blood=1),
         ], engine={"detection_model": "spotting"}), basic, seed=1)
-        world.step()
+        prime_sensors(world)
         self.assertTrue(world.seen.get(1, set()))
 
 
@@ -223,8 +230,7 @@ class TestPhysicsDirectFire(unittest.TestCase):
         basic = make_basic()
         world = build_world(scenario([operator(1, 0, 1010),
                                       operator(2, 1, 1011, blood=5)]), basic, seed=1)
-        for _ in range(2):
-            world.step()
+        prime_sensors(world)
         fire = [e for e in world.events if e["type"] == "direct_fire"]
         self.assertTrue(fire)
         self.assertEqual(fire[0].get("model"), "physics")

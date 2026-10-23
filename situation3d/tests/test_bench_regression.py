@@ -25,8 +25,8 @@ GRID = {"center_lon": 119.9, "center_lat": 23.1, "cols": 60, "rows": 60,
         "width_m": 200.0}
 # Acceptance target is 100 ms; shared-host scheduling noise pushes 500-entity
 # p95 into the 90-110 ms range, so the gate allows a small margin.
-P95_LIMIT_MS = 80.0   # standalone ~25-49 ms; shared-host scheduling noise
-P99_LIMIT_MS = 150.0  # covers the lockstep scan spikes p95 skips
+P95_LIMIT_MS = 100.0  # acceptance target; 800-entity standalone ~60-66 ms
+P99_LIMIT_MS = 150.0  # covers the scan spikes p95 skips
 TICKS = 70  # covers >=2 scan periods so the periodic scan spike is gated
 
 

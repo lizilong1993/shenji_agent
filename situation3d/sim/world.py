@@ -150,6 +150,12 @@ class World(object):
         if entity.profile is None:
             entity.profile = profile_for(entity.unit_type, entity.domain)
         self.entities[entity.uid] = entity
+        if self.scan_interval_s > 0.0:
+            # Phase-staggered first scan: no synchronous t=0 sweep, so the
+            # first interval carries ~1/interval of the observers each tick.
+            phase = self._scan_phase(entity.uid)
+            self._scan_due.setdefault(entity.uid, self.time_s + phase)
+            self._phys_scan_due.setdefault(entity.uid, self.time_s + phase)
         self._refresh_cell_cache()
         return entity
 
@@ -441,6 +447,36 @@ class World(object):
         return float(e.components[key])
 
     # -- sensors ------------------------------------------------------------
+    def prepare_first_scan(self) -> None:
+        """Run the initial full sensor sweep at load time, then stagger.
+
+        Doing the sweep here instead of on the first simulation tick keeps
+        the initial contacts immediate without a t=0 tick spike; later scans
+        are phase-offset per observer.
+        """
+        if self.scan_interval_s < 0.0:
+            return
+        from sim.context import WorldRuleContext
+        ctx = WorldRuleContext(self)
+        if self.detection_model == "physical":
+            from sim import perception
+            seen = perception.compute_seen(self, interval_s=0.0)
+        else:
+            seen = self._compute_table_seen(ctx, full=True)
+        from sim import spotting as spotting_model
+        source = self._seen_own if self._seen_own else seen
+        if self.enable_radio_share or self.detection_model == "spotting":
+            seen = spotting_model.radio_share(self, source)
+        self.seen = seen
+        self._seen_dirty = False
+        self._sensor_time_s = self.time_s
+        alive = [e for e in self.entities.values()
+                 if e.alive and not e.on_board]
+        offset = (self.scan_interval_s if self.scan_interval_s > 0.0 else 0.0)
+        self._scan_due = {e.uid: self.time_s + offset + self._scan_phase(e.uid)
+                          for e in alive}
+        self._phys_scan_due = dict(self._scan_due)
+
     def _scan_phase(self, uid: int) -> float:
         """Deterministic per-observer phase offset inside one interval."""
         interval = self.scan_interval_s
@@ -588,9 +624,9 @@ class World(object):
             return
         phase = self._scan_phase(uid)
         if int(uid) not in due_map:
-            # First schedule after the initial full sweep: one interval plus
-            # this observer's deterministic phase.
-            due_map[int(uid)] = self.time_s + interval + phase
+            # First schedule for a newly observed entity: its phase offset
+            # inside the current interval (no synchronous initial sweep).
+            due_map[int(uid)] = self.time_s + phase
             return
         base = max(due_map[int(uid)], self.time_s)
         # Keep the phase on every later scan, even when a time jump or a
@@ -1439,14 +1475,13 @@ class World(object):
     def next_event_s(self) -> Optional[float]:
         """Earliest scheduled event time (None when nothing is pending)."""
         candidates: List[float] = []
-        if self.scan_interval_s > 0.0 and self._sensor_time_s is None:
-            candidates.append(self.time_s)   # initial full sweep
         if self.weather_enabled and self._next_env_s is None:
             candidates.append(self.time_s)   # first weather/daylight pass
-        if self.scan_interval_s > 0.0 and self._scan_due:
-            candidates.append(min(self._scan_due.values()))
-        if self.scan_interval_s > 0.0 and self._phys_scan_due:
-            candidates.append(min(self._phys_scan_due.values()))
+        scan_map = (self._phys_scan_due
+                    if self.detection_model == "physical"
+                    else self._scan_due)
+        if self.scan_interval_s > 0.0 and scan_map:
+            candidates.append(min(scan_map.values()))
         if self._pending_impacts:
             candidates.append(self._next_impact_s)
         if self.weather_enabled and self._next_env_s is not None:
