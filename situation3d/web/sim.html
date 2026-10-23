@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>TW2 推演控制台（测试端）</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; font: 14px/1.5 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+         background: #f4f6f8; color: #1f2933; }
+  header { background: #fff; border-bottom: 1px solid #d9e0e6; padding: 14px 20px;
+           display: flex; align-items: baseline; gap: 12px; }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  header .badge { font-size: 12px; color: #1f6feb; background: #e8f1ff;
+                  border: 1px solid #c9dcff; border-radius: 999px; padding: 2px 9px; }
+  main { padding: 16px 20px 40px; }
+  .panel { background: #fff; border: 1px solid #d9e0e6; border-radius: 8px;
+           padding: 14px 16px; margin-bottom: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #52606d; }
+  input, select { padding: 6px 8px; border: 1px solid #cbd5df; border-radius: 5px;
+                  font: inherit; background: #fff; }
+  input[type=number] { width: 90px; }
+  button { padding: 7px 14px; border: 1px solid #1f6feb; border-radius: 5px;
+           background: #1f6feb; color: #fff; cursor: pointer; font: inherit; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.ghost { background: #fff; color: #1f6feb; }
+  button.danger { background: #fff; color: #b42318; border-color: #e6b8b3; }
+  .hint { color: #6b7785; font-size: 12px; }
+  .status { margin-left: auto; font-size: 12px; color: #52606d; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #eef2f5; vertical-align: top; }
+  th { color: #52606d; font-weight: 600; font-size: 12px; white-space: nowrap; }
+  tr:hover td { background: #fafcff; }
+  .pill { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px;
+          margin-right: 3px; border: 1px solid #cbd5df; color: #52606d; background: #f7f9fb; }
+  .pill.latest { border-color: #b7d3ff; background: #eef5ff; color: #1f6feb; }
+  .pill.best { border-color: #b7e1c4; background: #eefaf2; color: #137a3d; }
+  .pill.pinned { border-color: #f0d49b; background: #fff8e8; color: #8a5a00; }
+  .ok { color: #137a3d; } .bad { color: #b42318; }
+  .actions { display: flex; flex-wrap: wrap; gap: 4px; }
+  .actions button { padding: 4px 8px; font-size: 12px; }
+  code { font-size: 12px; color: #52606d; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TW2 推演控制台</h1>
+  <span class="badge">测试端 · 真实推演</span>
+  <span class="hint">发起推演会占用一个 CPU 进程；1440 tick 约 7 分钟。</span>
+</header>
+<main>
+  <section class="panel">
+    <div class="row">
+      <label>案例 <select id="case"></select></label>
+      <label>随机种子 <input id="seed" type="number" value="20261023" step="1"></label>
+      <label>推演时长（tick） <input id="ticks" type="number" value="1440" min="10" max="2000" step="10"></label>
+      <button id="launch">发起推演</button>
+      <span class="status" id="status"></span>
+    </div>
+  </section>
+  <section class="panel">
+    <div class="row" style="margin-bottom:8px">
+      <strong>运行结果</strong>
+      <span class="hint">保留三槽位：本次（自动）/ 最优（可发布）/ 指定保留；未占槽位的旧运行会被清理。</span>
+      <button class="ghost" id="refresh" style="margin-left:auto">刷新</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>运行</th><th>状态</th><th>seed</th><th>事件</th><th>开火</th><th>毁伤</th>
+          <th>损失</th><th>校验</th><th>角色</th><th>操作</th>
+        </tr></thead>
+        <tbody id="runs"><tr><td colspan="10" class="hint">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script src="./src/simConsole.js"></script>
+</body>
+</html>

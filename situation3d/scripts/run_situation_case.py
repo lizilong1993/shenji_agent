@@ -32,6 +32,9 @@ for p in (SITUATION3D, os.path.join(SITUATION3D, "server")):
         sys.path.insert(0, p)
 
 from engine.scenario import Target  # noqa: E402
+from engine.rolecards.legacy import card_from_legacy  # noqa: E402
+from engine import symbology  # noqa: E402
+from geo.geodesy import haversine_m  # noqa: E402
 from sim.mission import MissionRunner  # noqa: E402
 from sim.scenario import build_world  # noqa: E402
 from run_store import RunStore  # noqa: E402
@@ -68,8 +71,29 @@ def _envpack_hash(path):
     manifest = os.path.join(path, "manifest.json")
     if not os.path.isfile(manifest):
         return None
+    h = hashlib.sha256()
     with open(manifest, "rb") as fh:
-        return hashlib.sha256(fh.read()).hexdigest()
+        h.update(fh.read())
+    # Include the layer payloads: re-baking geometry with an unchanged manifest
+    # must change the provenance hash.
+    try:
+        with open(manifest, encoding="utf-8") as fh:
+            doc = json.load(fh)
+        layers = doc.get("layers") or {}
+    except (OSError, ValueError):
+        layers = {}
+    for name in sorted(layers):
+        rel = (layers[name] or {}).get("path")
+        if not rel:
+            continue
+        full = os.path.join(path, rel)
+        if not os.path.isfile(full):
+            continue
+        h.update(name.encode("utf-8"))
+        with open(full, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                h.update(chunk)
+    return h.hexdigest()
 
 
 def _clear_subcell_buildings(world):
@@ -182,6 +206,22 @@ def _target_defs(world, meta):
             "height_m": float(m.get("height_m") or 2.0),
             "source": "platform_profile",
         }
+        # The browser panel expects the legacy snapshot shape
+        # (class_id/summary/projection); the raw card is kept only for tests.
+        try:
+            entry["role_card"] = card_from_legacy({
+                "target_id": cid, "name": m["name"],
+                "platform_class": m["platform_class"], "domain": _ui_domain(entity),
+                "affiliation": "red" if entity.affiliation == 0 else "blue",
+                "role": m.get("role", ""), "model": m["model"],
+                "icon": m.get("icon", "unknown"),
+                "speed_kn": float(m.get("speed_kn") or 0.0),
+                "altitude_m": float(entity.pose.alt_m or 0.0),
+                "road_bound": _ui_domain(entity) == "land",
+                "subclass_id": m.get("subclass_id"),
+            }, include_effective=False)
+        except Exception:  # noqa: BLE001 - keep the raw card if the registry rejects it
+            pass
         if _ui_domain(entity) == "land":
             entry["lane"] = {"id": 0, "width_m": 3.75, "center_offset_m": 1.875,
                              "side": "right"}
@@ -290,14 +330,16 @@ def _convert_events(world, uid_to_cid, frames, tick_seconds, tick_count, stages)
                          "tof_s": ev.get("tof_s")})
             events.append(fire)
             last_fire[(shooter, target)] = fire_id
-            impact_tick = min(tick_count, tick + max(0, int(math.ceil(float(ev.get("tof_s") or 0.0) / tick_seconds))))
+            impact_tick = min(tick_count, tick + int(float(ev.get("tof_s") or 0.0) // tick_seconds))
             impact_pos = pos(impact_tick, target) or tgt_pos
+            detail = str(ev.get("result") or "")
+            hit = detail not in ("", "miss", "none")
             imp = _event_base("I-" + eid, impact_tick, _stage_id(stages, impact_tick), "impact",
                               [shooter, target], impact_pos,
-                              "命中" if (ev.get("result") in ("hit", "penetrated", "kill")) else "未命中",
-                              cause=[fire_id])
+                              "命中" if hit else "未命中", cause=[fire_id])
             imp.update({"shooter_id": shooter, "target_id": target,
-                        "result": ev.get("result"), "damage": ev.get("damage")})
+                        "result": "hit" if hit else "miss",
+                        "result_detail": detail, "damage": ev.get("damage")})
             events.append(imp)
             last_impact[target] = imp["id"]
         elif typ == "indirect_fire":
@@ -340,11 +382,15 @@ def _convert_events(world, uid_to_cid, frames, tick_seconds, tick_count, stages)
             if not shooter or not target:
                 continue
             cause = [last_fire[(shooter, target)]] if (shooter, target) in last_fire else []
+            detail = str(ev.get("result") or "")
+            label = ("被拦截" if detail == "intercepted" else
+                     ("命中" if detail == "hit" else "未命中"))
             imp = _event_base("I-" + eid, tick, stage, "impact", [shooter, target],
                               location or pos(tick, target),
-                              ev.get("description") or "导弹命中", cause=cause)
+                              ev.get("description") or label, cause=cause)
             imp.update({"shooter_id": shooter, "target_id": target,
-                        "result": ev.get("result"), "damage": ev.get("damage"),
+                        "result": "hit" if detail == "hit" else "miss",
+                        "result_detail": detail, "damage": ev.get("damage"),
                         "intercepted": ev.get("intercepted")})
             events.append(imp)
             last_impact[target] = imp["id"]
@@ -383,7 +429,20 @@ def _convert_events(world, uid_to_cid, frames, tick_seconds, tick_count, stages)
             events.append(_event_base("W-" + eid, tick, stage, "warning", actors,
                                       location, ev.get("description") or typ,
                                       source="engine"))
-    events.sort(key=lambda e: (e["tick"], e["id"]))
+    order = {"fire": 0, "impact": 1, "destroy": 2, "mission": 3,
+             "release": 4, "objective_progress": 5, "warning": 6}
+    events.sort(key=lambda e: (e["tick"], order.get(e["type"], 9), e["id"]))
+    # The engine emits "destroyed" from inside the damage call, before the
+    # direct-fire event is appended. With the impact sorted first, link the
+    # destruction to the last hit on the same target.
+    last_hit = {}
+    for ev in events:
+        if ev["type"] == "impact" and ev.get("result") == "hit" and ev.get("target_id"):
+            last_hit[ev["target_id"]] = ev["id"]
+        elif ev["type"] == "destroy":
+            target = ev.get("target_id") or (ev.get("actors") or [None])[0]
+            if target in last_hit and not ev.get("cause_event_ids"):
+                ev["cause_event_ids"] = [last_hit[target]]
     return events
 
 
@@ -417,6 +476,8 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=20261023)
     ap.add_argument("--ticks", type=int, default=None)
     ap.add_argument("--runs-dir", default=None)
+    ap.add_argument("--run-id", default=None,
+                    help="reserved run id (created by the test console)")
     ap.add_argument("--envpack", default=DEFAULT_ENVPACK)
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args(argv)
@@ -439,14 +500,21 @@ def main(argv=None):
 
     runs_dir = args.runs_dir or os.path.join(SITUATION3D, "var", "sim_runs")
     store = RunStore(runs_dir)
-    run_id = store.create_run(
-        args.case, seed=args.seed,
-        config={"tick_seconds": tick_seconds, "ticks": tick_count,
-                "envpack": os.path.basename(envpack),
-                "engine": scenario.get("engine")},
-        scenario_hash=scenario_hash, engine_commit=engine_commit,
-        envpack_hash=envpack_hash)
-    store.update_run(args.case, run_id, status="running")
+    config = {"tick_seconds": tick_seconds, "ticks": tick_count,
+              "envpack": os.path.basename(envpack),
+              "engine": scenario.get("engine")}
+    if args.run_id:
+        run_id = args.run_id
+        store.get_run(args.case, run_id)  # must exist (reserved by the API/CLI)
+        store.update_run(args.case, run_id, status="running",
+                         config=config, scenario_hash=scenario_hash,
+                         engine_commit=engine_commit, envpack_hash=envpack_hash)
+    else:
+        run_id = store.create_run(
+            args.case, seed=args.seed, config=config,
+            scenario_hash=scenario_hash, engine_commit=engine_commit,
+            envpack_hash=envpack_hash)
+        store.update_run(args.case, run_id, status="running")
     t_start = time.time()
     try:
         world = build_world(scenario, {}, seed=args.seed, dt_s=tick_seconds,
@@ -461,6 +529,7 @@ def main(argv=None):
                                interval_s=tick_seconds)
         frames = []
         step_ms = []
+        travelled = {cid: 0.0 for cid in meta}
         for tick in range(tick_count + 1):
             if tick > 0:
                 t0 = time.perf_counter()
@@ -475,6 +544,14 @@ def main(argv=None):
                     continue
                 rows.append(_frame_row2(entity, cid, uid_to_cid, world.time_s))
             rows.sort(key=lambda r: r["id"])
+            prev_rows = {r["id"]: r for r in (frames[-1]["targets"] if frames else [])}
+            for row in rows:
+                prev = prev_rows.get(row["id"])
+                if (prev and prev.get("mode") == row.get("mode")
+                        and row.get("mode") != "embarked"):
+                    travelled[row["id"]] = travelled.get(row["id"], 0.0) + haversine_m(
+                        (prev["lon"], prev["lat"]), (row["lon"], row["lat"]))
+                row["travelled_m"] = round(travelled.get(row["id"], 0.0), 1)
             phase = _phase_at(cm.get("phases") or [], tick)
             frames.append({
                 "tick": tick,
@@ -598,6 +675,7 @@ def main(argv=None):
             "targets": _target_defs(world, meta),
             "frames": frames,
             "events": events,
+            "nodes": nodes.get("nodes") or [],
             "objectives": objectives,
             "outcome": outcome,
             "provenance": {
@@ -608,6 +686,7 @@ def main(argv=None):
                                                                  time.gmtime()),
             },
             "inference_model": None,
+            "symbology": symbology.catalog(),
             "auto_plots": [],
         })
         trajectory_bytes = json.dumps(doc, ensure_ascii=False,

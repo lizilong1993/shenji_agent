@@ -179,11 +179,35 @@ class RunStore(object):
                 with open(path, "r", encoding="utf-8") as fh:
                     state = json.load(fh)
                 if state.get("schema") == SCHEMA_STATE and isinstance(state.get("runs"), dict):
-                    return state
+                    return self._reconcile_state(case_dir, state)
             except (OSError, ValueError):
                 pass
         state = self._rebuild_state(case_dir)
         _atomic_write_json(path, state)
+        return state
+
+    def _reconcile_state(self, case_dir, state):
+        """Keep the index honest when a crash splits run.json and state.json."""
+        changed = False
+        best = None
+        for rid, ent in list(state.get("runs", {}).items()):
+            try:
+                run = self._read_run(case_dir, rid)
+            except RunNotFound:
+                state["runs"].pop(rid, None)
+                changed = True
+                continue
+            fresh = self._entry(run)
+            if fresh != ent:
+                state["runs"][rid] = fresh
+                changed = True
+            if "best" in fresh.get("roles", []):
+                best = rid
+        if state.get("best") != best:
+            state["best"] = best
+            changed = True
+        if changed:
+            self._save_state(case_dir, state)
         return state
 
     def _rebuild_state(self, case_dir):
@@ -217,6 +241,7 @@ class RunStore(object):
                 "metrics": run.get("metrics") or {},
                 "validation": run.get("validation") or {},
                 "seed": run.get("seed"),
+                "progress": run.get("progress") or {},
             }
             if "best" in roles:
                 best = name
@@ -248,6 +273,7 @@ class RunStore(object):
             "metrics": run.get("metrics") or {},
             "validation": run.get("validation") or {},
             "seed": run.get("seed"),
+            "progress": run.get("progress") or {},
         }
 
     def _read_run(self, case_dir, run_id):
@@ -261,14 +287,20 @@ class RunStore(object):
         run["updated_at"] = utc_now()
         _atomic_write_json(os.path.join(case_dir, run_id, "run.json"), run)
 
-    @staticmethod
-    def _remove_role(state, role, except_run=None):
+    def _remove_role(self, case_dir, state, role, except_run=None):
         for rid, ent in state.get("runs", {}).items():
             if rid == except_run:
                 continue
             roles = ent.get("roles") or []
             if role in roles:
-                ent["roles"] = [r for r in roles if r != role]
+                new_roles = [r for r in roles if r != role]
+                ent["roles"] = new_roles
+                try:
+                    run = self._read_run(case_dir, rid)
+                    run["roles"] = new_roles
+                    self._write_run(case_dir, rid, run)
+                except RunNotFound:
+                    pass
 
     def _delete_run_locked(self, case_dir, state, run_id, reason):
         run_dir = os.path.join(case_dir, run_id)
@@ -317,11 +349,22 @@ class RunStore(object):
     # -- public API ---------------------------------------------------------
 
     def create_run(self, case_id, seed=None, config=None, scenario_hash=None,
-                   engine_commit=None, envpack_hash=None):
+                   engine_commit=None, envpack_hash=None, run_id=None,
+                   reject_active=False):
         case_dir = self._case_dir(case_id)
         with self._lock(case_dir):
             state = self._load_state(case_dir)
-            run_id = self._new_run_id(case_dir)
+            if reject_active:
+                for rid, ent in state.get("runs", {}).items():
+                    if ent.get("status") in ("queued", "running"):
+                        raise RunConflict("another run is already active",
+                                          active=rid)
+            if run_id is not None:
+                self._validate_run(run_id)
+                if os.path.exists(os.path.join(case_dir, run_id)):
+                    raise RunConflict("run already exists: %s" % run_id)
+            else:
+                run_id = self._new_run_id(case_dir)
             os.makedirs(os.path.join(case_dir, run_id), exist_ok=True)
             run = {
                 "schema": SCHEMA_RUN,
@@ -408,7 +451,7 @@ class RunStore(object):
             run["artifacts"] = hashes
             run["metrics"] = metrics or {}
             run["validation"] = validation or {}
-            self._remove_role(state, "latest", except_run=run_id)
+            self._remove_role(case_dir, state, "latest", except_run=run_id)
             roles = _ordered_roles([r for r in (run.get("roles") or [])
                                     if r != "latest"] + ["latest"])
             run["roles"] = roles
@@ -487,7 +530,7 @@ class RunStore(object):
                                   status=run.get("status"))
             if not (run.get("validation") or {}).get("passed", False):
                 raise RunConflict("run failed validation; fix or choose another run")
-            self._remove_role(state, "best", except_run=run_id)
+            self._remove_role(case_dir, state, "best", except_run=run_id)
             roles = _ordered_roles([r for r in (run.get("roles") or [])
                                     if r != "best"] + ["best"])
             run["roles"] = roles
@@ -558,9 +601,17 @@ class RunStore(object):
                 raise RunConflict("best run cannot be deleted; select another first")
             if "pinned" in (run.get("roles") or []):
                 raise RunConflict("pinned run must be unpinned first")
+            if run.get("status") in ("queued", "running"):
+                raise RunConflict("active run cannot be deleted",
+                                  status=run.get("status"))
             self._delete_run_locked(case_dir, state, run_id, "user delete")
             self._save_state(case_dir, state)
             return True
+
+    def audit_note(self, case_id, run_id, action, note=""):
+        case_dir = self._case_dir(case_id)
+        with self._lock(case_dir):
+            self._audit(case_dir, str(action), run_id, note=str(note or ""))
 
     def verify(self, case_id, run_id):
         run_dir = self._run_dir(case_id, run_id)

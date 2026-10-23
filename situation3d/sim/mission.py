@@ -267,10 +267,14 @@ class MissionRunner(object):
                 self._assign(mission, uid)
 
     def _at_objective(self, mission, entity):
+        # Prefer the explicit passable point and its configured radius; the
+        # 200 m rule cell is only the fallback for name-only missions.
+        if mission["lon"] is not None and mission["lat"] is not None:
+            return haversine_m((entity.pose.lon, entity.pose.lat),
+                               (mission["lon"], mission["lat"])) <= mission["arrive_m"]
         if mission["cell"] is not None:
             return self.world.rule_cell(entity) == mission["cell"]
-        return haversine_m((entity.pose.lon, entity.pose.lat),
-                           (mission["lon"], mission["lat"])) <= mission["arrive_m"]
+        return False
 
     def _complete(self, now):
         for mid in sorted(self.missions):

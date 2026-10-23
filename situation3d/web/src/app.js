@@ -1439,6 +1439,10 @@ function switchTheatre(theatre) {
 function applySituationData(data, caseId) {
   {
       if (!data.frames || !data.frames.length) throw new Error('TS数据为空');
+      // New-engine runs may omit hotspot metadata; never let an optional layer
+      // crash the whole case load.
+      if (!Array.isArray(data.hotspots)) data.hotspots = [];
+      if (!Array.isArray(data.nodes)) data.nodes = [];
 
       teardownScene();
 
@@ -1491,6 +1495,7 @@ function applySituationData(data, caseId) {
       renderTransport();
       clearTargetSelection();
       setTick(0);
+      createNodeNav(data);
       updateInferenceUi();
       applyAutoPlots(data);
 
@@ -1553,6 +1558,8 @@ function redrawPlotsAfterClear() {
 
 function teardownScene() {
   if (!viewer) return;
+  var nodeNav = document.getElementById('nodeNav');
+  if (nodeNav) nodeNav.remove();
   detachFollow('TS已切换');
   clearTargetSelection();
   if (window.TargetCombatFx) TargetCombatFx.dispose();
@@ -3739,7 +3746,7 @@ function hotspotAt(lat, lon) {
   if (!state.data) return -1;
   let best = -1;
   let bestArea = Infinity;
-  state.data.hotspots.forEach(function (hs, i) {
+  (state.data.hotspots || []).forEach(function (hs, i) {
     const b = hs.bbox;
     if (lat < b[1] || lat > b[3] || lon < b[0] || lon > b[2]) return;
     const area = (b[2] - b[0]) * (b[3] - b[1]);
@@ -6049,6 +6056,47 @@ function renderTransport() {
   dom.clockLabel.textContent = t.toISOString().replace('T', ' ').slice(0, 19) + 'Z';
 }
 
+/**
+ * 关键态势节点（引擎运行自带 nodes[]）：给演示端一个"按节点看"的入口。
+ * 只在案例数据包含 nodes 时渲染，旧案例的界面完全不变。
+ */
+function createNodeNav(data) {
+  var old = document.getElementById('nodeNav');
+  if (old) old.remove();
+  var nodes = (data && data.nodes) || [];
+  if (!nodes.length) return;
+  var box = document.createElement('div');
+  box.id = 'nodeNav';
+  box.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:14px;' +
+    'z-index:1200;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;' +
+    'max-width:92vw;padding:6px 8px;background:rgba(255,255,255,.92);' +
+    'border:1px solid #d9e0e6;border-radius:8px;box-shadow:0 2px 10px rgba(15,40,70,.08);' +
+    'font:12px/1.4 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:#1f2933';
+  var label = document.createElement('span');
+  label.textContent = '关键节点';
+  label.style.cssText = 'color:#52606d;padding:3px 4px 3px 2px';
+  box.appendChild(label);
+  nodes.forEach(function (node) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    var hours = (node.tick || 0) * (data.tick_seconds || 30) / 3600;
+    btn.textContent = (node.title || node.type || '节点') + ' · ' +
+      (hours < 10 ? hours.toFixed(1) : Math.round(hours)) + 'h';
+    btn.title = node.description || '';
+    btn.style.cssText = 'padding:3px 8px;border:1px solid #cbd5df;border-radius:5px;' +
+      'background:#fff;color:#1f2933;cursor:pointer;font:inherit';
+    btn.onclick = function () {
+      setPlaying(false);
+      setTick(node.tick || 0);
+      renderTargetCounts();
+      renderTransport();
+      updateInferenceUi();
+    };
+    box.appendChild(btn);
+  });
+  document.body.appendChild(box);
+}
+
 function setTick(tick) {
   if (!state.data || !state.data.frames) { state.tick = 0; state.tickFloat = 0; return; }
   const max = timelineMaxTick();
@@ -8203,8 +8251,11 @@ function main() {
     // 目录为空时 `default` 是 null —— 此时**不加载任何案例**，与"没有指定 case"
     // 走同一条空态路径，而不是拿 null 去 loadCase 报"未知案例"。
     const known = (state.caseIndex && state.caseIndex.cases) || [];
+    const runWanted = params.get('run');
+    // A run id is self-contained: the test port may have an empty situations
+    // directory but still serve the run through /api/situation?run=.
     const id = known.some(function (c) { return c.id === wanted; })
-      ? wanted : (state.caseIndex.default || null);
+      ? wanted : ((runWanted ? wanted : null) || state.caseIndex.default || null);
     if (!id) {
       console.warn('[situations] 找不到案例「' + wanted + '」，且目录中没有默认案例');
       return null;

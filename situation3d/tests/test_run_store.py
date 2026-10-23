@@ -152,6 +152,36 @@ class RunStoreTest(unittest.TestCase):
         self.assertEqual(rows[0]["run_id"], a)
         self.assertEqual(sorted(rows[0]["roles"]), ["latest", "pinned"])
 
+    def test_explicit_run_id_reservation(self):
+        rid = "20261023T000000Z-abcdef12"
+        got = self.store.create_run(CASE, seed=5, run_id=rid)
+        self.assertEqual(got, rid)
+        self.assertEqual(self.store.get_run(CASE, rid)["status"], "queued")
+        with self.assertRaises(RunConflict):
+            self.store.create_run(CASE, seed=6, run_id=rid)
+
+    def test_audit_note_is_appended(self):
+        rid = self._complete(1)
+        self.store.audit_note(CASE, rid, "select", "smoke note")
+        path = os.path.join(self.tmp.name, CASE, "audit.jsonl")
+        with open(path, encoding="utf-8") as fh:
+            lines = [json.loads(line) for line in fh if line.strip()]
+        self.assertTrue(any(x.get("action") == "select" and x.get("note") == "smoke note"
+                            for x in lines))
+
+    def test_unpin_does_not_resurrect_removed_latest(self):
+        a = self._complete(1)
+        self.store.pin(CASE, a)
+        b = self._complete(2)
+        self.store.unpin(CASE, a)
+        latest = [rid for rid, roles in self._roles().items() if "latest" in roles]
+        self.assertEqual(latest, [b])
+
+    def test_active_run_cannot_be_deleted(self):
+        rid = self.store.create_run(CASE, seed=1)
+        with self.assertRaises(RunConflict):
+            self.store.delete_run(CASE, rid)
+
     def test_invalid_ids_rejected(self):
         with self.assertRaises(RunError):
             self.store.create_run("../escape")

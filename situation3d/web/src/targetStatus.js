@@ -100,6 +100,13 @@
     cache.finalHp = {};
     cache.destroyedAt = {};
     cache.ranks = {};
+    // Engine-produced runs expose per-frame blood as ``strength``. When the
+    // case declares ``provenance.runtime = engine_run`` we use that value and
+    // never synthesize damage from inference exposure; legacy cases keep the
+    // old heuristic unchanged.
+    cache.engineMode = !!(data.provenance && data.provenance.runtime === 'engine_run');
+    cache.engineTick = -1;
+    cache.engineRows = {};
 
     var ids = (data.targets || []).map(function (t) { return t.id; });
     ids.forEach(function (id) {
@@ -227,6 +234,18 @@
     });
   }
 
+  function engineRow(data, tick, id) {
+    if (cache.engineTick !== tick) {
+      var fr = (data.frames || [])[tick] || {};
+      var rows = fr.targets || [];
+      var map = {};
+      for (var i = 0; i < rows.length; i++) map[rows[i].id] = rows[i];
+      cache.engineRows = map;
+      cache.engineTick = tick;
+    }
+    return cache.engineRows[id] || null;
+  }
+
   function statusOf(hp) {
     if (hp <= 0) return 3;
     if (hp <= THRESHOLDS.severe) return 2;
@@ -251,6 +270,27 @@
     var max = Math.max(0, (data.frames || []).length - 1);
     var t = Math.max(0, Math.min(max, tick | 0));
     _advance(t);
+
+    if (cache.engineMode) {
+      var row = engineRow(data, t, id);
+      if (row && typeof row.strength === 'number') {
+        var ehp = Math.round(Math.max(0, Math.min(1, row.strength)) * 1000) / 10;
+        var est = statusOf(ehp);
+        var inf = cache.infRef;
+        var entry = (inf && inf.length) ? (inf[Math.min(t, inf.length - 1)] || {}).targets : null;
+        var e = entry ? entry[id] : null;
+        return {
+          hp: ehp,
+          status: est,
+          label: TIERS[est].label,
+          destroyedAt: row.status === 'destroyed' ? t : null,
+          alert: e ? (typeof e.alert === 'number' ? e.alert : null) : null,
+          alertLabel: e && e.alert_label ? e.alert_label : '',
+          exposure: 0,
+          finalHp: ehp,
+        };
+      }
+    }
 
     var total = cache.totalExposure[id] || 0;
     var final = (cache.finalHp[id] === undefined) ? 100 : cache.finalHp[id];

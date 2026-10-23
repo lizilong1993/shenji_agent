@@ -53,12 +53,12 @@ python3 scripts/run_situation_case.py --case taiwan_dense_transfer_v1 \
 | 指标 | 值 |
 |---|---|
 | 帧 | 1441（30 s/帧，12 h） |
-| 事件 | 489：fire 212、impact 212、destroy 22、mission 22、release 16、objective 5 |
-| 损失 | 红 9 / 蓝 13 |
-| 目标归属 | D/E 红，F 蓝（partial） |
-| 产物 | trajectory.json 约 32 MB |
-| 耗时 | 413 s（p50 284 ms / p95 431 ms per tick） |
-| 校验 | 通过：finite；water_hits=2（两栖/瞬态）、building_hits=0 |
+| 事件 | 148：fire 44、impact 44、destroy 20、mission 20、release 16、objective 4 |
+| 损失 | 红 14 / 蓝 6 |
+| 目标归属 | D 红，E/F 蓝（partial） |
+| 产物 | trajectory.json 约 32.3 MB |
+| 耗时 | 501 s（p50 284 ms / p95 510 ms per tick） |
+| 校验 | 通过：finite；water_hits=2（瞬态）、building_hits=1（瞬态） |
 
 `validation` 规则：位置有限；停驻单位由子格清障移到最近空地；移动中的亚单元
 瞬态水/建筑命中允许 2 次（20k 行 +1），系统性违规仍失败。
@@ -66,7 +66,8 @@ python3 scripts/run_situation_case.py --case taiwan_dense_transfer_v1 \
 ## 4. 测试端回放
 
 ```bash
-SITUATION_DIR=web/data/situations python3 server/serve.py --port 8876 --mode test \
+SITUATION_DIR=/remote-home/lizilong/shenji_agent/situation3d/web/data/situations \
+  python3 server/serve.py --port 8876 --mode test \
   --runs-dir var/sim_runs
 # 打开
 http://127.0.0.1:8876/?case=taiwan_dense_transfer_v1&run=<run_id>
@@ -75,7 +76,7 @@ http://127.0.0.1:8876/?case=taiwan_dense_transfer_v1&run=<run_id>
 - `GET /api/sim/runs?case_id=...`：运行列表（test 模式）；
 - `GET /api/situation?id=...&run=<run_id>&part=core|inference`：读取运行库轨迹；
 - demo 模式下上述接口返回 400/404，demo 进程启动时断言未加载 `sim/rules`。
-- 前端 `app.js` 只在 `?run=` 存在且模式允许时使用运行库；没有整包回退。
+- 前端 `app.js` 在 URL 带 `?run=` 时向 `/api/situation` 追加 run 参数；模式判定由服务端负责（demo 返回 400），运行结果没有整包回退。
 
 ## 5. 已知限制（D1）
 

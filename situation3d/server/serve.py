@@ -32,7 +32,9 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -62,7 +64,7 @@ from modes import (  # noqa: E402
     DEFAULT_MODE, MODES, assert_no_simulation, capabilities as mode_capabilities,
     normalize_mode,
 )
-from run_store import RunError, RunStore  # noqa: E402
+from run_store import RunConflict, RunError, RunNotFound, RunStore  # noqa: E402
 
 EXTRA_TYPES = {
     ".js": "application/javascript; charset=utf-8",
@@ -258,6 +260,78 @@ SERVER_MODE = normalize_mode(env("SITUATION_MODE") or DEFAULT_MODE)
 RUNS_DIR = env("SITUATION_RUNS_DIR") or os.path.join(_PKG_ROOT, "var", "sim_runs")
 RUN_STORE = None
 
+# Cases that the test console may launch. The module name is resolved under
+# situation3d/campaigns/; keep this list explicit (no arbitrary module loading
+# from an HTTP body).
+ENGINE_CASES = {"taiwan_dense_transfer_v1": "taiwan_dense"}
+MAX_TEST_TICKS = 2000
+
+
+def _run_log_path(case_id, run_id):
+    return os.path.join(RUNS_DIR, case_id, run_id, "run.log")
+
+
+def _watch_run(case_id, run_id, proc, log_fh):
+    try:
+        rc = proc.wait()
+    finally:
+        try:
+            log_fh.close()
+        except OSError:
+            pass
+    try:
+        run = RUN_STORE.get_run(case_id, run_id)
+        if run.get("status") in ("queued", "running"):
+            try:
+                with open(_run_log_path(case_id, run_id), encoding="utf-8",
+                          errors="replace") as fh:
+                    tail = fh.read()[-4000:]
+            except OSError:
+                tail = ""
+            RUN_STORE.fail_run(case_id, run_id,
+                               "runner exited with %d" % rc, log_text=tail)
+    except Exception:  # noqa: BLE001 - watchdog must never kill the server
+        import traceback
+        traceback.print_exc()
+
+
+def _launch_run(body):
+    case_id = str((body or {}).get("case_id") or "")
+    if case_id not in ENGINE_CASES:
+        raise RunError("unknown engine case: %s" % case_id)
+    try:
+        seed = int((body or {}).get("seed") or 20261023)
+        ticks = int((body or {}).get("ticks") or 1440)
+    except (TypeError, ValueError):
+        raise RunError("seed/ticks must be integers")
+    if ticks < 10 or ticks > MAX_TEST_TICKS:
+        raise RunError("ticks must be between 10 and %d" % MAX_TEST_TICKS)
+    # Reserve and check the active-slot invariant under one store lock, so two
+    # concurrent launches cannot both pass the check.
+    run_id = RUN_STORE.create_run(case_id, seed=seed,
+                                  config={"ticks": ticks, "seed": seed},
+                                  reject_active=True)
+    script = os.path.join(_PKG_ROOT, "scripts", "run_situation_case.py")
+    log_path = _run_log_path(case_id, run_id)
+    log_fh = None
+    try:
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        log_fh = open(log_path, "a", encoding="utf-8")
+        cmd = [sys.executable, script, "--case", case_id, "--seed", str(seed),
+               "--ticks", str(ticks), "--runs-dir", RUNS_DIR,
+               "--run-id", run_id, "--quiet"]
+        proc = subprocess.Popen(cmd, cwd=_PKG_ROOT, stdout=log_fh,
+                                stderr=subprocess.STDOUT,
+                                env=dict(os.environ, PYTHONUNBUFFERED="1"))
+    except Exception as exc:  # noqa: BLE001
+        if log_fh is not None:
+            log_fh.close()
+        RUN_STORE.fail_run(case_id, run_id, "spawn failed: %s" % exc)
+        raise RunError("spawn failed: %s" % exc)
+    threading.Thread(target=_watch_run,
+                     args=(case_id, run_id, proc, log_fh), daemon=True).start()
+    return {"run_id": run_id, "status": "queued", "seed": seed, "ticks": ticks}
+
 # `_api_situations` 的索引缓存：键 = 目录里各 .json 的 (名字, 大小, mtime_ns)，值 = 响应体。
 # 见该方法的注释：不缓存的话，每次进系统都要白白解析 53.6 MB 的案例数据（10.5 s）。
 _SITUATIONS_CACHE = {"key": None, "body": None}
@@ -354,6 +428,10 @@ def _case_parts(path):
 
         ent = {"key": key, "core": core, "core_gz": core_gz,
                "inference": inf, "inference_gz": inf_gz}
+        # Run playback adds a new 30 MB trajectory per viewed run; keep the
+        # in-memory split cache bounded (disk files remain for reuse).
+        while len(_CASE_PARTS) >= 12:
+            _CASE_PARTS.pop(next(iter(_CASE_PARTS)))
         _CASE_PARTS[path] = ent
         return ent
 
@@ -1163,6 +1241,12 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json_bytes(parts["inference"],
                                       gz_body=parts["inference_gz"])
             return
+        if path == "/api/sim/cases":
+            if SERVER_MODE != "test" or RUN_STORE is None:
+                self._send_json({"error": "not found"}, 404)
+                return
+            self._send_json({"cases": [{"id": k} for k in sorted(ENGINE_CASES)]})
+            return
         if path == "/api/sim/runs":
             # 只在测试端存在；演示端连路由都不暴露。
             if SERVER_MODE != "test" or RUN_STORE is None:
@@ -1178,6 +1262,28 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, 400)
                 return
             self._send_json({"mode": "test", "case_id": cid, "runs": runs})
+            return
+        if path.startswith("/api/sim/runs/"):
+            if SERVER_MODE != "test" or RUN_STORE is None:
+                self._send_json({"error": "not found"}, 404)
+                return
+            rest = path[len("/api/sim/runs/"):]
+            if "/" in rest:
+                self._send_json({"error": "not found"}, 404)
+                return
+            cid = (query or {}).get("case_id") or ""
+            if not cid:
+                self._send_json({"error": "case_id 必填"}, 400)
+                return
+            try:
+                run = RUN_STORE.get_run(cid, rest)
+            except RunNotFound as exc:
+                self._send_json({"error": str(exc)}, 404)
+                return
+            except RunError as exc:
+                self._send_json({"error": str(exc)}, 400)
+                return
+            self._send_json(run)
             return
         if path == "/api/health":
             self._api_health()
@@ -1452,7 +1558,58 @@ class Handler(SimpleHTTPRequestHandler):
             if SERVER_MODE != "test" or RUN_STORE is None:
                 self._send_json({"error": "simulation API is disabled in demo mode"}, 403)
                 return
-            self._send_json({"error": "simulation runner not implemented yet"}, 501)
+            body = self._read_json_body() or {}
+            if path == "/api/sim/runs":
+                try:
+                    self._send_json(_launch_run(body), 202)
+                except RunConflict as exc:
+                    self._send_json({"error": str(exc), **exc.detail}, 409)
+                except RunError as exc:
+                    self._send_json({"error": str(exc)}, 400)
+                return
+            if path.startswith("/api/sim/runs/"):
+                rest = path[len("/api/sim/runs/"):].split("/")
+                if not rest or not rest[0]:
+                    self._send_json({"error": "run_id 必填"}, 400)
+                    return
+                run_id = rest[0]
+                action = rest[1] if len(rest) > 1 else ""
+                cid = str(body.get("case_id") or "taiwan_dense_transfer_v1")
+                try:
+                    if action == "select":
+                        if not body.get("confirm"):
+                            self._send_json({"error": "confirm=true 必填"}, 400)
+                            return
+                        run = RUN_STORE.set_best(cid, run_id)
+                        RUN_STORE.audit_note(cid, run_id, "select",
+                                             str(body.get("note") or ""))
+                        self._send_json({"run": run})
+                        return
+                    if action == "pin":
+                        run = RUN_STORE.pin(cid, run_id, replace=body.get("replace"))
+                        self._send_json({"run": run})
+                        return
+                    if action == "unpin":
+                        run = RUN_STORE.unpin(cid, run_id)
+                        self._send_json({"run": run})
+                        return
+                    if action == "delete":
+                        if not body.get("confirm"):
+                            self._send_json({"error": "confirm=true 必填"}, 400)
+                            return
+                        RUN_STORE.delete_run(cid, run_id)
+                        self._send_json({"deleted": run_id})
+                        return
+                except RunConflict as exc:
+                    self._send_json({"error": str(exc), **exc.detail}, 409)
+                    return
+                except RunNotFound as exc:
+                    self._send_json({"error": str(exc)}, 404)
+                    return
+                except RunError as exc:
+                    self._send_json({"error": str(exc)}, 400)
+                    return
+            self._send_json({"error": "未知推演接口"}, 404)
             return
         # 令牌写入接口已移除：ion token 现在只从 `.env` 的 CESIUM_ION_TOKEN 读取，
         # 界面上那个输入框与「保存令牌」按钮也已删掉。唯一的调用方消失后，这条写入
@@ -1610,6 +1767,10 @@ class Handler(SimpleHTTPRequestHandler):
         self._send_tile(data, ctype)
 
     def do_GET(self):
+        if (SERVER_MODE != "test" and self.path.split("?")[0] in
+                ("/sim.html", "/src/simConsole.js")):
+            self.send_error(404, "Not Found")
+            return
         if self.path.split("?")[0].startswith("/tiles3d/"):
             try:
                 self._tiles3d_item()
@@ -1708,6 +1869,18 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def send_head(self):
+        # Demo must not expose the test console, including URL-encoded/dotted
+        # aliases (translate_path would normalize them to the same file).
+        if SERVER_MODE != "test":
+            try:
+                from urllib.parse import unquote
+                raw = unquote(self.path.split("?")[0])
+                name = os.path.basename(os.path.normpath(raw))
+            except Exception:  # noqa: BLE001
+                name = ""
+            if name in ("sim.html", "simConsole.js"):
+                self.send_error(404, "Not Found")
+                return None
         try:
             return self._send_head()
         except Exception:  # noqa: BLE001 - never leave the client with no reply

@@ -448,6 +448,8 @@ def case_meta():
             {"name": AREAS[k]["name"],
              "bbox": [AREAS[k]["lon"] - 0.012, AREAS[k]["lat"] - 0.010,
                       AREAS[k]["lon"] + 0.012, AREAS[k]["lat"] + 0.010],
+             "center": [AREAS[k]["lat"], AREAS[k]["lon"]],
+             "span_deg": [0.024, 0.020],
              "zoom": 13}
             for k in sorted(AREAS)
         ],

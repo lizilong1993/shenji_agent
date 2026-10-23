@@ -54,13 +54,36 @@ git -C "$DEMO_WT" merge --ff-only "$target" || die "fast-forward 合并失败（
 if [ "$with_data" = 1 ]; then
   src=$MAIN_WT/situation3d/web/data
   dst=$DEMO_WT/situation3d/web/data
+  release=$dst/demo_release.json
+  rel_case=""; rel_hash=""
+  if [ -f "$release" ]; then
+    rel_case=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("case_id") or "")' "$release") \
+      || die "读取 demo_release.json 失败"
+    rel_hash=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("trajectory_sha256") or "")' "$release") \
+      || die "读取 demo_release.json 失败"
+    [ -n "$rel_case" ] && [ -n "$rel_hash" ] || die "demo_release.json 缺少 case_id/trajectory_sha256"
+    if [ -n "$rel_case" ]; then
+      actual=$(sha256sum "$dst/situations/$rel_case.json" 2>/dev/null | cut -d" " -f1)
+      [ "$actual" = "$rel_hash" ] || die "演示端 $rel_case 与 demo_release.json 哈希不一致"
+      echo "发布产物校验通过: $rel_case $rel_hash"
+    fi
+  fi
   for f in "$src"/situations/*.json; do
     case "$f" in *.bak*) continue ;; esac
+    base=$(basename "$f" .json)
+    if [ -n "$rel_case" ] && [ "$base" = "$rel_case" ]; then
+      echo "跳过已发布案例（保持选定推演结果）: $base"
+      continue
+    fi
     cp -p "$f" "$dst/situations/"
   done
   cp -p "$src/base.json" "$dst/base.json" 2>/dev/null || true
   cp -p "$src/ion.json" "$dst/ion.json" 2>/dev/null || true
-  echo "案例数据已同步"
+  if [ -n "$rel_case" ]; then
+    actual=$(sha256sum "$dst/situations/$rel_case.json" 2>/dev/null | cut -d" " -f1)
+    [ "$actual" = "$rel_hash" ] || die "同步后发布产物校验失败: $rel_case"
+  fi
+  echo "案例数据已同步（已发布的选定结果未被覆盖）"
 fi
 
 "$SVC" demo restart || true
