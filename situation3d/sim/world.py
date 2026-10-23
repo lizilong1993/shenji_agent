@@ -97,6 +97,8 @@ class World(object):
         self.intel: Dict[int, dict] = {}
         self._cell_cache: Dict[int, Tuple[int, int]] = {}
         self._cell_members: Dict[Tuple[int, int], List[Entity]] = {}
+        self._kind_cache: Dict[int, str] = {}
+        self._det_meta_cache: Dict[tuple, tuple] = {}
         self._detect_cache: Dict[Tuple[int, int], tuple] = {}
         self._los_cell_cache: Dict[tuple, bool] = {}
         # P3: fixed per-observer sensor cadence, independent of force size.
@@ -608,12 +610,25 @@ class World(object):
             self.seen.pop(dead_uid, None)
         entities = [e for e in self.sorted_entities() if e.alive and not e.on_board]
         cells = self._cell_cache
-        kind_of = {e.uid: ctx.view(e).unit_kind for e in entities}
+        kind_of = {}
+        for e in entities:
+            kind = self._kind_cache.get(e.uid)
+            if kind is None:
+                kind = ctx.view(e).unit_kind
+                self._kind_cache[e.uid] = kind
+            kind_of[e.uid] = kind
         det_meta = {}
         for e in entities:
-            view = ctx.view(e)
-            det_meta[e.uid] = (int(ctx.cover_at(view)),
-                               ctx.elevation_grade(view))
+            key = (e.uid, round(e.pose.lon, 6), round(e.pose.lat, 6),
+                   bool(e.concealed))
+            meta = self._det_meta_cache.get(key)
+            if meta is None:
+                view = ctx.view(e)
+                meta = (int(ctx.cover_at(view)),
+                        ctx.elevation_grade(view))
+                if len(self._det_meta_cache) < 200000:
+                    self._det_meta_cache[key] = meta
+            det_meta[e.uid] = meta
         table = __import__("rules.detection", fromlist=["observation_doc"]).observation_doc()["table"]
         # P3: fixed per-observer scan cadence.  The refresh rhythm depends on
         # ``scan_interval_s`` only, never on the number of entities.
