@@ -1,0 +1,61 @@
+# P0 基线冻结状态（2026-10-21）
+
+> 基线：`feat/campaign-demo` @ `6982407`，tag `wargame-baseline-6982407`
+> 本阶段结论：**P0 全部关闭**。鉴权按项目既有 runbook 恢复后完成受控实测；TarType/ObjBlood、ele_rect、骰点、time.tick、AttMin 均已确认，F0/F1/F2 判定为不影响直瞄裁决的元数据。台海 golden replay 已录制并逐位复验（§5）。
+
+## 1. 已完成
+
+| 项 | 结果 |
+|---|---|
+| 基线 tag | `wargame-baseline-6982407` → 6982407730db1ef6613e5ed2e349414fbbbb569e |
+| 基线测试 | 41 项全部通过（core 34 + campaign 7），worktree 干净 |
+| 规则数据 JSON | `rules/data/*.json`，由 `tools/geo_p0/extract_rules.py` 从 `docs/裁决表格.xlsx` 与 `Data/weapons/*` 生成 |
+| 差异报告 | `docs/geo_engine/P0_rule_diff_report.md`（`tools/geo_p0/diff_rules.py` 可重生成） |
+| tick>1 回归 fixture | `tests/test_wargame_core_timebase.py`；换算公式集中在 `compat/timebase.py` |
+| golden replay | `tests/fixtures/golden_core_1231_seed20261021.json`；`tests/test_golden_replay.py`（`GEORULES_GOLDEN=1` 时重放 300 tick，逐位一致） |
+| 黑盒实测 | `tools/geo_p0/probe_env.py` 等 4 个探针；鉴权恢复后完成 TarType/高差/骰点/tick/AttMin 实验 |
+
+## 2. 黑盒实测结论（train_env 4.1.0，2026-10-21）
+
+- **TarType（确认）**：`0` 间瞄、`1` 对人员、`2` 对车辆、`3` 对空。旧数据字典把 1/2 写反。
+  - 对车辆：wp36 在 d14/15/16/18 攻击力 6/5/4/2，与 TarType=2 行逐格一致（历史回放 + 受控实验）。
+  - 对人员：`ObjBlood` 是**攻方车/班数**，不是目标血量。攻方 blood 1/2/3/4/5 对步兵打出 2/3/5/7/9，与 TarType=1 的 ObjBlood 1..5 行一致；目标 blood 保持 3 不变。
+- **ele_rect（确认）**：8×12 表行 = 高差等级（1–8），列 = 距离（1–12）；**仅仰射（攻方更低）生效**，平射/俯射为 0，距离 >12 为 0，Δh>8 按 8 钳位。
+  - 验证点：低 2 级 d1 → -2（基值 10→8），低 2 级 d5 → -1（基值 9→8），低 1 级 d8 → 0，低 3 级 d1 → -3；人员表同规则（基值 5→3）。
+  - 数据字典“行=射击方、列=目标方”的推测错误；`裁决表格` 表头“高度差/距离”正确。
+- **骰点（确认）**：`random1`/`random2` 均为 2d6 三角分布（200 个独立 setup，峰值 6–8），不是 `randint(2,12)` 均匀分布。引擎随机流不受 Python 种子控制，相同想定重复 setup 结果不同。
+- **time.tick（确认）**：`tick` = 每步帧数，1 帧 = 1 s；直瞄 75 s 冷却在 tick=1/2/5 下间隔 75/38/15 步；`cur_step` 每 step 加 1。
+- **AttMin（确认）**：wp69（AttMin=2）在 d1 射击返回错误 503 `CantShootOfOutOfAim`。
+- **F0/F1/F2（不影响直瞄裁决）**：F0=100/101/102 的 wp71/83/75 对同一目标均正常直瞄，judge 字段无差异；wp69/73 的拒绝由 AttMin=2 决定。判定为制导/引信/动画类元数据，P4 主表对拍不依赖；如后续接入导弹飞行段再专项确认。
+
+## 3. 鉴权问题的处置（项目既有方案）
+
+项目 `round5_revision_v12/sdk_plan_c_runbook.sh` 记录了同容器（465a18f93ac6，eth0 `02:42:ac:11:00:05`）的处理办法：容器重建会换 MAC，`.engine_config` 需按**当前 MAC + 原始首次使用时间戳**重绑；失败的时间校验会在 `/root/.engine_config` 留下过期标记，重绑前需清除。
+
+2026-10-21 按该流程执行：
+
+1. 备份原配置到 `/tmp/engine_config.bak.20261021_134447`；
+2. 写入 `base64(<当前 MAC>,1785636126742546063)`；
+3. 删除 `/root/.engine_config` 过期标记；
+4. `Authenticator.pass_MAC_check()` 与 `pass_time_check_since_first_use()` 均返回 True；
+5. `env.setup()` 打印 `did pass authentication`，`judge_info` 正常产生。
+
+## 4. 未完成项
+
+无（P0 范围内）。F0/F1/F2 已定性，如需导弹飞行段/制导过程保真再另立实验。
+
+## 5. 台海 golden replay（已录制）
+
+`map_9001` 由 `scripts/build_campaign_map.py` 现场生成、未入库；本轮从既有 campaign worktree 取得该图（`basic.json` + `cost.pickle`），放入本 worktree 的 `web/data/campaign_maps/map_9001/`（该目录被 `.gitignore` 忽略）。
+
+录制结果（`tests/fixtures/golden_taiwan_campaign_manifest.json`）：
+
+| 项 | 值 |
+|---|---|
+| 命令 | `python3 scripts/run_campaign.py --case taiwan_landing --out <dir> --seed 20261021` |
+| 输出 | 1440 tick / 7 阶段 / 934 事件 / 20,647,907 B |
+| 输出 sha256 | `652104edeb790fa306d76f4e07a776b14171b9a793e0b29efd2f8ef12f66e414` |
+| 地图 sha256 | `basic.json` c1b57153…、`cost.pickle` 6f7c2e0a… |
+| 结局（引擎） | 蓝方胜，红 78 / 蓝 221，红损 16 / 蓝损 7 |
+
+两次独立运行输出 sha256 完全一致；`tests/test_golden_taiwan.py` 在 `GEORULES_TW=1` 时重跑并校验哈希（约 14–20 s），默认只校验 manifest 与地图哈希。注意引擎结局与脚本设定结局不一致（`match=false`），这是基线行为，golden replay 锁定的就是该行为。

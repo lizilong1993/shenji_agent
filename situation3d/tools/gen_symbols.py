@@ -93,6 +93,11 @@ PLATFORMS = {
     "generic_land":    ("10", "120500"),   # Land Unit（通用）
     "generic_air":     ("01", "110104"),   # Air（通用）
     "unknown":         ("10", "120500"),   # 未知：陆上帧 + 问号图形
+    # campaign additions (merged from feat/geo-engine)
+    "amphibious":     ("10", "120300"),   # Land Unit / Amphibious
+    "landing_craft":  ("30", "120206"),   # Sea Surface / Landing Craft
+    "infantry":       ("10", "121100"),   # Land Unit / Infantry
+    "engineering":    ("10", "141100"),   # Land Unit / Sustainment / Engineer
 }
 
 # blue force = Friend, red force = Hostile. Colour comes from the SIDC itself
@@ -147,6 +152,11 @@ GLYPH_OF = {
     "aew": "aew",
     "helicopter": "helicopter",
     "uav": "uav",
+    # campaign additions
+    "amphibious": "amphibious",
+    "landing_craft": "amphibious",
+    "infantry": "generic_land",
+    "engineering": "transport",
     # 兜底
     "generic_sea": "generic_sea",
     "generic_land": "generic_land",

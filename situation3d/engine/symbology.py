@@ -85,6 +85,11 @@ ICONS: Dict[str, dict] = {
     "generic_land": {"label": "陆上目标", "domain": "land", "family": "通用", "abbrev": "GND"},
     "generic_air": {"label": "空中目标", "domain": "air", "family": "通用", "abbrev": "AIR"},
     "unknown": {"label": "未知目标", "domain": "land", "family": "通用", "abbrev": "UNK"},
+    # -- campaign additions ----------------------------------------------
+    "amphibious": {"label": "两栖车辆", "domain": "land", "family": "地面机动", "abbrev": "AAV"},
+    "landing_craft": {"label": "登陆艇", "domain": "sea", "family": "两栖舰船", "abbrev": "LCU"},
+    "infantry": {"label": "步兵", "domain": "land", "family": "地面机动", "abbrev": "INF"},
+    "engineering": {"label": "工兵", "domain": "land", "family": "工程保障", "abbrev": "ENG"},
 }
 
 

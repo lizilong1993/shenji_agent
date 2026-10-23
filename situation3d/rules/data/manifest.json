@@ -1,0 +1,16 @@
+{
+ "schema": "msgeo.rules.v1",
+ "source_date": "2026-09-15 (SDK data snapshot)",
+ "generated": "2026-10-21",
+ "files": [
+  "attack_levels.json",
+  "crt.json",
+  "elevation.json",
+  "manifest.json",
+  "minefield.json",
+  "observation.json",
+  "weapons_0.json",
+  "wpdata.json",
+  "zm_attack_level.json"
+ ]
+}

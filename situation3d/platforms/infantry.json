@@ -1,0 +1,103 @@
+{
+  "schema": "msplatform.v1",
+  "key": "infantry",
+  "identity": {
+    "name_zh": "步兵小队",
+    "domain": "land",
+    "size_class": "small"
+  },
+  "dimensions": {
+    "length_m": 1.2,
+    "width_m": 1.2,
+    "height_m": 0.0
+  },
+  "mass": {
+    "combat_t": 0.15
+  },
+  "power": {
+    "power_hp": 0.0
+  },
+  "motion": {
+    "max_speed_ms": 1.7,
+    "accel_ms2": 2.0,
+    "decel_ms2": 4.0,
+    "turn_rate_dps": 360.0,
+    "min_turn_radius_m": 0.0,
+    "pivot_turn": true,
+    "terrain_factors": {
+      "open": 1.0,
+      "forest": 0.8,
+      "urban": 0.9,
+      "soft": 0.7,
+      "water": 0.0,
+      "rock": 0.6
+    },
+    "speed_curve": [
+      [
+        0.0,
+        1.0
+      ],
+      [
+        1.7,
+        1.0
+      ]
+    ]
+  },
+  "terrain": {
+    "max_gradient_deg": 45.0,
+    "max_side_slope_deg": 35.0,
+    "wading_depth_m": 1.2,
+    "swim_depth_m": 2.5,
+    "amphibious": false,
+    "road_bound": false
+  },
+  "sea": {
+    "draft_m": 0.0,
+    "ukc_m": 0.5,
+    "max_operating_depth_m": 0.0
+  },
+  "air": {
+    "min_clearance_m": 0.0,
+    "service_ceiling_m": 0.0,
+    "agl_m": 0.0,
+    "climb_rate_ms": 5.0,
+    "descent_rate_ms": 5.0
+  },
+  "road": {
+    "weight_t": 0.0,
+    "height_m": 0.0,
+    "beam_m": 0.0
+  },
+  "armor": {
+    "class": 0,
+    "faces_mm_rha": {
+      "front": 0,
+      "side": 0,
+      "rear": 0,
+      "top": 0
+    }
+  },
+  "signature": {
+    "rcs_m2": 0.05,
+    "ir": 0.3,
+    "acoustic": 0.6
+  },
+  "sensors": [
+    {
+      "kind": "optics",
+      "range_m": 2000
+    }
+  ],
+  "weapons": [
+    {
+      "weapon_id": 29,
+      "name": "步兵武器",
+      "ammo": 30
+    }
+  ],
+  "provenance": {
+    "source": "demo-estimate",
+    "confidence": "low",
+    "note": "演示估计值，非真实装备数据；P0.3 v1 仅用于重建现有行为。"
+  }
+}

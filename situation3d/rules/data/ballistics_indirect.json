@@ -1,0 +1,48 @@
+{
+  "schema": "msgeo.ballistics_indirect.v1",
+  "note": "Demo values for physical indirect fire (P1.5). Representative estimates, not authoritative equipment data.",
+  "by_weapon_id": {
+    "72": {
+      "name": "155mm howitzer",
+      "muzzle_velocity_mps": 827,
+      "min_range_m": 2000,
+      "max_range_m": 24000,
+      "cep_m": 55,
+      "cep_observed_m": 25,
+      "blast_radius_m": 60,
+      "lethality_infantry": 3.0,
+      "lethality_vehicle": 1.5,
+      "armor_factor": 0.22,
+      "base_m": 0.0,
+      "top_m": 300.0
+    },
+    "88": {
+      "name": "122mm howitzer",
+      "muzzle_velocity_mps": 690,
+      "min_range_m": 1500,
+      "max_range_m": 15000,
+      "cep_m": 70,
+      "cep_observed_m": 30,
+      "blast_radius_m": 50,
+      "lethality_infantry": 2.5,
+      "lethality_vehicle": 1.2,
+      "armor_factor": 0.25,
+      "base_m": 0.0,
+      "top_m": 280.0
+    },
+    "89": {
+      "name": "105mm howitzer",
+      "muzzle_velocity_mps": 494,
+      "min_range_m": 1000,
+      "max_range_m": 11000,
+      "cep_m": 65,
+      "cep_observed_m": 30,
+      "blast_radius_m": 45,
+      "lethality_infantry": 2.0,
+      "lethality_vehicle": 1.0,
+      "armor_factor": 0.3,
+      "base_m": 0.0,
+      "top_m": 260.0
+    }
+  }
+}
