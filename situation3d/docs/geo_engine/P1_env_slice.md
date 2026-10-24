@@ -67,10 +67,11 @@ NavField(30m) cold build ~8.2 s; cached ~0.013 s; 10k routes route_ok 100%
 planned 10000 / no_path 0
 route_ok 10000 (100%)
 gate_denied_routes 56, gate_denied_points 112 / 78519 sampled (0.14%)
+gate_denial_reasons: water_depth 112
 mean_length 369.2 m; plan_p95 3.2 ms; nav_build ~0.013 s (缓存命中)
 ```
 
-`safe_fallback` 在平滑/圆角路径未通过 `_points_ok` 时回退到原始 A* 顶点，并把首尾点吸附到 30 m 单元中心；这会把起终点最多偏移一个单元（30 m），但保证 `route_ok`。代价是 56 条路线仍有 112 个逐点 Gate 拒绝（0.14%），集中在建筑/水域边缘，下一轮定位。
+`safe_fallback` 在平滑/圆角路径未通过 `_points_ok` 时回退到原始 A* 顶点，并把首尾点吸附到 30 m 单元中心；这会把起终点最多偏移一个单元（30 m），但保证 `route_ok`。56 条路线上的 112 个逐点 Gate 拒绝全部是 `water_depth`，集中在桥面/近岸道路——这是“桥面应通行、桥下水面不可通行”的语义缺失。尝试过“桥上跳过水深门”，但会把桥头/水域边缘的起终点混入采样，导致 `no_path` 和建筑拒绝激增，已回退；正确做法是补桥面/桥下净空的 3D 障碍层，而不是在 Gate 里临时跳过。
 
 ## 4. 已知限制
 
@@ -87,7 +88,7 @@ mean_length 369.2 m; plan_p95 3.2 ms; nav_build ~0.013 s (缓存命中)
 1. 把 Anping 的 `terrain` 换成 COG（NLSC/Copernicus）、`buildings/roads` 换成 GeoParquet/FlatGeobuf；保留 `source/license/confidence`。
 2. 把 `ObstacleSet` 扩展为建筑体块 + 桥面 + 树冠 + 动态事件；加 BVH/空间桶。
 3. 把 `passability()` 的 `unknown_policy` 接到 `Policy` 对象/审批/场景覆盖；统计合法路线成功率/假阻断率。
-4. 定位 56 条路线上的 112 个 Gate 拒绝点（0.14%），判断是建筑/水域边缘误差还是 30 m 单元吸附；补局部 1–3 m 细化，保持 `route_ok=100%`。
+4. 处理 112 个 `water_depth` 拒绝点：补桥面/桥下净空的 3D 障碍层，区分“桥面可通行”和“桥下水面不可通行”；不要用“桥上跳过水深门”的临时规则。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
 > 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5` + `e37324c`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。

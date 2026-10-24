@@ -9,6 +9,7 @@ conformance harness, not a replacement for the future 10k-route regression.
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import os
 import random
@@ -47,6 +48,7 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
     route_ok_n = 0
     gate_denied_routes = 0
     gate_denied_points = 0
+    gate_denial_reasons = collections.Counter()
     sampled_points = 0
     total_m = 0.0
     plan_times = []
@@ -79,8 +81,10 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
         while s <= route.total_m:
             pose = route.pose_at(s)
             sampled_points += 1
-            if not query.passability(profile, pose.lon, pose.lat).value["allowed"]:
+            gate = query.passability(profile, pose.lon, pose.lat)
+            if not gate.value["allowed"]:
                 denied += 1
+                gate_denial_reasons.update(gate.value["reason_codes"])
             s += sample_m
         gate_denied_points += denied
         if denied:
@@ -103,6 +107,7 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
         "gate_denied_rate": (
             round(gate_denied_points / sampled_points, 6) if sampled_points else None
         ),
+        "gate_denial_reasons": gate_denial_reasons.most_common(),
         "mean_length_m": round(total_m / planned, 1) if planned else None,
         "plan_p95_s": round(p95, 4) if p95 is not None else None,
     }
