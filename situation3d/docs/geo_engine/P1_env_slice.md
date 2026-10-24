@@ -18,8 +18,9 @@
 - 新增 `envmodel/gates.py` + `SpatialQueryV3.passability()`：建筑、水深、坡度、道路限重/限高/限宽门，返回原因码与 `unknown` 标记；`unknown_policy` 从 manifest `gates` 读取（bridge/tunnel 默认 advisory，water/building/slope/road 默认 deny）。
 - 新增 `BridgeSet`：从 OSM `bridge=true` 的 128 条道路边生成低置信桥面（甲板高=端点地形+8 m，容差 25 m）；桥面点跳过水深门，但仍检查桥重/桥高/桥宽。
 - 新增 `envmodel/policy.py`：加载/校验 `situation3d.policy.v1`（要求 `approval_status=approved`），把 policy `gates` 的 `unknown_policy` 覆盖到 manifest 默认值；`open_pack(..., policy_path=...)` 可直接使用。
+- 新增 `envmodel/authorization.py`：通用 ROE + 阵营/目标域/武器类别矩阵授权（`hold` 禁火、`return_fire`/`defensive` 需受威胁、`weapons_free` 查矩阵），不包含目标选择或战术规则。
 - `mobility/nav_field.py` 增加可选 `safe_fallback`（默认 False）：平滑/圆角路径未通过 `_points_ok` 时回退原始 A* 顶点并吸附首尾单元中心；默认行为不变，10k 一致性检查显式启用。
-- 新增 `tests/test_envmodel_v3.py`：17 项测试，全部通过。
+- 新增 `tests/test_envmodel_v3.py`：18 项测试，全部通过。
 
 ## 2. 关键语义
 
@@ -34,9 +35,9 @@
 ```bash
 cd situation3d
 python3 -m unittest tests.test_envmodel_v3 -v
-# Ran 17 tests ... OK
+# Ran 18 tests ... OK
 python3 -m unittest tests.test_envmodel_v3 tests.test_geo_engine_core tests.test_planning tests.test_kinematics tests.test_nav_field -q
-# Ran 86 tests ... OK (1 skipped)
+# Ran 87 tests ... OK (1 skipped)
 ```
 
 真实包抽样（`envpacks/taiwan_tw2_v3`）：
@@ -81,7 +82,7 @@ mean_length 383.9 m; plan_p95 3.3 ms; nav_build ~0.008 s (缓存命中)
 2. `nav_graph()` 直接构造 `NavField(30 m)`；未做按需加载/LOD/缓存签名，冷构建约 8 s，缓存命中约 0.013 s，性能不是生产级。
 3. `road_graph()` 返回 legacy `(nodes, edges)`；尚无车道/信号/交通状态。
 4. `ObstacleSet` 复用现有建筑空间索引；`BridgeSet` 只是 OSM `bridge` 边的低置信甲板（地形+8 m），尚未加入真实桥面高程、桥下净空、树冠、隧道内壁、动态障碍。
-5. `passability()` 已接建筑/水深/坡度/道路限重限高限宽门，`unknown_policy` 已从 manifest `gates` 和已批准 `Policy.gates` 读取；尚未把 ROE/授权矩阵接入行为层。
+5. `passability()` 已接建筑/水深/坡度/道路限重限高限宽门，`unknown_policy` 已从 manifest `gates` 和已批准 `Policy.gates` 读取；`authorization.py` 只做通用 ROE/矩阵授权，尚未接入 `World`/行为层。
 6. `safe_fallback` 保证 `route_ok`，但会把起终点最多吸附 30 m 单元中心，并牺牲部分平滑；这是 30 m 网格的已知代价。
 7. `tile()` 只返回图层路径元数据；未实现 COG/PMTiles/3D Tiles 范围读取。
 

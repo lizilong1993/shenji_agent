@@ -8,8 +8,8 @@ import tempfile
 import unittest
 
 from env.pack_env import load_envpack_environment
-from envmodel import (SpatialQueryV3, evaluate_gates, load_manifest,
-                      load_policy, open_pack)
+from envmodel import (SpatialQueryV3, authorize_engagement, evaluate_gates,
+                      load_manifest, load_policy, open_pack)
 from envmodel.manifest import ManifestError
 from envmodel.policy import PolicyError
 from mobility.profile import profile_for
@@ -288,6 +288,30 @@ class EnvModelTest(unittest.TestCase):
             json.dump(policy, fh)
         with self.assertRaises(PolicyError):
             load_policy(path)
+
+    def test_authorization_matrix(self):
+        policy = {
+            "policy_id": "auth-test",
+            "approval_status": "approved",
+            "roe": "return_fire",
+            "authorization_matrix": {"blue": {"land": ["cannon"]}},
+        }
+        ok = authorize_engagement(policy, "blue", "land", "cannon", under_fire=True)
+        self.assertTrue(ok.allowed)
+        self.assertEqual(ok.reason, "authorized")
+        self.assertFalse(
+            authorize_engagement(policy, "blue", "land", "cannon").allowed
+        )
+        self.assertFalse(
+            authorize_engagement(policy, "blue", "land", "atgm", under_fire=True).allowed
+        )
+        self.assertFalse(
+            authorize_engagement(policy, "red", "land", "cannon", under_fire=True).allowed
+        )
+        hold = dict(policy, roe="hold")
+        self.assertFalse(
+            authorize_engagement(hold, "blue", "land", "cannon", under_fire=True).allowed
+        )
 
     def test_gates_land_open(self):
         profile = profile_for("vehicle", "land")
