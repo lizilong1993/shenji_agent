@@ -6,6 +6,7 @@ import json
 import os
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 from env.pack_env import load_envpack_environment
 from envmodel import (SpatialQueryV3, authorize_engagement, evaluate_gates,
@@ -13,6 +14,7 @@ from envmodel import (SpatialQueryV3, authorize_engagement, evaluate_gates,
 from envmodel.manifest import ManifestError
 from envmodel.policy import PolicyError
 from mobility.profile import profile_for
+from sim.world import World
 
 CENTER = (120.16, 23.0)
 BUILDING_RING = [
@@ -312,6 +314,27 @@ class EnvModelTest(unittest.TestCase):
         self.assertFalse(
             authorize_engagement(hold, "blue", "land", "cannon", under_fire=True).allowed
         )
+
+    def test_world_authorization_gate(self):
+        world = World.__new__(World)
+        world.time_s = 0.0
+        world.weapon_ready = lambda uid, key: True
+        world.policy = {
+            "policy_id": "world-auth",
+            "approval_status": "approved",
+            "roe": "return_fire",
+            "authorization_matrix": {"blue": {"land": ["direct"]}},
+        }
+        attacker = SimpleNamespace(
+            uid=1, affiliation=1, last_damaged_s=0.0,
+            weapons=[SimpleNamespace(key="w1", kind="direct")],
+        )
+        target = SimpleNamespace(domain="land")
+        self.assertTrue(world.authorize_engagement(attacker, target))
+        world.policy = dict(world.policy, roe="hold")
+        self.assertFalse(world.authorize_engagement(attacker, target))
+        world.policy = None
+        self.assertTrue(world.authorize_engagement(attacker, target))
 
     def test_gates_land_open(self):
         profile = profile_for("vehicle", "land")

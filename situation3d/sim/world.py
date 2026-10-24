@@ -70,6 +70,9 @@ class World(object):
         self._target_block: Dict[Tuple[int, int], float] = {}
         # P1.6 behaviour intents (objective + pace/risk).
         self.intents: Dict[int, object] = {}
+        # Optional approved Policy (ROE + authorization matrix). None keeps
+        # legacy behavior; dict enables the generic authorization gate.
+        self.policy = None
         # Physical perception state (P1.4).
         self.tracks: Dict[int, dict] = {}
         self._phys_last_seen: Dict[Tuple[int, int], float] = {}
@@ -935,6 +938,33 @@ class World(object):
                                    source="commander")
 
     # -- engagement ---------------------------------------------------------
+    def authorize_engagement(self, attacker, target) -> bool:
+        """Generic Policy gate before any engagement.
+
+        No policy keeps legacy behavior. With a policy, every ready weapon's
+        ``kind`` is checked against the approved ROE/matrix; at least one must
+        be authorized. This does not select targets or encode tactics.
+        """
+        if not self.policy:
+            return True
+        from envmodel.authorization import authorize_engagement
+        side_key = {0: "red", 1: "blue"}.get(attacker.affiliation, "neutral")
+        under_fire = (
+            attacker.last_damaged_s >= 0.0
+            and self.time_s - attacker.last_damaged_s <= 300.0
+        )
+        ready = [w for w in attacker.weapons
+                 if self.weapon_ready(attacker.uid, w.key)]
+        if not ready:
+            return False
+        for weapon in ready:
+            category = getattr(weapon, "kind", "direct") or "direct"
+            if authorize_engagement(
+                    self.policy, side_key, target.domain, category,
+                    under_fire=under_fire).allowed:
+                return True
+        return False
+
     def _engage(self, ctx: WorldRuleContext) -> None:
         ctx.refresh()
         for attacker in self.sorted_entities():
@@ -970,6 +1000,8 @@ class World(object):
                     if event is not None:
                         event["tick_s"] = round(self.time_s, 1)
                         self._append(event)
+                continue
+            if not self.authorize_engagement(attacker, target):
                 continue
             if _is_ground(attacker) and _is_ground(target):
                 if attacker.marching:
