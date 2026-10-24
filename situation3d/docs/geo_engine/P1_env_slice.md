@@ -95,4 +95,4 @@ mean_length 383.9 m; plan_p95 3.3 ms; nav_build ~0.008 s (缓存命中)
 4. 处理 140 个 `water_depth` 拒绝点：用更完整的桥面高程/桥下净空几何或道路-水面拓扑区分桥面与水面；当前 `BridgeSet` 只覆盖 OSM `bridge=true` 的 128 条边，桥头/未标注桥仍会误判。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
-> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5` + `e37324c` + `476e299` + `dc4dcec` + `ce20b89` + `a2b8d13` + `443661c` + `6cd5de0` + `4b2467a`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
+> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5` + `e37324c` + `476e299` + `dc4dcec` + `ce20b89` + `a2b8d13` + `443661c` + `6cd5de0` + `4b2467a` + `545e3b7` + `3f7ee5e`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
