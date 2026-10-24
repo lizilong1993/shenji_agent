@@ -88,4 +88,4 @@ mean_length 366.3 m; plan_p95 2.8 ms; nav_build ~0.008 s (缓存命中)
 4. 把 `route_ok` 从 85.6% 提升到约定门槛（目标 ≥95%）：定位 30 m 网格/圆角/平滑造成的 14.4% 不可行路径，补局部 1–3 m 细化或回退重规划。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
-> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
+> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
