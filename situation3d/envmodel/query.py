@@ -13,6 +13,7 @@ from typing import Any, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar
 from .gates import evaluate_gates
 from .manifest import V3Manifest
 from .obstacles import BridgeSet, ObstacleSet
+from .policy import gate_overrides
 
 T = TypeVar("T")
 Coord = Tuple[float, float]
@@ -30,15 +31,17 @@ class Envelope(Generic[T]):
 class SpatialQueryV3:
     """Spatial query view bound to one simulation time."""
 
-    def __init__(self, env: Any, manifest: V3Manifest, time_s: float = 0.0):
+    def __init__(self, env: Any, manifest: V3Manifest, time_s: float = 0.0,
+                 policy: Optional[Dict[str, Any]] = None):
         self.env = env
         self.manifest = manifest
         self.time_s = float(time_s)
+        self.policy = dict(policy or {})
         self._obstacles = ObstacleSet(env, manifest)
         self._bridges = BridgeSet(env, manifest)
 
     def at(self, time_s: float) -> "SpatialQueryV3":
-        return SpatialQueryV3(self.env, self.manifest, time_s)
+        return SpatialQueryV3(self.env, self.manifest, time_s, self.policy)
 
     def capabilities(self) -> set:
         return {
@@ -226,6 +229,7 @@ class SpatialQueryV3:
                 policy[str(key)] = str(value.get("unknown_policy") or "deny")
             else:
                 policy[str(key)] = str(value)
+        policy.update(gate_overrides(self.policy))
         return policy
 
     def passability(self, profile: Any, lon: float, lat: float) -> Envelope:

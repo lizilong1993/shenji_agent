@@ -8,8 +8,10 @@ import tempfile
 import unittest
 
 from env.pack_env import load_envpack_environment
-from envmodel import SpatialQueryV3, evaluate_gates, load_manifest, open_pack
+from envmodel import (SpatialQueryV3, evaluate_gates, load_manifest,
+                      load_policy, open_pack)
 from envmodel.manifest import ManifestError
+from envmodel.policy import PolicyError
 from mobility.profile import profile_for
 
 CENTER = (120.16, 23.0)
@@ -247,6 +249,45 @@ class EnvModelTest(unittest.TestCase):
         self.assertTrue(r.allowed)
         self.assertTrue(r.unknown)
         self.assertIn("water_depth_unknown_advisory", r.reason_codes)
+
+    def test_policy_loader_and_override(self):
+        policy = {
+            "schema": "situation3d.policy.v1",
+            "policy_id": "test-policy",
+            "revision": "0.1",
+            "approval_status": "approved",
+            "approved_by": "test",
+            "roe": "return_fire",
+            "posture": "defensive",
+            "authorization_matrix": {},
+            "gates": {"water_depth": {"unknown_policy": "advisory"}},
+        }
+        path = os.path.join(self.root, "policy.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(policy, fh)
+        self.assertEqual(load_policy(path)["policy_id"], "test-policy")
+        query = open_pack(self.root, policy_path=path)
+        profile = profile_for("vehicle", "land")
+        r = query.passability(profile, 120.1508, 22.9908)
+        self.assertTrue(r.value["allowed"])
+        self.assertIn("water_depth_unknown_advisory", r.value["reason_codes"])
+
+    def test_policy_requires_approval(self):
+        policy = {
+            "schema": "situation3d.policy.v1",
+            "policy_id": "draft",
+            "revision": "0.1",
+            "approval_status": "draft",
+            "approved_by": "test",
+            "roe": "hold",
+            "posture": "defensive",
+            "authorization_matrix": {},
+        }
+        path = os.path.join(self.root, "policy.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(policy, fh)
+        with self.assertRaises(PolicyError):
+            load_policy(path)
 
     def test_gates_land_open(self):
         profile = profile_for("vehicle", "land")
