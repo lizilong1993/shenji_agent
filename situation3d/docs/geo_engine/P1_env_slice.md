@@ -16,8 +16,9 @@
 - 新增 `scripts/check_paths_v3.py`：从道路节点采样起终点，跑 `NavField` 路径、`route_ok` 与逐点 Gate 检查；默认 300 条，可跑 10k。
 - 用 `taiwan_tw2_v1` 和 `anping_v2c` 生成 v3 包（gitignored），验证真实包的 `open_pack`、时间绑定、水体/水深、建筑障碍与 LOS。
 - 新增 `envmodel/gates.py` + `SpatialQueryV3.passability()`：建筑、水深、坡度、道路限重/限高/限宽门，返回原因码与 `unknown` 标记；`unknown_policy` 从 manifest `gates` 读取（bridge/tunnel 默认 advisory，water/building/slope/road 默认 deny）。
+- 新增 `BridgeSet`：从 OSM `bridge=true` 的 128 条道路边生成低置信桥面（甲板高=端点地形+8 m，容差 25 m）；桥面点跳过水深门，但仍检查桥重/桥高/桥宽。
 - `mobility/nav_field.py` 增加可选 `safe_fallback`（默认 False）：平滑/圆角路径未通过 `_points_ok` 时回退原始 A* 顶点并吸附首尾单元中心；默认行为不变，10k 一致性检查显式启用。
-- 新增 `tests/test_envmodel_v3.py`：14 项测试，全部通过。
+- 新增 `tests/test_envmodel_v3.py`：15 项测试，全部通过。
 
 ## 2. 关键语义
 
@@ -32,7 +33,7 @@
 ```bash
 cd situation3d
 python3 -m unittest tests.test_envmodel_v3 -v
-# Ran 14 tests ... OK
+# Ran 15 tests ... OK
 python3 -m unittest tests.test_envmodel_v3 tests.test_geo_engine_core tests.test_planning tests.test_kinematics tests.test_nav_field -q
 # Ran 83 tests ... OK (1 skipped)
 ```
@@ -66,19 +67,19 @@ NavField(30m) cold build ~8.2 s; cached ~0.013 s; 10k routes route_ok 100%
 ```text
 planned 10000 / no_path 0
 route_ok 10000 (100%)
-gate_denied_routes 56, gate_denied_points 112 / 78519 sampled (0.14%)
-gate_denial_reasons: water_depth 112
-mean_length 369.2 m; plan_p95 3.2 ms; nav_build ~0.013 s (缓存命中)
+gate_denied_routes 70, gate_denied_points 140 / 81564 sampled (0.17%)
+gate_denial_reasons: water_depth 140
+mean_length 383.9 m; plan_p95 3.3 ms; nav_build ~0.008 s (缓存命中)
 ```
 
-`safe_fallback` 在平滑/圆角路径未通过 `_points_ok` 时回退到原始 A* 顶点，并把首尾点吸附到 30 m 单元中心；这会把起终点最多偏移一个单元（30 m），但保证 `route_ok`。56 条路线上的 112 个逐点 Gate 拒绝全部是 `water_depth`，集中在桥面/近岸道路——这是“桥面应通行、桥下水面不可通行”的语义缺失。尝试过“桥上跳过水深门”，但会把桥头/水域边缘的起终点混入采样，导致 `no_path` 和建筑拒绝激增，已回退；正确做法是补桥面/桥下净空的 3D 障碍层，而不是在 Gate 里临时跳过。
+`safe_fallback` 在平滑/圆角路径未通过 `_points_ok` 时回退到原始 A* 顶点，并把首尾点吸附到 30 m 单元中心；这会把起终点最多偏移一个单元（30 m），但保证 `route_ok`。`BridgeSet` 已把 128 条 OSM 桥梁边作为低置信桥面，桥面点跳过水深门；剩余 140 个 `water_depth` 拒绝点（0.17%）说明仍有未打 `bridge` 标签的近岸道路或桥头被 30 m 采样判为水面，不能靠“桥上跳过水深”解决，需更完整的桥面/桥下净空几何或道路-水面拓扑。
 
 ## 4. 已知限制
 
 1. `taiwan_tw2_v3` / `anping_v3` 仍是 legacy JSON 图层：Anping 是离线 OSM/DEM/GEBCO 缓存（300 m 地形），TW2 是基础图回退 100 m；未接入 COG/GeoParquet/3D Tiles。
 2. `nav_graph()` 直接构造 `NavField(30 m)`；未做按需加载/LOD/缓存签名，冷构建约 8 s，缓存命中约 0.013 s，性能不是生产级。
 3. `road_graph()` 返回 legacy `(nodes, edges)`；尚无车道/信号/交通状态。
-4. `ObstacleSet` 复用现有建筑空间索引；尚未加入树冠、桥面/桥下净空、隧道内壁、动态障碍。
+4. `ObstacleSet` 复用现有建筑空间索引；`BridgeSet` 只是 OSM `bridge` 边的低置信甲板（地形+8 m），尚未加入真实桥面高程、桥下净空、树冠、隧道内壁、动态障碍。
 5. `passability()` 已接建筑/水深/坡度/道路限重限高限宽门，`unknown_policy` 已从 manifest `gates` 读取；尚未接 `Policy` 对象/审批/场景覆盖。
 6. `safe_fallback` 保证 `route_ok`，但会把起终点最多吸附 30 m 单元中心，并牺牲部分平滑；这是 30 m 网格的已知代价。
 7. `tile()` 只返回图层路径元数据；未实现 COG/PMTiles/3D Tiles 范围读取。
@@ -88,7 +89,7 @@ mean_length 369.2 m; plan_p95 3.2 ms; nav_build ~0.013 s (缓存命中)
 1. 把 Anping 的 `terrain` 换成 COG（NLSC/Copernicus）、`buildings/roads` 换成 GeoParquet/FlatGeobuf；保留 `source/license/confidence`。
 2. 把 `ObstacleSet` 扩展为建筑体块 + 桥面 + 树冠 + 动态事件；加 BVH/空间桶。
 3. 把 `passability()` 的 `unknown_policy` 接到 `Policy` 对象/审批/场景覆盖；统计合法路线成功率/假阻断率。
-4. 处理 112 个 `water_depth` 拒绝点：补桥面/桥下净空的 3D 障碍层，区分“桥面可通行”和“桥下水面不可通行”；不要用“桥上跳过水深门”的临时规则。
+4. 处理 140 个 `water_depth` 拒绝点：用更完整的桥面高程/桥下净空几何或道路-水面拓扑区分桥面与水面；当前 `BridgeSet` 只覆盖 OSM `bridge=true` 的 128 条边，桥头/未标注桥仍会误判。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
 > 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5` + `e37324c` + `476e299` + `dc4dcec`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。

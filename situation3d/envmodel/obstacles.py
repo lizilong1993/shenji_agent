@@ -8,9 +8,24 @@ re-implement geometry.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, Optional, Tuple
 
 from .manifest import V3Manifest
+
+
+def _point_segment_m(lon: float, lat: float, a, b) -> float:
+    kx = 111320.0 * math.cos(math.radians(lat))
+    ky = 110540.0
+    px, py = lon * kx, lat * ky
+    ax, ay = a[0] * kx, a[1] * ky
+    bx, by = b[0] * kx, b[1] * ky
+    dx, dy = bx - ax, by - ay
+    denom = dx * dx + dy * dy
+    if denom <= 1e-12:
+        return math.hypot(px - ax, py - ay)
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / denom))
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
 
 
 class ObstacleSet:
@@ -61,4 +76,58 @@ class ObstacleSet:
             "source": meta.get("source"),
             "confidence": meta.get("confidence"),
             "format": meta.get("format"),
+        }
+
+
+class BridgeSet:
+    """Bridge decks derived from OSM road edges.
+
+    The legacy pack has no bridge deck geometry, so this is a low-confidence
+    placeholder: deck height = max(endpoint terrain) + 8 m.  It exists to make
+    the water gate distinguish "on a bridge deck" from "in the water below".
+    """
+
+    def __init__(self, env: Any, manifest: V3Manifest, tolerance_m: float = 25.0):
+        self.env = env
+        self.manifest = manifest
+        self.tolerance_m = float(tolerance_m)
+        self._items = []
+        nodes, edges = env.road_graph()
+        for edge in edges:
+            if not edge.get("bridge"):
+                continue
+            pa = nodes.get(edge.get("a"))
+            pb = nodes.get(edge.get("b"))
+            if not pa or not pb:
+                continue
+            deck = max(self.env.elevation(pa[0], pa[1]),
+                       self.env.elevation(pb[0], pb[1])) + 8.0
+            self._items.append({
+                "edge": edge,
+                "a": (float(pa[0]), float(pa[1])),
+                "b": (float(pb[0]), float(pb[1])),
+                "deck_m": deck,
+                "clearance_m": 8.0,
+                "confidence": "low",
+            })
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+    def at(self, lon: float, lat: float) -> Optional[Dict[str, Any]]:
+        best = None
+        best_m = self.tolerance_m
+        for item in self._items:
+            dist = _point_segment_m(lon, lat, item["a"], item["b"])
+            if dist <= best_m:
+                best = item
+                best_m = dist
+        return best
+
+    def summary(self) -> Dict[str, Any]:
+        return {
+            "count": len(self),
+            "tolerance_m": self.tolerance_m,
+            "confidence": "low",
+            "note": "deck height placeholder = terrain + 8 m",
         }

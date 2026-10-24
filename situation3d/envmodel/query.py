@@ -12,7 +12,7 @@ from typing import Any, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar
 
 from .gates import evaluate_gates
 from .manifest import V3Manifest
-from .obstacles import ObstacleSet
+from .obstacles import BridgeSet, ObstacleSet
 
 T = TypeVar("T")
 Coord = Tuple[float, float]
@@ -35,6 +35,7 @@ class SpatialQueryV3:
         self.manifest = manifest
         self.time_s = float(time_s)
         self._obstacles = ObstacleSet(env, manifest)
+        self._bridges = BridgeSet(env, manifest)
 
     def at(self, time_s: float) -> "SpatialQueryV3":
         return SpatialQueryV3(self.env, self.manifest, time_s)
@@ -232,6 +233,7 @@ class SpatialQueryV3:
         result = evaluate_gates(
             profile, lon, lat, self.env, depth_kind, self._gate_policy(),
             is_water=self._is_water(lon, lat),
+            on_bridge=self._bridges.at(lon, lat) is not None,
         )
         quality = "unknown" if result.unknown else "derived"
         return self._wrap(

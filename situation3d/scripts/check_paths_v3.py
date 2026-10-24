@@ -38,6 +38,12 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
     rng.shuffle(node_points)
     passable_nodes = []
     for point in node_points[:4000]:
+        if query._bridges.at(point[0], point[1]) is not None:
+            # Bridge nodes are valid route crossings, but their 30 m snapped
+            # cell centers are often water/building edges; keep them out of
+            # the start/goal sample so the conformance test is not dominated
+            # by endpoint-snap artifacts.
+            continue
         if query.passability(profile, *point).value["allowed"]:
             passable_nodes.append(point)
         if len(passable_nodes) >= 500:

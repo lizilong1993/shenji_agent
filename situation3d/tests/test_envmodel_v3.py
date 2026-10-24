@@ -58,12 +58,20 @@ def make_pack(root: str) -> None:
         {"ring": BUILDING_RING, "height_m": 20.0, "height_source": "test"},
     ])
     _write_json(os.path.join(root, "roads", "graph.json"), {
-        "nodes": {"n1": [120.15, 22.99], "n2": [120.17, 23.01]},
+        "nodes": {
+            "n1": [120.15, 22.99], "n2": [120.17, 23.01],
+            "n3": [120.1495, 22.9915], "n4": [120.1535, 22.9915],
+        },
         "edges": [{
             "a": "n1", "b": "n2", "length_m": 3000.0,
             "class": "primary", "surface": "asphalt",
             "bridge": False, "tunnel": False, "oneway": False,
             "maxheight": None, "maxweight": "1", "width": None,
+        }, {
+            "a": "n3", "b": "n4", "length_m": 400.0,
+            "class": "secondary", "surface": "asphalt",
+            "bridge": True, "tunnel": False, "oneway": False,
+            "maxheight": "5", "maxweight": None, "width": None,
         }],
     })
     manifest = {
@@ -208,11 +216,20 @@ class EnvModelTest(unittest.TestCase):
         b = self.query.passability(profile, *CENTER)
         self.assertFalse(b.value["allowed"])
         self.assertIn("building", b.value["reason_codes"])
-        w = self.query.passability(profile, 120.1515, 22.9915)
+        w = self.query.passability(profile, 120.1508, 22.9908)
         self.assertFalse(w.value["allowed"])
         self.assertIn("water_depth_unknown", w.value["reason_codes"])
         self.assertTrue(w.value["unknown"])
         self.assertEqual(w.quality, "unknown")
+
+    def test_bridge_deck_skips_water(self):
+        profile = profile_for("vehicle", "land")
+        # Bridge edge n3->n4 crosses the test water polygon at this point.
+        b = self.query.passability(profile, 120.1515, 22.9915)
+        self.assertTrue(b.value["allowed"])
+        self.assertTrue(b.value["unknown"])
+        self.assertIn("bridge_mlc_unknown_advisory", b.value["reason_codes"])
+        self.assertEqual(len(self.query._bridges), 1)
 
     def test_gates_road_limit(self):
         profile = profile_for("vehicle", "land")

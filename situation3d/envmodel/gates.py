@@ -66,7 +66,8 @@ def _number(value) -> float:
 def evaluate_gates(profile, lon: float, lat: float, env,
                    depth_kind: str = "unknown",
                    policy: Optional[Dict[str, str]] = None,
-                   is_water: Optional[bool] = None) -> GateResult:
+                   is_water: Optional[bool] = None,
+                   on_bridge: bool = False) -> GateResult:
     """Evaluate hard gates in a deterministic order.
 
     Order: building collision -> water/depth -> slope -> road limits.
@@ -74,6 +75,8 @@ def evaluate_gates(profile, lon: float, lat: float, env,
     rather than pretending it is surveyed. ``policy`` maps gate names to
     ``unknown_policy`` values (``deny``/``advisory``/``allow_with_penalty``).
     ``is_water`` overrides the legacy fallback water predicate when supplied.
+    ``on_bridge`` means the point is on a bridge deck, so water below is not a
+    blocking condition; bridge limits are still checked in the road section.
     """
     if env.building_at(lon, lat) is not None:
         return GateResult(False, ("building",), ("building",))
@@ -82,20 +85,21 @@ def evaluate_gates(profile, lon: float, lat: float, env,
     if is_water is None:
         is_water = bool(env.is_water(lon, lat))
     domain = str(getattr(profile, "domain", "land"))
-    if domain in ("surface", "subsurface"):
-        need = float(getattr(profile, "draft_m", 0.0)) + float(
-            getattr(profile, "ukc_m", 0.0)
-        )
-        if depth is None and is_water:
-            return _unknown_gate(policy, "water_depth", "water_depth")
-        if depth is not None and depth < need:
-            return GateResult(False, ("water_depth",), ("water_depth",))
-    else:
-        wading = float(getattr(profile, "wading_depth_m", 0.0))
-        if depth is None and is_water:
-            return _unknown_gate(policy, "water_depth", "water_depth")
-        if depth is not None and depth > wading:
-            return GateResult(False, ("water_depth",), ("water_depth",))
+    if not on_bridge:
+        if domain in ("surface", "subsurface"):
+            need = float(getattr(profile, "draft_m", 0.0)) + float(
+                getattr(profile, "ukc_m", 0.0)
+            )
+            if depth is None and is_water:
+                return _unknown_gate(policy, "water_depth", "water_depth")
+            if depth is not None and depth < need:
+                return GateResult(False, ("water_depth",), ("water_depth",))
+        else:
+            wading = float(getattr(profile, "wading_depth_m", 0.0))
+            if depth is None and is_water:
+                return _unknown_gate(policy, "water_depth", "water_depth")
+            if depth is not None and depth > wading:
+                return GateResult(False, ("water_depth",), ("water_depth",))
 
     slope = float(env.slope_deg(lon, lat))
     max_slope = float(getattr(profile, "max_gradient_deg", 0.0) or 0.0)
