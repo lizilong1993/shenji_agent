@@ -74,4 +74,4 @@ NavField(30m) build: ~8.2 s; 8/8 sampled routes route_ok=True
 4. 增加 `nav_graph` 的 30 m/2 m 双层与缓存签名；用真实包跑 10k 条路径的穿越/route_ok 检查（当前只做了 8 条 smoke）。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
-> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
+> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
