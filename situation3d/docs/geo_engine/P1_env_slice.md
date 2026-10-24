@@ -90,4 +90,4 @@ mean_length 369.2 m; plan_p95 3.2 ms; nav_build ~0.013 s (缓存命中)
 4. 定位 56 条路线上的 112 个 Gate 拒绝点（0.14%），判断是建筑/水域边缘误差还是 30 m 单元吸附；补局部 1–3 m 细化，保持 `route_ok=100%`。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
-> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
+> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5` + `e37324c`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
