@@ -96,4 +96,4 @@ mean_length 343.8 m; plan_p95 77.1 ms
 4. 处理 accepted-only 过滤暴露的 109 条 `gate_rejected`/180 条 `no_path`：把局部 4 m 绕行结果写回统一导航场/mask，扩大窗口覆盖长街区/水域，收敛 `route_ok` 78% 与精确 Gate 100% 的差异。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
-> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5` + `e37324c` + `476e299` + `dc4dcec` + `ce20b89` + `a2b8d13` + `443661c` + `6cd5de0` + `4b2467a` + `545e3b7` + `3f7ee5e` + `437b092` + `c8603bd` + `d19fb2b` + `bba2ef3` + `dfc6883` + `c3589df` + `d83bd2d` + `2aece9d` + `fbd4adc` + `c48c7b2`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
+> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5` + `e37324c` + `476e299` + `dc4dcec` + `ce20b89` + `a2b8d13` + `443661c` + `6cd5de0` + `4b2467a` + `545e3b7` + `3f7ee5e` + `437b092` + `c8603bd` + `d19fb2b` + `bba2ef3` + `dfc6883` + `c3589df` + `d83bd2d` + `2aece9d` + `fbd4adc` + `c48c7b2` + `6c7d652` + `d12c7a9`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
