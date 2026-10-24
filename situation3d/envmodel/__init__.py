@@ -8,6 +8,7 @@ used by LOS and passability queries.
 
 from .authorization import AuthorizationDecision, authorize_engagement
 from .gates import GateResult, evaluate_gates
+from .local_grid import plan_local
 from .manifest import ManifestError, V3Manifest, load_manifest
 from .obstacles import BridgeSet, ObstacleSet
 from .policy import PolicyError, gate_overrides, load_policy, validate_policy
@@ -48,6 +49,7 @@ __all__ = [
     "load_manifest",
     "load_policy",
     "open_pack",
+    "plan_local",
     "plan_valid_route",
     "repair_route",
     "validate_policy",

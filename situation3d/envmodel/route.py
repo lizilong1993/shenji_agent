@@ -14,6 +14,8 @@ from typing import Any, List, Optional, Sequence
 from geo.geodesy import initial_bearing_deg
 from sim.entity import Pose, Route
 
+from .local_grid import plan_local
+
 
 def validate_route(query: Any, profile: Any, route: Route,
                    step_m: float = 10.0) -> bool:
@@ -106,6 +108,28 @@ def repair_route(query: Any, profile: Any, route: Route,
             )
             if validate_route(query, profile, candidate, step_m=step_m):
                 return candidate
+
+    # A single point shift is not enough for a block spanning several cells:
+    # plan a short 3 m detour around the blocked window and splice it in.
+    total = float(route.total_m)
+    s0 = max(0.0, blocked_s - 80.0)
+    s1 = min(total, blocked_s + 80.0)
+    a = route.pose_at(s0)
+    b = route.pose_at(s1)
+    local = plan_local(query, profile, (a.lon, a.lat), (b.lon, b.lat))
+    if local is not None:
+        i0 = _nearest_index(route, s0)
+        i1 = _nearest_index(route, s1)
+        if i0 < i1:
+            points = list(route.points[:i0 + 1]) + list(local.points) + list(route.points[i1:])
+            speed = float(getattr(profile, "max_speed_ms", 5.0) or 5.0)
+            combined = Route(
+                points=points,
+                speed_limits=[speed] * (len(points) - 1),
+                modes=["offroad"] * (len(points) - 1),
+            )
+            if validate_route(query, profile, combined, step_m=step_m):
+                return combined
     return None
 
 
