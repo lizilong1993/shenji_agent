@@ -91,4 +91,4 @@ mean_length 369.2 m; plan_p95 3.2 ms; nav_build ~0.013 s (缓存命中)
 4. 处理 112 个 `water_depth` 拒绝点：补桥面/桥下净空的 3D 障碍层，区分“桥面可通行”和“桥下水面不可通行”；不要用“桥上跳过水深门”的临时规则。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
-> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5` + `e37324c`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
+> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5` + `e37324c` + `476e299` + `dc4dcec`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
