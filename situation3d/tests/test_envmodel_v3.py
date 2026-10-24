@@ -323,11 +323,11 @@ class EnvModelTest(unittest.TestCase):
             "policy_id": "world-auth",
             "approval_status": "approved",
             "roe": "return_fire",
-            "authorization_matrix": {"blue": {"land": ["direct"]}},
+            "authorization_matrix": {"blue": {"land": ["cannon"]}},
         }
         attacker = SimpleNamespace(
             uid=1, affiliation=1, last_damaged_s=0.0,
-            weapons=[SimpleNamespace(key="w1", kind="direct")],
+            weapons=[SimpleNamespace(key="w1", weapon_id=36, kind="direct")],
         )
         target = SimpleNamespace(domain="land")
         self.assertTrue(world.authorize_engagement(attacker, target))

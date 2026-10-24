@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 import random
+from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
 from geo.geodesy import haversine_m, initial_bearing_deg
@@ -30,6 +31,23 @@ from sim.tactics import TacticalController
 
 def _is_ground(entity) -> bool:
     return getattr(entity, "domain", "land") in ("land", "amphibious")
+
+
+@lru_cache(maxsize=1)
+def _weapon_category_map() -> Dict[str, str]:
+    """Map wpdata weapon id -> role-card category (cannon/atgm/sam/...)."""
+    try:
+        from engine.rolecards import load_registry
+        registry = load_registry()
+        out = {}
+        for item in (registry.equipment.get("weapons") or {}).values():
+            weapon_id = ((item.get("sdk") or {}).get("wpdata_id"))
+            category = item.get("category")
+            if weapon_id is not None and category:
+                out[str(weapon_id)] = str(category)
+        return out
+    except Exception:
+        return {}
 
 
 class World(object):
@@ -958,7 +976,11 @@ class World(object):
         if not ready:
             return False
         for weapon in ready:
-            category = getattr(weapon, "kind", "direct") or "direct"
+            category = _weapon_category_map().get(
+                str(getattr(weapon, "weapon_id", ""))
+            )
+            if not category:
+                category = getattr(weapon, "kind", "direct") or "direct"
             if authorize_engagement(
                     self.policy, side_key, target.domain, category,
                     under_fire=under_fire).allowed:
