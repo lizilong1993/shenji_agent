@@ -48,7 +48,6 @@ def check(pack: str, samples: int = 200, los_pairs: int = 200,
 
     # Building height quality at footprint centroids.
     quality = collections.Counter()
-    layer = query.manifest.layer("buildings")
     path = query.manifest.layer_path("buildings")
     if path:
         with open(path, encoding="utf-8") as fh:
