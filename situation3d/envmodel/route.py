@@ -112,11 +112,12 @@ def repair_route(query: Any, profile: Any, route: Route,
     # A single point shift is not enough for a block spanning several cells:
     # plan a short 3 m detour around the blocked window and splice it in.
     total = float(route.total_m)
-    s0 = max(0.0, blocked_s - 80.0)
-    s1 = min(total, blocked_s + 80.0)
+    s0 = max(0.0, blocked_s - 120.0)
+    s1 = min(total, blocked_s + 120.0)
     a = route.pose_at(s0)
     b = route.pose_at(s1)
-    local = plan_local(query, profile, (a.lon, a.lat), (b.lon, b.lat))
+    local = plan_local(query, profile, (a.lon, a.lat), (b.lon, b.lat),
+                       res_m=4.0, margin_m=50.0)
     if local is not None:
         i0 = _nearest_index(route, s0)
         i1 = _nearest_index(route, s1)

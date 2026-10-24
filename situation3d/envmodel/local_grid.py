@@ -35,8 +35,15 @@ def _domain(profile) -> str:
 
 def _cell_ok(query, profile, lon: float, lat: float) -> bool:
     env = query.env
-    if env.building_at(lon, lat) is not None:
-        return False
+    half = min(10.0, max(0.5, float(getattr(profile, "width_m", 1.0) or 1.0) / 2.0))
+    kx = 111320.0 * math.cos(math.radians(lat))
+    ky = 110540.0
+    # Inflate building footprint tests by roughly half the vehicle width.
+    for dlon, dlat in ((0.0, 0.0), (half / kx, 0.0),
+                       (-half / kx, 0.0), (0.0, half / ky),
+                       (0.0, -half / ky)):
+        if env.building_at(lon + dlon, lat + dlat) is not None:
+            return False
     try:
         is_water = bool(query._is_water(lon, lat))
     except Exception:
