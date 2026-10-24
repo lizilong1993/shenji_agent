@@ -18,7 +18,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from envmodel import open_pack, validate_route
+from envmodel import open_pack, repair_route, validate_route
 from mobility.nav_field import NavField
 from mobility.profile import profile_for
 
@@ -85,8 +85,12 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
             no_path += 1
             continue
         if not validate_route(query, profile, route):
-            gate_rejected += 1
-            continue
+            repaired = repair_route(query, profile, route)
+            if repaired is None or not validate_route(
+                    query, profile, repaired, step_m=10.0):
+                gate_rejected += 1
+                continue
+            route = repaired
         planned += 1
         total_m += route.total_m
         ok = bool(nav.route_ok(profile, route))

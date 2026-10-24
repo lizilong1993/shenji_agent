@@ -63,20 +63,20 @@ NavField(30m) cold build ~8.2 s; cached ~0.013 s; 1k 路径一致性见 §3.1
 
 注意：TW2 抽样点的 `ele=-3/-21` 来自 legacy 地形层（`source=legacy-basic`，100 m）；Anping 的 300 m 地形/GEBCO 水深也不是生产精度。这暴露的是数据质量，不是查询实现错误。
 
-### 3.1 路径一致性（300 条探索，accepted-only 安全过滤）
+### 3.1 路径一致性（300 条探索，accepted-only + 局部点修复）
 
-`scripts/check_paths_v3.py --pack envpacks/anping_v3 --routes 300`（从道路节点采样起终点，30 m NavField，`blocked` 回调排除建筑中心，`safe_fallback=True`，再用 `validate_route` 按 10 m 采样做精确 Gate 后校验）：
+`scripts/check_paths_v3.py --pack envpacks/anping_v3 --routes 300`（道路节点起终点，30 m NavField，`blocked` 排除建筑中心，`safe_fallback=True`，`repair_route` 侧移首阻塞点，再用 10 m 精确 Gate 复验）：
 
 ```text
-planned/accepted 86
-no_path 214
-gate_rejected 191
-accepted route_ok 86 (100%)
-accepted gate_denied 0 / 516 sampled
-mean_length 274.8 m; plan_p95 77.1 ms
+planned/accepted 91
+no_path 209
+gate_rejected 175
+accepted route_ok 83 (91.2%)
+accepted gate_denied 0 / 586 sampled
+mean_length 296.5 m; plan_p95 74.6 ms
 ```
 
-这说明后校验可以保证**被接受的路线不穿越建筑/水域**，但代价是大量路线被拒绝/找不到：300 个请求中只有 86 条被接受。根因仍是 30 m 单元格与亚单元建筑足迹不一致，属于规划层缺口，不是 Gate 判定问题；下一步必须做局部 1–3 m 足迹级规划/绕行，而不是继续放宽 `safe_fallback`。
+后校验 + 局部点修复能保证**被接受的路线 0 穿越建筑/水域**，但接受率仍只有约 30%。侧移单点只能处理小范围遮挡，遇到整段街区/水域时仍被拒绝；根因是 30 m 单元格与亚单元足迹不一致，下一步需要真正的局部 1–3 m 网格/绕行，而不是继续调偏移量。
 
 ## 4. 已知限制
 
@@ -93,7 +93,7 @@ mean_length 274.8 m; plan_p95 77.1 ms
 1. 把 Anping 的 `terrain` 换成 COG（NLSC/Copernicus）、`buildings/roads` 换成 GeoParquet/FlatGeobuf；保留 `source/license/confidence`。
 2. 把 `ObstacleSet` 扩展为建筑体块 + 桥面 + 树冠 + 动态事件；加 BVH/空间桶。
 3. 把 `passability()` 的 `unknown_policy` 接到 `Policy` 对象/审批/场景覆盖；统计合法路线成功率/假阻断率。
-4. 处理 accepted-only 过滤暴露的 191 条 `gate_rejected`/214 条 `no_path`：补局部 1–3 m 足迹级规划/绕行，让更多起终点在保证 0 穿越的前提下被接受。
+4. 处理 accepted-only 过滤暴露的 175 条 `gate_rejected`/209 条 `no_path`：补局部 1–3 m 网格/绕行，让更多起终点在保证 0 穿越的前提下被接受；单点侧移只能处理小遮挡。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
 > 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5` + `e37324c` + `476e299` + `dc4dcec` + `ce20b89` + `a2b8d13` + `443661c` + `6cd5de0` + `4b2467a` + `545e3b7` + `3f7ee5e` + `437b092` + `c8603bd` + `d19fb2b` + `bba2ef3` + `dfc6883` + `c3589df`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
