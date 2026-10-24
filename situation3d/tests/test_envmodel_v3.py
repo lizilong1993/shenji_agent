@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 from env.pack_env import load_envpack_environment
-from envmodel import SpatialQueryV3, load_manifest, open_pack
+from envmodel import SpatialQueryV3, evaluate_gates, load_manifest, open_pack
 from envmodel.manifest import ManifestError
 from mobility.profile import profile_for
 
@@ -219,6 +219,17 @@ class EnvModelTest(unittest.TestCase):
         r = self.query.passability(profile, 120.155, 22.995)
         self.assertFalse(r.value["allowed"])
         self.assertIn("road_maxweight", r.value["reason_codes"])
+
+    def test_gates_unknown_policy_advisory(self):
+        profile = profile_for("vehicle", "land")
+        r = evaluate_gates(
+            profile, 120.1515, 22.9915, self.env,
+            depth_kind="unknown",
+            policy={"water_depth": "advisory"},
+        )
+        self.assertTrue(r.allowed)
+        self.assertTrue(r.unknown)
+        self.assertIn("water_depth_unknown_advisory", r.reason_codes)
 
     def test_gates_land_open(self):
         profile = profile_for("vehicle", "land")

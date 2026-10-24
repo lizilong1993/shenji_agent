@@ -9,7 +9,7 @@ reasons instead of a bare boolean so callers can audit why a move was denied.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Dict, Optional, Tuple
 
 from mobility.passability import road_edge_passable
 
@@ -21,6 +21,30 @@ class GateResult:
     gate_ids: Tuple[str, ...] = ()
     unknown: bool = False
     quality: str = "derived"
+
+
+def _policy_value(policy: Optional[Dict[str, str]], key: str,
+                  default: str = "deny") -> str:
+    if not policy:
+        return default
+    value = policy.get(key)
+    if isinstance(value, dict):
+        value = value.get("unknown_policy")
+    return str(value or default)
+
+
+def _unknown_gate(policy: Optional[Dict[str, str]], key: str,
+                  gate_id: str, default: str = "deny") -> GateResult:
+    decision = _policy_value(policy, key, default)
+    if decision == "deny":
+        return GateResult(False, (key + "_unknown",), (gate_id,), True, "unknown")
+    if decision == "advisory":
+        return GateResult(
+            True, (key + "_unknown_advisory",), (gate_id,), True, "unknown"
+        )
+    return GateResult(
+        True, (key + "_unknown_penalty",), (gate_id,), True, "unknown"
+    )
 
 
 def _number(value) -> float:
@@ -40,35 +64,36 @@ def _number(value) -> float:
 
 
 def evaluate_gates(profile, lon: float, lat: float, env,
-                   depth_kind: str = "unknown") -> GateResult:
+                   depth_kind: str = "unknown",
+                   policy: Optional[Dict[str, str]] = None,
+                   is_water: Optional[bool] = None) -> GateResult:
     """Evaluate hard gates in a deterministic order.
 
     Order: building collision -> water/depth -> slope -> road limits.
     ``depth_kind='unknown'`` treats the legacy default water depth as unknown
-    rather than pretending it is surveyed.
+    rather than pretending it is surveyed. ``policy`` maps gate names to
+    ``unknown_policy`` values (``deny``/``advisory``/``allow_with_penalty``).
+    ``is_water`` overrides the legacy fallback water predicate when supplied.
     """
     if env.building_at(lon, lat) is not None:
         return GateResult(False, ("building",), ("building",))
 
     depth = None if depth_kind == "unknown" else env.water_depth(lon, lat)
-    is_water = bool(env.is_water(lon, lat))
+    if is_water is None:
+        is_water = bool(env.is_water(lon, lat))
     domain = str(getattr(profile, "domain", "land"))
     if domain in ("surface", "subsurface"):
         need = float(getattr(profile, "draft_m", 0.0)) + float(
             getattr(profile, "ukc_m", 0.0)
         )
         if depth is None and is_water:
-            return GateResult(
-                False, ("water_depth_unknown",), ("water_depth",), True, "unknown"
-            )
+            return _unknown_gate(policy, "water_depth", "water_depth")
         if depth is not None and depth < need:
             return GateResult(False, ("water_depth",), ("water_depth",))
     else:
         wading = float(getattr(profile, "wading_depth_m", 0.0))
         if depth is None and is_water:
-            return GateResult(
-                False, ("water_depth_unknown",), ("water_depth",), True, "unknown"
-            )
+            return _unknown_gate(policy, "water_depth", "water_depth")
         if depth is not None and depth > wading:
             return GateResult(False, ("water_depth",), ("water_depth",))
 
@@ -80,6 +105,14 @@ def evaluate_gates(profile, lon: float, lat: float, env,
     getter = getattr(env, "road_edge_at", None)
     if getter is not None:
         edge = getter(lon, lat, 25.0)
+        if edge and (edge.get("bridge") or edge.get("tunnel")):
+            missing = [
+                key for key in ("maxweight", "maxheight")
+                if _number(edge.get(key)) <= 0.0
+            ]
+            if missing:
+                key = "bridge_mlc" if edge.get("bridge") else "tunnel_clearance"
+                return _unknown_gate(policy, key, "road_limit", "advisory")
         if edge and not road_edge_passable(profile, edge):
             reasons = []
             max_weight = _number(edge.get("maxweight"))

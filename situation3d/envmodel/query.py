@@ -74,10 +74,22 @@ class SpatialQueryV3:
     def landcover(self, lon: float, lat: float) -> Envelope:
         return self._wrap("landcover", self.env.landcover(lon, lat))
 
+    def _is_water(self, lon: float, lat: float) -> bool:
+        """Water membership from the pack polygons, not the legacy fallback."""
+        polygon_at = getattr(self.env, "_polygon_at", None)
+        index = getattr(self.env, "_water_index", None)
+        if polygon_at is not None and index is not None:
+            return polygon_at(index, lon, lat) is not None
+        return bool(self.env.is_water(lon, lat))
+
     def water(self, lon: float, lat: float) -> Envelope:
         depth_kind = str(self._meta("hydrography").get("depth_kind") or "unknown")
-        depth = None if depth_kind == "unknown" else self.env.water_depth(lon, lat)
-        is_water = bool(self.env.is_water(lon, lat))
+        is_water = self._is_water(lon, lat)
+        depth = (
+            None
+            if depth_kind == "unknown" or not is_water
+            else self.env.water_depth(lon, lat)
+        )
         if depth is None:
             quality = "unknown" if is_water else "not_applicable"
             return self._wrap(
@@ -205,9 +217,22 @@ class SpatialQueryV3:
     def cover(self, lon: float, lat: float, heading_deg: float = 0.0) -> Envelope:
         return self._wrap("landcover", self.env.cover_height(lon, lat), quality="derived")
 
+    def _gate_policy(self) -> Dict[str, str]:
+        gates = self.manifest.data.get("gates") or {}
+        policy = {}
+        for key, value in gates.items():
+            if isinstance(value, dict):
+                policy[str(key)] = str(value.get("unknown_policy") or "deny")
+            else:
+                policy[str(key)] = str(value)
+        return policy
+
     def passability(self, profile: Any, lon: float, lat: float) -> Envelope:
         depth_kind = str(self._meta("hydrography").get("depth_kind") or "unknown")
-        result = evaluate_gates(profile, lon, lat, self.env, depth_kind)
+        result = evaluate_gates(
+            profile, lon, lat, self.env, depth_kind, self._gate_policy(),
+            is_water=self._is_water(lon, lat),
+        )
         quality = "unknown" if result.unknown else "derived"
         return self._wrap(
             "terrain",

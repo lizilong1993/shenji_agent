@@ -143,6 +143,14 @@ def upgrade(src: str, dst: str, force: bool = False) -> dict:
             "local_res_m": 2.0,
             "graph_version": "p1-slice",
         },
+        "gates": {
+            "building": {"unknown_policy": "deny"},
+            "water_depth": {"unknown_policy": "deny"},
+            "slope": {"unknown_policy": "deny"},
+            "road_limit": {"unknown_policy": "deny"},
+            "bridge_mlc": {"unknown_policy": "advisory", "capacity_kind": "maxweight"},
+            "tunnel_clearance": {"unknown_policy": "advisory", "capacity_kind": "maxheight"},
+        },
         "provenance": {
             "built_at": built_at,
             "tool_versions": {"upgrade_envpack_v3": "0.1"},

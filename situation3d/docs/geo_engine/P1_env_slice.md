@@ -13,9 +13,10 @@
   - `open_pack(root)`：一次加载 manifest + `EnvPackEnvironment`。
 - 新增 `scripts/upgrade_envpack_v3.py`：把 legacy envpack 复制并写成 v3 清单；不重投影、不改变图层内容。
 - 新增 `scripts/check_envmodel_v3.py`：抽样检查水体/水深、建筑高度质量、道路覆盖与 LOS 可见率。
+- 新增 `scripts/check_paths_v3.py`：从道路节点采样起终点，跑 `NavField` 路径、`route_ok` 与逐点 Gate 检查；默认 300 条，可跑 10k。
 - 用 `taiwan_tw2_v1` 和 `anping_v2c` 生成 v3 包（gitignored），验证真实包的 `open_pack`、时间绑定、水体/水深、建筑障碍与 LOS。
-- 新增 `envmodel/gates.py` + `SpatialQueryV3.passability()`：建筑、水深、坡度、道路限重/限高/限宽门，返回原因码与 `unknown` 标记。
-- 新增 `tests/test_envmodel_v3.py`：13 项测试，全部通过。
+- 新增 `envmodel/gates.py` + `SpatialQueryV3.passability()`：建筑、水深、坡度、道路限重/限高/限宽门，返回原因码与 `unknown` 标记；`unknown_policy` 从 manifest `gates` 读取（bridge/tunnel 默认 advisory，water/building/slope/road 默认 deny）。
+- 新增 `tests/test_envmodel_v3.py`：14 项测试，全部通过。
 
 ## 2. 关键语义
 
@@ -30,9 +31,9 @@
 ```bash
 cd situation3d
 python3 -m unittest tests.test_envmodel_v3 -v
-# Ran 13 tests ... OK
+# Ran 14 tests ... OK
 python3 -m unittest tests.test_envmodel_v3 tests.test_geo_engine_core tests.test_planning tests.test_kinematics -q
-# Ran 68 tests ... OK
+# Ran 69 tests ... OK
 ```
 
 真实包抽样（`envpacks/taiwan_tw2_v3`）：
@@ -52,26 +53,39 @@ water sample: 145/300 points; depth range 2.3–21.7 m (GEBCO, derived)
 building height quality: default 1889, derived 670, measured 101
 LOS visible: 12/200 at 2 m, 144/200 at 30 m
 obstacles: 2665
-NavField(30m) build: ~8.2 s; 8/8 sampled routes route_ok=True
+NavField(30m) cold build ~8.2 s; cached ~0.008 s; 10k routes route_ok 85.6%
 ```
 
 注意：TW2 抽样点的 `ele=-3/-21` 来自 legacy 地形层（`source=legacy-basic`，100 m）；Anping 的 300 m 地形/GEBCO 水深也不是生产精度。这暴露的是数据质量，不是查询实现错误。
 
+### 3.1 10k 路径一致性
+
+`scripts/check_paths_v3.py --pack envpacks/anping_v3 --routes 10000`（从道路节点采样起终点，30 m NavField）：
+
+```text
+planned 10000 / no_path 0
+route_ok 8564 (85.64%)
+gate_denied_routes 526, gate_denied_points 526 / 78012 sampled (0.67%)
+mean_length 366.3 m; plan_p95 2.8 ms; nav_build ~0.008 s (缓存命中)
+```
+
+`route_ok` 约 85.6%，说明 30 m 网格/圆角/平滑后的路径仍有 14.4% 被同层 mask 判为不可行；逐点 Gate 拒绝只有 0.67%，说明“路径不可行”主要来自规划层几何/圆角，而不是水深/建筑门。这是下一轮要收敛的重点。
+
 ## 4. 已知限制
 
 1. `taiwan_tw2_v3` / `anping_v3` 仍是 legacy JSON 图层：Anping 是离线 OSM/DEM/GEBCO 缓存（300 m 地形），TW2 是基础图回退 100 m；未接入 COG/GeoParquet/3D Tiles。
-2. `nav_graph()` 直接构造 `NavField(30 m)`；未做按需加载/LOD/缓存签名，构建约 8 s，性能不是生产级。
+2. `nav_graph()` 直接构造 `NavField(30 m)`；未做按需加载/LOD/缓存签名，冷构建约 8 s，缓存命中约 0.008 s，性能不是生产级。
 3. `road_graph()` 返回 legacy `(nodes, edges)`；尚无车道/信号/交通状态。
 4. `ObstacleSet` 复用现有建筑空间索引；尚未加入树冠、桥面/桥下净空、隧道内壁、动态障碍。
-5. `passability()` 已接建筑/水深/坡度/道路限重限高限宽门，但 `unknown_policy` 仍是固定保守策略，未从 manifest/Policy 读取。
+5. `passability()` 已接建筑/水深/坡度/道路限重限高限宽门，`unknown_policy` 已从 manifest `gates` 读取；尚未接 `Policy` 对象/审批/场景覆盖。
 6. `tile()` 只返回图层路径元数据；未实现 COG/PMTiles/3D Tiles 范围读取。
 
 ## 5. 下一步
 
 1. 把 Anping 的 `terrain` 换成 COG（NLSC/Copernicus）、`buildings/roads` 换成 GeoParquet/FlatGeobuf；保留 `source/license/confidence`。
 2. 把 `ObstacleSet` 扩展为建筑体块 + 桥面 + 树冠 + 动态事件；加 BVH/空间桶。
-3. 把 `passability()` 的 `unknown_policy` 接到 manifest/Policy；统计合法路线成功率/假阻断率。
-4. 增加 `nav_graph` 的 30 m/2 m 双层与缓存签名；用真实包跑 10k 条路径的穿越/route_ok 检查（当前只做了 8 条 smoke）。
+3. 把 `passability()` 的 `unknown_policy` 接到 `Policy` 对象/审批/场景覆盖；统计合法路线成功率/假阻断率。
+4. 把 `route_ok` 从 85.6% 提升到约定门槛（目标 ≥95%）：定位 30 m 网格/圆角/平滑造成的 14.4% 不可行路径，补局部 1–3 m 细化或回退重规划。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
 > 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
