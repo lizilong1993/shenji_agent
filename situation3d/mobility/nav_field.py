@@ -690,6 +690,10 @@ class NavField(object):
                 points = fixed
             elif self._points_ok(prof, raw_points):
                 points = raw_points
+            else:
+                # Both candidates are invalid; do not return a route that
+                # route_ok would reject.
+                return None
         return self._route(prof, points)
 
     def _segment_clear(self, a: Pose, b: Pose, mask, blocked) -> bool:

@@ -33,6 +33,10 @@ def _copy_tree(src: str, dst: str) -> None:
 
 
 def upgrade(src: str, dst: str, force: bool = False) -> dict:
+    src_real = os.path.realpath(src)
+    dst_real = os.path.realpath(dst)
+    if src_real == dst_real or dst_real.startswith(src_real + os.sep):
+        raise SystemExit("refusing to write into the source directory")
     src_manifest_path = os.path.join(src, "manifest.json")
     if not os.path.isfile(src_manifest_path):
         raise SystemExit("source manifest not found: %s" % src_manifest_path)

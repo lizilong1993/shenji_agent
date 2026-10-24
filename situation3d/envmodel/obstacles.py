@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional, Tuple
 from .manifest import V3Manifest
 
 
-def _point_segment_m(lon: float, lat: float, a, b) -> float:
+def _point_segment_mt(lon: float, lat: float, a, b) -> Tuple[float, float]:
     kx = 111320.0 * math.cos(math.radians(lat))
     ky = 110540.0
     px, py = lon * kx, lat * ky
@@ -23,9 +23,15 @@ def _point_segment_m(lon: float, lat: float, a, b) -> float:
     dx, dy = bx - ax, by - ay
     denom = dx * dx + dy * dy
     if denom <= 1e-12:
-        return math.hypot(px - ax, py - ay)
-    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / denom))
-    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+        return math.hypot(px - ax, py - ay), 0.0
+    t = ((px - ax) * dx + (py - ay) * dy) / denom
+    tc = max(0.0, min(1.0, t))
+    dist = math.hypot(px - (ax + tc * dx), py - (ay + tc * dy))
+    return dist, t
+
+
+def _point_segment_m(lon: float, lat: float, a, b) -> float:
+    return _point_segment_mt(lon, lat, a, b)[0]
 
 
 class ObstacleSet:
@@ -118,11 +124,20 @@ class BridgeSet:
         best = None
         best_m = self.tolerance_m
         for item in self._items:
-            dist = _point_segment_m(lon, lat, item["a"], item["b"])
-            if dist <= best_m:
+            dist, t = _point_segment_mt(lon, lat, item["a"], item["b"])
+            # Require the projection to fall on the bridge segment, not the
+            # 25 m capsule beyond either end.
+            if -1e-9 <= t <= 1.0 + 1e-9 and dist <= best_m:
                 best = item
                 best_m = dist
         return best
+
+    def near(self, lon: float, lat: float) -> bool:
+        """Capsule test including bridge approaches; used by sampling filters."""
+        for item in self._items:
+            if _point_segment_m(lon, lat, item["a"], item["b"]) <= self.tolerance_m:
+                return True
+        return False
 
     def summary(self) -> Dict[str, Any]:
         return {

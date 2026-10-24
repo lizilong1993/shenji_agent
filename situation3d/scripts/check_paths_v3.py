@@ -38,14 +38,15 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
     rng.shuffle(node_points)
     passable_nodes = []
     for point in node_points[:4000]:
-        if query._bridges.at(point[0], point[1]) is not None:
-            # Bridge nodes are valid route crossings, but their 30 m snapped
-            # cell centers are often water/building edges; keep them out of
-            # the start/goal sample so the conformance test is not dominated
-            # by endpoint-snap artifacts.
+        if query._bridges.near(point[0], point[1]):
+            # Bridge nodes/approaches are valid route crossings, but their
+            # 30 m snapped cell centers are often water/building edges; keep
+            # them out of the start/goal sample so the conformance test is not
+            # dominated by endpoint-snap artifacts.
             continue
         if query.passability(profile, *point).value["allowed"]:
-            passable_nodes.append(point)
+            if nav.motion_point_ok(profile, point[0], point[1]):
+                passable_nodes.append(point)
         if len(passable_nodes) >= 500:
             break
 
@@ -73,7 +74,11 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
             if not query.passability(profile, *goal).value["allowed"]:
                 continue
         t0 = time.time()
-        route = nav.plan(profile, start, goal, safe_fallback=True)
+        route = nav.plan(
+            profile, start, goal,
+            blocked=lambda lon, lat: query.building(lon, lat).value is not None,
+            safe_fallback=True,
+        )
         plan_times.append(time.time() - t0)
         if route is None:
             no_path += 1

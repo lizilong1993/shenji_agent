@@ -96,6 +96,9 @@ class EnvPackEnvironment(object):
         with open(os.path.join(root, "manifest.json"), encoding="utf-8") as fh:
             self.manifest = json.load(fh)
         self.layers = self.manifest.get("layers") or {}
+        if "water" not in self.layers and "hydrography" in self.layers:
+            # v3 standardizes on hydrography; keep the runtime key stable.
+            self.layers["water"] = dict(self.layers["hydrography"])
         self.grid = LegacyHexGrid.from_grid_meta(self.manifest["grid"])
         self._terrain = self._load_json("terrain")
         self._bathymetry = self._load_json("bathymetry")

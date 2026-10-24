@@ -8,6 +8,7 @@ source/license/confidence) without changing the runtime loader.
 from __future__ import annotations
 
 import json
+import math
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
@@ -65,7 +66,14 @@ class V3Manifest:
         path = meta.get("path")
         if not path:
             return None
-        return os.path.join(self.root, str(path))
+        candidate = os.path.realpath(os.path.join(self.root, str(path)))
+        root = os.path.realpath(self.root)
+        try:
+            if os.path.commonpath([root, candidate]) != root:
+                raise ManifestError("layer path escapes pack root: %r" % path)
+        except ValueError:
+            raise ManifestError("layer path escapes pack root: %r" % path)
+        return candidate
 
 
 def load_manifest(root: str) -> V3Manifest:
@@ -80,6 +88,9 @@ def load_manifest(root: str) -> V3Manifest:
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
 
+    if not isinstance(data, dict):
+        raise ManifestError("manifest must be a JSON object")
+
     if data.get("schema") != "msgeo.envpack.v3":
         raise ManifestError(
             "unsupported schema %r (expected msgeo.envpack.v3)"
@@ -93,12 +104,17 @@ def load_manifest(root: str) -> V3Manifest:
     bbox = data.get("bbox") or []
     if not isinstance(bbox, list) or len(bbox) != 4:
         raise ManifestError("bbox must be [lon_min, lat_min, lon_max, lat_max]")
-    if not all(isinstance(v, (int, float)) for v in bbox):
-        raise ManifestError("bbox values must be numeric")
+    if not all(isinstance(v, (int, float)) and math.isfinite(float(v))
+               for v in bbox):
+        raise ManifestError("bbox values must be finite numbers")
 
     layers = data.get("layers")
     if not isinstance(layers, dict):
         raise ManifestError("layers must be an object")
+    if "hydrography" in layers and "water" not in layers:
+        # Legacy EnvPackEnvironment reads the "water" key; v3 standardizes on
+        # "hydrography". Keep one compatibility alias in memory.
+        layers["water"] = dict(layers["hydrography"])
     for name in REQUIRED_LAYERS:
         if name not in layers:
             raise ManifestError("manifest missing layer %r" % name)

@@ -13,7 +13,7 @@ from typing import Any, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar
 from .gates import evaluate_gates
 from .manifest import V3Manifest
 from .obstacles import BridgeSet, ObstacleSet
-from .policy import gate_overrides
+from .policy import gate_overrides, validate_policy
 
 T = TypeVar("T")
 Coord = Tuple[float, float]
@@ -36,6 +36,8 @@ class SpatialQueryV3:
         self.env = env
         self.manifest = manifest
         self.time_s = float(time_s)
+        if policy:
+            policy = validate_policy(policy, require_approved=True)
         self.policy = dict(policy or {})
         self._obstacles = ObstacleSet(env, manifest)
         self._bridges = BridgeSet(env, manifest)
@@ -56,9 +58,13 @@ class SpatialQueryV3:
         return self.manifest.layer(name)
 
     def _quality(self, name: str, value: Any) -> str:
+        meta = self._meta(name)
         if value is None:
-            return "unknown" if self._meta(name) else "not_applicable"
-        confidence = str(self._meta(name).get("confidence") or "unknown")
+            return "unknown" if meta else "not_applicable"
+        explicit = meta.get("quality")
+        if explicit:
+            return str(explicit)
+        confidence = str(meta.get("confidence") or "unknown")
         return "measured" if confidence in ("high", "medium") else "derived"
 
     def _wrap(self, name: str, value: Any, quality: Optional[str] = None) -> Envelope:
@@ -94,6 +100,13 @@ class SpatialQueryV3:
             if depth_kind == "unknown" or not is_water
             else self.env.water_depth(lon, lat)
         )
+        # The legacy loader falls back to a 20 m default when bathymetry has
+        # no negative (water) value at this point. Treat that as unknown.
+        bathy = getattr(self.env, "_bathymetry", None)
+        if depth is not None and bathy is not None:
+            sound = self.env._grid_value(bathy, lon, lat)
+            if sound is None or float(sound) >= 0.0:
+                depth = None
         if depth is None:
             quality = "unknown" if is_water else "not_applicable"
             return self._wrap(
@@ -147,6 +160,8 @@ class SpatialQueryV3:
             "water": self.water,
             "building": self.building,
             "road": self.road,
+            "soil": self.soil,
+            "weather": self.weather,
         }
         if kind not in dispatch:
             raise ValueError("unsupported batch kind %r" % kind)
@@ -213,6 +228,9 @@ class SpatialQueryV3:
                 "visible": visible and not building_blocked,
                 "path_visible": visible,
                 "building_blocked": building_blocked,
+                "first_blocker": "building" if building_blocked else None,
+                "blocker_kind": "building" if building_blocked else None,
+                "clearance_m": None,
                 "medium": medium,
             },
             quality="derived",
@@ -232,12 +250,14 @@ class SpatialQueryV3:
         policy.update(gate_overrides(self.policy))
         return policy
 
-    def passability(self, profile: Any, lon: float, lat: float) -> Envelope:
+    def passability(self, profile: Any, lon: float, lat: float,
+                    altitude_m: Optional[float] = None) -> Envelope:
         depth_kind = str(self._meta("hydrography").get("depth_kind") or "unknown")
         result = evaluate_gates(
             profile, lon, lat, self.env, depth_kind, self._gate_policy(),
             is_water=self._is_water(lon, lat),
             on_bridge=self._bridges.at(lon, lat) is not None,
+            altitude_m=altitude_m,
         )
         quality = "unknown" if result.unknown else "derived"
         return self._wrap(
@@ -247,6 +267,7 @@ class SpatialQueryV3:
                 "reason_codes": list(result.reason_codes),
                 "gate_ids": list(result.gate_ids),
                 "unknown": result.unknown,
+                "cost": 1.0 if result.allowed else 0.0,
             },
             quality=quality,
         )

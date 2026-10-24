@@ -1,9 +1,8 @@
-"""Minimal typed gate evaluation for the P1/P2 environment slice.
+"""Typed gate evaluation for the P1 environment slice.
 
-The full P0 contract has typed gates with unknown policies.  This module covers
-the gates the existing legacy layers can actually evaluate: building collision,
-water depth, slope and road weight/height/width limits.  It returns structured
-reasons instead of a bare boolean so callers can audit why a move was denied.
+Gates are evaluated in a deterministic order: building collision, medium
+(water/air/land), slope, then road weight/height/width limits. Unknown values
+fail closed unless an approved policy explicitly chooses advisory/penalty.
 """
 
 from __future__ import annotations
@@ -11,7 +10,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
+from mobility.passability import passable as _passable
 from mobility.passability import road_edge_passable
+
+DOMAIN_ALIASES = {
+    "maritime_surface": "surface",
+    "maritime_subsurface": "subsurface",
+}
+UNKNOWN_POLICIES = ("deny", "advisory", "allow_with_penalty")
 
 
 @dataclass(frozen=True)
@@ -36,6 +42,8 @@ def _policy_value(policy: Optional[Dict[str, str]], key: str,
 def _unknown_gate(policy: Optional[Dict[str, str]], key: str,
                   gate_id: str, default: str = "deny") -> GateResult:
     decision = _policy_value(policy, key, default)
+    if decision not in UNKNOWN_POLICIES:
+        decision = "deny"
     if decision == "deny":
         return GateResult(False, (key + "_unknown",), (gate_id,), True, "unknown")
     if decision == "advisory":
@@ -63,42 +71,54 @@ def _number(value) -> float:
         return 0.0
 
 
+def _domain(profile) -> str:
+    raw = str(getattr(profile, "domain", "land"))
+    return DOMAIN_ALIASES.get(raw, raw)
+
+
 def evaluate_gates(profile, lon: float, lat: float, env,
                    depth_kind: str = "unknown",
                    policy: Optional[Dict[str, str]] = None,
                    is_water: Optional[bool] = None,
-                   on_bridge: bool = False) -> GateResult:
-    """Evaluate hard gates in a deterministic order.
+                   on_bridge: bool = False,
+                   altitude_m: Optional[float] = None) -> GateResult:
+    """Evaluate hard gates; unknown values are conservative.
 
-    Order: building collision -> water/depth -> slope -> road limits.
-    ``depth_kind='unknown'`` treats the legacy default water depth as unknown
-    rather than pretending it is surveyed. ``policy`` maps gate names to
-    ``unknown_policy`` values (``deny``/``advisory``/``allow_with_penalty``).
-    ``is_water`` overrides the legacy fallback water predicate when supplied.
-    ``on_bridge`` means the point is on a bridge deck, so water below is not a
-    blocking condition; bridge limits are still checked in the road section.
+    ``on_bridge`` is only meaningful for land/amphibious platforms: it skips
+    the water-depth gate (the deck is above the water) while bridge weight and
+    clearance limits are still checked. Air platforms are delegated to the
+    existing altitude-aware passability predicate.
     """
+    domain = _domain(profile)
+    if domain == "air":
+        if not _passable(profile, lon, lat, env, altitude_m):
+            return GateResult(False, ("airspace",), ("airspace",))
+        return GateResult(True)
+
     if env.building_at(lon, lat) is not None:
         return GateResult(False, ("building",), ("building",))
 
     depth = None if depth_kind == "unknown" else env.water_depth(lon, lat)
     if is_water is None:
         is_water = bool(env.is_water(lon, lat))
-    domain = str(getattr(profile, "domain", "land"))
+    on_bridge = bool(on_bridge and domain in ("land", "amphibious"))
+
     if not on_bridge:
         if domain in ("surface", "subsurface"):
+            if not is_water:
+                return GateResult(False, ("not_water",), ("medium",))
             need = float(getattr(profile, "draft_m", 0.0)) + float(
                 getattr(profile, "ukc_m", 0.0)
             )
-            if depth is None and is_water:
+            if depth is None:
                 return _unknown_gate(policy, "water_depth", "water_depth")
-            if depth is not None and depth < need:
+            if depth < need:
                 return GateResult(False, ("water_depth",), ("water_depth",))
         else:
             wading = float(getattr(profile, "wading_depth_m", 0.0))
-            if depth is None and is_water:
+            if is_water and depth is None:
                 return _unknown_gate(policy, "water_depth", "water_depth")
-            if depth is not None and depth > wading:
+            if is_water and depth is not None and depth > wading:
                 return GateResult(False, ("water_depth",), ("water_depth",))
 
     slope = float(env.slope_deg(lon, lat))
@@ -109,18 +129,12 @@ def evaluate_gates(profile, lon: float, lat: float, env,
     getter = getattr(env, "road_edge_at", None)
     if getter is not None:
         edge = getter(lon, lat, 25.0)
-        if edge and (edge.get("bridge") or edge.get("tunnel")):
-            missing = [
-                key for key in ("maxweight", "maxheight")
-                if _number(edge.get(key)) <= 0.0
-            ]
-            if missing:
-                key = "bridge_mlc" if edge.get("bridge") else "tunnel_clearance"
-                return _unknown_gate(policy, key, "road_limit", "advisory")
-        if edge and not road_edge_passable(profile, edge):
+        if edge:
             reasons = []
             max_weight = _number(edge.get("maxweight"))
-            if max_weight > 0 and float(getattr(profile, "weight_t", 0.0)) > max_weight:
+            if max_weight > 0 and float(
+                getattr(profile, "weight_t", 0.0)
+            ) > max_weight:
                 reasons.append("road_maxweight")
             max_height = _number(edge.get("maxheight"))
             if max_height > 0 and float(
@@ -130,8 +144,18 @@ def evaluate_gates(profile, lon: float, lat: float, env,
             width = _number(edge.get("width"))
             if width > 0 and float(getattr(profile, "beam_m", 0.0)) > width:
                 reasons.append("road_width")
-            return GateResult(
-                False, tuple(reasons or ("road_limit",)), ("road_limit",)
-            )
+            if reasons:
+                return GateResult(False, tuple(reasons), ("road_limit",))
+
+            if edge.get("bridge") or edge.get("tunnel"):
+                missing = [
+                    key for key in ("maxweight", "maxheight")
+                    if _number(edge.get(key)) <= 0.0
+                ]
+                if missing:
+                    key = "bridge_mlc" if edge.get("bridge") else "tunnel_clearance"
+                    return _unknown_gate(policy, key, "road_limit", "advisory")
+            if not road_edge_passable(profile, edge):
+                return GateResult(False, ("road_limit",), ("road_limit",))
 
     return GateResult(True)

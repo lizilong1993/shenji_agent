@@ -956,14 +956,22 @@ class World(object):
                                    source="commander")
 
     # -- engagement ---------------------------------------------------------
-    def authorize_engagement(self, attacker, target) -> bool:
-        """Generic Policy gate before any engagement.
+    def _ready_weapons(self, attacker) -> List[object]:
+        out = []
+        weapons = list(attacker.weapons)
+        weapons.extend(getattr(attacker, "sea_air_weapons", []) or [])
+        for weapon in weapons:
+            key = getattr(weapon, "key", None)
+            if key and not self.weapon_ready(attacker.uid, key):
+                continue
+            if float(getattr(weapon, "ammo", 1) or 0) <= 0.0:
+                continue
+            out.append(weapon)
+        return out
 
-        No policy keeps legacy behavior. With a policy, every ready weapon's
-        ``kind`` is checked against the approved ROE/matrix; at least one must
-        be authorized. This does not select targets or encode tactics.
-        """
-        if not self.policy:
+    def _authorize_weapons(self, attacker, target_domain: str,
+                           weapons: List[object]) -> bool:
+        if self.policy is None:
             return True
         from envmodel.authorization import authorize_engagement
         side_key = {0: "red", 1: "blue"}.get(attacker.affiliation, "neutral")
@@ -971,21 +979,39 @@ class World(object):
             attacker.last_damaged_s >= 0.0
             and self.time_s - attacker.last_damaged_s <= 300.0
         )
-        ready = [w for w in attacker.weapons
-                 if self.weapon_ready(attacker.uid, w.key)]
-        if not ready:
-            return False
-        for weapon in ready:
+        decisions = []
+        for weapon in weapons:
             category = _weapon_category_map().get(
                 str(getattr(weapon, "weapon_id", ""))
             )
             if not category:
                 category = getattr(weapon, "kind", "direct") or "direct"
-            if authorize_engagement(
-                    self.policy, side_key, target.domain, category,
-                    under_fire=under_fire).allowed:
-                return True
-        return False
+            decisions.append(authorize_engagement(
+                self.policy, side_key, target_domain, category,
+                under_fire=under_fire,
+            ))
+        # All weapons that could actually be selected must be authorized; an
+        # authorized cannon must not cover an unauthorized ATGM in the same
+        # loadout.
+        return bool(decisions) and all(d.allowed for d in decisions)
+
+    def authorize_engagement(self, attacker, target) -> bool:
+        """Generic Policy gate before any engagement.
+
+        No policy keeps legacy behavior. With a policy, all ready weapons
+        (including sea/air weapons) must be authorized for the target domain.
+        """
+        return self._authorize_weapons(
+            attacker, target.domain, self._ready_weapons(attacker)
+        )
+
+    def authorize_indirect(self, attacker) -> bool:
+        """Gate an area/indirect fire with no concrete target."""
+        weapons = [
+            weapon for weapon in self._ready_weapons(attacker)
+            if getattr(weapon, "kind", None) == "indirect"
+        ]
+        return self._authorize_weapons(attacker, "land", weapons)
 
     def _engage(self, ctx: WorldRuleContext) -> None:
         ctx.refresh()
@@ -1016,6 +1042,9 @@ class World(object):
             if target is None:
                 aim = getattr(attacker, "aim_cell", None)
                 if aim is not None:
+                    if not self.authorize_indirect(attacker):
+                        attacker.aim_cell = None
+                        continue
                     event = self._resolve_indirect(
                         ctx.view(attacker), tuple(aim), ctx, observed=False)
                     attacker.aim_cell = None

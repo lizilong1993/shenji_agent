@@ -44,12 +44,17 @@ def validate_policy(data: Any, require_approved: bool = True) -> Dict[str, Any]:
     gates = data.get("gates")
     if gates is not None and not isinstance(gates, dict):
         raise PolicyError("policy gates must be an object")
+    for name, value in (gates or {}).items():
+        unknown = value.get("unknown_policy") if isinstance(value, dict) else value
+        if unknown is not None and str(unknown) not in (
+                "deny", "advisory", "allow_with_penalty"):
+            raise PolicyError("invalid unknown_policy for gate %r" % name)
     return data
 
 
 def gate_overrides(policy: Optional[Dict[str, Any]]) -> Dict[str, str]:
     """Return ``{gate_name: unknown_policy}`` from an approved policy."""
-    if not policy:
+    if not policy or policy.get("approval_status") != "approved":
         return {}
     out: Dict[str, str] = {}
     for key, value in (policy.get("gates") or {}).items():

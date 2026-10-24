@@ -315,6 +315,78 @@ class EnvModelTest(unittest.TestCase):
             authorize_engagement(hold, "blue", "land", "cannon", under_fire=True).allowed
         )
 
+    def test_policy_raw_dict_requires_approval(self):
+        with self.assertRaises(PolicyError):
+            open_pack(self.root, policy={
+                "policy_id": "draft",
+                "approval_status": "draft",
+                "roe": "hold",
+                "authorization_matrix": {},
+            })
+
+    def test_surface_vessel_on_land_denied(self):
+        profile = profile_for("ship", "surface")
+        r = self.query.passability(profile, 120.165, 23.007)
+        self.assertFalse(r.value["allowed"])
+        self.assertIn("not_water", r.value["reason_codes"])
+
+    def test_invalid_unknown_policy_denies(self):
+        profile = profile_for("vehicle", "land")
+        r = evaluate_gates(
+            profile, 120.1508, 22.9908, self.env,
+            depth_kind="unknown",
+            policy={"water_depth": "bogus"},
+        )
+        self.assertFalse(r.allowed)
+        self.assertIn("water_depth_unknown", r.reason_codes)
+
+    def test_world_sea_air_authorization(self):
+        world = World.__new__(World)
+        world.time_s = 0.0
+        world.weapon_ready = lambda uid, key: True
+        world.policy = {
+            "policy_id": "sea-auth",
+            "approval_status": "approved",
+            "roe": "weapons_free",
+            "authorization_matrix": {"blue": {"surface": ["sam"]}},
+        }
+        attacker = SimpleNamespace(
+            uid=2, affiliation=1, last_damaged_s=-1.0, weapons=[],
+            sea_air_weapons=[
+                SimpleNamespace(key="s1", weapon_id=9999, kind="sam", ammo=4)
+            ],
+        )
+        target = SimpleNamespace(domain="surface")
+        self.assertTrue(world.authorize_engagement(attacker, target))
+        world.policy = {}
+        self.assertFalse(world.authorize_engagement(attacker, target))
+
+    def test_world_indirect_authorization(self):
+        world = World.__new__(World)
+        world.time_s = 0.0
+        world.weapon_ready = lambda uid, key: True
+        attacker = SimpleNamespace(
+            uid=3, affiliation=1, last_damaged_s=-1.0,
+            weapons=[SimpleNamespace(key="i1", weapon_id=9998,
+                                     kind="indirect", ammo=2)],
+            sea_air_weapons=[],
+        )
+        world.policy = {
+            "policy_id": "indirect-auth",
+            "approval_status": "approved",
+            "roe": "weapons_free",
+            "authorization_matrix": {"blue": {"land": ["indirect"]}},
+        }
+        self.assertTrue(world.authorize_indirect(attacker))
+        world.policy = dict(world.policy, roe="hold")
+        self.assertFalse(world.authorize_indirect(attacker))
+
+    def test_surface_vessel_on_bridge_still_water_gated(self):
+        profile = profile_for("ship", "surface")
+        r = self.query.passability(profile, 120.1515, 22.9915)
+        self.assertFalse(r.value["allowed"])
+        self.assertIn("water_depth_unknown", r.value["reason_codes"])
+
     def test_world_authorization_gate(self):
         world = World.__new__(World)
         world.time_s = 0.0
