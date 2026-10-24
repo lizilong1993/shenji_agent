@@ -10,10 +10,11 @@ from types import SimpleNamespace
 
 from env.pack_env import load_envpack_environment
 from envmodel import (SpatialQueryV3, authorize_engagement, evaluate_gates,
-                      load_manifest, load_policy, open_pack)
+                      load_manifest, load_policy, open_pack, validate_route)
 from envmodel.manifest import ManifestError
 from envmodel.policy import PolicyError
 from mobility.profile import profile_for
+from sim.entity import Pose, Route
 from sim.world import World
 
 CENTER = (120.16, 23.0)
@@ -386,6 +387,19 @@ class EnvModelTest(unittest.TestCase):
         r = self.query.passability(profile, 120.1515, 22.9915)
         self.assertFalse(r.value["allowed"])
         self.assertIn("water_depth_unknown", r.value["reason_codes"])
+
+    def test_route_validation_rejects_building(self):
+        profile = profile_for("vehicle", "land")
+        through = Route(
+            points=[Pose(120.158, 23.0), Pose(120.162, 23.0)],
+            speed_limits=[5.0], modes=["offroad"],
+        )
+        self.assertFalse(validate_route(self.query, profile, through))
+        clear = Route(
+            points=[Pose(120.164, 23.007), Pose(120.1655, 23.007)],
+            speed_limits=[5.0], modes=["offroad"],
+        )
+        self.assertTrue(validate_route(self.query, profile, clear))
 
     def test_world_authorization_gate(self):
         world = World.__new__(World)

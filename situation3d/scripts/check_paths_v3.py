@@ -18,7 +18,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from envmodel import open_pack
+from envmodel import open_pack, validate_route
 from mobility.nav_field import NavField
 from mobility.profile import profile_for
 
@@ -52,6 +52,7 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
 
     planned = 0
     no_path = 0
+    gate_rejected = 0
     route_ok_n = 0
     gate_denied_routes = 0
     gate_denied_points = 0
@@ -83,6 +84,9 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
         if route is None:
             no_path += 1
             continue
+        if not validate_route(query, profile, route):
+            gate_rejected += 1
+            continue
         planned += 1
         total_m += route.total_m
         ok = bool(nav.route_ok(profile, route))
@@ -110,6 +114,7 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
         "attempts": attempts,
         "planned": planned,
         "no_path": no_path,
+        "gate_rejected": gate_rejected,
         "route_ok": route_ok_n,
         "route_ok_rate": round(route_ok_n / planned, 4) if planned else None,
         "gate_denied_routes": gate_denied_routes,

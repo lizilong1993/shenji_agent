@@ -12,6 +12,7 @@ from .manifest import ManifestError, V3Manifest, load_manifest
 from .obstacles import BridgeSet, ObstacleSet
 from .policy import PolicyError, gate_overrides, load_policy, validate_policy
 from .query import Envelope, SpatialQueryV3
+from .route import plan_valid_route, validate_route
 
 
 def open_pack(root: str, time_s: float = 0.0,
@@ -47,5 +48,7 @@ __all__ = [
     "load_manifest",
     "load_policy",
     "open_pack",
+    "plan_valid_route",
     "validate_policy",
+    "validate_route",
 ]
