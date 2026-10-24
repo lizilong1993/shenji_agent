@@ -551,7 +551,8 @@ class NavField(object):
              goal: Tuple[float, float], blocked=None,
              start_snap: int = _MAX_SNAP_CELLS,
              goal_snap: int = _MAX_GOAL_SNAP_CELLS,
-             max_nodes: int = 300000) -> Optional[Route]:
+             max_nodes: int = 300000,
+             safe_fallback: bool = False) -> Optional[Route]:
         mask, speed = self.profile_mask(prof)
         start_i = self._snap_cell(mask, prof, start[0], start[1], start_snap)
         goal_i = self._snap_cell(mask, prof, goal[0], goal[1], goal_snap)
@@ -674,6 +675,21 @@ class NavField(object):
                 points = raw_points
             else:
                 return None
+        if safe_fallback and not self._points_ok(prof, points):
+            # Smoothing/fillets can shave a blocked cell at 30 m resolution,
+            # and the exact start/goal may sit outside the 30 m mask cell.
+            # Fall back to raw A* vertices with snapped cell-center endpoints.
+            start_row, start_col = divmod(start_i, self.cols)
+            goal_row, goal_col = divmod(goal_i, self.cols)
+            sx, sy = self._center(start_row, start_col)
+            gx, gy = self._center(goal_row, goal_col)
+            fixed = [Pose(sx, sy, self.env.elevation(sx, sy))]
+            fixed.extend(raw_points[1:-1])
+            fixed.append(Pose(gx, gy, self.env.elevation(gx, gy)))
+            if self._points_ok(prof, fixed):
+                points = fixed
+            elif self._points_ok(prof, raw_points):
+                points = raw_points
         return self._route(prof, points)
 
     def _segment_clear(self, a: Pose, b: Pose, mask, blocked) -> bool:

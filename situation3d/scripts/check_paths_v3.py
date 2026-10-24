@@ -65,7 +65,7 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
             if not query.passability(profile, *goal).value["allowed"]:
                 continue
         t0 = time.time()
-        route = nav.plan(profile, start, goal)
+        route = nav.plan(profile, start, goal, safe_fallback=True)
         plan_times.append(time.time() - t0)
         if route is None:
             no_path += 1
