@@ -22,12 +22,27 @@ class ObstacleSet:
         return len(getattr(self.env, "_buildings", []) or [])
 
     def at(self, lon: float, lat: float) -> Optional[Dict[str, Any]]:
+        item = None
+        polygon_at = getattr(self.env, "_polygon_at", None)
+        index = getattr(self.env, "_building_index", None)
+        if polygon_at is not None and index is not None:
+            item = polygon_at(index, lon, lat)
+        if item is not None:
+            return {
+                "footprint": item.get("ring") or [],
+                "height_m": float(item.get("height_m") or 6.0),
+                "height_source": item.get("height_source"),
+                "levels": item.get("levels"),
+                "kind": "building",
+            }
         building = self.env.building_at(lon, lat)
         if building is None:
             return None
         return {
             "footprint": building.footprint,
             "height_m": float(building.height_m),
+            "height_source": None,
+            "levels": None,
             "kind": "building",
         }
 

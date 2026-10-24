@@ -10,6 +10,7 @@ import unittest
 from env.pack_env import load_envpack_environment
 from envmodel import SpatialQueryV3, load_manifest, open_pack
 from envmodel.manifest import ManifestError
+from mobility.profile import profile_for
 
 CENTER = (120.16, 23.0)
 BUILDING_RING = [
@@ -62,7 +63,7 @@ def make_pack(root: str) -> None:
             "a": "n1", "b": "n2", "length_m": 3000.0,
             "class": "primary", "surface": "asphalt",
             "bridge": False, "tunnel": False, "oneway": False,
-            "maxheight": None, "maxweight": None, "width": None,
+            "maxheight": None, "maxweight": "1", "width": None,
         }],
     })
     manifest = {
@@ -201,6 +202,29 @@ class EnvModelTest(unittest.TestCase):
     def test_tile(self):
         tile = self.query.tile("0/0/0", 0)
         self.assertEqual(tile.value["path"], "terrain/grid.json")
+
+    def test_gates_building_and_water(self):
+        profile = profile_for("vehicle", "land")
+        b = self.query.passability(profile, *CENTER)
+        self.assertFalse(b.value["allowed"])
+        self.assertIn("building", b.value["reason_codes"])
+        w = self.query.passability(profile, 120.1515, 22.9915)
+        self.assertFalse(w.value["allowed"])
+        self.assertIn("water_depth_unknown", w.value["reason_codes"])
+        self.assertTrue(w.value["unknown"])
+        self.assertEqual(w.quality, "unknown")
+
+    def test_gates_road_limit(self):
+        profile = profile_for("vehicle", "land")
+        r = self.query.passability(profile, 120.155, 22.995)
+        self.assertFalse(r.value["allowed"])
+        self.assertIn("road_maxweight", r.value["reason_codes"])
+
+    def test_gates_land_open(self):
+        profile = profile_for("vehicle", "land")
+        r = self.query.passability(profile, 120.165, 23.007)
+        self.assertTrue(r.value["allowed"])
+        self.assertEqual(r.value["reason_codes"], [])
 
 
 if __name__ == "__main__":

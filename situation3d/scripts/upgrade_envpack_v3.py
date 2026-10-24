@@ -47,6 +47,12 @@ def upgrade(src: str, dst: str, force: bool = False) -> dict:
 
     for name in ("terrain", "landcover", "water", "buildings", "roads"):
         _copy_tree(os.path.join(src, name), os.path.join(dst, name))
+    bathy_rel = (old.get("layers") or {}).get("bathymetry", {}).get("path")
+    has_bathy = bool(bathy_rel and os.path.isfile(os.path.join(src, bathy_rel)))
+    if has_bathy:
+        _copy_tree(
+            os.path.join(src, bathy_rel), os.path.join(dst, bathy_rel)
+        )
     basic = old.get("fallback_basic_json")
     if basic and os.path.isfile(os.path.join(src, basic)):
         _copy_tree(os.path.join(src, basic), os.path.join(dst, basic))
@@ -85,8 +91,8 @@ def upgrade(src: str, dst: str, force: bool = False) -> dict:
                 "license": "ODbL-1.0",
                 "license_id": "ODbL-1.0",
                 "confidence": "low",
-                "depth_kind": "unknown",
-                "notes": "no depth field in legacy pack",
+                "depth_kind": "synthetic" if has_bathy else "unknown",
+                "notes": "depth from bathymetry grid when present" if has_bathy else "no depth field in legacy pack",
             },
             # Compatibility alias: EnvPackEnvironment reads the "water" key.
             "water": {
@@ -96,7 +102,7 @@ def upgrade(src: str, dst: str, force: bool = False) -> dict:
                 "license": "ODbL-1.0",
                 "license_id": "ODbL-1.0",
                 "confidence": "low",
-                "depth_kind": "unknown",
+                "depth_kind": "synthetic" if has_bathy else "unknown",
             },
             "landcover": {
                 "format": "json",
@@ -165,6 +171,22 @@ def upgrade(src: str, dst: str, force: bool = False) -> dict:
             },
         ],
     }
+    if has_bathy:
+        manifest["layers"]["bathymetry"] = {
+            "format": "grid-json",
+            "path": bathy_rel,
+            "source": "legacy-bathymetry",
+            "license": "mixed",
+            "license_id": "MIXED",
+            "confidence": "low",
+            "depth_kind": "synthetic",
+            "notes": "GEBCO/legacy bathymetry grid; not navigation-grade",
+        }
+    if (old.get("provenance") or {}).get("building_heights"):
+        manifest["layers"]["buildings"]["height_kind"] = "derived"
+        manifest["layers"]["buildings"]["notes"] = (
+            "height_source is per-feature: tag/levels/fallback/default"
+        )
     with open(os.path.join(dst, "manifest.json"), "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, ensure_ascii=False, indent=2)
     return {
@@ -173,7 +195,6 @@ def upgrade(src: str, dst: str, force: bool = False) -> dict:
         "layers": sorted(manifest["layers"]),
         "built_at": built_at,
     }
-
 
 def main() -> int:
     parser = argparse.ArgumentParser()

@@ -6,6 +6,7 @@ time-bound ``SpatialQuery`` contract, and exposes the building/obstacle set
 used by LOS and passability queries.
 """
 
+from .gates import GateResult, evaluate_gates
 from .manifest import ManifestError, V3Manifest, load_manifest
 from .obstacles import ObstacleSet
 from .query import Envelope, SpatialQueryV3
@@ -22,10 +23,12 @@ def open_pack(root: str, time_s: float = 0.0) -> SpatialQueryV3:
 
 __all__ = [
     "Envelope",
+    "GateResult",
     "ManifestError",
     "ObstacleSet",
     "SpatialQueryV3",
     "V3Manifest",
+    "evaluate_gates",
     "load_manifest",
     "open_pack",
 ]

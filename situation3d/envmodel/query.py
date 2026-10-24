@@ -10,8 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar
 
-from mobility.passability import passable as _passable
-
+from .gates import evaluate_gates
 from .manifest import V3Manifest
 from .obstacles import ObstacleSet
 
@@ -98,11 +97,19 @@ class SpatialQueryV3:
         if item is None:
             return self._wrap("buildings", None, quality="not_applicable")
         height_kind = str(self._meta("buildings").get("height_kind") or "unknown")
+        source = str(item.get("height_source") or "")
         quality = {
-            "measured": "measured",
-            "derived": "derived",
+            "tag": "measured",
+            "levels": "derived",
+            "fallback": "derived",
             "default": "default",
-        }.get(height_kind, "unknown")
+        }.get(source)
+        if quality is None:
+            quality = {
+                "measured": "measured",
+                "derived": "derived",
+                "default": "default",
+            }.get(height_kind, "unknown")
         return self._wrap("buildings", item, quality=quality)
 
     def road(self, lon: float, lat: float) -> Envelope:
@@ -199,9 +206,16 @@ class SpatialQueryV3:
         return self._wrap("landcover", self.env.cover_height(lon, lat), quality="derived")
 
     def passability(self, profile: Any, lon: float, lat: float) -> Envelope:
-        allowed = bool(_passable(profile, lon, lat, self.env))
+        depth_kind = str(self._meta("hydrography").get("depth_kind") or "unknown")
+        result = evaluate_gates(profile, lon, lat, self.env, depth_kind)
+        quality = "unknown" if result.unknown else "derived"
         return self._wrap(
             "terrain",
-            {"allowed": allowed, "reason_codes": [] if allowed else ["blocked"]},
-            quality="derived",
+            {
+                "allowed": result.allowed,
+                "reason_codes": list(result.reason_codes),
+                "gate_ids": list(result.gate_ids),
+                "unknown": result.unknown,
+            },
+            quality=quality,
         )
