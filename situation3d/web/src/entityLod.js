@@ -30,8 +30,8 @@
   'use strict';
 
   var DEFAULTS = {
-    enter3dHeight: 1e9,
-    exit3dHeight: 1e9,
+    enter3dHeight: 3000,
+    exit3dHeight: 3600,
   };
 
   var MODE_ICON = 'icon';

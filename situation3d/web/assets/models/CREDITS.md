@@ -40,3 +40,10 @@
 - 052D 无公开可下载的精确资产，使用同族 052C 模型；空警-500 使用 KJ-2000；歼-16 使用 Su-30MKK；F-16V 使用 F-16C；CM-11 使用 M48A5；15 式轻型坦克无可用资产，回退到 99A 大类模型。
 - 所有 GLB 均按公开全长（舰长/机长/车长含炮管）归一为 1 单位 = 1 米，原点在水线/地面/机体中心，艏/头朝 Blender +Y。
 - Sketchfab 模型已按 CC-BY / Free Standard 许可署名；二次分发时请保留本文件。
+
+
+## 2026-10-26 P0 优化
+
+- 纹理统一 ≤1024 WebP；静态件 `palette` → `join` 合批；按预算 `simplify`；静态模型 `meshopt`。
+- 逐资产面数/预算/许可见 `manifest.json`、`specs.json`、`licenses.json`；原始 GLB 已在运维侧备份。
+- 带关节模型（Z-10、HQ-9、HQ-16、YJ-62、M1A2）只做纹理压缩，保留节点名与几何，供 `targetCombatFx` 驱动。

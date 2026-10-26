@@ -1,0 +1,868 @@
+{
+  "version": 2,
+  "generated_at": "2026-10-26T11:50:01",
+  "note": "由 tools/model_budget_test.py 生成；sha256 对应优化后的 GLB。",
+  "assets": {
+    "type_052c.glb": {
+      "sha256": "b8dbc8b98eafcc31a6c98df8ca9e250d42b305d50aa8981fdcdec40ed6720032",
+      "bytes": 1039244,
+      "mb": 0.99,
+      "tris": 29413,
+      "prims": 8,
+      "materials": 8,
+      "images": 7,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_large",
+      "public": {
+        "public_length_m": 155.0,
+        "public_width_m": 17.2,
+        "approx_of": "052D",
+        "notes": "052D 用 052C 近似"
+      },
+      "license": {
+        "source": "Type 052C Destroyer (DCS World)",
+        "author": "KojfDiscord",
+        "license": "CC Attribution",
+        "use": "052C 驱逐舰（用于 052D / 驱逐舰大类近似）",
+        "risk": [
+          "upstream-game-asset"
+        ],
+        "source_url": null
+      }
+    },
+    "type_054a.glb": {
+      "sha256": "f9aed2b8b949b5ba8da6718679bc265117b48c528648a07e6a8ec6c96bfcc947",
+      "bytes": 987876,
+      "mb": 0.94,
+      "tris": 29907,
+      "prims": 6,
+      "materials": 6,
+      "images": 6,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_large",
+      "public": {
+        "public_length_m": 134.0,
+        "public_width_m": 16.0
+      },
+      "license": {
+        "source": "Type-054A Class Frigate",
+        "author": "MirzaArrafiERV_45",
+        "license": "CC Attribution",
+        "use": "054A 护卫舰",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_056a.glb": {
+      "sha256": "22b220c40a4d3b9ced8e85416734abe99b874c7447b4c36e5a34d944d3a3b731",
+      "bytes": 81684,
+      "mb": 0.08,
+      "tris": 1208,
+      "prims": 3,
+      "materials": 3,
+      "images": 4,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_small",
+      "public": {
+        "public_length_m": 89.0,
+        "public_width_m": 11.1
+      },
+      "license": {
+        "source": "自建（tools/modelgen/build_custom.py）",
+        "author": "本项目",
+        "license": "项目内部",
+        "use": "056A 型轻型护卫舰",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_071.glb": {
+      "sha256": "93dbc7017fb785288e9fed663948a8ce290d1e382ee2df6fb2ef39fe639162cd",
+      "bytes": 951664,
+      "mb": 0.91,
+      "tris": 29451,
+      "prims": 13,
+      "materials": 13,
+      "images": 12,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_large",
+      "public": {
+        "public_length_m": 210.0,
+        "public_width_m": 28.0
+      },
+      "license": {
+        "source": "Yuzhao-class landing ship Kunlun Shan",
+        "author": "42manako",
+        "license": "CC Attribution",
+        "use": "071 综合登陆舰",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_903.glb": {
+      "sha256": "ff6ca43790f63c15203006ecd4cb14ed2d8381564fac0d7cb2275da243105ca1",
+      "bytes": 77460,
+      "mb": 0.07,
+      "tris": 912,
+      "prims": 3,
+      "materials": 3,
+      "images": 4,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_small",
+      "public": {
+        "public_length_m": 178.5,
+        "public_width_m": 24.8
+      },
+      "license": {
+        "source": "自建（tools/modelgen/build_custom.py）",
+        "author": "本项目",
+        "license": "项目内部",
+        "use": "903 型综合补给舰",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_e2d.glb": {
+      "sha256": "0e98f5f776519e08e72d90c0a2ab521a5a1338cb50d541b040289fde7df5ec0e",
+      "bytes": 965052,
+      "mb": 0.92,
+      "tris": 23079,
+      "prims": 4,
+      "materials": 4,
+      "images": 13,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "aircraft_aew",
+      "public": {
+        "public_length_m": 17.6,
+        "public_width_m": 24.56
+      },
+      "license": {
+        "source": "Grumman E-2D Advanced Hawkeye",
+        "author": "MirzaArrafiERV_45",
+        "license": "CC Attribution",
+        "use": "E-2D（E-2K 近似）",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_eq240.glb": {
+      "sha256": "493d120988b1a646fbf884c125be11e587165fc96168a2d237329c00f492ee00",
+      "bytes": 448500,
+      "mb": 0.43,
+      "tris": 8601,
+      "prims": 6,
+      "materials": 6,
+      "images": 11,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_ior",
+        "KHR_materials_specular",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_truck",
+      "public": {
+        "public_length_m": 6.9,
+        "public_width_m": 2.47
+      },
+      "license": {
+        "source": "Dongfeng EQ240/EQ2081",
+        "author": "42manako",
+        "license": "CC Attribution",
+        "use": "东风 EQ240（运输车队）",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_f16c.glb": {
+      "sha256": "d7c685b1206191ea9cae0faacd6b85fd4b274bcd2725625db5c52397c66bb0d2",
+      "bytes": 1226940,
+      "mb": 1.17,
+      "tris": 19263,
+      "prims": 10,
+      "materials": 10,
+      "images": 24,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "aircraft_fighter",
+      "public": {
+        "public_length_m": 15.06,
+        "public_width_m": 9.96,
+        "approx_of": "F-16V"
+      },
+      "license": {
+        "source": "F-16C Block 50 Custom #5",
+        "author": "Jeyhun1985",
+        "license": "CC Attribution",
+        "use": "F-16C（F-16V 近似）",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_hq16.glb": {
+      "sha256": "70cdcf99ca2c2803de885f85c40dca7377ee137d5582cf1b6c47fcb5b86bbbd8",
+      "bytes": 108600,
+      "mb": 0.1,
+      "tris": 1172,
+      "prims": 19,
+      "materials": 5,
+      "images": 1,
+      "extensions": [
+        "EXT_texture_webp"
+      ],
+      "animations": 0,
+      "class": "rigged",
+      "public": {
+        "public_length_m": 11.0,
+        "public_width_m": 3.3
+      },
+      "license": {
+        "source": "自建（tools/modelgen/build_custom.py）",
+        "author": "本项目",
+        "license": "项目内部",
+        "use": "红旗-16 发射车",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_hq9.glb": {
+      "sha256": "2d2a52f6b4b10b7ee276118ccfb18379233761e354f3902bbd2d75c4396af6d0",
+      "bytes": 915060,
+      "mb": 0.87,
+      "tris": 17165,
+      "prims": 11,
+      "materials": 1,
+      "images": 1,
+      "extensions": [
+        "EXT_texture_webp",
+        "KHR_materials_specular"
+      ],
+      "animations": 0,
+      "class": "rigged",
+      "public": {
+        "public_length_m": 12.0,
+        "public_width_m": 3.5
+      },
+      "license": {
+        "source": "Chinese HQ-9",
+        "author": "42manako",
+        "license": "CC Attribution",
+        "use": "红旗-9 防空系统",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_idf.glb": {
+      "sha256": "7dacf2f6ca6739ef538288173d71072b2ef3bab1b9d99e3486c460f1d9199dda",
+      "bytes": 644840,
+      "mb": 0.61,
+      "tris": 20120,
+      "prims": 7,
+      "materials": 7,
+      "images": 6,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "aircraft_fighter",
+      "public": {
+        "public_length_m": 14.21,
+        "public_width_m": 9.0
+      },
+      "license": {
+        "source": "AIDC F-CK-1B \"Ching-Kuo\" IDF",
+        "author": "jmadden64",
+        "license": "CC Attribution",
+        "use": "IDF 经国号",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_j16.glb": {
+      "sha256": "e08b097a7f0cbe4ecf92476dddfa71237294f7284aecfb8e6efee9a47b61a9c1",
+      "bytes": 1575500,
+      "mb": 1.5,
+      "tris": 19262,
+      "prims": 16,
+      "materials": 16,
+      "images": 34,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "aircraft_fighter",
+      "public": {
+        "public_length_m": 21.9,
+        "public_width_m": 14.7,
+        "approx_of": "J-16",
+        "notes": "Su-30MKK 近似"
+      },
+      "license": {
+        "source": "Su-30MKK with Kh-59M",
+        "author": "Jeyhun1985",
+        "license": "CC Attribution",
+        "use": "歼-16（Su-30MKK 同族近似）",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_kidd.glb": {
+      "sha256": "81575e843f5b431adc31f6f009724a187a536c150e79628df397eb6261a10b92",
+      "bytes": 79960,
+      "mb": 0.08,
+      "tris": 1080,
+      "prims": 3,
+      "materials": 3,
+      "images": 4,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_small",
+      "public": {
+        "public_length_m": 171.6,
+        "public_width_m": 16.8
+      },
+      "license": {
+        "source": "自建（tools/modelgen/build_custom.py）",
+        "author": "本项目",
+        "license": "项目内部",
+        "use": "基隆级（Kidd）驱逐舰",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_kj2000.glb": {
+      "sha256": "31c0908d1c4107103e9f9ba82a13aac6aeb730f3b3a2b0becb2a124a00898b53",
+      "bytes": 776556,
+      "mb": 0.74,
+      "tris": 23299,
+      "prims": 8,
+      "materials": 8,
+      "images": 7,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "aircraft_aew",
+      "public": {
+        "public_length_m": 46.59,
+        "public_width_m": 50.5,
+        "approx_of": "KJ-500",
+        "notes": "KJ-500 用 KJ-2000 近似，尺寸偏大"
+      },
+      "license": {
+        "source": "KJ-2000 (DCS World)",
+        "author": "KojfDiscord",
+        "license": "CC Attribution",
+        "use": "KJ-2000（空警-500 / 预警机大类近似）",
+        "risk": [
+          "upstream-game-asset"
+        ],
+        "source_url": null
+      }
+    },
+    "type_m109a6.glb": {
+      "sha256": "0237e9146d0efe5e7d1cfd3e3d84f1f636c1565b9eceeed684db267c35c36389",
+      "bytes": 303776,
+      "mb": 0.29,
+      "tris": 11923,
+      "prims": 7,
+      "materials": 7,
+      "images": 5,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_tank",
+      "public": {
+        "public_length_m": 9.7,
+        "public_width_m": 3.9
+      },
+      "license": {
+        "source": "M109A6 Paladin Self-Propelled Howitzer",
+        "author": "MirzaArrafiERV_45",
+        "license": "CC Attribution",
+        "use": "M109A6 自行榴弹炮",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_m1a2.glb": {
+      "sha256": "f25eb7ae903fdb843ce8f6f6de8b188523d6492031bce4f99645d980dc45d920",
+      "bytes": 2155960,
+      "mb": 2.06,
+      "tris": 30065,
+      "prims": 15,
+      "materials": 8,
+      "images": 1,
+      "extensions": [
+        "EXT_texture_webp",
+        "KHR_materials_ior",
+        "KHR_materials_specular"
+      ],
+      "animations": 0,
+      "class": "rigged",
+      "public": {
+        "public_length_m": 9.77,
+        "public_width_m": 3.66
+      },
+      "license": {
+        "source": "M1a2",
+        "author": "muhammadvscode",
+        "license": "CC Attribution",
+        "use": "M1A2（M1A2T）",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_m48a5.glb": {
+      "sha256": "a6618c22545cd9a99110175d7e4a422dc4a4943ce65bc9ee8c206f4755cfcf85",
+      "bytes": 183332,
+      "mb": 0.17,
+      "tris": 9448,
+      "prims": 3,
+      "materials": 2,
+      "images": 3,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_tank",
+      "public": {
+        "public_length_m": 8.69,
+        "public_width_m": 3.63,
+        "approx_of": "CM-11",
+        "notes": "CM-11 用 M48A5 近似"
+      },
+      "license": {
+        "source": "M48A5 Patton Medium Tank",
+        "author": "MirzaArrafiERV_45",
+        "license": "CC Attribution",
+        "use": "M48A5（CM-11 近似）",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_m777.glb": {
+      "sha256": "fe9d7629bdf152cb91676965622a2197acc5c01a1a871b3c6e5cd1ebd0404ac4",
+      "bytes": 56304,
+      "mb": 0.05,
+      "tris": 972,
+      "prims": 3,
+      "materials": 3,
+      "images": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_truck",
+      "public": {
+        "public_length_m": 10.2,
+        "public_width_m": 2.77
+      },
+      "license": {
+        "source": "自建（tools/modelgen/build_custom.py）",
+        "author": "本项目",
+        "license": "项目内部",
+        "use": "M777 超轻型榴弹炮",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_mq9.glb": {
+      "sha256": "e5cb5371aa7d4c5c0ebf7760a6e211ae8241c66aedeed50c8759c736da7e8077",
+      "bytes": 434344,
+      "mb": 0.41,
+      "tris": 18868,
+      "prims": 1,
+      "materials": 1,
+      "images": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "aircraft_fighter",
+      "public": {
+        "public_length_m": 11.0,
+        "public_width_m": 20.1
+      },
+      "license": {
+        "source": "MQ-9 Reaper Drone – Game Ready Military Asset",
+        "author": "racingrevved",
+        "license": "CC Attribution",
+        "use": "MQ-9（无人机大类）",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_pac3.glb": {
+      "sha256": "95f0ecbd68623f614ea7e0e5597cb69a99e87999bac109b0fb4e5f108329e3a5",
+      "bytes": 225888,
+      "mb": 0.22,
+      "tris": 8396,
+      "prims": 3,
+      "materials": 2,
+      "images": 4,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_specular",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_truck",
+      "public": {
+        "public_length_m": 12.0,
+        "public_width_m": 2.9,
+        "notes": "模型为展开射击状态"
+      },
+      "license": {
+        "source": "MIM-104 Patriot Air Defense System",
+        "author": "MirzaArrafiERV_45",
+        "license": "CC Attribution",
+        "use": "爱国者 PAC-3",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_panshi.glb": {
+      "sha256": "4ba7728671f9cec222e289e0dc9cabe308f9cbc0190091246e84a3dd1ba99d9f",
+      "bytes": 76936,
+      "mb": 0.07,
+      "tris": 900,
+      "prims": 3,
+      "materials": 3,
+      "images": 4,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_small",
+      "public": {
+        "public_length_m": 196.0,
+        "public_width_m": 25.5
+      },
+      "license": {
+        "source": "自建（tools/modelgen/build_custom.py）",
+        "author": "本项目",
+        "license": "项目内部",
+        "use": "磐石级补给舰",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_perry.glb": {
+      "sha256": "d987b3294b2b79c4ca05b39ca7e277ba6c22ec5b65cf21168457505edb17b495",
+      "bytes": 1306008,
+      "mb": 1.25,
+      "tris": 29395,
+      "prims": 9,
+      "materials": 9,
+      "images": 8,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_large",
+      "public": {
+        "public_length_m": 135.6,
+        "public_width_m": 13.7
+      },
+      "license": {
+        "source": "USS Oliver Hazard Perry FFG-7",
+        "author": "MirzaArrafiERV_45",
+        "license": "CC Attribution",
+        "use": "成功级（Perry 级）护卫舰",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_phl03.glb": {
+      "sha256": "ec4ee30259f7c28d006da0e879779f69d3e411cc4833846084ec70250dca75c9",
+      "bytes": 193700,
+      "mb": 0.18,
+      "tris": 11222,
+      "prims": 2,
+      "materials": 2,
+      "images": 3,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_truck",
+      "public": {
+        "public_length_m": 11.5,
+        "public_width_m": 3.4
+      },
+      "license": {
+        "source": "PHL-03 03式远程火箭炮系统",
+        "author": "EXcalibur117",
+        "license": "Free Standard",
+        "use": "PHL-03 远程火箭炮",
+        "risk": [
+          "sketchfab-free-standard-redistribution"
+        ],
+        "source_url": null
+      }
+    },
+    "type_plz05.glb": {
+      "sha256": "a53b2452db2d640450b48d52aa91fd4d6b480eb7e6a8bac5ae5ac69d1f9c738c",
+      "bytes": 1245532,
+      "mb": 1.19,
+      "tris": 14261,
+      "prims": 17,
+      "materials": 17,
+      "images": 56,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_ior",
+        "KHR_materials_specular",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_tank",
+      "public": {
+        "public_length_m": 11.6,
+        "public_width_m": 3.4
+      },
+      "license": {
+        "source": "Chinese PLZ-05",
+        "author": "42manako",
+        "license": "CC Attribution",
+        "use": "PLZ-05 自行加榴炮",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_rafale.glb": {
+      "sha256": "db19a674ce8d7f3ae5897fc8f00e02f2f80fed236ffdf4d988803f229ac3a782",
+      "bytes": 696728,
+      "mb": 0.66,
+      "tris": 18891,
+      "prims": 5,
+      "materials": 5,
+      "images": 15,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_clearcoat",
+        "KHR_materials_specular",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "aircraft_fighter",
+      "public": {
+        "public_length_m": 15.27,
+        "public_width_m": 10.9
+      },
+      "license": {
+        "source": "Dassault Rafale",
+        "author": "mbooo1",
+        "license": "CC Attribution",
+        "use": "阵风 B",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_tuochiang.glb": {
+      "sha256": "c53d9cf3446c731b24a9b77b3e11881663be19f5169c582eb3b89427741be296",
+      "bytes": 96544,
+      "mb": 0.09,
+      "tris": 1556,
+      "prims": 6,
+      "materials": 6,
+      "images": 3,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_small",
+      "public": {
+        "public_length_m": 60.4,
+        "public_width_m": 14.0
+      },
+      "license": {
+        "source": "自建（tools/modelgen/build_custom.py）",
+        "author": "本项目",
+        "license": "项目内部",
+        "use": "沱江级巡逻舰",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_yj62.glb": {
+      "sha256": "2cfd1f21f67b5f0c578bfdf0037ccaa25f699d77645c0eb122015d66476ea3fa",
+      "bytes": 99348,
+      "mb": 0.09,
+      "tris": 1052,
+      "prims": 15,
+      "materials": 4,
+      "images": 1,
+      "extensions": [
+        "EXT_texture_webp"
+      ],
+      "animations": 0,
+      "class": "rigged",
+      "public": {
+        "public_length_m": 13.0,
+        "public_width_m": 2.5
+      },
+      "license": {
+        "source": "自建（tools/modelgen/build_custom.py）",
+        "author": "本项目",
+        "license": "项目内部",
+        "use": "鹰击-62 岸舰导弹发射车",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_z10.glb": {
+      "sha256": "e4694f9c371f9afe9495eb9f24278058a1ac3f6cfab85bcb0566db0da4177a8c",
+      "bytes": 903192,
+      "mb": 0.86,
+      "tris": 22012,
+      "prims": 10,
+      "materials": 4,
+      "images": 1,
+      "extensions": [
+        "EXT_texture_webp",
+        "KHR_materials_specular"
+      ],
+      "animations": 0,
+      "class": "rigged",
+      "public": {
+        "public_length_m": 14.15,
+        "public_width_m": 12.0
+      },
+      "license": {
+        "source": "Changhe Z-10W",
+        "author": "42manako",
+        "license": "CC Attribution",
+        "use": "直-10",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_ztd05.glb": {
+      "sha256": "37b34831835c3e3d3c05d5f097d5684784dbfad76ad90ee5acbe10b3fe97a43a",
+      "bytes": 130532,
+      "mb": 0.12,
+      "tris": 8868,
+      "prims": 5,
+      "materials": 5,
+      "images": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_tank",
+      "public": {
+        "public_length_m": 9.5,
+        "public_width_m": 3.36
+      },
+      "license": {
+        "source": "[OD]ZTD-05AG AAV 05式改型两栖突击车",
+        "author": "EXcalibur117",
+        "license": "Free Standard",
+        "use": "05 式两栖突击车",
+        "risk": [
+          "sketchfab-free-standard-redistribution"
+        ],
+        "source_url": null
+      }
+    },
+    "type_ztz99a.glb": {
+      "sha256": "a5c9c68988b123cf37889e098f3229b611986b8e77ea6631d7f49088751cea38",
+      "bytes": 341348,
+      "mb": 0.33,
+      "tris": 12513,
+      "prims": 2,
+      "materials": 2,
+      "images": 2,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_tank",
+      "public": {
+        "public_length_m": 11.0,
+        "public_width_m": 3.5,
+        "approx_of": "15式",
+        "notes": "15 式用 99A 近似"
+      },
+      "license": {
+        "source": "Type 99 MBT",
+        "author": "philano",
+        "license": "CC Attribution",
+        "use": "99A 主战坦克",
+        "risk": [],
+        "source_url": null
+      }
+    }
+  }
+}
