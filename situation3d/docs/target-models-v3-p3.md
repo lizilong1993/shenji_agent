@@ -31,7 +31,7 @@ LOD1 与 LOD0 同朝向、同原点、同 yaw fix；`lod1_*` 文件不参与 `ty
 
 ## 3. 验证
 
-- `node --check web/src/app.js`、`entityLod.js` 通过；`entity_lod_test.js` 206/206。
+- `node --check web/src/app.js`、`entityLod.js` 通过；`entity_lod_test.js` 218/218。
 - Cesium 1.145 + headless Chromium 实测（`taiwan_dense_transfer_v1`）：
   - 相机 2000 m：80 个有模型目标中 **69 个**（ZTD-05×36 + EQ240×24 + Perry×3 + J-16×2 + 空警-500×2 + E-2D×2）URI 为对应的 `lod1_*`；
   - 相机 800 m：0 个 LOD1；相机 4000 m：0 个 LOD1；
