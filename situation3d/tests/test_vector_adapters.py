@@ -70,6 +70,12 @@ class VectorProcTest(unittest.TestCase):
         url = adapters._gba_url(115, 20, 120, 25)
         self.assertTrue(url.endswith("e115_n25_e120_n20.parquet"))
 
+    def test_worldcover_tiles_and_url(self):
+        tiles = adapters._worldcover_tiles((118.0, 24.4, 118.1, 24.5))
+        self.assertEqual(tiles, [(117, 24)])
+        url = adapters._worldcover_url(117, 24)
+        self.assertTrue(url.endswith("N24E117_Map.tif"))
+
     def test_chmv2_quadkeys_cover_bbox(self):
         keys = adapters._quadkeys((118.0, 24.4, 118.1, 24.5))
         self.assertTrue(keys)
@@ -102,6 +108,23 @@ class AdapterOrchestrationTest(unittest.TestCase):
         self.assertIn("gba down", result["errors"][0])
         self.assertEqual(self.store.get(result["entry"].entry_id).notes["adapter"],
                          "overture")
+
+    def test_landcover_registration(self):
+        raster = os.path.join(self.tmp, "lc.tif")
+        with open(raster, "wb") as fh:
+            fh.write(b"II*\x00" + b"\0" * 128)
+        info = {"width": 10, "height": 10, "band_count": 1,
+                "crs": "EPSG:4326"}
+        with mock.patch.object(
+                adapters, "fetch_worldcover",
+                return_value=(raster, info, {"label": "WorldCover",
+                                             "as_of": "2021-01-01"})):
+            result = adapters.acquire_landcover(
+                self.store, DatasetSpec(name="lc", bbox=SPEC.bbox,
+                                        kind="landcover"), self.cache)
+        self.assertEqual(result["entry"].kind, "landcover")
+        self.assertEqual(result["manifest"]["schema"], "s3d.raster.v1")
+        self.assertTrue(self.store.verify(result["entry"].entry_id)["ok"])
 
     def test_canopy_registration(self):
         raster = os.path.join(self.tmp, "canopy.tif")

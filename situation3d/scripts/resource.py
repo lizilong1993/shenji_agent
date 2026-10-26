@@ -24,7 +24,7 @@ from resources import providers  # noqa: E402
 from resources.acquire import (AcquireError, acquire_tiles,  # noqa: E402
                                probe_report)
 from resources.adapters import (acquire_buildings, acquire_canopy,  # noqa: E402
-                                DatasetError)
+                                acquire_landcover, DatasetError)
 from resources.vectorproc import DatasetSpec  # noqa: E402
 from resources.enrichment import enrich_envpack  # noqa: E402
 from resources.processing import TilesetSpec  # noqa: E402
@@ -351,6 +351,25 @@ def cmd_enrich(args):
     return 0
 
 
+def cmd_landcover(args):
+    store = _store(args)
+    try:
+        spec = DatasetSpec(name=args.name, bbox=_parse_bbox(args.bbox),
+                           kind="landcover")
+        result = acquire_landcover(
+            store, spec,
+            args.cache_root or os.path.join(str(store.root), "cache"),
+            mode=args.mode)
+    except (DatasetError, ValueError) as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    print(json.dumps({"entry": result["entry"].as_dict(),
+                      "manifest": result["manifest"],
+                      "source": result["source"]},
+                     ensure_ascii=False, indent=1))
+    return 0
+
+
 def cmd_kinds(args):
     rows = [KINDS[k].as_dict() for k in sorted(KINDS)]
     print(json.dumps(rows, ensure_ascii=False, indent=1))
@@ -442,6 +461,16 @@ def main(argv=None):
     p.add_argument("--cache-root", default=None)
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_canopy)
+
+    p = sub.add_parser("landcover",
+                       help="acquire ESA WorldCover land-cover raster")
+    p.add_argument("--name", required=True)
+    p.add_argument("--bbox", required=True)
+    p.add_argument("--mode", choices=("auto", "offline", "online"),
+                   default="auto")
+    p.add_argument("--cache-root", default=None)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_landcover)
 
     p = sub.add_parser("tiles", help="acquire an XYZ tileset from parallel sources")
     p.add_argument("--name", required=True)

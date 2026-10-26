@@ -41,6 +41,11 @@ CHMV2_AS_OF = "2024-01-01"
 
 OVERTURE_LICENSE = "Overture Maps data license (per-layer; check CDLA/ODbL terms)"
 
+WORLDCOVER_BASE = ("https://esa-worldcover.s3.eu-central-1.amazonaws.com/"
+                   "v200/2021/map")
+WORLDCOVER_LICENSE = "CC BY 4.0 (ESA WorldCover 2021 v200)"
+WORLDCOVER_AS_OF = "2021-01-01"
+
 
 def _lon_tag(lon: int) -> str:
     return "%s%03d" % ("e" if lon >= 0 else "w", abs(int(lon)))
@@ -245,6 +250,51 @@ def _quadkeys(bbox, zoom: int = CHMV2_ZOOM) -> List[str]:
                    for y in range(min(y0, y1), max(y0, y1) + 1)})
 
 
+def _tag_upper(lon: int, lat: int) -> str:
+    return "%s%02d%s%03d" % ("N" if lat >= 0 else "S", abs(int(lat)),
+                             "E" if lon >= 0 else "W", abs(int(lon)))
+
+
+def _worldcover_tiles(bbox, step: int = 3):
+    w, s, e, n = [float(v) for v in bbox]
+    lat0 = int(math.floor(s / step) * step)
+    lon0 = int(math.floor(w / step) * step)
+    out = []
+    while lon0 <= e:
+        lat = lat0
+        while lat <= n:
+            out.append((lon0, lat))
+            lat += step
+        lon0 += step
+    return out
+
+
+def _worldcover_url(lon0: int, lat0: int) -> str:
+    return "%s/ESA_WorldCover_10m_2021_v200_%s_Map.tif" % (
+        WORLDCOVER_BASE, _tag_upper(lon0, lat0))
+
+
+def _warp_sources(urls, bbox, dest: str, timeout_s: int = 240) -> str:
+    import shutil
+    import subprocess
+    if shutil.which("gdalwarp") is None:
+        raise DatasetError("gdalwarp not found")
+    w, s, e, n = [float(v) for v in bbox]
+    env = dict(os.environ)
+    env.setdefault("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
+    env.setdefault("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif,.tiff")
+    env.setdefault("GDAL_HTTP_MAX_RETRY", "2")
+    cmd = ["gdalwarp", "-q", "-te_srs", "EPSG:4326",
+           "-te", "%.8f" % w, "%.8f" % s, "%.8f" % e, "%.8f" % n,
+           "-of", "GTiff"] + ["/vsicurl/" + u for u in urls] + [dest]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, timeout=timeout_s, env=env)
+    if proc.returncode != 0:
+        raise DatasetError("raster warp failed: %s"
+                           % proc.stderr.decode("utf-8", "replace")[-500:])
+    return dest
+
+
 def fetch_chmv2(store: ResourceStore, spec: DatasetSpec, cache_root: str,
                 mode: str = "auto", resolution_m: float = 1.2,
                 timeout_s: int = 240) -> Any:
@@ -257,32 +307,48 @@ def fetch_chmv2(store: ResourceStore, spec: DatasetSpec, cache_root: str,
     os.makedirs(work, exist_ok=True)
     dest = os.path.join(work, "%s.tif" % spec.slug)
     # GDAL /vsicurl handles the COG windows; pass every covering tile.
-    if len(urls) == 1:
-        crop_raster_window(urls[0], spec.bbox, dest, timeout_s=timeout_s)
-    else:
-        # gdalwarp accepts multiple sources; build the command directly.
-        import subprocess
-        import shutil as _shutil
-        if _shutil.which("gdalwarp") is None:
-            raise DatasetError("gdalwarp not found")
-        w, s, e, n = spec.bbox
-        env = dict(os.environ)
-        env.setdefault("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
-        env.setdefault("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif,.tiff")
-        env.setdefault("GDAL_HTTP_MAX_RETRY", "2")
-        cmd = ["gdalwarp", "-q", "-te_srs", "EPSG:4326",
-               "-te", "%.8f" % w, "%.8f" % s, "%.8f" % e, "%.8f" % n,
-               "-of", "GTiff"] + ["/vsicurl/" + u for u in urls] + [dest]
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, timeout=timeout_s,
-                              env=env)
-        if proc.returncode != 0:
-            raise DatasetError("CHMv2 warp failed: %s"
-                               % proc.stderr.decode("utf-8", "replace")[-500:])
+    _warp_sources(urls, spec.bbox, dest, timeout_s=timeout_s)
     info = raster_info(dest)
     source = {"label": "Meta/WRI CHMv2 canopy height", "tiles": urls,
               "license": CHMV2_LICENSE, "as_of": CHMV2_AS_OF}
     return dest, info, source
+
+
+def fetch_worldcover(store: ResourceStore, spec: DatasetSpec,
+                     cache_root: str, mode: str = "auto",
+                     timeout_s: int = 240) -> Any:
+    spec.validate()
+    tiles = _worldcover_tiles(spec.bbox)
+    urls = [_worldcover_url(lon, lat) for lon, lat in tiles]
+    work = os.path.join(cache_root, "raster", "worldcover")
+    os.makedirs(work, exist_ok=True)
+    dest = os.path.join(work, "%s.tif" % spec.slug)
+    _warp_sources(urls, spec.bbox, dest, timeout_s=timeout_s)
+    info = raster_info(dest)
+    source = {"label": "ESA WorldCover 10m 2021 v200", "tiles": urls,
+              "license": WORLDCOVER_LICENSE, "as_of": WORLDCOVER_AS_OF}
+    return dest, info, source
+
+
+def acquire_landcover(store: ResourceStore, spec: DatasetSpec,
+                      cache_root: str, mode: str = "auto") -> Any:
+    spec.validate()
+    dest, info, source = fetch_worldcover(store, spec, cache_root, mode)
+    root = os.path.join(str(store.root), "cache", "datasets",
+                        spec.kind, spec.slug, spec.hash()[:12])
+    os.makedirs(root, exist_ok=True)
+    import shutil
+    target = os.path.join(root, "landcover.tif")
+    if os.path.abspath(dest) != os.path.abspath(target):
+        shutil.copyfile(dest, target)
+    manifest = write_raster_manifest(root, "landcover.tif", spec, source,
+                                     info, extra={"adapter": "worldcover"})
+    entry = register_dataset(store, spec, root, source, WORLDCOVER_LICENSE,
+                             quality="measured", provider="adapter:worldcover",
+                             as_of=WORLDCOVER_AS_OF,
+                             notes={"adapter": "worldcover",
+                                    "classes": "ESA WorldCover 2021"})
+    return {"entry": entry, "manifest": manifest, "source": source}
 
 
 def acquire_canopy(store: ResourceStore, spec: DatasetSpec,
