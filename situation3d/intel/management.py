@@ -18,6 +18,14 @@ from .case import load_case_profile
 CONFLICT_RADIUS_KM = 25.0
 CONFLICT_WINDOW_H = 6.0
 _CASE_SAFE = re.compile(r"[^A-Za-z0-9_.-]+")
+_CASE_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,80}$")
+
+
+def _case_key(value: Any) -> str:
+    text = str(value or "default")
+    if not _CASE_RE.match(text) or ".." in text:
+        raise ValueError("invalid case_id")
+    return text
 
 
 def _now() -> str:
@@ -130,6 +138,7 @@ class IntelManager:
         self.profile_root = profile_root
         self.manual = ManualIntelStore(os.path.join(root, "manual.json"))
         self.sources = SourceStore(os.path.join(root, "sources.json"))
+        self._cache = {}
 
     def _bundle(self, case_id: str) -> Optional[dict]:
         safe = _CASE_SAFE.sub("_", case_id or "default") or "default"
@@ -150,7 +159,7 @@ class IntelManager:
             return None
 
     def overview(self, case_id: str) -> dict:
-        case_id = str(case_id or "default")
+        case_id = _case_key(case_id)
         profile = self._profile(case_id)
         sources = self.sources.list()
         source_names = {entry.get("source_id"): entry.get("name")
@@ -162,9 +171,15 @@ class IntelManager:
                             % (case_id, _CASE_SAFE.sub("_", case_id)))
             auto_records = []
         else:
-            auto_records = [record for record in bundle.get("observations") or []
-                            if isinstance(record, dict)
-                            and record.get("status", "active") == "active"]
+            bundle_case = str(bundle.get("scenario_id") or "")
+            if bundle_case and bundle_case != case_id:
+                warnings.append("bundle scenario_id=%s 与案例 %s 不一致，已忽略"
+                                % (bundle_case, case_id))
+                auto_records = []
+            else:
+                auto_records = [record for record in bundle.get("observations") or []
+                                if isinstance(record, dict)
+                                and record.get("status", "active") == "active"]
         auto_items = [item for item in (_auto_item(record, source_names)
                                         for record in auto_records)
                       if item is not None]
@@ -183,8 +198,7 @@ class IntelManager:
                     continue
                 manual_type = canonical_type(manual.get("type"))
                 auto_type = canonical_type(auto.get("type"))
-                if manual_type != auto_type and manual_type not in (
-                        "target", "threat"):
+                if manual_type != auto_type:
                     continue
                 auto_time = _time(auto.get("event_time"))
                 if manual_time is None or auto_time is None:
@@ -221,10 +235,25 @@ class IntelManager:
                                                          tzinfo=timezone.utc)).timestamp(),
             str(item.get("id")),
         ))
-        links = link_items(items, profile,
-                           radius_km=max(CONFLICT_RADIUS_KM, 50.0),
-                           window_h=max(CONFLICT_WINDOW_H, 24.0))
-        key_items = extract_key_items(items, links, profile)
+        revision = hashlib.sha256("|".join([
+            self.manual.revision(),
+            self.sources.revision(),
+            str((bundle or {}).get("hash") or ""),
+            str((profile.to_dict() if profile else "")),
+            datetime.now(timezone.utc).strftime("%Y%m%d%H"),
+        ]).encode("utf-8")).hexdigest()[:16]
+        cache_key = (case_id, revision)
+        cached = self._cache.get(cache_key)
+        if cached is None:
+            links = link_items(items, profile,
+                               radius_km=max(CONFLICT_RADIUS_KM, 50.0),
+                               window_h=max(CONFLICT_WINDOW_H, 24.0))
+            key_items = extract_key_items(items, links, profile)
+            if len(self._cache) > 8:
+                self._cache.clear()
+            self._cache[cache_key] = (links, key_items)
+        else:
+            links, key_items = cached
         counts = {
             "manual_active": len(active_manual),
             "manual_revoked": len(manual_items) - len(active_manual),
@@ -234,12 +263,6 @@ class IntelManager:
             "links": len(links),
             "key_items": len(key_items),
         }
-        revision = hashlib.sha256("|".join([
-            self.manual.revision(),
-            self.sources.revision(),
-            str((bundle or {}).get("hash") or ""),
-            str((profile.to_dict() if profile else "")),
-        ]).encode("utf-8")).hexdigest()[:16]
         return {
             "case_id": case_id,
             "generated_at": _now(),

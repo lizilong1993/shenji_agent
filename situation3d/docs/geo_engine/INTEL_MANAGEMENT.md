@@ -51,7 +51,7 @@
 - 首次加载从自动连接器注册表种子化内置源（USGS/GDACS/FIRMS/ADS-B/EONET/GDELT + 人工录入）。
 - 支持添加自定义源（id、名称、类型、领域、URL、描述、标签、启用状态）、编辑展示字段/启停、删除自定义源；内置源禁止删除、可停用。
 - 支持按关键字搜索（ID/名称/描述/标签/领域）和按类型/启用状态过滤；服务端 `GET /api/intel/sources?q=&kind=&enabled=`，前端再做即时过滤。
-- 自定义源目前是**来源登记/人工情报归属**，不是自动抓取连接器；`rss`/`weather` 等 kind 为后续通用连接器预留。
+- 自定义源目前是**来源登记/人工情报归属**，不是自动抓取连接器；URL 只登记，不自动请求。`rss`/`weather` 等 kind 为后续通用连接器预留。
 
 ### 2.4 统一列表与优先级
 
@@ -59,7 +59,7 @@
 
 1. 读取案例的 `var/intel/<case>/bundle.json` 自动观测。
 2. 读取人工情报（含撤销记录）。
-3. 冲突判定：同领域、同规范类型、时间差 ≤6 h、距离 ≤25 km 的**有效人工情报**覆盖自动情报；自动记录保留，标 `effective=false`、`superseded_by=<manual id>`。
+3. 冲突判定：同领域、同规范类型、时间差 ≤6 h、距离 ≤25 km 的**有效人工情报**覆盖自动情报；自动记录保留，标 `effective=false`、`superseded_by=<manual id>`。`target`/`threat` 不自动匹配所有类型（避免误覆盖）。
 4. 输出统一 items（`priority=manual|auto`、`source_name`、`verification`、`effective`、`conflicts`、`record`），人工有效项排前；原始自动 `record` 不删除。
 5. 计算跨域链接和关键情报（见下）。
 
@@ -85,7 +85,9 @@
 - `POST /api/intel/manual/<id>/revoke`
 - `POST /api/intel/sources`、`POST /api/intel/sources/<id>`、`POST /api/intel/sources/<id>/delete`
 
-前端 `web/src/intelUi.js` + `intel.css`，顶栏“情报”按钮打开模态框，三标签页：情报列表（统一列表、筛选、关键情报、关联、编辑/撤销）、人工录入（结构化表单）、情报源管理（搜索/类型/状态过滤、添加、停用、删除）。列表每 5 s 轮询，增删改后立即刷新；深度链接 `?intel=list|manual|sources`。
+前端 `web/src/intelUi.js` + `intel.css`，顶栏“情报”按钮打开模态框，三标签页：情报列表（统一列表、筛选、关键情报、关联、编辑/撤销）、人工录入（结构化表单）、情报源管理（搜索/类型/状态过滤、添加、停用、删除）。列表每 5 s 轮询（输入框聚焦或请求进行中时跳过），增删改后立即刷新；深度链接 `?intel=list|manual|sources`。
+
+写接口只在服务端模式为 `test` 时开放（演示模式只读），并要求 `Content-Type: application/json`；演示端仍可读取统一列表。
 
 ## 3. 多领域扩展方案
 
@@ -111,6 +113,7 @@ geo_weight, time_weight, topic_weight, min_confidence, updated_at, revision
 ```
 
 - 由案例/任务状态生成：任务类型（登陆/巡逻/救灾）改变 domain 权重；目标/路线改变 AOI/实体；阶段改变时间窗。
+- 内置 profile 按案例保留相关域子集（全球 profile 才放开全部域），避免“全领域”成为实际不过滤。
 - `IntelManager.overview` 用 requirement 做**排序/聚焦**，不替代 bbox 硬过滤；对已定位情报 bbox 为主，对文本情报关键词/国家为主。
 - 需求变化时只更新 requirement 并重算 links/key items，不重建已归档 bundle；UI 通过轮询拿到新 `revision`。
 

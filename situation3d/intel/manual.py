@@ -12,8 +12,14 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
-from .taxonomy import (normalize_domain, normalize_type,
-                       normalize_verification)
+from .taxonomy import (DOMAINS, normalize_type, normalize_verification)
+
+
+def _domain(value: Any) -> str:
+    raw = str(value or "other").strip().lower()
+    if raw not in DOMAINS:
+        raise ValueError("unknown domain %r" % (value,))
+    return raw
 
 MANUAL_VERSION = 1
 STATUSES = ("active", "revoked")
@@ -136,7 +142,7 @@ class ManualIntelStore:
             "intel_id": "manual:" + uuid.uuid4().hex,
             "case_id": case_id,
             "title": _text(payload.get("title"), "title", 200),
-            "domain": normalize_domain(payload.get("domain")),
+            "domain": _domain(payload.get("domain")),
             "intel_type": intel_type,
             "event_time": _time(payload.get("event_time")),
             "lat": _coord(payload.get("lat"), "lat", -90.0, 90.0),
@@ -176,7 +182,7 @@ class ManualIntelStore:
                 if payload.get("title") is not None:
                     item["title"] = _text(payload["title"], "title", 200)
                 if payload.get("domain") is not None:
-                    item["domain"] = normalize_domain(payload["domain"])
+                    item["domain"] = _domain(payload["domain"])
                 if payload.get("intel_type") is not None or payload.get("type") is not None:
                     item["intel_type"] = normalize_type(
                         payload.get("intel_type") or payload.get("type"))
@@ -231,7 +237,3 @@ class ManualIntelStore:
             parts = ["%s:%s" % (item.get("intel_id"), item.get("revision"))
                      for item in data["items"] if isinstance(item, dict)]
             return "|".join(sorted(parts))
-
-
-def empty_manual_store() -> ManualIntelStore:
-    return ManualIntelStore(os.path.join(os.getcwd(), "manual.json"))

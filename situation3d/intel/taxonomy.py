@@ -47,7 +47,7 @@ def normalize_domains(values: Optional[Iterable[str]]) -> Tuple[str, ...]:
     if values is None:
         return ()
     if isinstance(values, str):
-        values = [values]
+        values = [item.strip() for item in values.split(",") if item.strip()]
     out = []
     for value in values:
         domain = normalize_domain(value)

@@ -14,7 +14,6 @@
   "domains": [
     "hazard",
     "conflict",
-    "maritime",
     "aviation",
     "infrastructure",
     "weather",
@@ -23,8 +22,6 @@
     "society",
     "social",
     "selfmedia",
-    "cyber",
-    "health",
     "other"
   ],
   "keywords": [

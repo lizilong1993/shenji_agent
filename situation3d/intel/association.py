@@ -8,6 +8,7 @@ machine; manual entries remain flagged unverified until an analyst says otherwis
 from __future__ import annotations
 
 import math
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -61,21 +62,45 @@ def _keywords(profile) -> Tuple[str, ...]:
                  if str(value).strip())
 
 
+def _term_hit(term: str, text: str) -> bool:
+    """Word-boundary matching for short Latin terms; substring for CJK."""
+    if not term:
+        return False
+    if term.isascii() and term.isalpha():
+        return re.search(r"(?<![a-z0-9])" + re.escape(term)
+                         + r"(?![a-z0-9])", text) is not None
+    return term in text
+
+
 def _shared_keywords(left: Dict[str, Any], right: Dict[str, Any],
                      profile) -> List[str]:
     terms = _keywords(profile)
     if not terms:
         return []
     left_text, right_text = _text(left), _text(right)
-    return [term for term in terms if term in left_text and term in right_text]
+    return [term for term in terms
+            if _term_hit(term, left_text) and _term_hit(term, right_text)]
 
 
 def link_items(items: Sequence[Dict[str, Any]], profile=None,
                radius_km: float = 50.0, window_h: float = 24.0,
-               max_links: int = 300) -> List[Dict[str, Any]]:
+               max_links: int = 300,
+               max_items: int = 600) -> List[Dict[str, Any]]:
     """Find spatial/temporal or shared-topic links between active items."""
     active = [item for item in items
               if item.get("status") != "revoked"]
+    if len(active) > max_items:
+        def _rank(item):
+            confidence = 0.0
+            try:
+                confidence = float(item.get("confidence") or 0.0)
+            except (TypeError, ValueError):
+                confidence = 0.0
+            stamp = _time(item.get("event_time"))
+            return (0 if item.get("priority") == "manual" else 1,
+                    -confidence,
+                    -(stamp.timestamp() if stamp else 0.0))
+        active = sorted(active, key=_rank)[:max_items]
     links = []
     for index, left in enumerate(active):
         for right in active[index + 1:]:
@@ -155,7 +180,7 @@ def extract_key_items(items: Sequence[Dict[str, Any]],
     scored = []
     for item in active:
         text = _text(item)
-        hits = [term for term in terms if term in text]
+        hits = [term for term in terms if _term_hit(term, text)]
         age_h = 0.0
         stamp = _time(item.get("event_time"))
         if stamp is not None:

@@ -1323,6 +1323,8 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 self._send_json(_intel_manager().overview(
                     query.get("case_id") or "default"))
+            except ValueError as exc:
+                self._send_json({"error": str(exc)}, 400)
             except Exception as exc:  # noqa: BLE001 - report a useful message
                 self._send_json({"error": "%s: %s"
                                  % (type(exc).__name__, exc)}, 500)
@@ -1757,6 +1759,15 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _api_intel_post(self, path):
         from urllib.parse import unquote
+        # Writes are a test-console capability. Demo mode is a public read-only
+        # replay; keep it that way even if the server is bound to 0.0.0.0.
+        if SERVER_MODE != "test":
+            self._send_json({"error": "intel writes are disabled in demo mode"}, 403)
+            return
+        content_type = (self.headers.get("Content-Type") or "").lower()
+        if not content_type.startswith("application/json"):
+            self._send_json({"error": "Content-Type must be application/json"}, 415)
+            return
         body = self._read_json_body()
         if body is None:
             body = {}

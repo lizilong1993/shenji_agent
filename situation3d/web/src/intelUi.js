@@ -134,8 +134,15 @@
   function startPoll() {
     stopPoll();
     state.timer = setInterval(function () {
-      if (state.tab === 'list' && !state.editing) refresh();
+      if (state.tab === 'list' && !state.editing && !state.loading &&
+          !isEditingField()) refresh();
     }, 5000);
+  }
+
+  function isEditingField() {
+    var active = document.activeElement;
+    if (!active || !active.closest || !active.closest('#intelBody')) return false;
+    return ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(active.tagName) >= 0;
   }
 
   function stopPoll() {
@@ -144,6 +151,7 @@
 
   function refresh() {
     if (!modal() || modal().classList.contains('hidden')) return Promise.resolve();
+    if (state.loading) return Promise.resolve();
     state.loading = true;
     var requested = caseId();
     var url = '/api/intel/overview?case_id=' + encodeURIComponent(requested);
@@ -234,6 +242,9 @@
       ' · 冲突覆盖 ' + (counts.superseded || 0) +
       ' · 关联 ' + (counts.links || 0)));
     body.appendChild(summary);
+    (overview.warnings || []).forEach(function (warning) {
+      body.appendChild(el('div', 'intel-warn', warning));
+    });
 
     if ((overview.key_items || []).length) {
       var key = el('div', 'intel-key');
@@ -301,9 +312,13 @@
     head.appendChild(el('span', 'intel-badge ' + item.priority,
       item.priority === 'manual' ? '人工' : '自动'));
     if (item.priority === 'manual') {
-      head.appendChild(el('span', 'intel-badge priority', '高优先级'));
-      head.appendChild(el('span', 'intel-badge verify-' + item.verification,
-        label(VERIFY, item.verification)));
+      if (item.status !== 'revoked') {
+        head.appendChild(el('span', 'intel-badge priority', '高优先级'));
+        head.appendChild(el('span', 'intel-badge verify-' + item.verification,
+          label(VERIFY, item.verification)));
+      } else {
+        head.appendChild(el('span', 'intel-badge revoked', '历史优先级'));
+      }
     } else {
       head.appendChild(el('span', 'intel-badge source', sourceName(item)));
     }
@@ -550,7 +565,13 @@
       global.alert('标题和具体内容不能为空');
       return;
     }
-    var lat = Number(payload.lat), lon = Number(payload.lon);
+    var latText = String(data.get('lat') || '').trim();
+    var lonText = String(data.get('lon') || '').trim();
+    if (!latText || !lonText) {
+      global.alert('经纬度不能为空');
+      return;
+    }
+    var lat = Number(latText), lon = Number(lonText);
     if (!isFinite(lat) || lat < -90 || lat > 90 ||
         !isFinite(lon) || lon < -180 || lon > 180) {
       global.alert('经纬度不合法');

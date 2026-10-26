@@ -104,7 +104,7 @@ class CaseProfileTest(unittest.TestCase):
                                     is_centroid=True, sourcecountry="France")
         self.assertTrue(profile.matches(inside))
         self.assertFalse(profile.matches(outside))
-        self.assertTrue(profile.matches(wrong_domain))
+        self.assertFalse(profile.matches(wrong_domain))
         self.assertFalse(profile.matches(wrong_source))
         self.assertFalse(profile.matches(wrong_keyword))
 

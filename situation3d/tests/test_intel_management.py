@@ -103,6 +103,8 @@ class ManualStoreTest(unittest.TestCase):
                 manager.manual.create(_manual_payload(event_time="yesterday"))
             with self.assertRaises(ValueError):
                 manager.manual.create(_manual_payload(case_id="bad case"))
+            with self.assertRaises(ValueError):
+                manager.manual.create(_manual_payload(domain="military"))
 
 
 class SourceStoreTest(unittest.TestCase):
@@ -126,10 +128,14 @@ class SourceStoreTest(unittest.TestCase):
             found = manager.sources.list(q="本地")
             self.assertEqual([item["source_id"] for item in found],
                              ["local_news"])
+            by_domain = {item["source_id"]
+                         for item in manager.sources.list(q="society")}
+            self.assertIn("local_news", by_domain)
+            self.assertIn("gdelt", by_domain)
             by_kind = manager.sources.list(kind="rss")
             self.assertEqual([item["source_id"] for item in by_kind],
                              ["local_news"])
-            manager.sources.update("local_news", {"enabled": False})
+            manager.sources.update("local_news", {"enabled": "false"})
             self.assertEqual(manager.sources.list(enabled=False)[0]["source_id"],
                              "local_news")
             removed = manager.sources.delete("local_news")
@@ -189,7 +195,7 @@ class OverviewTest(unittest.TestCase):
             self.assertTrue(auto["effective"])
             self.assertEqual(overview["counts"]["superseded"], 0)
 
-    def test_generic_target_manual_supersedes_auto(self):
+    def test_generic_target_does_not_supersede_different_type(self):
         with tempfile.TemporaryDirectory() as root:
             _write_bundle(root, "case1", [_auto()])
             manager = IntelManager(root)
@@ -197,8 +203,8 @@ class OverviewTest(unittest.TestCase):
             overview = manager.overview("case1")
             auto = [row for row in overview["items"]
                     if row["priority"] == "auto"][0]
-            self.assertFalse(auto["effective"])
-            self.assertEqual(overview["counts"]["superseded"], 1)
+            self.assertTrue(auto["effective"])
+            self.assertEqual(overview["counts"]["superseded"], 0)
 
     def test_missing_bundle_is_warning_not_failure(self):
         with tempfile.TemporaryDirectory() as root:
@@ -208,6 +214,20 @@ class OverviewTest(unittest.TestCase):
             self.assertEqual(overview["counts"]["manual_active"], 1)
             self.assertEqual(overview["counts"]["auto"], 0)
             self.assertTrue(overview["warnings"])
+
+    def test_mismatched_bundle_is_ignored(self):
+        with tempfile.TemporaryDirectory() as root:
+            _write_bundle(root, "case1", [_auto()])
+            path = os.path.join(root, "case1", "bundle.json")
+            with open(path, encoding="utf-8") as handle:
+                data = json.load(handle)
+            data["scenario_id"] = "global"
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump(data, handle)
+            overview = IntelManager(root).overview("case1")
+            self.assertEqual(overview["counts"]["auto"], 0)
+            self.assertTrue(any("不一致" in warning
+                                for warning in overview["warnings"]))
 
 
 if __name__ == "__main__":

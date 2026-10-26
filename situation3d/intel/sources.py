@@ -26,6 +26,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _as_bool(value: Any, default: bool = True) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    text = str(value).strip().lower()
+    if text in ("false", "0", "no", "off", ""):
+        return False
+    if text in ("true", "1", "yes", "on"):
+        return True
+    return bool(value)
+
+
 def _tags(value: Any) -> List[str]:
     if value is None:
         return []
@@ -135,6 +148,7 @@ class SourceStore:
                 str(item.get("name") or ""),
                 str(item.get("description") or ""),
                 " ".join(item.get("tags") or []),
+                " ".join(item.get("domains") or []),
             ]).lower()
             if text and text not in haystack:
                 continue
@@ -169,7 +183,7 @@ class SourceStore:
             "url": str(payload.get("url") or "").strip()[:500],
             "description": str(payload.get("description") or "").strip()[:500],
             "tags": _tags(payload.get("tags")),
-            "enabled": bool(payload.get("enabled", True)),
+            "enabled": _as_bool(payload.get("enabled", True), True),
             "builtin": False,
             "license": str(payload.get("license") or "").strip()[:200],
             "attribution": str(payload.get("attribution") or name).strip()[:200],
@@ -189,6 +203,9 @@ class SourceStore:
             raise ValueError("payload must be an object")
         with self._lock:
             data = self._load_unlocked()
+            if payload.get("name") is not None and not str(
+                    payload.get("name")).strip():
+                raise ValueError("name cannot be empty")
             for item in data["items"]:
                 if item.get("source_id") != source_id:
                     continue
@@ -197,7 +214,7 @@ class SourceStore:
                     # enabled state may change.
                     for key in ("name", "description", "tags", "enabled"):
                         if payload.get(key) is not None:
-                            item[key] = (bool(payload[key])
+                            item[key] = (_as_bool(payload[key])
                                          if key == "enabled"
                                          else (str(payload[key]).strip()[:500]
                                                if key != "tags"
@@ -212,7 +229,7 @@ class SourceStore:
                         elif key == "tags":
                             item[key] = _tags(payload[key])
                         elif key == "enabled":
-                            item[key] = bool(payload[key])
+                            item[key] = _as_bool(payload[key])
                         else:
                             item[key] = str(payload[key]).strip()[:500]
                     if payload.get("domains") is not None:
