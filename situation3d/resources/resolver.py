@@ -23,6 +23,13 @@ from .model import (ResourceDecision, ResourceEntry, ResourceGap, ResourcePlan,
                     ResourceRequirement, slugify, utc_now)
 from .store import ResourceStore
 
+# Only world-data resources are pinned to the scenario date.  Code/rules
+# catalogs (role cards, platform profiles, weapon tables) are versioned with
+# the checkout; filtering them by a historical scenario date would block every
+# past-date run for no physical reason.
+DATE_SENSITIVE = {"envpack", "case_roads", "bathymetry", "weather",
+                  "intel_bundle"}
+
 IMPACT = {
     "envpack": "缺少可用的环境包时，地形/路网/水系/建筑没有权威来源，引擎不能安全推演",
     "case_roads": "案例初始编成与道路路由依赖该路网，缺失时无法生成初始想定",
@@ -120,6 +127,11 @@ def resolve_requirements(store: ResourceStore,
                          decisions: Iterable[ResourceDecision] = (),
                          case_id: str = "case") -> ResourcePlan:
     target = _target_date(scenario_date)
+    today = date.today()
+    # Freshness is measured against "now" when the scenario lies in the future:
+    # no snapshot can be newer than today, and a future target must not make
+    # perfectly current data look stale forever.
+    reference = min(target, today)
     accepted_stale = set(d.entry_id for d in decisions
                          if d.action == "use_cached_stale" and d.entry_id)
     chosen: List[ResourceEntry] = []
@@ -128,10 +140,13 @@ def resolve_requirements(store: ResourceStore,
         spec = kind_spec(req.kind)
         entries = store.entries(req.kind)
         matched = [e for e in entries if _scope_matches(e, req.scope)]
-        future = [e for e in matched
-                  if not (e.notes or {}).get("manual_override")
-                  and _entry_date(e.as_of) is not None
-                  and _entry_date(e.as_of) > target + timedelta(days=1)]
+        if req.kind in DATE_SENSITIVE:
+            future = [e for e in matched
+                      if not (e.notes or {}).get("manual_override")
+                      and _entry_date(e.as_of) is not None
+                      and _entry_date(e.as_of) > target + timedelta(days=1)]
+        else:
+            future = []
         usable = [e for e in matched if e not in future]
         usable.sort(key=lambda e: (e.as_of or "", e.fetched_at or "",
                                    e.entry_id), reverse=True)
@@ -197,10 +212,15 @@ def resolve_requirements(store: ResourceStore,
                     detail = "应提供: %s" % name
                 else:
                     detail = ""
+            impact = IMPACT.get(req.kind, req.reason or "运行所需资源缺失")
+            if reason == "no_point_in_time":
+                impact = "没有不晚于想定日期的快照；" + impact
+            elif reason == "integrity":
+                impact = "登记内容与磁盘不一致；" + impact
             gaps.append(ResourceGap(
                 kind=req.kind,
                 criticality=req.criticality,
-                impact=IMPACT.get(req.kind, req.reason or "运行所需资源缺失"),
+                impact=impact,
                 reason="%s%s" % (reason, (": " + req.reason) if req.reason else ""),
                 recommendation=_recommendation(req, reason, matched, detail),
                 candidates=tuple(e.as_dict() for e in matched[:3])))
@@ -216,10 +236,10 @@ def resolve_requirements(store: ResourceStore,
             if as_of is None:
                 stale = True
                 detail = "登记缺少 as_of，无法证明时效"
-            elif target - as_of > timedelta(days=float(ttl)):
+            elif reference - as_of > timedelta(days=float(ttl)):
                 stale = True
-                detail = "as_of=%s，距想定日期 %d 天，上限 %g 天" % (
-                    selected.as_of, (target - as_of).days, float(ttl))
+                detail = "as_of=%s，距参考日期 %d 天，上限 %g 天" % (
+                    selected.as_of, (reference - as_of).days, float(ttl))
         if not stale:
             continue
         if selected.entry_id in accepted_stale:
@@ -231,13 +251,25 @@ def resolve_requirements(store: ResourceStore,
                                 "entry_id": selected.entry_id},
                 candidates=(selected.as_dict(),)))
             continue
+        if target < today:
+            recommendation = {
+                "action": "choose_date_or_provide_snapshot",
+                "detail": "想定日期早于今天，在线刷新只会产生今天的数据；"
+                          "请调整日期或提供该时点的历史快照",
+                "choices": ["choose_date", "provide_file"],
+                "entry_id": selected.entry_id,
+                "as_of": selected.as_of,
+            }
+        else:
+            recommendation = dict(
+                _recommendation(req, "stale", [selected], detail),
+                entry_id=selected.entry_id, as_of=selected.as_of)
         gaps.append(ResourceGap(
             kind=req.kind, criticality=req.criticality,
-            impact=IMPACT.get(req.kind, req.reason or "数据时效不足"),
+            impact="数据时效不足（%s）；%s" % (
+                detail, IMPACT.get(req.kind, req.reason or "")),
             reason="stale: " + detail,
-            recommendation=dict(_recommendation(req, "stale", [selected], detail),
-                               entry_id=selected.entry_id,
-                               as_of=selected.as_of),
+            recommendation=recommendation,
             candidates=(selected.as_dict(),)))
     blocked = any(g.criticality == "critical" for g in gaps)
     status = "blocked" if blocked else ("degraded" if gaps else "ready")

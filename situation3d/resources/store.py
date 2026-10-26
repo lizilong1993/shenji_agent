@@ -39,6 +39,9 @@ class ResourceConflict(ResourceError):
 
 
 def default_root() -> str:
+    env_root = os.environ.get("SITUATION_RESOURCES_DIR")
+    if env_root:
+        return env_root
     return str(Path(__file__).resolve().parent.parent / "var" / "resources")
 
 
@@ -151,6 +154,11 @@ class ResourceStore(object):
 
     @staticmethod
     def _merge(old: ResourceEntry, new: ResourceEntry) -> ResourceEntry:
+        notes = dict(old.notes)
+        notes.update(new.notes)
+        if old.notes.get("manual_override") \
+                and not new.notes.get("manual_override"):
+            notes.pop("manual_override", None)
         return ResourceEntry(
             entry_id=old.entry_id,
             kind=new.kind,
@@ -167,7 +175,7 @@ class ResourceStore(object):
             license=new.license or old.license,
             quality=new.quality or old.quality,
             pinned=old.pinned or new.pinned,
-            notes=dict(old.notes, **new.notes),
+            notes=notes,
         )
 
     def set_pin(self, entry_id: str, pinned: bool = True) -> ResourceEntry:

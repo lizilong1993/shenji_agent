@@ -9,7 +9,7 @@
 
 | 模式 | 行为 |
 |---|---|
-| `auto`（默认） | 只有出现 **critical envpack 缺口**时尝试联网刷新；先做 3.5 s Overpass 探针，失败则保留现有资源并进入 waiting；成功则重建、登记、重新解析 |
+| `auto`（默认） | 只有出现 **critical envpack 缺口**、且想定日期不早于今天（`no_point_in_time` 除外）时尝试联网刷新；先做 3.5 s Overpass 探针，失败则保留现有资源并进入 waiting；成功则重建、登记、重新解析 |
 | `offline` | 永不联网；只用注册表中已有资源（缺失/过期按 P2 分级处理） |
 | `online` | 与 auto 相同的刷新，但探针失败视为错误（仍会等待用户） |
 | 决策 `fetch_online` | 即使本次为 offline，也强制尝试一次在线刷新 |
@@ -26,6 +26,7 @@
 - 输出：`<store>/cache/envpacks/<pack_id>@<UTC时间戳>/`；原始响应缓存在 `<store>/cache/_cache`。
 - 登记：内容哈希 + `as_of=重建日期` + `provider=online-refresh`，entry_id 带时间戳
   （`envpack:<pack>@<stamp>`），旧版本保留，历史 run 的路径/哈希不受影响。
+- 同一模板同一天只重建一次：已存在 `refreshed_from` 且 `as_of=今天` 的版本时直接复用。
 - **质量门**：若重建结果的 roads 层仍是 `fallback-basic`（Overpass 不可达/返回不完整），
   默认拒绝登记，并提示检查网络/代理或使用离线包；只有显式 `--allow-degraded` 才登记
   `quality=derived` 的包。

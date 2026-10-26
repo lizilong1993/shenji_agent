@@ -104,6 +104,10 @@ class ValidateTasksTest(unittest.TestCase):
             with self.assertRaises(TaskError, msg=str(raw)):
                 tasking.validate_tasks([raw], SCENARIO)
 
+    def test_nan_start_is_rejected(self):
+        with self.assertRaises(TaskError):
+            tasking.validate_tasks([task(start_s=float("nan"))], SCENARIO)
+
     def test_duplicate_unit_across_tasks(self):
         tasks = [task(id="U1"), task(id="U2", units=[1])]
         with self.assertRaises(TaskError):
@@ -181,6 +185,21 @@ class MergeTest(unittest.TestCase):
                    "tasks": [task(id="U1", units=[2])]}
         missions, _summary = tasking.merge_missions(DEFAULTS, request, SCENARIO)
         self.assertEqual([m["id"] for m in missions], ["D0", "B0", "U1"])
+
+    def test_per_task_side_overrides_that_sides_defaults(self):
+        request = {"mode": "user", "side": 0,
+                   "tasks": [task(id="U1", side=1, units=[9],
+                                  objective="E区", lon=None, lat=None)]}
+        missions, summary = tasking.merge_missions(DEFAULTS, request, SCENARIO)
+        self.assertEqual([m["id"] for m in missions], ["D0", "U1"])
+        self.assertEqual(summary["dropped_default_missions"], ["B0"])
+
+    def test_mixed_per_task_side_conflict(self):
+        request = {"mode": "mixed", "side": 0,
+                   "tasks": [task(id="U1", side=1, units=[9],
+                                  objective="E区", lon=None, lat=None)]}
+        with self.assertRaises(TaskError):
+            tasking.merge_missions(DEFAULTS, request, SCENARIO)
 
     def test_user_mode_can_depend_on_kept_default(self):
         request = {"mode": "user", "side": 0,

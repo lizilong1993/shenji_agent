@@ -208,9 +208,10 @@ def validate_tasks(tasks: Iterable[Any], scenario: Dict[str, Any],
             if dep not in seen_ids:
                 raise TaskError("%s: unknown predecessor %r" % (mid, dep))
         try:
-            start_s = float(raw.get("start_s") or 0.0)
+            start_s = _check_number(float(raw.get("start_s") or 0.0),
+                                    "%s start_s" % mid)
         except (TypeError, ValueError):
-            raise TaskError("%s: start_s must be a number" % mid)
+            raise TaskError("%s: start_s must be a finite number" % mid)
         if start_s < 0:
             raise TaskError("%s: start_s must be >= 0" % mid)
         if duration > 0 and start_s > duration:
@@ -250,25 +251,23 @@ def validate_tasks(tasks: Iterable[Any], scenario: Dict[str, Any],
     return out
 
 
-def _unit_override(defaults, tasks, side):
-    """Remove user-tasked units from own-side defaults.
+def _unit_override(defaults, tasks):
+    """Remove user-tasked units from the same-side defaults.
 
     Returns ``(kept, dropped_ids, trimmed_ids)``.  A default mission that
     loses all of its units is dropped; a partially overridden one keeps the
     remaining units.  Kept missions must not depend on a dropped mission.
     """
-    tasked = set()
+    tasked = {}
     for task in tasks:
-        tasked.update(task["units"])
+        tasked.setdefault(int(task["side"]), set()).update(task["units"])
     kept = []
     dropped = []
     trimmed = []
     for item in defaults:
-        if int(item.get("side", 0)) != side:
-            kept.append(item)
-            continue
+        side = int(item.get("side", 0))
         units = [int(u) for u in item.get("units") or []]
-        overlap = [u for u in units if u in tasked]
+        overlap = [u for u in units if u in tasked.get(side, ())]
         if not overlap:
             kept.append(item)
             continue
@@ -276,7 +275,8 @@ def _unit_override(defaults, tasks, side):
             dropped.append(str(item.get("id")))
             continue
         trimmed_item = dict(item)
-        trimmed_item["units"] = [u for u in units if u not in tasked]
+        removed = tasked.get(side, set())
+        trimmed_item["units"] = [u for u in units if u not in removed]
         trimmed.append(str(item.get("id")))
         kept.append(trimmed_item)
     dropped_set = set(dropped)
@@ -314,21 +314,22 @@ def merge_missions(default_missions: Iterable[Dict[str, Any]],
     dropped: List[str] = []
     trimmed: List[str] = []
     if mode == "user":
-        kept, dropped, trimmed = _unit_override(defaults, tasks, side)
+        kept, dropped, trimmed = _unit_override(defaults, tasks)
     else:
         kept = defaults
         default_units = {}
         for item in kept:
-            if int(item.get("side", 0)) != side:
-                continue
+            mission_side = int(item.get("side", 0))
             for uid in item.get("units") or []:
-                default_units[int(uid)] = str(item.get("id"))
+                default_units[(mission_side, int(uid))] = str(item.get("id"))
         for task in tasks:
+            task_side = int(task["side"])
             for uid in task["units"]:
-                if uid in default_units:
+                key = (task_side, uid)
+                if key in default_units:
                     raise TaskError(
                         "单位 %s 已属于默认任务 %s；请使用 mode=user 或调整单位"
-                        % (uid, default_units[uid]))
+                        % (uid, default_units[key]))
     kept_ids = set(str(item.get("id")) for item in kept)
     for task in tasks:
         for dep in task["after"]:

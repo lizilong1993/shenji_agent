@@ -262,7 +262,7 @@ class ResourceDecision:
             "entry_id": self.entry_id,
             "note": self.note,
             "decided_by": self.decided_by,
-            "decided_at": self.decided_at or utc_now(),
+            "decided_at": self.decided_at,
             "accept_stale": bool(self.accept_stale),
             "kind": self.kind,
             "path": self.path,

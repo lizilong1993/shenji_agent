@@ -83,6 +83,28 @@ class ResolverTest(unittest.TestCase):
         self.assertEqual([e.entry_id for e in plan.entries], ["envpack:stale"])
         self.assertIn("stale_accepted", plan.gaps[0].reason)
 
+    def test_future_target_does_not_make_current_data_stale(self):
+        add_entry(self.store, "envpack:now", "envpack", "now",
+                  "2026-10-23", bbox=[120.0, 22.8, 120.2, 23.0])
+        plan = resolve_requirements(self.store, [ENV_REQ], "2027-01-01")
+        self.assertEqual(plan.status, "ready")
+        self.assertEqual([e.entry_id for e in plan.entries], ["envpack:now"])
+
+    def test_historical_target_keeps_code_catalogs(self):
+        req = ResourceRequirement("rolecards", "critical", "角色卡")
+        add_entry(self.store, "rolecards:repo", "rolecards", "x",
+                  "2026-10-21")
+        plan = resolve_requirements(self.store, [req], "2026-09-01")
+        self.assertEqual(plan.status, "ready")
+
+    def test_historical_stale_points_to_date_change(self):
+        add_entry(self.store, "envpack:old", "envpack", "old",
+                  "2026-08-01", bbox=[120.0, 22.8, 120.2, 23.0])
+        plan = resolve_requirements(self.store, [ENV_REQ], "2026-09-01")
+        self.assertEqual(plan.status, "blocked")
+        self.assertEqual(plan.gaps[0].recommendation["action"],
+                         "choose_date_or_provide_snapshot")
+
     def test_advisory_stale_degrades_but_continues(self):
         req = ResourceRequirement("intel_bundle", "advisory", "情报")
         add_entry(self.store, "intel_bundle:x", "intel_bundle", "x",

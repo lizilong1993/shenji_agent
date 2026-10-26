@@ -15,7 +15,8 @@ if SITUATION3D not in sys.path:
     sys.path.insert(0, SITUATION3D)
 
 from resources.catalog import default_criticality, kind_spec, validate_kind  # noqa: E402
-from resources.model import ResourceEntry, ResourcePlan, hash_path  # noqa: E402
+from resources.model import (ResourceDecision, ResourceEntry,  # noqa: E402
+                             ResourcePlan, hash_path)
 from resources.scanners import scan_envpack, scan_repo  # noqa: E402
 from resources.store import (ResourceConflict, ResourceNotFound,  # noqa: E402
                              ResourceStore)
@@ -232,6 +233,18 @@ class RepoScanTest(unittest.TestCase):
 
 
 class PlanContractTest(unittest.TestCase):
+    def test_decision_timestamps_do_not_break_hash(self):
+        entry = ResourceEntry(
+            entry_id="envpack:p1", kind="envpack", path="/tmp/p1",
+            content_hash="a" * 64, size=1)
+        d1 = ResourceDecision(action="use_cached_stale", entry_id="envpack:p1")
+        d2 = ResourceDecision(action="use_cached_stale", entry_id="envpack:p1")
+        p1 = ResourcePlan(plan_id="p", scenario_date="2026-10-26",
+                          entries=(entry,), decisions=(d1,))
+        p2 = ResourcePlan(plan_id="p", scenario_date="2026-10-26",
+                          entries=(entry,), decisions=(d2,))
+        self.assertEqual(p1.hash(), p2.hash())
+
     def test_plan_hash_is_content_sensitive(self):
         entry = ResourceEntry(
             entry_id="envpack:p1", kind="envpack", path="/tmp/p1",

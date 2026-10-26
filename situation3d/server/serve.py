@@ -259,6 +259,7 @@ SERVER_MODE = normalize_mode(env("SITUATION_MODE") or DEFAULT_MODE)
 # 运行库只属于测试端；演示端即使目录存在也不会被创建/读取。
 RUNS_DIR = env("SITUATION_RUNS_DIR") or os.path.join(_PKG_ROOT, "var", "sim_runs")
 RUN_STORE = None
+_RESOLVE_LOCK = threading.Lock()
 
 # Cases that the test console may launch. The module name is resolved under
 # situation3d/campaigns/; keep this list explicit (no arbitrary module loading
@@ -332,9 +333,21 @@ def _watch_run(case_id, run_id, proc, log_fh):
         traceback.print_exc()
 
 
+def _resource_allowed_roots():
+    roots = [os.path.join(_PKG_ROOT, "envpacks"),
+             os.path.join(_PKG_ROOT, "var", "resources"),
+             os.path.join(_PKG_ROOT, "var", "resources", "cache")]
+    raw = env("SITUATION_RESOURCE_ROOTS") or ""
+    roots += [part for part in raw.split(os.pathsep) if part.strip()]
+    return [os.path.realpath(os.path.abspath(part)) for part in roots]
+
+
 def _spawn_run(case_id, run_id, extra_args=None):
     """(Re)start the runner subprocess for an existing run record."""
     run = RUN_STORE.get_run(case_id, run_id)
+    pid = run.get("pid")
+    if pid is not None and _pid_alive(pid):
+        raise RunError("run already has a live runner (pid %s)" % pid)
     config = run.get("config") or {}
     seed = run.get("seed")
     if seed is None:
@@ -1259,7 +1272,7 @@ class Handler(SimpleHTTPRequestHandler):
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             return None
-        if n <= 0 or n > 65536:
+        if n <= 0 or n > 1200000:
             return None
         try:
             return json.loads(self.rfile.read(n).decode("utf-8"))
@@ -1725,31 +1738,48 @@ class Handler(SimpleHTTPRequestHandler):
                 cid = str(body.get("case_id") or "taiwan_dense_transfer_v1")
                 try:
                     if action == "resolve":
-                        run = RUN_STORE.get_run(cid, run_id)
-                        if run.get("status") != "waiting_resources":
-                            self._send_json({"error": "run is not waiting for "
-                                             "resources", "status": run.get("status")}, 409)
-                            return
+                        allowed = ("use_cached_stale", "fetch_online",
+                                   "provide_file", "cancel")
                         decisions = body.get("decisions")
                         if not isinstance(decisions, list) or len(decisions) > 50:
                             self._send_json({"error": "decisions must be a list "
                                              "(max 50)"}, 400)
                             return
                         for item in decisions:
-                            if not isinstance(item, dict) or not item.get("action"):
-                                self._send_json({"error": "each decision needs "
-                                                 "an action"}, 400)
+                            if not isinstance(item, dict) or item.get("action") not in allowed:
+                                self._send_json({"error": "decision action must be "
+                                                 "one of %s" % ", ".join(allowed)}, 400)
                                 return
-                        run_dir = RUN_STORE.run_dir(cid, run_id)
-                        path = os.path.join(run_dir, "decisions.json")
-                        tmp = path + ".tmp"
-                        with open(tmp, "w", encoding="utf-8") as fh:
-                            json.dump({"decisions": decisions}, fh,
-                                      ensure_ascii=False, indent=1)
-                        os.replace(tmp, path)
-                        RUN_STORE.update_run(cid, run_id, status="queued")
-                        _spawn_run(cid, run_id,
-                                   extra_args=["--resolutions", path])
+                            if item.get("action") == "provide_file":
+                                path = item.get("path")
+                                if not isinstance(path, str) or not os.path.isabs(path) \
+                                        or not os.path.isdir(path):
+                                    self._send_json({"error": "provide_file needs an "
+                                                     "existing absolute directory path"}, 400)
+                                    return
+                                real = os.path.realpath(path)
+                                roots = _resource_allowed_roots()
+                                if not any(real == root or real.startswith(root + os.sep)
+                                           for root in roots):
+                                    self._send_json({"error": "path is outside the allowed "
+                                                     "resource roots"}, 400)
+                                    return
+                        with _RESOLVE_LOCK:
+                            run = RUN_STORE.get_run(cid, run_id)
+                            if run.get("status") != "waiting_resources":
+                                self._send_json({"error": "run is not waiting for "
+                                                 "resources", "status": run.get("status")}, 409)
+                                return
+                            run_dir = RUN_STORE.run_dir(cid, run_id)
+                            path = os.path.join(run_dir, "decisions.json")
+                            tmp = path + ".tmp"
+                            with open(tmp, "w", encoding="utf-8") as fh:
+                                json.dump({"decisions": decisions}, fh,
+                                          ensure_ascii=False, indent=1)
+                            os.replace(tmp, path)
+                            RUN_STORE.update_run(cid, run_id, status="queued")
+                            _spawn_run(cid, run_id,
+                                       extra_args=["--resolutions", path])
                         self._send_json({"run_id": run_id, "status": "queued"})
                         return
                     if action == "select":
@@ -1772,7 +1802,7 @@ class Handler(SimpleHTTPRequestHandler):
                     if action == "cancel":
                         run = RUN_STORE.get_run(cid, run_id)
                         pid = run.get("pid")
-                        if pid:
+                        if pid and _pid_alive(pid):
                             try:
                                 os.kill(int(pid), 15)
                             except OSError:

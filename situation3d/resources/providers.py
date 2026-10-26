@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import urllib.error
 import urllib.parse
@@ -90,6 +91,13 @@ def refresh_envpack(store: ResourceStore, entry: ResourceEntry,
     """Rebuild ``entry`` from live sources and register a versioned copy."""
     if entry.kind != "envpack":
         raise ProviderError("refresh_envpack only supports envpack entries")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    for existing in store.entries("envpack"):
+        if (existing.notes.get("refreshed_from") == entry.entry_id
+                and existing.as_of == today):
+            # One refresh per template per day: repeated auto runs must not
+            # rebuild 38 MB every time or grow the registry without bound.
+            return existing
     if not os.path.isdir(entry.path):
         raise ProviderError("envpack path missing: %s" % entry.path)
     manifest_path = os.path.join(entry.path, "manifest.json")
@@ -142,9 +150,22 @@ def refresh_envpack(store: ResourceStore, entry: ResourceEntry,
 
 
 def register_provided_envpack(store: ResourceStore, path: str,
-                              entry_id: Optional[str] = None) -> ResourceEntry:
+                              entry_id: Optional[str] = None,
+                              allowed_roots=None) -> ResourceEntry:
     """Register a user-supplied envpack path (manual override)."""
-    path = os.path.abspath(path)
+    path = os.path.realpath(os.path.abspath(path))
+    if allowed_roots:
+        roots = [os.path.realpath(os.path.abspath(root))
+                 for root in allowed_roots]
+        if not any(path == root or path.startswith(root + os.sep)
+                   for root in roots):
+            raise ProviderError(
+                "提供的路径不在允许目录内：%s（允许：%s）"
+                % (path, ", ".join(roots)))
+    if entry_id and not re.match(
+            r"^[a-z0-9][a-z0-9_.-]*:[A-Za-z0-9][A-Za-z0-9_.:@-]*$",
+            entry_id):
+        raise ProviderError("entry_id 格式无效: %r" % entry_id)
     if not os.path.isdir(path):
         raise ProviderError("provided envpack path not found: %s" % path)
     try:

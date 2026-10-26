@@ -149,6 +149,26 @@ class RefreshTest(unittest.TestCase):
         self.assertTrue(entry.notes.get("manual_override"))
         self.assertEqual(entry.provider, "provided-file")
 
+    def test_same_day_refresh_is_reused(self):
+        first = providers.refresh_envpack(
+            self.store, self.entry, self.cache,
+            osm_source=FakeOsm(), dem_source=FakeDem())
+        second = providers.refresh_envpack(
+            self.store, self.entry, self.cache,
+            osm_source=FakeOsm(EMPTY), dem_source=FakeDem())
+        self.assertEqual(first.entry_id, second.entry_id)
+        self.assertEqual(len(self.store.entries("envpack")), 2)
+
+    def test_provide_path_allowlist(self):
+        with self.assertRaises(providers.ProviderError):
+            providers.register_provided_envpack(
+                self.store, self.pack, entry_id="envpack:blocked",
+                allowed_roots=[self.cache])
+        entry = providers.register_provided_envpack(
+            self.store, self.pack, entry_id="envpack:allowed",
+            allowed_roots=[os.path.dirname(self.pack)])
+        self.assertEqual(entry.entry_id, "envpack:allowed")
+
     def test_probe_failure(self):
         self.assertFalse(providers.probe_online("127.0.0.1", 9, 0.2))
 

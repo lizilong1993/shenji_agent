@@ -46,8 +46,11 @@ waiting_resources / running → failed / cancelled
 1. 匹配 scope：名称（theatre）与 bbox（包含场景锚点 + 所有任务点；无 bbox 的资源视为全局）。
 2. 不使用“晚于想定日期 +1 天”的数据（point-in-time）。
 3. 在可用候选中取 `as_of` 最新；随后校验内容哈希，损坏的候选跳过并记为 integrity 缺口。
-4. 超过该类型 TTL（envpack 30 天、情报 1 天、DEM/GEBCO 365 天）标记 stale：
-   critical → `blocked`；advisory → `degraded` 继续。
+4. 超过该类型 TTL（envpack 30 天、情报 1 天、DEM/GEBCO 365 天）标记 stale。时效参考日为
+   `min(想定日期, 今天)`：未来想定不会被当前数据误判过期；历史想定的过期建议是调整日期或
+   提供历史快照，而不是在线刷新。critical → `blocked`；advisory → `degraded` 继续。
+   日期过滤只作用于世界数据类（envpack/case_roads/水深/天气/情报），角色卡/平台/武器等
+   代码数据不做历史日期过滤。
 5. 用户可用 `use_cached_stale` 决策显式接受过期数据，计划转为 degraded 并留下警告。
 
 `--envpack <path>` 是显式人工覆盖：登记为 `provider=cli-override`，跳过日期过滤，

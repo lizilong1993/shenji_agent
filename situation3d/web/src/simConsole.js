@@ -3,7 +3,8 @@
  * Also: scenario date, launch-time tasks, resource preflight / resolve. */
 (function () {
   'use strict';
-  var state = { caseId: null, runs: [], timer: null, busy: false, resolveRun: null };
+  var state = { caseId: null, runs: [], timer: null, busy: false,
+                resolveRun: null, dateTouched: false };
   var el = {};
 
   function $(id) { return document.getElementById(id); }
@@ -75,19 +76,25 @@
   }
 
   function resourceHtml(run) {
+    var res = run.resources || {};
+    var fetchErr = res.fetch_error ? '<div class="hint bad">' + esc(res.fetch_error) + '</div>' : '';
     if (run.status === 'waiting_resources') {
       var gaps = run.resource_gaps || [];
       var kinds = gaps.map(function (g) { return g.kind; });
       return '<span class="bad">等待资源</span>' +
-        (kinds.length ? '<div class="hint">' + esc(kinds.join('、')) + '</div>' : '');
+        (kinds.length ? '<div class="hint">' + esc(kinds.join('、')) + '</div>' : '') +
+        fetchErr;
     }
-    var res = run.resources || {};
     if (!res.status) return '<span class="hint">—</span>';
     var cls = res.status === 'ready' ? 'ok' : (res.status === 'degraded' ? 'warn' : 'bad');
     var warn = (res.warnings || []).length;
-    var fetchErr = res.fetch_error ? '<div class="hint bad">' + esc(res.fetch_error) + '</div>' : '';
+    var derived = (res.entries || []).filter(function (e) {
+      return e.quality && e.quality !== 'measured';
+    }).length;
     return '<span class="' + cls + '">' + esc(res.status) + '</span>' +
-      (warn ? '<div class="hint">⚠ ' + warn + ' 条提示</div>' : '') + fetchErr;
+      (warn ? '<div class="hint">⚠ ' + warn + ' 条提示</div>' : '') +
+      (derived ? '<div class="hint warn">⚠ ' + derived + ' 项降级数据</div>' : '') +
+      fetchErr;
   }
 
   function render() {
@@ -288,6 +295,8 @@
   function resolve(decisions) {
     if (!state.resolveRun) return;
     var runId = state.resolveRun.run_id;
+    var buttons = el.resolver.querySelectorAll('button');
+    for (var i = 0; i < buttons.length; i++) buttons[i].disabled = true;
     setResolverStatus('提交处理…');
     postRun(runId, 'resolve', { decisions: decisions })
       .then(function () {
@@ -298,6 +307,7 @@
       })
       .catch(function (err) {
         setResolverStatus('处理失败：' + err.message, true);
+        for (var j = 0; j < buttons.length; j++) buttons[j].disabled = false;
       });
   }
 
@@ -402,6 +412,12 @@
       resolverCancel: $('resolver-cancel'), resolverClose: $('resolver-close')
     };
     el.date.value = localNowInput();
+    el.date.addEventListener('change', function () { state.dateTouched = true; });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && !state.dateTouched) {
+        el.date.value = localNowInput();
+      }
+    });
     el.launch.addEventListener('click', launch);
     el.refresh.addEventListener('click', refresh);
     el.runs.addEventListener('click', onAction);

@@ -15,10 +15,12 @@
   未添加任务时不发送 tasks，执行案例内置 doctrine。
 - **运行表资源列**：显示 ready/degraded/等待资源；degraded 显示提示条数；
   waiting 显示缺口资源类型。
-- **资源处理面板**：对 `waiting_resources` 运行展示缺口原因、建议路径/命令，并提供：
+- **资源处理面板**：对 `waiting_resources` 运行展示缺口原因、建议路径/命令（含网络探测/质量门
+  失败原因与降级数据提示），并提供：
   - 接受该缓存数据（use_cached_stale，仅当缺口带 entry_id）；
   - 在线刷新（fetch_online）；
-  - 提供环境包路径（provide_file，服务器绝对路径）；
+  - 提供环境包路径（provide_file，服务器绝对路径，且必须位于 `SITUATION_RESOURCE_ROOTS`
+    或默认 envpacks/var/resources 目录内）；
   - 取消运行（cancel）。
 - 轮询：queued/running 每 3 s，waiting_resources 每 10 s。
 
@@ -29,10 +31,10 @@ Playwright（临时测试服务器 8861/8862，独立 runs 目录；未触碰 88
 1. 页面加载：案例下拉出现，无 pageerror / console error；默认日期已填。
 2. 添加任务（4001,4002 → 120.10/22.93，offline 模式）发起：API 202，run.config 记录
    `scenario_date=2026-10-26T05:27:00.000Z`、`tasking={mode:user,side:0,tasks:1}`。
-3. 想定日期 2027-01-01 + offline + 20 tick：运行进入“等待资源”，资源列显示 envpack；
-   点击“处理资源”打开缺口面板，展示 stale 原因（as_of=2026-10-23，超 30 天上限）。
-4. 点击“接受该缓存数据”：resolve 成功，运行完成；资源列显示 degraded + ⚠1；
-   表格出现“完成”。
+3. 想定日期 2026-09-01 + offline + 20 tick：运行进入“等待资源”，资源列显示 envpack 与
+   “候选快照晚于想定日期”提示；点击“处理资源”打开缺口面板。
+4. 点击“提供环境包路径”并输入允许目录内的 envpack：resolve 成功，运行完成；
+   资源列显示 ready + “降级数据”提示；表格出现“完成”。
 5. 全程无 pageerror；截图用于目视检查布局。
 
 ## 3. 限制

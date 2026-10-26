@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import importlib.util
 import json
 import math
@@ -520,23 +520,29 @@ def _load_decisions(path):
 def _ensure_local_resources(store):
     """Register repo artifacts and the default envpack when absent.
 
-    This is local-only (no network) and idempotent; it keeps a fresh checkout
-    or a new worktree from blocking on its own tracked data.
+    Local-only (no network) and idempotent.  It also refreshes entries whose
+    content changed (roads/rolecards/platforms/weapons) so a stale index does
+    not turn into a false ``integrity`` gap on every run.
     """
     try:
-        have = set(entry.kind for entry in store.entries())
-        needed = {"rolecards", "platforms", "weapons", "case_roads"}
-        if not needed.issubset(have):
-            entries, errors = scan_repo(SITUATION3D)
-            for entry in entries:
-                if entry.kind in needed and entry.kind not in have:
-                    try:
-                        store.register(entry)
-                    except Exception:  # noqa: BLE001 - keep the scan going
-                        pass
-            if errors:
-                print("[resource] scan warnings: %s" % errors, file=sys.stderr)
-        if "envpack" not in have and os.path.isdir(DEFAULT_ENVPACK):
+        entries, errors = scan_repo(SITUATION3D)
+        try:
+            current = {e.entry_id: e for e in store.entries()}
+        except Exception:  # noqa: BLE001 - fall through to full registration
+            current = {}
+        for entry in entries:
+            old = current.get(entry.entry_id)
+            if old is not None and old.content_hash == entry.content_hash:
+                continue
+            try:
+                store.register(entry, replace=True)
+            except Exception as exc:  # noqa: BLE001 - keep the scan going
+                print("[resource] register %s failed: %s"
+                      % (entry.entry_id, exc), file=sys.stderr)
+        if errors:
+            print("[resource] scan warnings: %s" % errors, file=sys.stderr)
+        if not any(e.kind == "envpack" for e in store.entries()) \
+                and os.path.isdir(DEFAULT_ENVPACK):
             try:
                 store.register(scan_envpack(DEFAULT_ENVPACK))
             except Exception as exc:  # noqa: BLE001
@@ -544,6 +550,33 @@ def _ensure_local_resources(store):
                       file=sys.stderr)
     except Exception as exc:  # noqa: BLE001 - resolution will report the gap
         print("[resource] registry bootstrap failed: %s" % exc, file=sys.stderr)
+
+
+def _allowed_resource_roots(store):
+    raw = os.environ.get("SITUATION_RESOURCE_ROOTS", "")
+    roots = [os.path.abspath(p) for p in raw.split(os.pathsep) if p.strip()]
+    roots += [os.path.join(SITUATION3D, "envpacks"),
+              os.path.join(str(store.root), "cache"), str(store.root)]
+    return roots
+
+
+def _check_task_points(missions, scenario, bbox):
+    objectives = {}
+    for item in scenario.get("objectives") or []:
+        if item.get("name") is not None and item.get("lon") is not None:
+            objectives[str(item["name"])] = (item["lon"], item["lat"])
+    for mission in missions or []:
+        lon, lat = mission.get("lon"), mission.get("lat")
+        if lon is None:
+            lon, lat = objectives.get(str(mission.get("objective")),
+                                      (None, None))
+        if lon is None:
+            continue
+        if not (bbox[0] <= float(lon) <= bbox[2]
+                and bbox[1] <= float(lat) <= bbox[3]):
+            raise SystemExit(
+                "task request rejected: %s point %.6f,%.6f outside envpack bbox %s"
+                % (mission.get("id"), float(lon), float(lat), list(bbox)))
 
 
 def _wait_for_resources(store, case_id, run_id, summary, config):
@@ -554,7 +587,7 @@ def _wait_for_resources(store, case_id, run_id, summary, config):
     merged.update(config or {})
     store.update_run(case_id, run_id, status="waiting_resources",
                      resources=summary, resource_gaps=summary.get("gaps") or [],
-                     config=merged,
+                     config=merged, pid=None,
                      scenario_date=summary.get("scenario_date"))
     print(json.dumps({"status": "waiting_resources", "summary": summary},
                      ensure_ascii=False, indent=1))
@@ -617,7 +650,8 @@ def main(argv=None):
                 raise SystemExit("provide_file 需要 path")
             try:
                 providers.register_provided_envpack(
-                    rstore, decision.path, decision.entry_id or None)
+                    rstore, decision.path, decision.entry_id or None,
+                    allowed_roots=_allowed_resource_roots(rstore))
             except providers.ProviderError as exc:
                 raise SystemExit("provide_file failed: %s" % exc)
     force_fetch = any(d.action == "fetch_online" for d in decisions)
@@ -681,6 +715,19 @@ def main(argv=None):
         raise SystemExit("task request rejected: %s" % exc)
     scenario["missions"] = missions
     scenario["tasking"] = tasking_summary
+    # Reject coordinate typos before they are mistaken for a resource gap.
+    anchor = scenario.get("geo_anchor") or {}
+    candidates = []
+    for entry in rstore.entries("envpack"):
+        bbox = entry.bbox
+        if bbox is None or anchor.get("lon") is None:
+            continue
+        if bbox[0] <= float(anchor["lon"]) <= bbox[2] \
+                and bbox[1] <= float(anchor["lat"]) <= bbox[3]:
+            candidates.append(entry)
+    if candidates:
+        candidates.sort(key=lambda e: e.as_of or "")
+        _check_task_points(missions, scenario, candidates[-1].bbox)
     scenario_bytes = json.dumps(scenario, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     scenario_hash = _sha256_bytes(scenario_bytes)
 
@@ -689,6 +736,9 @@ def main(argv=None):
                                engine=scenario.get("engine"),
                                decisions=decisions)
     summary = preflight.plan_summary(plan)
+    envpack_candidate = preflight.entry_for(plan, "envpack")
+    if envpack_candidate is not None and envpack_candidate.bbox is not None:
+        _check_task_points(missions, scenario, envpack_candidate.bbox)
     config = {"tick_seconds": tick_seconds, "ticks": tick_count,
               "scenario_date": cm.get("start_time_utc"),
               "tasking": tasking_summary,
@@ -700,8 +750,25 @@ def main(argv=None):
     if plan.status == "blocked":
         gap_kinds = set(g.kind for g in plan.gaps
                         if g.criticality == "critical")
+        envpack_reasons = set(
+            (g.reason or "").split(":", 1)[0] for g in plan.gaps
+            if g.kind == "envpack" and g.criticality == "critical")
         online_allowed = (args.resource_mode in ("auto", "online")
                           or force_fetch)
+        try:
+            target_date = date.fromisoformat(str(scenario_date)[:10])
+        except ValueError:
+            raise SystemExit("scenario_date must be ISO 8601: %r"
+                             % (scenario_date,))
+        if target_date < date.today():
+            online_allowed = False
+            if "envpack" in gap_kinds:
+                fetch_error = ("想定日期早于今天，在线刷新无法生成该时点的数据；"
+                               "请调整日期或提供历史快照")
+        if "no_point_in_time" in envpack_reasons:
+            online_allowed = False
+            fetch_error = ("候选快照晚于想定日期；在线刷新无法解决，"
+                           "请调整日期或提供历史快照")
         if "envpack" in gap_kinds and online_allowed:
             candidates = sorted(rstore.entries("envpack"),
                                 key=lambda e: e.as_of or "", reverse=True)
@@ -742,7 +809,7 @@ def main(argv=None):
     store.update_run(args.case, run_id, status="running", config=config,
                      scenario_hash=scenario_hash,
                      engine_commit=engine_commit, envpack_hash=envpack_hash,
-                     resources=summary)
+                     resources=summary, resource_gaps=[])
     t_start = time.time()
     try:
         world = build_world(scenario, {}, seed=args.seed, dt_s=tick_seconds,
