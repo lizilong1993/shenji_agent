@@ -15,12 +15,13 @@
 | `type_kj2000.glb` → `lod1_kj2000.glb` | 23,299 面 / 0.74 MB / 8 prims | **10,863 面 / 0.35 MB / 8 prims** | 512 贴图 + simplify 0.3 + webp + meshopt |
 | `type_kj500.glb` → `lod1_kj500.glb` | 23,293 面 / 0.74 MB / 8 prims | **10,804 面 / 0.35 MB / 8 prims** | 512 贴图 + simplify 0.3 + webp + meshopt |
 | `type_e2d.glb` → `lod1_e2d.glb` | 23,079 面 / 0.92 MB / 4 prims | **15,686 面 / 0.40 MB / 4 prims** | 512 贴图 + simplify 0.3 + webp + meshopt |
+| `type_052c.glb` → `lod1_052c.glb` | 29,413 面 / 0.99 MB / 8 prims | **16,288 面 / 0.52 MB / 8 prims** | 512 贴图 + simplify 0.3/error 0.05 + meshopt |
 
 LOD1 与 LOD0 同朝向、同原点、同 yaw fix；`lod1_*` 文件不参与 `type_*` 的预算/许可/bboxes 统计。
 
 ## 2. 运行时切换
 
-- `EntityLod.lod1UrlFor(def)` 登记 ZTD-05/EQ240/Perry/J-16/KJ-2000/KJ-500/E-2D；其他型号返回 null。071/054A 因 simplify 后仍约 2.2–2.6 万面、收益不足，暂不登记。
+- `EntityLod.lod1UrlFor(def)` 登记 ZTD-05/EQ240/Perry/J-16/KJ-2000/KJ-500/E-2D/052C；其他型号返回 null。071/054A/055 因 simplify 后仍约 2.2–3.2 万面、收益不足，暂不登记。
 - `app.js` 新增 `applyTargetModelLod()`：
   - 相机高度 **1.2–3 km** 时，对登记型号把 `entity.model.uri` 切到 LOD1；
   - 低于 1.2 km 回 LOD0；高于 3 km 回 LOD0（此时通常已回 2D 图标）；
@@ -39,14 +40,14 @@ LOD1 与 LOD0 同朝向、同原点、同 yaw fix；`lod1_*` 文件不参与 `ty
 
 ## 4. 已知限制
 
-- 七型有 LOD1；071/054A 简化收益不足未做；052C/056A 等未做。
+- 八型有 LOD1；071/054A/055 简化收益不足未做；056A 面数过低不需要。
 - LOD1 不减 primitive，只减三角面；draw calls 需靠实例化/合批。
 - 60 个目标在阈值处同时换 URI，资源已缓存但仍可能有一次加载抖动；未做真机 GPU 帧时间验收。
 - LOD1 的 EQ240 车轮细节更简化，1.2 km 近边界需目视复核。
 
 ## 5. 下一批
 
-1. 052C/056A 等 LOD1；071/054A 需更合适的减面参数/网格；
+1. 071/054A/055 需更合适的减面参数/网格；
 2. 对 ZTD-05/EQ240 做实例化/共享 Model，进一步压 draw calls；
 3. 真机 GPU（RTX 3060/4060 级）测 1.5/3/6 km 的 FPS、draw calls、首帧时间；
 4. 轮系/雷达/炮塔关节与 052D 网格改造继续排期。

@@ -267,6 +267,7 @@
     './assets/models/type_kj2000.glb': './assets/models/lod1_kj2000.glb',
     './assets/models/type_kj500.glb': './assets/models/lod1_kj500.glb',
     './assets/models/type_e2d.glb': './assets/models/lod1_e2d.glb',
+    './assets/models/type_052c.glb': './assets/models/lod1_052c.glb',
   };
 
   function lod1UrlFor(def) {
