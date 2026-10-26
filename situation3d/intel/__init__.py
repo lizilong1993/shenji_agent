@@ -4,6 +4,7 @@ from .case import (CaseIntelProfile, list_case_profiles,
                    load_case_profile)
 from .fusion import FusedEvent, fuse
 from .gateway import CueBatch, IntelBundle, IntelCue, IntelGateway
+from .management import IntelManager
 from .model import Observation, iso, parse_time
 from .normalize import normalize
 from .scheduler import IntelScheduler
@@ -16,6 +17,7 @@ __all__ = [
     "IntelBundle",
     "IntelCue",
     "IntelGateway",
+    "IntelManager",
     "IntelScheduler",
     "Observation",
     "components",

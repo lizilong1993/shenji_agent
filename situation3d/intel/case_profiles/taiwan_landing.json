@@ -1,14 +1,54 @@
 {
-  "case_id": "taiwan_landing",
-  "name": "台海联合登陆（虚构演示）",
-  "bbox": [118.8, 21.8, 121.0, 24.2],
-  "domains": ["hazard", "conflict", "maritime", "aviation", "other"],
-  "sources": ["usgs", "gdacs", "firms", "eonet", "adsb", "gdelt"],
-  "keywords": ["taiwan", "taiwan strait", "pla", "kinmen", "penghu",
-               "tainan", "kaohsiung", "台海", "台湾", "台南", "高雄",
-               "澎湖", "金门"],
-  "countries": ["Taiwan", "China"],
+  "bbox": [
+    118.8,
+    21.8,
+    121.0,
+    24.2
+  ],
   "buffer_km": 50.0,
+  "case_id": "taiwan_landing",
+  "countries": [
+    "Taiwan",
+    "China"
+  ],
+  "domains": [
+    "hazard",
+    "conflict",
+    "maritime",
+    "aviation",
+    "infrastructure",
+    "weather",
+    "news",
+    "geography",
+    "society",
+    "social",
+    "selfmedia",
+    "other"
+  ],
+  "keywords": [
+    "taiwan",
+    "taiwan strait",
+    "pla",
+    "kinmen",
+    "penghu",
+    "tainan",
+    "kaohsiung",
+    "台海",
+    "台湾",
+    "台南",
+    "高雄",
+    "澎湖",
+    "金门"
+  ],
   "lookback_hours": 24.0,
-  "max_items": 5000
+  "max_items": 5000,
+  "name": "台海联合登陆（虚构演示）",
+  "sources": [
+    "usgs",
+    "gdacs",
+    "firms",
+    "eonet",
+    "adsb",
+    "gdelt"
+  ]
 }

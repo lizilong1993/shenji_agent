@@ -97,13 +97,20 @@ class CaseProfileTest(unittest.TestCase):
         outside = observation("out", 30.0, 120.5, "Taiwan Strait patrol")
         wrong_domain = observation("domain", 23.5, 120.5, "Taiwan Strait",
                                    domain="health")
+        wrong_source = observation("source", 23.5, 120.5, "Taiwan Strait",
+                                   source_id="mystery")
         wrong_keyword = observation("keyword", 23.5, 120.5, "Weather in Paris",
                                     source_id="gdelt", geo_precision="unknown",
                                     is_centroid=True, sourcecountry="France")
+        substring_noise = observation(
+            "noise", 23.5, 120.5, "Analysts display a new platform",
+            source_id="gdelt", geo_precision="unknown", is_centroid=True)
         self.assertTrue(profile.matches(inside))
         self.assertFalse(profile.matches(outside))
         self.assertFalse(profile.matches(wrong_domain))
+        self.assertFalse(profile.matches(wrong_source))
         self.assertFalse(profile.matches(wrong_keyword))
+        self.assertFalse(profile.matches(substring_noise))
 
     def test_profile_overrides_and_hash(self):
         profile = load_case_profile("taiwan_landing")

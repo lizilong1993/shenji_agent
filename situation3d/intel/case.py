@@ -16,6 +16,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 
 from .model import Observation
+from .taxonomy import term_hit
 
 DEFAULT_PROFILE_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                     "case_profiles")
@@ -181,12 +182,12 @@ class CaseIntelProfile:
         text = None
         if self.keywords and coarse:
             text = self._haystack(observation)
-            if not any(keyword.lower() in text for keyword in self.keywords):
+            if not any(term_hit(keyword, text) for keyword in self.keywords):
                 return False
         if self.countries and coarse:
             if text is None:
                 text = self._haystack(observation)
-            if not any(country.lower() in text for country in self.countries):
+            if not any(term_hit(country, text) for country in self.countries):
                 return False
         return True
 

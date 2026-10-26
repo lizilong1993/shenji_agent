@@ -7407,6 +7407,7 @@ function bindUI() {
       });
     });
   if (window.SituationPanel) SituationPanel.bind();
+  if (window.IntelPanel) IntelPanel.bind();
 
   // 图层管理批量操作
   Array.prototype.forEach.call(
@@ -7931,6 +7932,11 @@ function applyCaseIndependentHooks() {
   // TS面板：?situation=input|manage|download（取证与深链用）
   if (params.has('situation') && window.SituationPanel) {
     SituationPanel.open(params.get('situation') || 'input');
+  }
+
+  // 情报面板：?intel=list|manual|sources（取证与深链用）
+  if (params.has('intel') && window.IntelPanel) {
+    IntelPanel.open(params.get('intel') || 'list');
   }
 
   // 本地地名：?places=0|1

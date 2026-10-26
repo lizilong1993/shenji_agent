@@ -1,0 +1,116 @@
+/* 情报管理面板 — 沿用 TS 模态框的浅色底与边框，只补列表/表单组件 */
+
+.intel-modal-panel { width: min(1080px, calc(100vw - 48px)); }
+
+.intel-summary {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 10px; padding: 8px 10px;
+  background: #f3f7fd; border: 1px solid var(--border); border-radius: 5px;
+}
+.intel-summary b { font-size: 13px; }
+.intel-note { color: var(--text-dim); font-size: 11.5px; line-height: 1.5; }
+
+.intel-toolbar {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  margin: 10px 0;
+}
+.intel-input, .intel-select {
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 4px 7px; font: inherit; font-size: 12px; line-height: 18px;
+  height: 28px; box-sizing: border-box;
+  color: var(--text); background: #fff;
+}
+.intel-textarea { height: auto; }
+.intel-input[type="search"] { min-width: 220px; flex: 1 1 220px; }
+.intel-textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+
+.intel-key {
+  border: 1px solid #cfe0f5; border-radius: 5px; background: #f7fbff;
+  padding: 8px 10px; margin-bottom: 12px;
+}
+.intel-key-title { font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+.intel-key-row {
+  display: flex; gap: 8px; align-items: baseline; padding: 3px 0;
+  border-top: 1px dashed #dbe7f5; font-size: 11.5px;
+}
+.intel-key-row:first-of-type { border-top: 0; }
+.intel-key-score { color: var(--accent); font-weight: 600; min-width: 34px; }
+.intel-key-text { flex: 1 1 auto; }
+.intel-key-reason { color: var(--text-dim); flex: 1 1 40%; }
+
+.intel-card {
+  border: 1px solid var(--border); border-radius: 5px; background: #fff;
+  padding: 9px 11px; margin-bottom: 8px;
+  border-left: 4px solid #9aa7b8;
+}
+.intel-card.manual { border-left-color: #c8352c; }
+.intel-card.auto { border-left-color: #4f86c6; }
+.intel-card.superseded { background: #fbfbfc; opacity: .82; }
+.intel-card.revoked { opacity: .62; }
+
+.intel-card-head { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.intel-badge {
+  display: inline-block; border-radius: 3px; padding: 1px 6px;
+  font-size: 10.5px; line-height: 1.5; border: 1px solid #d7dee8;
+  color: #5b6778; background: #f6f8fb;
+}
+.intel-badge.manual { color: #a8332a; border-color: #efc3bf; background: #fff4f3; }
+.intel-badge.auto { color: #35669f; border-color: #c6d9ef; background: #f3f8ff; }
+.intel-badge.priority { color: #9a5b00; border-color: #efd49d; background: #fff9ea; }
+.intel-badge.on { color: #26734d; border-color: #b7ddc8; background: #f0fbf5; }
+.intel-badge.off { color: #8a5a5a; border-color: #e4c7c7; background: #fdf5f5; }
+.intel-badge.revoked { color: #6b7280; border-color: #d7dbe2; background: #f3f4f6; }
+.intel-badge.verify-unverified { color: #a15c00; border-color: #edd09b; background: #fff8e9; }
+.intel-badge.verify-verified { color: #26734d; border-color: #b7ddc8; background: #f0fbf5; }
+.intel-badge.verify-disputed { color: #a8332a; border-color: #efc3bf; background: #fff4f3; }
+
+.intel-title { font-size: 13px; font-weight: 600; margin: 6px 0 3px; }
+.intel-meta {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  color: var(--text-dim); font-size: 11px;
+}
+.intel-content { margin-top: 5px; font-size: 12px; line-height: 1.55; }
+.intel-warn {
+  margin-top: 6px; padding: 4px 7px; border-radius: 3px;
+  background: #fff8e9; border: 1px solid #efd9ad; color: #8a5a00;
+  font-size: 11px;
+}
+.intel-links { margin-top: 5px; color: #5b6778; font-size: 11px; }
+.intel-actions { display: flex; gap: 8px; margin-top: 7px; }
+.intel-actions .danger { color: #a8332a; border-color: #e3b8b4; }
+
+.intel-form {
+  border: 1px solid var(--border); border-radius: 5px;
+  background: #fbfdff; padding: 10px 12px; margin-top: 10px;
+}
+.intel-form h3 { margin: 0 0 8px; font-size: 13px; }
+.intel-form-head { margin-bottom: 8px; }
+.intel-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+.intel-field { display: flex; flex-direction: column; gap: 3px; }
+.intel-field-label { color: var(--text-dim); font-size: 11px; }
+.intel-field > .intel-input,
+.intel-field > .intel-select { width: 100%; box-sizing: border-box; }
+.intel-field > .intel-textarea { min-height: 70px; }
+
+.intel-source-list { margin: 8px 0; }
+.intel-source-row {
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--border); padding: 6px 2px;
+}
+.intel-source-main { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
+.intel-source-desc { color: var(--text-dim); font-size: 11px; }
+.intel-source-form { margin-top: 12px; }
+
+.intel-empty { padding: 16px 8px; color: var(--text-dim); font-size: 12px; }
+.intel-error {
+  padding: 10px 12px; margin-bottom: 8px; border: 1px solid #e0b4b4;
+  border-radius: 4px; background: #fdf2f2; color: #a33; font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .intel-grid { grid-template-columns: 1fr; }
+  .intel-input[type="search"] { min-width: 0; }
+}

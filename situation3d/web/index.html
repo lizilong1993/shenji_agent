@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="./vendor/cesium/Widgets/widgets.css">
   <link rel="stylesheet" href="./src/style.css">
   <link rel="stylesheet" href="./src/theme.css">
+  <link rel="stylesheet" href="./src/intel.css">
 </head>
 <body>
   <header class="topbar">
@@ -31,6 +32,9 @@
               title="查看与编辑当前TS：ZC范围、目标编成、图层">TS管理</button>
       <button type="button" class="menu-btn" data-situation-cmd="download"
               title="导出当前帧 / 全帧 CSV / TS定义">TS下载</button>
+
+      <button type="button" id="btnIntel" class="menu-btn"
+              title="统一情报管理：自动情报、人工情报与情报源">情报</button>
 
       <!-- 标绘：**创建**标绘的地方，原先在左栏的「标绘工具」里。
            搬到顶栏的理由：它是"动作"，不是"图层开关"；左栏那个位置要滚过图层管理才看得见，
@@ -291,6 +295,21 @@
     </div>
   </div>
 
+  <!-- 情报管理：自动情报与人工情报统一列表、人工结构化录入、情报源管理 -->
+  <div id="intelModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="情报管理">
+    <div class="modal-panel intel-modal-panel">
+      <div class="modal-head">
+        <div class="modal-tabs" id="intelTabs">
+          <button type="button" class="modal-tab active" data-intel-tab="list">情报列表</button>
+          <button type="button" class="modal-tab" data-intel-tab="manual">人工录入</button>
+          <button type="button" class="modal-tab" data-intel-tab="sources">情报源管理</button>
+        </div>
+        <button id="intelClose" type="button" class="modal-close" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body" id="intelBody"></div>
+    </div>
+  </div>
+
   <script src="./vendor/cesium/Cesium.js"></script>
   <script src="./src/tilecache.js"></script>
   <script src="./src/theme.js"></script>
@@ -319,6 +338,7 @@
   <script src="./src/places.js"></script>
   <script src="./src/situation.js"></script>
 <script src="./src/plotting.js"></script>
+  <script src="./src/intelUi.js"></script>
   <script src="./src/app.js"></script>
 </body>
 </html>
