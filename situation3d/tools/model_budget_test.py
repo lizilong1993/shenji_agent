@@ -49,7 +49,7 @@ P1_TARGETS = {
     "rigged": (30000, 15, 10, 2.20),
 }
 
-EXPECTED_MAIN_ASSETS = 30
+EXPECTED_MAIN_ASSETS = 33
 
 ALLOWED_EXT = {
     "EXT_texture_webp",

@@ -249,6 +249,32 @@
       "use": "M777 超轻型榴弹炮",
       "risk": [],
       "source_url": null
+    },
+    "type_075.glb": {
+      "source": "自建（tools/modelgen/build_custom.py `build_075()`）",
+      "author": "本项目",
+      "license": "项目内部",
+      "use": "075 两栖攻击舰（近似）",
+      "risk": [],
+      "source_url": null
+    },
+    "type_kj500.glb": {
+      "source": "KJ-2000 (DCS World) 缩比近似",
+      "author": "KojfDiscord",
+      "license": "CC Attribution",
+      "use": "空警-500（近似）",
+      "risk": [
+        "upstream-game-asset"
+      ],
+      "source_url": null
+    },
+    "type_ztq15.glb": {
+      "source": "Type 99 MBT 缩比近似",
+      "author": "philano",
+      "license": "CC Attribution",
+      "use": "15 式轻型坦克（近似）",
+      "risk": [],
+      "source_url": null
     }
   }
 }

@@ -76,7 +76,7 @@
     boat_speed: './assets/models/type_056a.glb',
     // 地面
     tank: './assets/models/type_ztz99a.glb',
-    light_tank: './assets/models/type_ztz99a.glb',
+    light_tank: './assets/models/type_ztq15.glb',
     amphibious_vehicle: './assets/models/type_ztd05.glb',
     spg: './assets/models/type_plz05.glb',
     howitzer: './assets/models/type_m777.glb',
@@ -100,6 +100,7 @@
     // 水面舰
     [/054a/i, 'type_054a'],
     [/903|综合补给/i, 'type_903'],
+    [/075|两栖攻击|lhd/i, 'type_075'],
     [/071|船坞登陆/i, 'type_071'],
     [/056a|轻型护卫|江岛/i, 'type_056a'],
     [/成功级|perry|佩里/i, 'type_perry'],
@@ -109,10 +110,10 @@
     // 052D 无公开可下载资产，用同族 052C 近似（文中注释、README 同步说明）
     [/052d|luyang.?iii/i, 'type_052c'],
     // 地面
+    [/15\s*式|ztq-?15/i, 'type_ztq15'],
     [/99a|ztz-?99/i, 'type_ztz99a'],
     [/m1a2/i, 'type_m1a2'],
     [/cm-?11|m48/i, 'type_m48a5'],
-    [/15\s*式|type.?15|ztq-?15/i, 'type_ztz99a'],
     [/05\s*式|ztd-?05|zbd-?05/i, 'type_ztd05'],
     [/plz-?05/i, 'type_plz05'],
     [/m109/i, 'type_m109a6'],
@@ -128,8 +129,8 @@
     [/f-?16/i, 'type_f16c'],
     [/idf|经国|f-?ck-?1/i, 'type_idf'],
     [/阵风|rafale/i, 'type_rafale'],
-    // 空警-500 无公开资产，用 KJ-2000（同为中方预警机）近似
-    [/空警-?500|kj-?500/i, 'type_kj2000'],
+    [/kj-?2000|空警-?2000/i, 'type_kj2000'],
+    [/空警-?500|kj-?500/i, 'type_kj500'],
     [/e-?2|鹰眼|hawkeye/i, 'type_e2d'],
     [/直-?10|z-?10/i, 'type_z10'],
     [/无人机|uav|drone|mq-?9|翼龙|彩虹/i, 'type_mq9'],

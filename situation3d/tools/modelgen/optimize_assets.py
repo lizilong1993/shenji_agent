@@ -35,6 +35,7 @@ CFG = {
     "type_052c": ("ship_large", 28000, True, True, True),
     "type_054a": ("ship_large", 28000, True, True, True),
     "type_071": ("ship_large", 28000, True, True, True),
+    "type_075": ("ship_large", 28000, True, True, True),
     "type_perry": ("ship_large", 28000, True, True, True),
     "type_903": ("ship_small", 12000, True, False, True),
     "type_kidd": ("ship_small", 12000, True, False, True),
@@ -44,6 +45,7 @@ CFG = {
     # 飞机
     "type_e2d": ("aircraft_aew", 22000, True, True, True),
     "type_kj2000": ("aircraft_aew", 22000, True, True, True),
+    "type_kj500": ("aircraft_aew", 22000, True, True, True),
     "type_j16": ("aircraft_fighter", 18000, True, True, True),
     "type_f16c": ("aircraft_fighter", 18000, True, True, True),
     "type_idf": ("aircraft_fighter", 18000, True, True, True),
@@ -51,6 +53,7 @@ CFG = {
     "type_mq9": ("aircraft_fighter", 18000, True, True, True),
     # 地面
     "type_ztz99a": ("ground_tank", 9000, True, True, True),
+    "type_ztq15": ("ground_tank", 9000, True, True, True),
     "type_m48a5": ("ground_tank", 9000, True, True, True),
     "type_m109a6": ("ground_tank", 9000, True, True, True),
     "type_plz05": ("ground_tank", 9000, True, True, True),
@@ -179,7 +182,9 @@ def optimize_one(name, cfg, tmp, backup_dir, apply):
     if apply:
         os.makedirs(backup_dir, exist_ok=True)
         bak = os.path.join(backup_dir, name + ".glb")
-        if not os.path.exists(bak) or os.path.getsize(bak) != os.path.getsize(src):
+        # 只写一次：绝不能用“已优化文件”覆盖原始备份。二次 --apply 时
+        # src 已经是优化件，若按大小判断会把备份毁掉。
+        if not os.path.exists(bak):
             shutil.copyfile(src, bak)
         shutil.copyfile(work, src)
 

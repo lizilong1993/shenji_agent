@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": "2026-10-26T11:50:01",
+  "generated_at": "2026-10-26T12:29:46",
   "note": "由 tools/model_budget_test.py 生成；sha256 对应优化后的 GLB。",
   "assets": {
     "type_052c.glb": {
@@ -115,6 +115,35 @@
         "author": "42manako",
         "license": "CC Attribution",
         "use": "071 综合登陆舰",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_075.glb": {
+      "sha256": "66388bcb6f2b5aa1e4a0e7930623757e248dc21a09153163a387cb9c871eee49",
+      "bytes": 179168,
+      "mb": 0.17,
+      "tris": 2216,
+      "prims": 6,
+      "materials": 6,
+      "images": 2,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_large",
+      "public": {
+        "public_length_m": 237.0,
+        "public_width_m": 36.0,
+        "notes": "075 两栖攻击舰，自建近似"
+      },
+      "license": {
+        "source": "自建（tools/modelgen/build_custom.py `build_075()`）",
+        "author": "本项目",
+        "license": "项目内部",
+        "use": "075 两栖攻击舰（近似）",
         "risk": [],
         "source_url": null
       }
@@ -391,14 +420,45 @@
       "public": {
         "public_length_m": 46.59,
         "public_width_m": 50.5,
-        "approx_of": "KJ-500",
-        "notes": "KJ-500 用 KJ-2000 近似，尺寸偏大"
+        "notes": "KJ-2000 本体；空警-500 使用 type_kj500"
       },
       "license": {
         "source": "KJ-2000 (DCS World)",
         "author": "KojfDiscord",
         "license": "CC Attribution",
         "use": "KJ-2000（空警-500 / 预警机大类近似）",
+        "risk": [
+          "upstream-game-asset"
+        ],
+        "source_url": null
+      }
+    },
+    "type_kj500.glb": {
+      "sha256": "a82dd85e83c3b4aaa921e6f9a03be3dbc6060ed5b474dca8d521ba497e46732f",
+      "bytes": 777052,
+      "mb": 0.74,
+      "tris": 23293,
+      "prims": 8,
+      "materials": 8,
+      "images": 7,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "aircraft_aew",
+      "public": {
+        "public_length_m": 36.0,
+        "public_width_m": 38.0,
+        "approx_of": "KJ-500",
+        "notes": "KJ-2000 缩比近似；机体/发动机仍为 Il-76 风格"
+      },
+      "license": {
+        "source": "KJ-2000 (DCS World) 缩比近似",
+        "author": "KojfDiscord",
+        "license": "CC Attribution",
+        "use": "空警-500（近似）",
         "risk": [
           "upstream-game-asset"
         ],
@@ -834,6 +894,36 @@
         "source_url": null
       }
     },
+    "type_ztq15.glb": {
+      "sha256": "7d8366a92b7037285099fe562d1f8cbd6d068edd2833e8a9c677ca33c824c4cf",
+      "bytes": 341432,
+      "mb": 0.33,
+      "tris": 12513,
+      "prims": 2,
+      "materials": 2,
+      "images": 2,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_tank",
+      "public": {
+        "public_length_m": 8.5,
+        "public_width_m": 3.3,
+        "approx_of": "15式",
+        "notes": "99A 缩比近似；炮塔/火炮仍为 99A"
+      },
+      "license": {
+        "source": "Type 99 MBT 缩比近似",
+        "author": "philano",
+        "license": "CC Attribution",
+        "use": "15 式轻型坦克（近似）",
+        "risk": [],
+        "source_url": null
+      }
+    },
     "type_ztz99a.glb": {
       "sha256": "a5c9c68988b123cf37889e098f3229b611986b8e77ea6631d7f49088751cea38",
       "bytes": 341348,
@@ -852,8 +942,7 @@
       "public": {
         "public_length_m": 11.0,
         "public_width_m": 3.5,
-        "approx_of": "15式",
-        "notes": "15 式用 99A 近似"
+        "notes": "99A 本体；15 式使用 type_ztq15"
       },
       "license": {
         "source": "Type 99 MBT",

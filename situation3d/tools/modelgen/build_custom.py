@@ -790,10 +790,54 @@ def build_m777():
     finish("t_m777", "ground")
 
 
+
+# ---------------------------------------------------------------------------
+# 075 型两栖攻击舰：L 237 m, B 36 m, 直通甲板 + 右舷舰岛（近似）
+# ---------------------------------------------------------------------------
+def build_075():
+    reset()
+    L, B, D = 237.0, 36.0, 8.1
+    h = hull(L, B, D, 15.0, "075_hull", bow_frac=0.74, transom=0.88)
+    paint_below_waterline(h, D)
+    deckz = 15.0
+    # 直通飞行甲板（略宽于船体，模拟外飘）
+    box("075_deck", (0, 4, deckz + 0.7), (34.0, 206.0, 1.4), deck())
+    box("075_deck_edge", (0, 4, deckz + 1.45), (34.4, 206.4, 0.18), navy())
+    # 甲板标线 / 起降点
+    for i, yy in enumerate((-78.0, -45.0, -12.0, 21.0, 54.0, 87.0)):
+        cyl("075_spot%d" % i, (0, yy, deckz + 1.53), 4.6, 0.06, white(), verts=36)
+        box("075_line%d" % i, (0, yy, deckz + 1.54), (8.0, 0.22, 0.04), white())
+    # 右舷舰岛
+    wedge("075_island", (9.6, 56, deckz + 1.4), (12.0, 48.0, 17.0), navy(), 0.88, 0.96)
+    box("075_bridge_win", (9.6, 68, deckz + 15.0), (10.0, 5.0, 1.6), glass())
+    box("075_island_win2", (9.6, 50, deckz + 11.0), (10.2, 4.0, 1.3), glass())
+    cyl("075_mast", (9.6, 60, deckz + 20.0), 0.25, 6.0, navy(), verts=12)
+    cyl("075_yard", (9.6, 60, deckz + 22.8), 0.11, 7.0, navy(), axis="X", verts=8)
+    # 烟囱
+    wedge("075_funnel", (9.6, 32, deckz + 13.0), (7.0, 9.0, 6.0), navy(), 0.85, 0.9)
+    box("075_funnel_top", (9.6, 32, deckz + 19.0), (5.4, 7.0, 0.4), dark())
+    # 两台舷侧升降机
+    for i, yy in enumerate((54.0, -28.0)):
+        box("075_elev%d" % i, (-15.0, yy, deckz + 1.55), (8.0, 18.0, 0.55), navy())
+    # 艉部坞舱门与艏门
+    box("075_welldeck", (0, -112.0, deckz - 4.5), (20.0, 10.0, 7.0), dark())
+    box("075_bowdoor", (0, 112.0, deckz - 2.0), (12.0, 4.0, 8.0), dark())
+    # 近防/防空
+    ciws("075_ciws_f", 100.0, deckz + 1.6)
+    ciws("075_ciws_a", -100.0, deckz + 1.6)
+    box("075_hq10", (-12.0, -44.0, deckz + 2.1), (2.4, 2.4, 1.2), navy())
+    # 救生筏
+    for sx in (-1, 1):
+        for i in range(6):
+            cyl("075_raft_%d_%d" % (sx, i), (sx * 14.0, -52.0 + i * 14.0, deckz + 1.8),
+                0.5, 0.9, white(), axis="X", verts=8)
+    finish("t_075", "water")
+
+
 BUILDERS = {
     "052d": build_052d, "056a": build_056a, "903": build_903, "panshi": build_panshi,
     "tuochiang": build_tuochiang, "kidd": build_kidd, "kj500": build_kj500,
-    "hq16": build_hq16, "yj62": build_yj62, "m777": build_m777,
+    "hq16": build_hq16, "yj62": build_yj62, "m777": build_m777, "075": build_075,
 }
 
 for key, fn in BUILDERS.items():

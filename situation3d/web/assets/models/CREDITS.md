@@ -34,10 +34,13 @@
 | `type_hq16.glb` | 自建（tools/modelgen/build_custom.py） | 本项目 | 项目内部 | 红旗-16 发射车 |
 | `type_yj62.glb` | 自建（tools/modelgen/build_custom.py） | 本项目 | 项目内部 | 鹰击-62 岸舰导弹发射车 |
 | `type_m777.glb` | 自建（tools/modelgen/build_custom.py） | 本项目 | 项目内部 | M777 超轻型榴弹炮 |
+| `type_075.glb` | 自建（tools/modelgen/build_custom.py `build_075()`） | 本项目 | 项目内部 | 075 两栖攻击舰（近似） |
+| `type_kj500.glb` | KJ-2000 (DCS World) 缩比近似 | KojfDiscord | CC Attribution | 空警-500（近似） |
+| `type_ztq15.glb` | Type 99 MBT 缩比近似 | philano | CC Attribution | 15 式轻型坦克（近似） |
 
 ## 说明
 
-- 052D 无公开可下载的精确资产，使用同族 052C 模型；空警-500 使用 KJ-2000；歼-16 使用 Su-30MKK；F-16V 使用 F-16C；CM-11 使用 M48A5；15 式轻型坦克无可用资产，回退到 99A 大类模型。
+- 052D 无公开可下载的精确资产，使用同族 052C 模型；空警-500 使用 KJ-2000 缩比（`type_kj500`）；15 式使用 99A 缩比（`type_ztq15`）；歼-16 使用 Su-30MKK；F-16V 使用 F-16C；CM-11 使用 M48A5。
 - 所有 GLB 均按公开全长（舰长/机长/车长含炮管）归一为 1 单位 = 1 米，原点在水线/地面/机体中心，艏/头朝 Blender +Y。
 - Sketchfab 模型已按 CC-BY / Free Standard 许可署名；二次分发时请保留本文件。
 
