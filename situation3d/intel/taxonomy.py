@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Iterable, Optional, Tuple
 
 DOMAINS = (
@@ -69,3 +70,15 @@ def normalize_source_kind(value: Optional[str]) -> str:
 def normalize_verification(value: Optional[str]) -> str:
     text = str(value or "").strip().lower()
     return text if text in VERIFICATION_STATES else "unverified"
+
+
+def term_hit(term: str, text: str) -> bool:
+    """Word-boundary matching for short Latin terms; substring for CJK."""
+    term = str(term or "").strip().lower()
+    text = str(text or "").lower()
+    if not term:
+        return False
+    if term.isascii() and term.isalpha():
+        return re.search(r"(?<![a-z0-9])" + re.escape(term)
+                         + r"(?![a-z0-9])", text) is not None
+    return term in text

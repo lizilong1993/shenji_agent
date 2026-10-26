@@ -23,7 +23,7 @@ def _domain(value: Any) -> str:
 
 MANUAL_VERSION = 1
 STATUSES = ("active", "revoked")
-_CASE_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,80}$")
+_CASE_ID = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 
 
 def _now() -> str:
@@ -78,7 +78,7 @@ def _tags(value: Any) -> List[str]:
 
 def _case_id(value: Any) -> str:
     text = str(value or "").strip()
-    if not _CASE_ID.match(text):
+    if not _CASE_ID.match(text) or ".." in text:
         raise ValueError("case_id is required and must be a safe identifier")
     return text
 

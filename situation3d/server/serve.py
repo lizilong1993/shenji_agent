@@ -1302,6 +1302,18 @@ class Handler(SimpleHTTPRequestHandler):
         except (ValueError, UnicodeDecodeError):
             return None
 
+    def _drain_request_body(self):
+        """Consume an unread body so keep-alive framing stays valid."""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        if n > 0:
+            try:
+                self.rfile.read(min(n, 1200000))
+            except OSError:
+                pass
+
     @staticmethod
     def _is_loopback(addr):
         return addr in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
@@ -1324,7 +1336,8 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json(_intel_manager().overview(
                     query.get("case_id") or "default"))
             except ValueError as exc:
-                self._send_json({"error": str(exc)}, 400)
+                status = 400 if exc.__class__.__name__ == "InvalidCaseId" else 500
+                self._send_json({"error": str(exc)}, status)
             except Exception as exc:  # noqa: BLE001 - report a useful message
                 self._send_json({"error": "%s: %s"
                                  % (type(exc).__name__, exc)}, 500)
@@ -1762,10 +1775,12 @@ class Handler(SimpleHTTPRequestHandler):
         # Writes are a test-console capability. Demo mode is a public read-only
         # replay; keep it that way even if the server is bound to 0.0.0.0.
         if SERVER_MODE != "test":
+            self._drain_request_body()
             self._send_json({"error": "intel writes are disabled in demo mode"}, 403)
             return
         content_type = (self.headers.get("Content-Type") or "").lower()
         if not content_type.startswith("application/json"):
+            self._drain_request_body()
             self._send_json({"error": "Content-Type must be application/json"}, 415)
             return
         body = self._read_json_body()

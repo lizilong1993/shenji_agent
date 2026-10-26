@@ -18,13 +18,17 @@ from .case import load_case_profile
 CONFLICT_RADIUS_KM = 25.0
 CONFLICT_WINDOW_H = 6.0
 _CASE_SAFE = re.compile(r"[^A-Za-z0-9_.-]+")
-_CASE_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,80}$")
+_CASE_RE = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
+
+
+class InvalidCaseId(ValueError):
+    pass
 
 
 def _case_key(value: Any) -> str:
     text = str(value or "default")
     if not _CASE_RE.match(text) or ".." in text:
-        raise ValueError("invalid case_id")
+        raise InvalidCaseId("invalid case_id")
     return text
 
 
@@ -240,9 +244,9 @@ class IntelManager:
             self.sources.revision(),
             str((bundle or {}).get("hash") or ""),
             str((profile.to_dict() if profile else "")),
-            datetime.now(timezone.utc).strftime("%Y%m%d%H"),
         ]).encode("utf-8")).hexdigest()[:16]
-        cache_key = (case_id, revision)
+        cache_key = (case_id, revision,
+                     datetime.now(timezone.utc).strftime("%Y%m%d%H"))
         cached = self._cache.get(cache_key)
         if cached is None:
             links = link_items(items, profile,

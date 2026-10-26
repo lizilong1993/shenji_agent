@@ -8,11 +8,11 @@ machine; manual entries remain flagged unverified until an analyst says otherwis
 from __future__ import annotations
 
 import math
-import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .fusion import TYPE_SYNONYMS
+from .taxonomy import term_hit
 
 EARTH_RADIUS_M = 6371000.0
 
@@ -62,16 +62,6 @@ def _keywords(profile) -> Tuple[str, ...]:
                  if str(value).strip())
 
 
-def _term_hit(term: str, text: str) -> bool:
-    """Word-boundary matching for short Latin terms; substring for CJK."""
-    if not term:
-        return False
-    if term.isascii() and term.isalpha():
-        return re.search(r"(?<![a-z0-9])" + re.escape(term)
-                         + r"(?![a-z0-9])", text) is not None
-    return term in text
-
-
 def _shared_keywords(left: Dict[str, Any], right: Dict[str, Any],
                      profile) -> List[str]:
     terms = _keywords(profile)
@@ -79,7 +69,7 @@ def _shared_keywords(left: Dict[str, Any], right: Dict[str, Any],
         return []
     left_text, right_text = _text(left), _text(right)
     return [term for term in terms
-            if _term_hit(term, left_text) and _term_hit(term, right_text)]
+            if term_hit(term, left_text) and term_hit(term, right_text)]
 
 
 def link_items(items: Sequence[Dict[str, Any]], profile=None,
@@ -180,7 +170,7 @@ def extract_key_items(items: Sequence[Dict[str, Any]],
     scored = []
     for item in active:
         text = _text(item)
-        hits = [term for term in terms if _term_hit(term, text)]
+        hits = [term for term in terms if term_hit(term, text)]
         age_h = 0.0
         stamp = _time(item.get("event_time"))
         if stamp is not None:

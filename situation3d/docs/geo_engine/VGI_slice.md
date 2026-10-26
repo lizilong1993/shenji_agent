@@ -187,6 +187,6 @@ python3 scripts/fetch_intel.py --case global --sources usgs,gdacs,eonet
 - 统一列表：自动 bundle + 人工记录；人工有效项优先；同领域/同类型 ±25 km/6 h 的自动项标 `effective=false`、`superseded_by`，原始 `record` 保留。
 - 情报源：内置源种子化 + 自定义源添加/编辑/停用/删除/关键字搜索/类型/状态过滤；`var/intel/sources.json`。内置源不可删除，可停用。
 - 跨领域：关联按空间/时间/案例关键词生成 `cross_domain/co_location/corroboration/topic` 链接；关键情报按人工优先、关键词、置信度、关联度、时效评分，附理由。
-- 前端：顶栏“情报”打开模态框，三标签页（情报列表/人工录入/情报源管理）；5 s 轮询 + 操作后立即刷新；`?intel=` 深链。
+- 前端：顶栏“情报”打开模态框，三标签页（情报列表/人工录入/情报源管理）；5 s 轮询 + 操作后立即刷新；`?intel=` 深链。写接口仅在服务端 `test` 模式开放并强制 JSON Content-Type，演示模式只读。
 - 域词汇扩展到气象、新闻、地理、人文社会、社交媒体、自媒体等；自定义源类型预留 rss/weather/web/social。
 - 未做：通用 RSS/Atom、Open-Meteo、`IntelRequirement` API、LLM 摘要、AIS WebSocket。
