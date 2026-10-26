@@ -25,10 +25,10 @@ LICENSES = os.path.join(MODELS, "licenses.json")
 MANIFEST = os.path.join(MODELS, "manifest.json")
 TOLERANCE = 0.08
 
-BUDGETS = {
+P0_BUDGETS = {
     # class: (tris, prims, materials, file_mb)
-    # P0 验收预算：按 2026-10-26 优化后的可达值 + 余量；报告 §5.1 的 P1
-    # 目标更紧（大型舰 28k、飞机 18k、坦克 9k 等），P1 重建后再收紧。
+    # P0 验收预算：按 2026-10-26 优化后的可达值 + 余量；P1 重建后应满足
+    # P1_TARGETS（与报告 §5.1 一致）。默认用 P0，避免把“P0 未达标”误报为回归。
     "ship_large": (31000, 14, 14, 1.70),
     "ship_small": (14000, 10, 8, 0.75),
     "aircraft_fighter": (21000, 18, 18, 1.60),
@@ -37,6 +37,19 @@ BUDGETS = {
     "ground_truck": (12000, 8, 8, 0.60),
     "rigged": (31000, 20, 12, 2.20),
 }
+
+P1_TARGETS = {
+    # 报告的 P1 目标；`--strict` 时使用。
+    "ship_large": (28000, 12, 6, 1.70),
+    "ship_small": (14000, 10, 4, 0.75),
+    "aircraft_fighter": (18000, 12, 6, 0.95),
+    "aircraft_aew": (22000, 12, 6, 1.25),
+    "ground_tank": (9000, 6, 3, 0.33),
+    "ground_truck": (7000, 8, 3, 0.28),
+    "rigged": (30000, 15, 10, 2.20),
+}
+
+EXPECTED_MAIN_ASSETS = 30
 
 ALLOWED_EXT = {
     "EXT_texture_webp",
@@ -86,7 +99,9 @@ def glb_info(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--write-manifest", action="store_true")
+    ap.add_argument("--strict", action="store_true", help="用 P1_TARGETS（报告 §5.1）而不是 P0 验收预算")
     args = ap.parse_args()
+    budgets = P1_TARGETS if args.strict else P0_BUDGETS
 
     specs = json.load(open(SPECS, encoding="utf-8"))["assets"]
     licenses = {}
@@ -106,10 +121,10 @@ def main():
             failures.append((name, "specs.json 缺少条目"))
             continue
         cls = meta["class"]
-        if cls not in BUDGETS:
+        if cls not in budgets:
             failures.append((name, "未知 class " + cls))
             continue
-        bt, bp, bm, bmb = BUDGETS[cls]
+        bt, bp, bm, bmb = budgets[cls]
         info = glb_info(path)
         bad = []
         if info["tris"] > bt * (1 + TOLERANCE):
@@ -132,6 +147,10 @@ def main():
                "license": licenses.get(name, {})},
         )
 
+    if len(rows) != EXPECTED_MAIN_ASSETS:
+        failures.append(("__count__", "主模型 %d 个，期望 %d 个" % (len(rows), EXPECTED_MAIN_ASSETS)))
+
+    print("budget: %s" % ("P1_TARGETS" if args.strict else "P0_BUDGETS"))
     print("%-22s %-16s %8s %8s %6s %4s %7s %6s  %s" % ("asset", "class", "tris", "budget", "prims", "max", "MB", "budget", "status"))
     for r in rows:
         print("%-22s %-16s %8d %8d %6d %4d %7.2f %6.2f  %s" % r)

@@ -8,7 +8,7 @@
 
 | 文件 | 改动 |
 |---|---|
-| `server/serve.py` | 新增 `ASSET_PREFIXES=("/assets/models/","/assets/fx/")`，资源以 `Cache-Control: public, max-age=3600` 下发；ETag/Last-Modified 仍可在过期后复用 |
+| `server/serve.py` | 新增 `ASSET_PREFIXES=("/assets/models/","/assets/fx/")`，资源以 `Cache-Control: public, max-age=600` 下发；ETag/Last-Modified 仍可在过期后复用 |
 | `web/src/entityLod.js` | 恢复 `DEFAULTS={enter3dHeight:3000, exit3dHeight:3600}`（此前为 `1e9`，导致 `entity_lod_test.js` 6 项失败） |
 | `web/assets/models/type_*.glb` | 30 型重新导出：纹理 ≤1024 + WebP；静态件 `palette → join`；按预算 `weld/simplify`；静态模型 `meshopt` |
 | `web/assets/models/specs.json` | 逐型号 class、公开长度/宽度/近似关系 |
@@ -28,7 +28,8 @@
 | 纹理字节 | 20.1 MB | **7.26 MB** | −63.9% |
 | 台海密集案例（80 目标）draw calls | 1,582 | **506** | −68.0% |
 | 台海密集案例三角面 | 3,004,938 | **937,250** | −68.8% |
-| 中印案例（10 目标）draw calls | 327 | **39** | −88.1% |
+| 中印案例（10 目标，9 个有模型）draw calls | 382 | **55** | −85.6% |
+| 中印案例（10 目标，9 个有模型）三角面 | 234,507 | **110,369** | −52.9% |
 
 主要单模型：052C 4.8→1.0 MB、071 5.5→0.9 MB、J-16 5.8→1.5 MB、PLZ-05 3.8→1.2 MB、ZTD-05 2.1→0.12 MB、EQ240 2.6→0.43 MB、PHL-03 2.1→0.18 MB / 228→2 primitives（MB 按 1024² 计）。
 
@@ -39,8 +40,8 @@
 - `python3 tools/model_license_test.py`：30/30 有许可记录；风险项 4 个：`type_052c`/`type_kj2000`（DCS 提取物）、`type_ztd05`/`type_phl03`（Sketchfab Free Standard）。
 - `node tools/entity_lod_test.js`：**183 通过 / 0 失败**。
 - Cesium 1.145 + headless Chromium/SwiftShader：052C、ZTD-05、PHL-03、071、Z-10、J-16、EQ240、M1A2 均成功加载，页面无 `pageErrors`；WebP（`EXT_texture_webp`）与 Meshopt（`EXT_meshopt_compression`）解码正常。
-- 8859 静态资源：`Cache-Control: public, max-age=3600` + ETag；`type_052c.glb` 1,039,244 B。
-- 世界包围盒/原点：抽查 052C/071/ZTD-05/EQ240/PHL-03，X/Z 包络不变；简化导致桅杆/天线尖端高度减少 0.1–2.0 m（052C 最明显），属薄件减面，已记录为 P1 需保护的对象。
+- 8859 静态资源：`200/304` 为 `Cache-Control: public, max-age=600` + ETag；404 不再继承长缓存；`type_052c.glb` 1,039,244 B。
+- 世界包围盒/原点：已用 `tools/model_bboxes_gltf.py` 重新生成 `web/assets/models/bboxes.json` 与 `engine/data/models/bboxes.json`（支持 meshopt）。抽查 052C/071/ZTD-05/EQ240/PHL-03：X/Z 包络与水线/地面原点不变；052C 顶高 43.73→41.76 m（桅杆尖）、ZTD-05 4.88→4.07 m（天线）、071 龙骨 -6.88→-6.53 m（0.35 m），属薄件减面，P1 需保护。
 
 ## 4. 备份与回滚
 
@@ -53,4 +54,4 @@
 - P1：052D（复用 `build_052d()`）、KJ-500（复用 `build_kj500()`）、15 式、CM-11（M60A3 炮塔）、075、056A/903/磐石/基隆/沱江细节；按用户新口径可继续增加 CC-BY/NC 资产。
 - P2：轮系/履带/炮塔/旋翼/雷达关节，艏浪/扬尘/加力/凝结尾迹/通信链路。
 - P3：LOD1（1.2–1.5 km 切换）、实例化、真机 GPU 验收。
-- 当前 `model_budget_test.py` 的预算为 P0 可达值；报告 §5.1 的 P1 目标更紧，P1 重建后逐型收紧。
+- `model_budget_test.py` 默认使用 P0 可达预算；`--strict` 使用报告 §5.1 的 P1 目标（当前 30 型中仍有多项不达标，属 P1 待办）。
