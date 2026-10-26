@@ -63,7 +63,8 @@ class CueBatch:
     log_hash: str
 
 
-SOURCE_PRIORITY = {"usgs": 0, "gdacs": 1, "firms": 2}
+SOURCE_PRIORITY = {"usgs": 0, "gdacs": 1, "firms": 2,
+                   "eonet": 3, "adsb": 4, "gdelt": 5}
 
 
 class IntelBundle:
@@ -205,14 +206,31 @@ class IntelGateway:
     """Consume observations as future-only cues, never as ground truth."""
 
     def __init__(self, bundle: IntelBundle, ttl_s: float = 3600.0,
-                 late_policy: str = "discard_and_log", fusion=None):
+                 late_policy: str = "discard_and_log", fusion=None,
+                 case_filter=None):
         self.bundle = bundle
         self.ttl_s = float(ttl_s)
         self.late_policy = late_policy
         self.fusion = fusion
+        self.case_filter = case_filter
         self._start_ms = int(parse_time(bundle.scenario_start).timestamp() * 1000)
         self._consumed = set()
         self.late = []
+
+    def set_case_filter(self, case_filter):
+        """Update the AOI/text filter without rebuilding the bundle."""
+        self.case_filter = case_filter
+        return self
+
+    @property
+    def filter_hash(self):
+        return getattr(self.case_filter, "filter_hash", None)
+
+    def _matches(self, observation: Observation) -> bool:
+        if self.case_filter is None:
+            return True
+        matcher = getattr(self.case_filter, "matches", self.case_filter)
+        return bool(matcher(observation))
 
     def consume(self, side: int, sim_time: float, watermark: float,
                 lookahead: float) -> CueBatch:
@@ -229,6 +247,8 @@ class IntelGateway:
                 break
             obs_side = obs.properties.get("side")
             if obs_side is not None and int(obs_side) != int(side):
+                continue
+            if not self._matches(obs):
                 continue
             if sim < watermark:
                 self.late.append(obs.observation_id)
@@ -290,6 +310,8 @@ class IntelGateway:
                 continue
             obs_side = obs.properties.get("side")
             if obs_side is not None and int(obs_side) != int(side):
+                continue
+            if not self._matches(obs):
                 continue
             sim = (obs.event_ms() - self._start_ms) / 1000.0
             if sim > horizon:

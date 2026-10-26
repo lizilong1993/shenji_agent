@@ -1,0 +1,12 @@
+{
+  "case_id": "global",
+  "name": "全球公开源",
+  "bbox": [-180.0, -90.0, 180.0, 90.0],
+  "domains": ["hazard", "conflict", "maritime", "aviation", "other"],
+  "sources": ["usgs", "gdacs", "eonet"],
+  "keywords": [],
+  "countries": [],
+  "buffer_km": 0.0,
+  "lookback_hours": 24.0,
+  "max_items": 5000
+}

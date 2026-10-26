@@ -55,6 +55,8 @@ class IntelScheduler:
             "bbox": list(self.gateway.bundle.bbox),
             "time_window": list(self.gateway.bundle.time_window),
             "source_allowlist": list(self.gateway.bundle.source_allowlist),
+            "case_id": getattr(self.gateway.case_filter, "case_id", None),
+            "case_filter_hash": self.gateway.filter_hash,
             "synthetic": self.gateway.bundle.synthetic,
             "lookahead_s": self.lookahead_s,
             "watermark_lag_s": self.watermark_lag_s,

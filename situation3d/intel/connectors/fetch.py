@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
+import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -17,7 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from ..gateway import IntelBundle, SOURCE_PRIORITY
 from ..model import Observation, iso, parse_time
-from . import firms, gdacs, usgs
+from . import adsb, eonet, firms, gdacs, gdelt, usgs
 from .archive import ArchiveRecord, archive_raw
 from .http import FetchError, MissingCredential, fetch_bytes
 from .registry import get_source
@@ -55,6 +56,7 @@ class FetchResult:
     statuses: Tuple[SourceStatus, ...]
     archives: Tuple[ArchiveRecord, ...]
     errors: Tuple[dict, ...]
+    truncated: bool = False
 
 
 def _normalize_bbox(bbox: Sequence[float]) -> Tuple[float, float, float, float]:
@@ -165,22 +167,84 @@ def _fetch_firms(spec, start, end, bbox, fetcher, map_key, fetched_at):
     return payloads, observations, errors
 
 
+def _fetch_adsb(spec, bbox, fetcher, fetched_at):
+    points = adsb.sample_points(bbox)
+    payloads = []
+    observations = []
+    errors = []
+    for index, (lat, lon) in enumerate(points):
+        url = adsb.build_url(lat, lon)
+        try:
+            raw = _fetch(url, spec.host, fetcher)
+        except Exception as exc:
+            errors.append("point %d: %s" % (index, exc))
+            continue
+        payload = _decode_json(raw)
+        payloads.append(("adsb_%d" % index, raw, "json"))
+        observations.extend(adsb.parse_payload(payload, fetched_at))
+    if not payloads:
+        raise FetchError("; ".join(errors) or "no ADS-B point returned data")
+    return payloads, observations, errors
+
+
+def _fetch_eonet(spec, start, end, bbox, fetcher, fetched_at):
+    url = eonet.build_url(start, end, bbox)
+    raw = _fetch(url, spec.host, fetcher)
+    payload = _decode_json(raw)
+    return [(spec.source_id, raw, "json")], eonet.parse_payload(
+        payload, fetched_at, bbox=bbox, start=start, end=end)
+
+
+def _fetch_gdelt(spec, start, end, case_profile, fetcher, fetched_at):
+    if case_profile is None or not case_profile.keywords:
+        raise FetchError("GDELT needs case keywords")
+    url = gdelt.build_url(case_profile.keywords, start, end)
+    raw = None
+    for attempt in range(2):
+        try:
+            raw = _fetch(url, spec.host, fetcher)
+            break
+        except FetchError as exc:
+            # GDELT asks for one request per 5 seconds; one retry is enough.
+            if attempt == 0 and "http 429" in str(exc) and fetcher is None:
+                time.sleep(6)
+                continue
+            raise
+    payload = _decode_json(raw)
+    return [(spec.source_id, raw, "json")], gdelt.parse_payload(
+        payload, fetched_at, case_profile.center)
+
+
 def _safe_error(exc: Exception) -> str:
     text = str(exc).strip() or type(exc).__name__
     return text[:300]
 
 
-def build_bundle(source_ids: Sequence[str], bbox: Sequence[float],
-                 start: Any, end: Any, fetched_at: Any = None,
+def build_bundle(source_ids: Optional[Sequence[str]] = None,
+                 bbox: Optional[Sequence[float]] = None,
+                 start: Any = None, end: Any = None, fetched_at: Any = None,
                  bundle_id: Optional[str] = None,
                  scenario_id: str = "vgi_live",
                  archive_root: Optional[str] = None,
                  fetcher: Optional[Fetcher] = None,
-                 firms_map_key: Optional[str] = None) -> FetchResult:
+                 firms_map_key: Optional[str] = None,
+                 case_profile=None) -> FetchResult:
     """Fetch selected sources, archive raw bytes, and return one bundle.
 
     ``fetcher`` is injected for offline tests; production calls ``http``.
+    ``case_profile`` supplies defaults and applies case-scoped filtering.
     """
+    if case_profile is not None:
+        if source_ids is None:
+            source_ids = case_profile.sources
+        if bbox is None:
+            bbox = case_profile.bbox
+    if source_ids is None:
+        raise ValueError("source_ids or case_profile is required")
+    if bbox is None:
+        raise ValueError("bbox or case_profile is required")
+    if start is None or end is None:
+        raise ValueError("start and end are required")
     if isinstance(source_ids, str):
         raise ValueError("source_ids must be a sequence, not a string")
     sources = tuple(dict.fromkeys(
@@ -220,12 +284,23 @@ def build_bundle(source_ids: Sequence[str], bbox: Sequence[float],
                 payloads, found, sensor_errors = _fetch_firms(
                     spec, start_dt, end_dt, bbox_tuple, fetcher, key,
                     fetched_dt)
+            elif source_id == "adsb":
+                payloads, found, sensor_errors = _fetch_adsb(
+                    spec, bbox_tuple, fetcher, fetched_dt)
+            elif source_id == "eonet":
+                payloads, found = _fetch_eonet(
+                    spec, start_dt, end_dt, bbox_tuple, fetcher, fetched_dt)
+            elif source_id == "gdelt":
+                payloads, found = _fetch_gdelt(
+                    spec, start_dt, end_dt, case_profile, fetcher, fetched_dt)
             else:  # pragma: no cover - registry already rejects this
                 raise FetchError("unsupported source %s" % (source_id,))
 
             kept = [obs for obs in found
                     if _in_bbox(obs, bbox_tuple)
                     and _in_window(obs, start_dt, end_dt)]
+            if case_profile is not None:
+                kept = [obs for obs in kept if case_profile.matches(obs)]
             kept = [
                 _clamp_live_event(obs, start_dt) if obs.source_id == "gdacs"
                 else obs
@@ -272,7 +347,10 @@ def build_bundle(source_ids: Sequence[str], bbox: Sequence[float],
                 count=0,
                 error=message,
             ))
-            errors.append({"source_id": source_id, "error": message})
+            # A missing optional key is a configuration state, not a failed
+            # run: keep the source visible in health but let the bundle stand.
+            if not isinstance(exc, MissingCredential):
+                errors.append({"source_id": source_id, "error": message})
 
     unique: Dict[str, Observation] = {}
     for obs in observations:
@@ -285,6 +363,10 @@ def build_bundle(source_ids: Sequence[str], bbox: Sequence[float],
     observations.sort(key=lambda obs: (
         obs.event_ms(), SOURCE_PRIORITY.get(obs.source_id, 9),
         obs.observation_id))
+    truncated = False
+    if case_profile is not None and len(observations) > case_profile.max_items:
+        observations = observations[:case_profile.max_items]
+        truncated = True
     observations = [
         dataclasses.replace(obs, ingest_seq=index)
         for index, obs in enumerate(observations)
@@ -294,13 +376,15 @@ def build_bundle(source_ids: Sequence[str], bbox: Sequence[float],
         dataclasses.replace(status, count=counts.get(status.source_id, 0))
         for status in statuses
     ]
+    prefix = ("vgi-%s-" % case_profile.case_id
+              if case_profile is not None else "vgi-")
     bundle = IntelBundle(
-        bundle_id=bundle_id or ("vgi-" + fetched_dt.strftime("%Y%m%dT%H%M%SZ")),
+        bundle_id=bundle_id or (prefix + fetched_dt.strftime("%Y%m%dT%H%M%SZ")),
         scenario_id=scenario_id,
         observations=observations,
         scenario_start=iso(start_dt),
         synthetic=False,
-        domain="hazard",
+        domain="multi" if case_profile is not None else "hazard",
         bbox=bbox_tuple,
         time_window=(iso(start_dt), iso(end_dt)),
         source_allowlist=sources,
@@ -310,4 +394,5 @@ def build_bundle(source_ids: Sequence[str], bbox: Sequence[float],
         statuses=tuple(statuses),
         archives=tuple(archives),
         errors=tuple(errors),
+        truncated=truncated,
     )

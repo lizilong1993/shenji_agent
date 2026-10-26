@@ -10,6 +10,8 @@ SOURCE_RELIABILITY = {
     "usgs": 0.98,
     "gdacs": 0.95,
     "firms": 0.80,
+    "eonet": 0.85,
+    "adsb": 0.75,
     "gdelt": 0.60,
 }
 HALF_LIFE_H = {
