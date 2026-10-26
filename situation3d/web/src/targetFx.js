@@ -35,8 +35,11 @@
 
   var ctx = null;                 // { viewer, data, api }
   var wheelStates = {};           // 目标 id -> { angle, radius }
-  var wakeSpecs = [];             // [{ id, def, outer, inner }]
-  var exhaustSpecs = [];          // [{ id, def, ps }]
+  var wakeSpecs = [];             // [{ id, def, outer, inner, bow }]
+  var exhaustSpecs = [];          // [{ id, def, core, plume, contrail }]
+  var dustSpecs = [];             // [{ id, def, billboard }]
+  var dustImage = null;
+  var BOW_SEGMENTS = 5;
   var modelCache = {};            // 目标 id -> Cesium.Model（仅带 glTF 动画的模型需要）
   var lastModelScan = 0;
   var lastAnimSync = 0;
@@ -61,6 +64,25 @@
 
   function isAir(def) {
     return String(def.domain || '').toLowerCase() === 'air';
+  }
+
+  function isLand(def) {
+    return String(def.domain || '').toLowerCase() === 'land';
+  }
+
+  function ensureDustImage() {
+    if (dustImage) return dustImage;
+    var c = document.createElement('canvas');
+    c.width = c.height = 64;
+    var g = c.getContext('2d');
+    var grd = g.createRadialGradient(32, 32, 2, 32, 32, 31);
+    grd.addColorStop(0, 'rgba(196,178,146,0.55)');
+    grd.addColorStop(0.45, 'rgba(170,150,120,0.30)');
+    grd.addColorStop(1, 'rgba(140,120,95,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 64, 64);
+    dustImage = c.toDataURL('image/png');
+    return dustImage;
   }
 
   /** 模型局部前向轴（与 targetMotion 的姿态约定一致）。 */
@@ -255,6 +277,46 @@
       return pts;
     }
 
+    function bowPositionsFor() {
+      var t = ctx.api.clockTime ? ctx.api.clockTime() : null;
+      if (!t) return [];
+      var rec = ctx.api.entity ? ctx.api.entity(id) : null;
+      var prop = rec && rec.position;
+      if (!prop) return [];
+      var sample = ctx.api.sample ? ctx.api.sample(id) : null;
+      var speedKn = sample ? Math.max(0, Number(sample.speed_kn) || 0) : 0;
+      if (speedKn < 0.5) return [];
+
+      var mps = speedKn * SPEED_TO_MPS;
+      var span = Math.max(4, Math.min(120, (lenM * 2) / Math.max(0.5, mps)));
+      var step = span / (BOW_SEGMENTS - 1);
+      var hdg = Cesium.Math.toRadians(sample.heading || 0);
+      var cart = new Cesium.Cartographic();
+      Cesium.Cartographic.fromCartesian(
+        Cesium.Cartesian3.fromDegrees(sample.lon, sample.lat, 0), Cesium.Ellipsoid.WGS84, cart);
+      var enu = Cesium.Transforms.eastNorthUpToFixedFrame(
+        Cesium.Cartesian3.fromRadians(cart.longitude, cart.latitude, 0));
+      Cesium.Cartesian3.fromElements(enu[0], enu[1], enu[2], scratchFwd);
+      Cesium.Cartesian3.multiplyByScalar(scratchFwd, Math.sin(hdg), scratchFwd);
+      Cesium.Cartesian3.fromElements(enu[4], enu[5], enu[6], scratchBack);
+      Cesium.Cartesian3.multiplyByScalar(scratchBack, Math.cos(hdg), scratchBack);
+      Cesium.Cartesian3.add(scratchFwd, scratchBack, scratchFwd);        // 前向
+      Cesium.Cartesian3.multiplyByScalar(scratchFwd, lenM * 0.45, scratchBack);
+
+      var pts = [];
+      var tmp = new Cesium.JulianDate();
+      for (var k = 0; k < BOW_SEGMENTS; k++) {
+        Cesium.JulianDate.addSeconds(t, -k * step, tmp);
+        var p = prop.getValue(tmp);
+        if (!p) break;
+        var q = Cesium.Cartesian3.add(p, scratchBack, new Cesium.Cartesian3());
+        var up = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(q, scratchUp);
+        Cesium.Cartesian3.add(q, Cesium.Cartesian3.multiplyByScalar(up, 1.2, up), q);
+        pts.push(q);
+      }
+      return pts;
+    }
+
     var outer = ctx.viewer.entities.add({
       id: 'wake-' + id + '-outer',
       show: false,
@@ -281,7 +343,20 @@
         clampToGround: false,
       },
     });
-    wakeSpecs.push({ id: id, def: def, outer: outer, inner: inner });
+    var bow = ctx.viewer.entities.add({
+      id: 'wake-' + id + '-bow',
+      show: false,
+      polyline: {
+        positions: new Cesium.CallbackProperty(bowPositionsFor, false),
+        width: 12,
+        material: new Cesium.PolylineGlowMaterialProperty({
+          color: Cesium.Color.fromCssColorString('#e8f4ff').withAlpha(0.10),
+          glowPower: 0.2,
+        }),
+        clampToGround: false,
+      },
+    });
+    wakeSpecs.push({ id: id, def: def, outer: outer, inner: inner, bow: bow });
   }
 
   function updateWakes() {
@@ -301,6 +376,7 @@
       }
       w.outer.show = on;
       w.inner.show = on;
+      w.bow.show = on && speed > 4 && !(camH > 50000);
     });
   }
 
@@ -387,7 +463,20 @@
         clampToGround: false,
       },
     });
-    exhaustSpecs.push({ id: id, def: def, core: core, plume: plume });
+    var contrail = ctx.viewer.entities.add({
+      id: 'exhaust-' + id + '-contrail',
+      show: false,
+      polyline: {
+        positions: new Cesium.CallbackProperty(positionsFor, false),
+        width: 20,
+        material: new Cesium.PolylineGlowMaterialProperty({
+          color: Cesium.Color.fromCssColorString('#f2f6fb').withAlpha(0.07),
+          glowPower: 0.12,
+        }),
+        clampToGround: false,
+      },
+    });
+    exhaustSpecs.push({ id: id, def: def, core: core, plume: plume, contrail: contrail });
   }
 
   function updateExhaust() {
@@ -405,6 +494,68 @@
       }
       ex.core.show = on;
       ex.plume.show = on;
+      ex.contrail.show = on && !!sample && Number(sample.alt) > 7000 && speed > 50;
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // 地面扬尘：每个地面目标一个 billboard，速度/距离门控
+  // ------------------------------------------------------------------
+
+  function makeDust(def) {
+    var id = def.id;
+    var formClass = formClassOf(def);
+    var lenM = (window.EntityLod && window.EntityLod.REAL_LENGTH_M[formClass]) || 8;
+
+    function positionFor() {
+      var sample = ctx.api.sample ? ctx.api.sample(id) : null;
+      if (!sample) return undefined;
+      var hdg = Cesium.Math.toRadians(sample.heading || 0);
+      var d = lenM * 0.35;
+      var dLat = -Math.cos(hdg) * d / 111320;
+      var cosLat = Math.max(0.05, Math.cos(Cesium.Math.toRadians(sample.lat || 0)));
+      var dLon = -Math.sin(hdg) * d / (111320 * cosLat);
+      return Cesium.Cartesian3.fromDegrees(
+        sample.lon + dLon, sample.lat + dLat, (Number(sample.alt) || 0) + 0.6,
+        Cesium.Ellipsoid.WGS84);
+    }
+
+    function scaleFor() {
+      var sample = ctx.api.sample ? ctx.api.sample(id) : null;
+      var speed = sample ? Math.max(0, Number(sample.speed_kn) || 0) : 0;
+      return Math.min(18, 5 + speed * 0.35);
+    }
+
+    var billboard = ctx.viewer.entities.add({
+      id: 'dust-' + id,
+      show: false,
+      position: new Cesium.CallbackProperty(positionFor, false),
+      billboard: {
+        image: ensureDustImage(),
+        scale: new Cesium.CallbackProperty(scaleFor, false),
+        color: Cesium.Color.WHITE.withAlpha(0.75),
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    });
+    dustSpecs.push({ id: id, def: def, billboard: billboard });
+  }
+
+  function updateDust() {
+    var camH = ctx.api.cameraHeight ? ctx.api.cameraHeight() : 0;
+    var playing = !!(ctx.api.playing && ctx.api.playing());
+    dustSpecs.forEach(function (d) {
+      var sample = ctx.api.sample ? ctx.api.sample(d.id) : null;
+      var speed = sample ? Math.max(0, Number(sample.speed_kn) || 0) : 0;
+      var on = playing && !!(ctx.api.isVisible && ctx.api.isVisible(d.def))
+        && speed > 2 && !(camH > 30000);
+      if (on && sample && ctx.viewer) {
+        var cam = ctx.viewer.camera.positionWC;
+        var p = Cesium.Cartesian3.fromDegrees(sample.lon, sample.lat, sample.alt || 0,
+          Cesium.Ellipsoid.WGS84, scratchTail);
+        on = Cesium.Cartesian3.distance(cam, p) < 25000;
+      }
+      d.billboard.show = on;
     });
   }
 
@@ -426,6 +577,7 @@
     wheelStates = {};
     wakeSpecs = [];
     exhaustSpecs = [];
+    dustSpecs = [];
     modelCache = {};
     lastModelScan = 0;
     lastAnimSync = 0;
@@ -440,6 +592,7 @@
       }
       if (isSea(def) && hasModel(def)) makeWake(def);
       if (isAir(def) && hasModel(def)) makeExhaust(def);
+      if (isLand(def) && hasModel(def)) makeDust(def);
     });
   }
 
@@ -453,6 +606,7 @@
     updateModelAnimations(now);
     updateWakes();
     updateExhaust();
+    updateDust();
   }
 
   function dispose() {
@@ -461,12 +615,19 @@
         try {
           if (w.outer) ctx.viewer.entities.remove(w.outer);
           if (w.inner) ctx.viewer.entities.remove(w.inner);
+          if (w.bow) ctx.viewer.entities.remove(w.bow);
         } catch (e) { /* 场景已拆 */ }
       });
       exhaustSpecs.forEach(function (ex) {
         try {
           if (ex.core) ctx.viewer.entities.remove(ex.core);
           if (ex.plume) ctx.viewer.entities.remove(ex.plume);
+          if (ex.contrail) ctx.viewer.entities.remove(ex.contrail);
+        } catch (e) { /* 已拆 */ }
+      });
+      dustSpecs.forEach(function (d) {
+        try {
+          if (d.billboard) ctx.viewer.entities.remove(d.billboard);
         } catch (e) { /* 已拆 */ }
       });
     }
@@ -474,15 +635,19 @@
     wheelStates = {};
     wakeSpecs = [];
     exhaustSpecs = [];
+    dustSpecs = [];
     modelCache = {};
   }
 
   function debug() {
     return {
       ready: !!ctx,
-      wakes: wakeSpecs.map(function (w) { return { id: w.id, show: !!w.outer.show }; }),
+      wakes: wakeSpecs.map(function (w) { return { id: w.id, show: !!w.outer.show, bow: !!(w.bow && w.bow.show) }; }),
       exhausts: exhaustSpecs.map(function (e) {
-        return { id: e.id, show: !!(e.core && e.core.show) };
+        return { id: e.id, show: !!(e.core && e.core.show), contrail: !!(e.contrail && e.contrail.show) };
+      }),
+      dusts: dustSpecs.map(function (d) {
+        return { id: d.id, show: !!(d.billboard && d.billboard.show) };
       }),
       wheels: Object.keys(wheelStates).map(function (id) {
         return { id: id, angle: +wheelStates[id].angle.toFixed(3) };

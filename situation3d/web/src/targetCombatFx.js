@@ -605,6 +605,9 @@
     var m = muzzlePosition(shooter, defById[shooter]);
     if (!m) return;
     spawnFlash(m, 1.0);
+    var sdef = defById[shooter] || {};
+    var isShip = /sea|naval|maritime/.test(String(sdef.domain || '').toLowerCase());
+    if (isShip && /导弹|反舰|火箭/.test(ev.weapon || '')) spawnVlsPlume(m);
     var impact = impactByFire[ev.id];
     if (impact) {
       var isMissile = /导弹|火箭弹/.test(ev.weapon || '');
@@ -751,6 +754,32 @@
     if (transients.length > MAX_TRANSIENTS) {
       var old = transients.shift();
       ctx.viewer.entities.remove(old.entity);
+    }
+  }
+
+  /** 舰载导弹垂直发射：沿地表法线叠几团火光/烟，近似 VLS 燃气羽流。 */
+  function spawnVlsPlume(pos) {
+    var up = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(pos, new Cesium.Cartesian3());
+    for (var k = 0; k < 4; k++) {
+      var q = Cesium.Cartesian3.add(
+        pos, Cesium.Cartesian3.multiplyByScalar(up, k * 5.5, new Cesium.Cartesian3()),
+        new Cesium.Cartesian3());
+      var ent = ctx.viewer.entities.add({
+        position: q,
+        billboard: {
+          image: k < 2 ? IMG.flash : IMG.smoke,
+          scale: 1.6 + k * 0.9,
+          color: k < 2
+            ? Cesium.Color.fromAlpha(Cesium.Color.WHITE, 0.8)
+            : Cesium.Color.fromAlpha(Cesium.Color.WHITE, 0.45),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+      transients.push({ entity: ent, until: Date.now() + 900 + k * 120 });
+      if (transients.length > MAX_TRANSIENTS) {
+        var old = transients.shift();
+        ctx.viewer.entities.remove(old.entity);
+      }
     }
   }
 
