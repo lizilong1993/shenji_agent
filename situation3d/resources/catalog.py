@@ -70,6 +70,22 @@ KINDS: Dict[str, KindSpec] = {
         "commander_service", "远程指挥模型（可选，离线回退 RuleCommander）",
         "advisory", 0.0, "",
         ("http",)),
+    "building_footprints": KindSpec(
+        "building_footprints", "建筑轮廓/高度（GBA、Overture 等）",
+        "advisory", 365.0, "s3d.vector.v1",
+        ("gba", "overture")),
+    "canopy_height": KindSpec(
+        "canopy_height", "树冠/植被高度栅格（CHMv2 等）",
+        "advisory", 365.0, "s3d.raster.v1",
+        ("chmv2",)),
+    "landcover": KindSpec(
+        "landcover", "地类栅格（ESA WorldCover 等）",
+        "advisory", 365.0, "s3d.raster.v1",
+        ("worldcover",)),
+    "tile_layer": KindSpec(
+        "tile_layer", "XYZ 地图/影像瓦片集（在线获取或本地栅格切片）",
+        "cosmetic", 365.0, "s3d.tileset.v1",
+        ("xyz", "raster", "file")),
     "tiles3d": KindSpec(
         "tiles3d", "3D Tiles / quantized-mesh 显示数据集",
         "cosmetic", 365.0, "",

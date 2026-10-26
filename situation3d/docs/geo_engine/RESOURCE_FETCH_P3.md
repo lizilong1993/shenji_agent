@@ -23,7 +23,7 @@
 - 模板：现有 envpack 的 `manifest.json` + `base_map.json` + grid（不改变 AOI/网格/分辨率）。
 - 数据源：复用 `geodata` 现有实现——Overpass（`OsmSource`）、Terrarium DEM（`DemSource`）、
   OSM PBF（`PbfOsmSource`，需要 pyosmium）与 GEBCO 可后续接入；HTTP 代理沿用环境变量。
-- **公开下载优先**：Overpass 不可用时，可用 Geofabrik `taiwan-latest.osm.pbf`
+- **公开下载优先**：Overpass 不可用时，可用 Geofabrik 区域 PBF（如 `taiwan-latest.osm.pbf`、`china-latest.osm.pbf`，项目覆盖全中国，不绑定台湾）
   （`scripts/resource.py download-pbf <url>`，urllib 走 `https_proxy`）先落到
   `cache/osm_pbf/`，再用 `fetch --osm-pbf <path>` 重建。runner 的 auto 模式会复用
   `SITUATION_OSM_PBF` 或缓存里 7 天内的同名 PBF，不自动下载（避免无提示的大流量）。

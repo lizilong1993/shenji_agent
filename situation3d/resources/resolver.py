@@ -28,7 +28,8 @@ from .store import ResourceStore
 # the checkout; filtering them by a historical scenario date would block every
 # past-date run for no physical reason.
 DATE_SENSITIVE = {"envpack", "case_roads", "bathymetry", "weather",
-                  "intel_bundle"}
+                  "intel_bundle", "tile_layer",
+                  "building_footprints", "canopy_height", "landcover"}
 
 IMPACT = {
     "envpack": "缺少可用的环境包时，地形/路网/水系/建筑没有权威来源，引擎不能安全推演",
