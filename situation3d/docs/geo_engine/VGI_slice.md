@@ -122,7 +122,7 @@ cd situation3d
 python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py tests/test_intel_scheduler.py tests/test_intel_connectors.py tests/test_intel_cases.py -v
 ```
 
-58 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定；调度器按 side 轮询、manifest 确定性与隔离、World 只发布到期 cue、多 side 中立观测、窗口内早事件不丢、`advance_to` 同步、未挂载时载荷不变；连接器 URL/allow-list、FIRMS 日期时间合并与跨日跨度/UTC 锚点、进行中 GDACS 事件、二维点几何、归档往返、离线 bundle、契约字段与 `from_dict` 往返、部分源失败与缺 key 上报；案例 profile 加载/覆盖/哈希、ADS-B 采样与军机标记、EONET 点选择、GDELT 质心定位、案例 bundle 过滤与 buffer 保留、max_items 截断、可选 GDELT 失败只告警、网关运行时 AOI 切换。
+61 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定；调度器按 side 轮询、manifest 确定性与隔离、World 只发布到期 cue、多 side 中立观测、窗口内早事件不丢、`advance_to` 同步、未挂载时载荷不变；连接器 URL/allow-list、FIRMS 日期时间合并与跨日跨度/UTC 锚点、进行中 GDACS 事件、二维点几何、归档往返、离线 bundle、契约字段与 `from_dict` 往返、部分源失败与缺 key 上报；案例 profile 加载/覆盖/哈希、显式 bbox 与 buffer、ADS-B 采样与军机标记、EONET 点选择与跨源类型归一、GDELT 质心定位与中文词、案例 bundle 过滤、max_items 保留最新、可选 GDELT 失败只告警、网关运行时 AOI 切换。
 
 ## 10. 已知限制与下一步
 
@@ -139,12 +139,12 @@ python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py tests/test_intel
 
 `intel/connectors/` 把“抓取—归档—归一化—bundle”放在仿真之外：
 
-- `registry.py`：USGS / GDACS / FIRMS 的 host、license、attribution、调度周期、parser 版本；FIRMS 需要 `FIRMS_MAP_KEY`。
+- `registry.py`：USGS / GDACS / FIRMS / ADS-B / EONET / GDELT 的 host、license、attribution、调度周期、parser 版本；FIRMS 需要 `FIRMS_MAP_KEY`，GDELT 标记为 optional。
 - `http.py`：只允许注册表 host、只允许 HTTPS/443、拒绝 URL 凭据、拒绝重定向、20 s 超时、8 MiB 响应上限；错误信息不包含带 key 的完整 URL。
 - `usgs.py`：FDSN `query?format=geojson`，按 bbox/时间窗查询。
 - `gdacs.py`：`gdacsapi/api/events/geteventlist/SEARCH`，事件类型 EQ/TC/FL/VO/WF/DR，告警级 Green/Orange/Red；列表接口无 bbox，抓取后本地过滤。
 - `firms.py`：`/api/area/csv`，四个 NRT 传感器；按 `[start.date, end.date]` 计算 1–5 天窗口（FIRMS 上限 5 天），把 `acq_date` + `acq_time`（HHMM）合并为 ISO 时间；单个传感器失败不丢弃其他传感器，状态记 `degraded`；非 CSV 响应直接判错。
-- `fetch.py`：`build_bundle(source_ids=None, bbox=None, start=None, end=None, ..., case_profile=None)` 返回 `FetchResult(bundle, statuses, archives, errors, truncated)`；观测先按 `(event_time, source priority, observation_id)` 排序、按 id 去重，再重排连续 `ingest_seq`；bundle 带 bbox/time_window/source_allowlist/`envelope_hash`，有 profile 时 `domain="multi"`。
+- `fetch.py`：`build_bundle(source_ids=None, bbox=None, start=None, end=None, ..., case_profile=None)` 返回 `FetchResult(bundle, statuses, archives, errors, warnings, truncated)`；观测先按 `(event_time, source priority, observation_id)` 排序、按 id 去重，再重排连续 `ingest_seq`；`max_items` 保留最新观测；bundle 带 bbox/time_window/source_allowlist/`envelope_hash`，有 profile 时 `domain="multi"`。
 - `archive.py`：`var/intel/archive/<label>/<utc>.<ext>.gz` + 原始字节 SHA-256；FIRMS 的 label 为 `firms_<SENSOR>`；`read_archive()` 可回放。
 - `scripts/fetch_intel.py`：按案例抓取，写 bundle 与 health JSON；默认 `global` profile（`usgs,gdacs,eonet`），FIRMS 需显式加入并配置 `FIRMS_MAP_KEY`（缺 key 记 unavailable，不阻断其他源）；`--allow-partial` 允许部分源失败仍写 canonical bundle，否则写 `*.partial` 并保留上一次好文件。示例见第 12 节。
 

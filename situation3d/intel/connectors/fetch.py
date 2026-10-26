@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+from ..case import expand_bbox
 from ..gateway import IntelBundle, SOURCE_PRIORITY
 from ..model import Observation, iso, parse_time
 from . import adsb, eonet, firms, gdacs, gdelt, usgs
@@ -243,9 +244,10 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
             source_ids = case_profile.sources
         if bbox is None:
             bbox = case_profile.bbox
-        # Fetch and pre-filter with the buffered AOI, otherwise observations
-        # in the declared buffer are silently dropped before matches() runs.
-        bbox = case_profile.expanded_bbox
+        elif tuple(float(value) for value in bbox) != case_profile.bbox:
+            # An explicit AOI is honoured by the case filter as well.
+            case_profile = case_profile.with_overrides(bbox=bbox)
+        bbox = expand_bbox(bbox, case_profile.buffer_km)
     if source_ids is None:
         raise ValueError("source_ids or case_profile is required")
     if bbox is None:
@@ -358,7 +360,8 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
             # A missing optional key is a configuration state, not a failed
             # run; optional feeds (GDELT) degrade the same way.
             entry = {"source_id": source_id, "error": message}
-            if isinstance(exc, MissingCredential) or spec.optional:
+            if isinstance(exc, MissingCredential) or (
+                    spec.optional and isinstance(exc, FetchError)):
                 warnings.append(entry)
             else:
                 errors.append(entry)

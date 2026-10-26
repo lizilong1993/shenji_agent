@@ -15,6 +15,7 @@ if SITUATION3D not in sys.path:
 
 from intel import (CaseIntelProfile, IntelBundle, IntelGateway,  # noqa: E402
                    Observation, load_case_profile)
+from intel.fusion import fuse  # noqa: E402
 from intel.connectors import adsb, eonet, gdelt, build_bundle  # noqa: E402
 from intel.connectors.http import FetchError  # noqa: E402
 from intel.normalize import (normalize_adsb, normalize_eonet,  # noqa: E402
@@ -186,6 +187,8 @@ class GlobalSourceTest(unittest.TestCase):
         url = gdelt.build_url(["taiwan", "strait"], START, END)
         self.assertIn("mode=artlist", url)
         self.assertIn("startdatetime=20261024000000", url)
+        cjk_url = gdelt.build_url(["台湾", "台南"], START, END)
+        self.assertIn("%E5%8F%B0", cjk_url)
         payload = json.loads(fake_fetch(
             "https://api.gdeltproject.org/x").decode())
         observations = normalize_gdelt(payload, FETCHED, (120.0, 23.0))
@@ -213,12 +216,68 @@ class GlobalSourceTest(unittest.TestCase):
         self.assertEqual(len(gdelt_obs), 1)  # Paris article filtered by keywords
         self.assertIn("Taiwan", gdelt_obs[0].title)
 
-    def test_max_items_truncates(self):
+    def test_explicit_bbox_overrides_profile(self):
         profile = load_case_profile("taiwan_landing").with_overrides(
-            sources=("adsb", "eonet", "gdelt"), max_items=2)
+            sources=("usgs",))
+        payload = {"features": [{
+            "id": "elsewhere",
+            "geometry": {"type": "Point", "coordinates": [10.5, 10.5]},
+            "properties": {"time": 1792800060000, "mag": 5.0,
+                           "place": "elsewhere"},
+        }]}
+
+        def fetch(url):
+            return json.dumps(payload).encode("utf-8")
+
+        result = build_bundle(
+            source_ids=("usgs",), bbox=(10.0, 10.0, 11.0, 11.0),
+            start=START, end=END, fetched_at=FETCHED,
+            fetcher=fetch, case_profile=profile)
+        self.assertEqual(len(result.bundle.observations), 1)
+        self.assertEqual(result.bundle.observations[0].observation_id,
+                         "usgs:elsewhere")
+
+    def test_profile_from_dict_null_defaults(self):
+        profile = CaseIntelProfile.from_dict({
+            "case_id": "nulls", "name": "nulls",
+            "bbox": [1.0, 2.0, 3.0, 4.0],
+            "buffer_km": None, "lookback_hours": None, "max_items": None,
+        })
+        self.assertEqual(profile.buffer_km, 0.0)
+        self.assertEqual(profile.lookback_hours, 24.0)
+        self.assertEqual(profile.max_items, 5000)
+
+    def test_eonet_storm_fuses_with_gdacs_cyclone(self):
+        eonet_obs = observation("eonet:storm", 23.5, 120.5,
+                                type="severestorms", source_id="eonet")
+        gdacs_obs = observation("gdacs:storm", 23.51, 120.51,
+                                type="tc", source_id="gdacs")
+        events = fuse([eonet_obs, gdacs_obs], radius_m=10000, window_s=3600)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].type, "cyclone")
+
+    def test_max_items_keeps_newest(self):
+        profile = load_case_profile("taiwan_landing").with_overrides(
+            sources=("usgs",), max_items=2)
+        payload = {"features": [
+            {"id": "t1", "geometry": {"type": "Point",
+                                      "coordinates": [120.1, 23.0]},
+             "properties": {"time": 1792803600000, "place": "01:00"}},
+            {"id": "t5", "geometry": {"type": "Point",
+                                      "coordinates": [120.2, 23.1]},
+             "properties": {"time": 1792818000000, "place": "05:00"}},
+            {"id": "t9", "geometry": {"type": "Point",
+                                      "coordinates": [120.3, 23.2]},
+             "properties": {"time": 1792832400000, "place": "09:00"}},
+        ]}
+
+        def fetch(url):
+            return json.dumps(payload).encode("utf-8")
+
         result = build_bundle(start=START, end=END, fetched_at=FETCHED,
-                              fetcher=fake_fetch, case_profile=profile)
-        self.assertEqual(len(result.bundle.observations), 2)
+                              fetcher=fetch, case_profile=profile)
+        self.assertEqual([obs.observation_id for obs in result.bundle.observations],
+                         ["usgs:t5", "usgs:t9"])
         self.assertTrue(result.truncated)
 
     def test_optional_gdelt_failure_is_a_warning(self):

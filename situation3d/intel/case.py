@@ -34,6 +34,22 @@ def _bbox(values: Sequence[float]) -> Tuple[float, float, float, float]:
     return west, south, east, north
 
 
+def expand_bbox(bbox: Sequence[float], buffer_km: float) -> Tuple[float, float, float, float]:
+    """Expand a bbox by a ground-distance buffer (degrees, clamped)."""
+    west, south, east, north = _bbox(bbox)
+    if buffer_km <= 0.0:
+        return west, south, east, north
+    lat_km = 111.32
+    lat_delta = float(buffer_km) / lat_km
+    center_lat = (south + north) / 2.0
+    cos_lat = max(0.05, math.cos(math.radians(center_lat)))
+    lon_delta = float(buffer_km) / (lat_km * cos_lat)
+    return (max(-180.0, west - lon_delta),
+            max(-90.0, south - lat_delta),
+            min(180.0, east + lon_delta),
+            min(90.0, north + lat_delta))
+
+
 def _strings(values: Optional[Iterable[Any]]) -> Tuple[str, ...]:
     if values is None:
         return ()
@@ -84,6 +100,11 @@ class CaseIntelProfile:
     def from_dict(cls, payload: Dict[str, Any]) -> "CaseIntelProfile":
         if not isinstance(payload, dict):
             raise ValueError("case profile must be an object")
+
+        def value(key, default):
+            item = payload.get(key)
+            return default if item is None else item
+
         return cls(
             case_id=payload.get("case_id") or payload.get("id") or "case",
             name=payload.get("name") or payload.get("case_id") or "",
@@ -92,9 +113,9 @@ class CaseIntelProfile:
             sources=payload.get("sources") or (),
             keywords=payload.get("keywords") or (),
             countries=payload.get("countries") or (),
-            buffer_km=payload.get("buffer_km", 0.0),
-            lookback_hours=payload.get("lookback_hours", 24.0),
-            max_items=payload.get("max_items", 5000),
+            buffer_km=value("buffer_km", 0.0),
+            lookback_hours=value("lookback_hours", 24.0),
+            max_items=value("max_items", 5000),
         )
 
     def to_dict(self) -> dict:
@@ -118,18 +139,7 @@ class CaseIntelProfile:
 
     @property
     def expanded_bbox(self) -> Tuple[float, float, float, float]:
-        west, south, east, north = self.bbox
-        if self.buffer_km <= 0.0:
-            return self.bbox
-        lat_km = 111.32
-        lat_delta = self.buffer_km / lat_km
-        center_lat = (south + north) / 2.0
-        cos_lat = max(0.05, math.cos(math.radians(center_lat)))
-        lon_delta = self.buffer_km / (lat_km * cos_lat)
-        return (max(-180.0, west - lon_delta),
-                max(-90.0, south - lat_delta),
-                min(180.0, east + lon_delta),
-                min(90.0, north + lat_delta))
+        return expand_bbox(self.bbox, self.buffer_km)
 
     @property
     def filter_hash(self) -> str:

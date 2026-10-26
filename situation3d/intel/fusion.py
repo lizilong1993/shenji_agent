@@ -39,7 +39,6 @@ TYPE_SYNONYMS = {
     "volcanoes": "volcano",
     "floods": "flood",
     "earthquakes": "earthquake",
-    "drought": "drought",
     "dusthaze": "dust",
     "sealakeice": "ice",
     "temperatureextremes": "extreme_temperature",
