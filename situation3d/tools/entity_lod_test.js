@@ -85,7 +85,7 @@ const exact = [
   ['磐石级油弹补给舰', 'type_panshi.glb'],
   ['99A 主战坦克', 'type_ztz99a.glb'],
   ['M1A2T 主战坦克', 'type_m1a2.glb'],
-  ['CM-11 主战坦克', 'type_m48a5.glb'],
+  ['CM-11 主战坦克', 'type_m60a3.glb'],
   ['15 式轻型坦克', 'type_ztq15.glb'],
   ['05 式两栖突击车', 'type_ztd05.glb'],
   ['PLZ-05 自行加榴炮', 'type_plz05.glb'],

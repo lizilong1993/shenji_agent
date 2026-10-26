@@ -37,7 +37,7 @@ def main():
             risk.append("upstream-game-asset")
         if "free standard" in text:
             risk.append("sketchfab-free-standard-redistribution")
-        if "not my model" in text:
+        if "not my model" in text or "来源链待核" in text:
             risk.append("provenance-unclear")
         assets[name] = {
             "source": source,

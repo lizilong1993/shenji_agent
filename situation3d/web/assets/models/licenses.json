@@ -122,7 +122,7 @@
       "source": "M48A5 Patton Medium Tank",
       "author": "MirzaArrafiERV_45",
       "license": "CC Attribution",
-      "use": "M48A5（CM-11 近似）",
+      "use": "M48A5 本体",
       "risk": [],
       "source_url": null
     },
@@ -274,6 +274,58 @@
       "license": "CC Attribution",
       "use": "15 式轻型坦克（近似）",
       "risk": [],
+      "source_url": null
+    },
+    "type_055.glb": {
+      "source": "Type-055 Destroyer",
+      "author": "hrd4588",
+      "license": "CC Attribution",
+      "use": "055 型驱逐舰",
+      "risk": [],
+      "source_url": null
+    },
+    "type_p3c.glb": {
+      "source": "Lockheed P-3C 2 \"Orion\"（模型 by mandun/3D Warehouse，来源链待核）",
+      "author": "ammardhamiri1",
+      "license": "CC Attribution",
+      "use": "P-3C 反潜巡逻机",
+      "risk": [
+        "provenance-unclear"
+      ],
+      "source_url": null
+    },
+    "type_ah64e.glb": {
+      "source": "Boeing AH-64D Apache Combat Helicopter",
+      "author": "MirzaArrafiERV_45",
+      "license": "CC Attribution",
+      "use": "AH-64E 近似",
+      "risk": [],
+      "source_url": null
+    },
+    "type_j20.glb": {
+      "source": "Chengdu J-20 fighter",
+      "author": "miopass",
+      "license": "CC Attribution",
+      "use": "J-20",
+      "risk": [],
+      "source_url": null
+    },
+    "type_m60a3.glb": {
+      "source": "M60A3 Patton Medium Tank - Toshueyi",
+      "author": "jonathanto99",
+      "license": "CC Attribution",
+      "use": "M60A3 / CM-11 近似",
+      "risk": [],
+      "source_url": null
+    },
+    "type_himars.glb": {
+      "source": "Ukrainian M142 HIMARS（作者注明 Not my model）",
+      "author": "42manako",
+      "license": "CC Attribution",
+      "use": "M142 HIMARS",
+      "risk": [
+        "provenance-unclear"
+      ],
       "source_url": null
     }
   }

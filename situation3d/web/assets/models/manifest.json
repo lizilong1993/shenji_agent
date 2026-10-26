@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": "2026-10-26T12:29:46",
+  "generated_at": "2026-10-26T12:53:02",
   "note": "由 tools/model_budget_test.py 生成；sha256 对应优化后的 GLB。",
   "assets": {
     "type_052c.glb": {
@@ -59,6 +59,35 @@
         "author": "MirzaArrafiERV_45",
         "license": "CC Attribution",
         "use": "054A 护卫舰",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_055.glb": {
+      "sha256": "2b65552a61973e5b47d8cdb0e6a25416fba0e338d4dfc2a8a66c878065764bc1",
+      "bytes": 285588,
+      "mb": 0.27,
+      "tris": 33728,
+      "prims": 5,
+      "materials": 5,
+      "images": 2,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_large",
+      "public": {
+        "public_length_m": 180.0,
+        "public_width_m": 20.0,
+        "notes": "055 型驱逐舰"
+      },
+      "license": {
+        "source": "Type-055 Destroyer",
+        "author": "hrd4588",
+        "license": "CC Attribution",
+        "use": "055 型驱逐舰",
         "risk": [],
         "source_url": null
       }
@@ -176,6 +205,37 @@
         "source_url": null
       }
     },
+    "type_ah64e.glb": {
+      "sha256": "6810da0d6299cb93d02c938b6da4d73f7dcd57ebc1243ced072bb663bbcdd6c2",
+      "bytes": 1257236,
+      "mb": 1.2,
+      "tris": 18029,
+      "prims": 6,
+      "materials": 6,
+      "images": 9,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_specular",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "aircraft_fighter",
+      "public": {
+        "public_length_m": 17.73,
+        "public_width_m": 14.63,
+        "approx_of": "AH-64E",
+        "notes": "AH-64D 近似 AH-64E"
+      },
+      "license": {
+        "source": "Boeing AH-64D Apache Combat Helicopter",
+        "author": "MirzaArrafiERV_45",
+        "license": "CC Attribution",
+        "use": "AH-64E 近似",
+        "risk": [],
+        "source_url": null
+      }
+    },
     "type_e2d.glb": {
       "sha256": "0e98f5f776519e08e72d90c0a2ab521a5a1338cb50d541b040289fde7df5ec0e",
       "bytes": 965052,
@@ -260,6 +320,39 @@
         "license": "CC Attribution",
         "use": "F-16C（F-16V 近似）",
         "risk": [],
+        "source_url": null
+      }
+    },
+    "type_himars.glb": {
+      "sha256": "e3b0d8ed84e436d52089a7a9ea8514fcf2b6bde5d5ccb7003db3bbef28987f48",
+      "bytes": 390508,
+      "mb": 0.37,
+      "tris": 7470,
+      "prims": 7,
+      "materials": 6,
+      "images": 4,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_materials_specular",
+        "KHR_materials_transmission",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_truck",
+      "public": {
+        "public_length_m": 7.0,
+        "public_width_m": 2.4,
+        "notes": "M142 HIMARS"
+      },
+      "license": {
+        "source": "Ukrainian M142 HIMARS（作者注明 Not my model）",
+        "author": "42manako",
+        "license": "CC Attribution",
+        "use": "M142 HIMARS",
+        "risk": [
+          "provenance-unclear"
+        ],
         "source_url": null
       }
     },
@@ -370,6 +463,35 @@
         "author": "Jeyhun1985",
         "license": "CC Attribution",
         "use": "歼-16（Su-30MKK 同族近似）",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_j20.glb": {
+      "sha256": "c3b33f4efc3b95d1dd5018aae0523fc7b8db9277a85059672ccb99a7544e3cfc",
+      "bytes": 294592,
+      "mb": 0.28,
+      "tris": 18885,
+      "prims": 2,
+      "materials": 1,
+      "images": 0,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "KHR_materials_specular",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "aircraft_fighter",
+      "public": {
+        "public_length_m": 20.3,
+        "public_width_m": 13.0,
+        "notes": "J-20"
+      },
+      "license": {
+        "source": "Chengdu J-20 fighter",
+        "author": "miopass",
+        "license": "CC Attribution",
+        "use": "J-20",
         "risk": [],
         "source_url": null
       }
@@ -539,14 +661,43 @@
       "public": {
         "public_length_m": 8.69,
         "public_width_m": 3.63,
-        "approx_of": "CM-11",
-        "notes": "CM-11 用 M48A5 近似"
+        "notes": "M48A5 本体；CM-11 现用 type_m60a3 近似"
       },
       "license": {
         "source": "M48A5 Patton Medium Tank",
         "author": "MirzaArrafiERV_45",
         "license": "CC Attribution",
-        "use": "M48A5（CM-11 近似）",
+        "use": "M48A5 本体",
+        "risk": [],
+        "source_url": null
+      }
+    },
+    "type_m60a3.glb": {
+      "sha256": "502babefa88ff4a67e58cd7b75bafdf8828c243afb0581ca91c0228361de8910",
+      "bytes": 201740,
+      "mb": 0.19,
+      "tris": 9439,
+      "prims": 2,
+      "materials": 2,
+      "images": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ground_tank",
+      "public": {
+        "public_length_m": 9.43,
+        "public_width_m": 3.63,
+        "approx_of": "CM-11",
+        "notes": "M60A3；CM-11 近似（M60A3 炮塔）"
+      },
+      "license": {
+        "source": "M60A3 Patton Medium Tank - Toshueyi",
+        "author": "jonathanto99",
+        "license": "CC Attribution",
+        "use": "M60A3 / CM-11 近似",
         "risk": [],
         "source_url": null
       }
@@ -604,6 +755,37 @@
         "license": "CC Attribution",
         "use": "MQ-9（无人机大类）",
         "risk": [],
+        "source_url": null
+      }
+    },
+    "type_p3c.glb": {
+      "sha256": "ad0c53e1e806c0d298ff680b7528c375ce0aa6bb6d44cfe1c00fe708f4eb97ea",
+      "bytes": 245812,
+      "mb": 0.23,
+      "tris": 23096,
+      "prims": 2,
+      "materials": 2,
+      "images": 1,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "aircraft_aew",
+      "public": {
+        "public_length_m": 35.6,
+        "public_width_m": 30.37,
+        "notes": "P-3C 反潜巡逻机"
+      },
+      "license": {
+        "source": "Lockheed P-3C 2 \"Orion\"（模型 by mandun/3D Warehouse，来源链待核）",
+        "author": "ammardhamiri1",
+        "license": "CC Attribution",
+        "use": "P-3C 反潜巡逻机",
+        "risk": [
+          "provenance-unclear"
+        ],
         "source_url": null
       }
     },

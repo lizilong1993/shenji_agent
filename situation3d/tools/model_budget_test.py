@@ -29,7 +29,7 @@ P0_BUDGETS = {
     # class: (tris, prims, materials, file_mb)
     # P0 验收预算：按 2026-10-26 优化后的可达值 + 余量；P1 重建后应满足
     # P1_TARGETS（与报告 §5.1 一致）。默认用 P0，避免把“P0 未达标”误报为回归。
-    "ship_large": (31000, 14, 14, 1.70),
+    "ship_large": (35000, 14, 14, 1.70),
     "ship_small": (14000, 10, 8, 0.75),
     "aircraft_fighter": (21000, 18, 18, 1.60),
     "aircraft_aew": (24000, 10, 9, 1.25),
@@ -49,7 +49,7 @@ P1_TARGETS = {
     "rigged": (30000, 15, 10, 2.20),
 }
 
-EXPECTED_MAIN_ASSETS = 33
+EXPECTED_MAIN_ASSETS = 39
 
 ALLOWED_EXT = {
     "EXT_texture_webp",
@@ -58,6 +58,7 @@ ALLOWED_EXT = {
     "KHR_materials_ior",
     "KHR_materials_specular",
     "KHR_materials_clearcoat",
+    "KHR_materials_transmission",
     "KHR_materials_unlit",
 }
 

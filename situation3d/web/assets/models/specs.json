@@ -108,8 +108,7 @@
       "class": "ground_tank",
       "public_length_m": 8.69,
       "public_width_m": 3.63,
-      "approx_of": "CM-11",
-      "notes": "CM-11 用 M48A5 近似"
+      "notes": "M48A5 本体；CM-11 现用 type_m60a3 近似"
     },
     "type_m109a6.glb": {
       "class": "ground_tank",
@@ -181,6 +180,44 @@
       "public_width_m": 3.3,
       "approx_of": "15式",
       "notes": "99A 缩比近似；炮塔/火炮仍为 99A"
+    },
+    "type_055.glb": {
+      "class": "ship_large",
+      "public_length_m": 180.0,
+      "public_width_m": 20.0,
+      "notes": "055 型驱逐舰"
+    },
+    "type_p3c.glb": {
+      "class": "aircraft_aew",
+      "public_length_m": 35.6,
+      "public_width_m": 30.37,
+      "notes": "P-3C 反潜巡逻机"
+    },
+    "type_ah64e.glb": {
+      "class": "aircraft_fighter",
+      "public_length_m": 17.73,
+      "public_width_m": 14.63,
+      "approx_of": "AH-64E",
+      "notes": "AH-64D 近似 AH-64E"
+    },
+    "type_j20.glb": {
+      "class": "aircraft_fighter",
+      "public_length_m": 20.3,
+      "public_width_m": 13.0,
+      "notes": "J-20"
+    },
+    "type_m60a3.glb": {
+      "class": "ground_tank",
+      "public_length_m": 9.43,
+      "public_width_m": 3.63,
+      "approx_of": "CM-11",
+      "notes": "M60A3；CM-11 近似（M60A3 炮塔）"
+    },
+    "type_himars.glb": {
+      "class": "ground_truck",
+      "public_length_m": 7.0,
+      "public_width_m": 2.4,
+      "notes": "M142 HIMARS"
     }
   }
 }

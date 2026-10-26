@@ -18,7 +18,7 @@
 | `type_mq9.glb` | MQ-9 Reaper Drone – Game Ready Military Asset | racingrevved | CC Attribution | MQ-9（无人机大类） |
 | `type_ztz99a.glb` | Type 99 MBT | philano | CC Attribution | 99A 主战坦克 |
 | `type_m1a2.glb` | M1a2 | muhammadvscode | CC Attribution | M1A2（M1A2T） |
-| `type_m48a5.glb` | M48A5 Patton Medium Tank | MirzaArrafiERV_45 | CC Attribution | M48A5（CM-11 近似） |
+| `type_m48a5.glb` | M48A5 Patton Medium Tank | MirzaArrafiERV_45 | CC Attribution | M48A5 本体 |
 | `type_ztd05.glb` | [OD]ZTD-05AG AAV 05式改型两栖突击车 | EXcalibur117 | Free Standard | 05 式两栖突击车 |
 | `type_plz05.glb` | Chinese PLZ-05 | 42manako | CC Attribution | PLZ-05 自行加榴炮 |
 | `type_m109a6.glb` | M109A6 Paladin Self-Propelled Howitzer | MirzaArrafiERV_45 | CC Attribution | M109A6 自行榴弹炮 |
@@ -37,6 +37,12 @@
 | `type_075.glb` | 自建（tools/modelgen/build_custom.py `build_075()`） | 本项目 | 项目内部 | 075 两栖攻击舰（近似） |
 | `type_kj500.glb` | KJ-2000 (DCS World) 缩比近似 | KojfDiscord | CC Attribution | 空警-500（近似） |
 | `type_ztq15.glb` | Type 99 MBT 缩比近似 | philano | CC Attribution | 15 式轻型坦克（近似） |
+| `type_055.glb` | Type-055 Destroyer | hrd4588 | CC Attribution | 055 型驱逐舰 |
+| `type_p3c.glb` | Lockheed P-3C 2 "Orion"（模型 by mandun/3D Warehouse，来源链待核） | ammardhamiri1 | CC Attribution | P-3C 反潜巡逻机 |
+| `type_ah64e.glb` | Boeing AH-64D Apache Combat Helicopter | MirzaArrafiERV_45 | CC Attribution | AH-64E 近似 |
+| `type_j20.glb` | Chengdu J-20 fighter | miopass | CC Attribution | J-20 |
+| `type_m60a3.glb` | M60A3 Patton Medium Tank - Toshueyi | jonathanto99 | CC Attribution | M60A3 / CM-11 近似 |
+| `type_himars.glb` | Ukrainian M142 HIMARS（作者注明 Not my model） | 42manako | CC Attribution | M142 HIMARS |
 
 ## 说明
 
