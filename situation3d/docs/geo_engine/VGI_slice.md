@@ -73,7 +73,7 @@ situation3d/tests/
 
 `confidence = 源可靠度 × 时间衰减 × 地理精度因子`：
 
-- 源可靠度：USGS 0.98、GDACS 0.95、FIRMS 0.80、GDELT 0.60，未知源 0.7。
+- 源可靠度：USGS 0.98、GDACS 0.95、NASA EONET 0.85、FIRMS 0.80、ADS-B 0.75、GDELT 0.60，未知源 0.7。
 - 时间衰减：按领域半衰期指数衰减（hazard/maritime/aviation 6 h，infrastructure 12 h，conflict/other 24 h，health 72 h），下限 0.2。
 - 地理精度：exact 1.0、street 0.95、locality 0.85、admin1 0.70、admin0 0.55、unknown 0.40；质心再乘 0.7。
 
@@ -122,13 +122,13 @@ cd situation3d
 python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py tests/test_intel_scheduler.py tests/test_intel_connectors.py tests/test_intel_cases.py -v
 ```
 
-55 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定；调度器按 side 轮询、manifest 确定性与隔离、World 只发布到期 cue、多 side 中立观测、窗口内早事件不丢、`advance_to` 同步、未挂载时载荷不变；连接器 URL/allow-list、FIRMS 日期时间合并与跨日跨度/UTC 锚点、进行中 GDACS 事件、二维点几何、归档往返、离线 bundle、契约字段与 `from_dict` 往返、部分源失败与缺 key 上报；案例 profile 加载/覆盖/哈希、ADS-B 采样与军机标记、EONET 点选择、GDELT 质心定位、案例 bundle 过滤、max_items 截断、网关运行时 AOI 切换。
+58 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定；调度器按 side 轮询、manifest 确定性与隔离、World 只发布到期 cue、多 side 中立观测、窗口内早事件不丢、`advance_to` 同步、未挂载时载荷不变；连接器 URL/allow-list、FIRMS 日期时间合并与跨日跨度/UTC 锚点、进行中 GDACS 事件、二维点几何、归档往返、离线 bundle、契约字段与 `from_dict` 往返、部分源失败与缺 key 上报；案例 profile 加载/覆盖/哈希、ADS-B 采样与军机标记、EONET 点选择、GDELT 质心定位、案例 bundle 过滤与 buffer 保留、max_items 截断、可选 GDELT 失败只告警、网关运行时 AOI 切换。
 
 ## 10. 已知限制与下一步
 
 - USGS/GDACS/FIRMS/ADS-B/EONET/GDELT 已有连接器；AIS 仍未实现（WebSocket/依赖决策）。
 - ADS-B 是快照（每架飞机一条最新观测），尚无轨迹生命周期/插值；AIS 同样待做。
-- GDELT DOC 无坐标，按案例质心定位、`geo_precision="unknown"`、置信度低；且 1 请求/5 秒，429 时该源不可用。
+- GDELT DOC 无坐标，按案例质心定位、`geo_precision="unknown"`、置信度低；且 1 请求/5 秒，429 时按可选源记 warning，不阻断 canonical bundle。
 - EONET 抓取全球开放事件后在本地按 bbox/时间选点；事件轨迹跨出 AOI 时仍保留 AOI 内的最后一点。
 - 融合需显式开启（`fusion=(radius, window)`），默认仍逐条产出 cue；融合以消费窗口内未消费成员为输入，跨窗口到达的同一事件可能分成多条 cue；固定锚点可能欠合并，O(N²) 复杂度需在 10k 级以上观测前引入空间索引。
 - 时间基准需调用方保证：`world.time_s=0` 必须对应 `bundle.scenario_start`，当前没有自动校验或 offset 参数，只在 manifest 记录。
@@ -156,8 +156,8 @@ python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py tests/test_intel
 
 过滤语义：
 
-- bbox 先按 `buffer_km` 扩展；域/源为白名单。
-- `keywords`/`countries` 只用于“粗定位”观测（`geo_precision in unknown/admin0` 或 `is_centroid`），例如 GDELT；已精确定位在 AOI 内的 ADS-B/EONET/USGS 不因标题不含关键词而被丢弃。
+- bbox 先按 `buffer_km` 扩展，抓取/预过滤和 `matches()` 都使用扩展后的 AOI。
+- `keywords`/`countries` 只用于“粗定位”观测（`geo_precision not in exact/street` 或 `is_centroid`），例如 GDELT；已精确定位在 AOI 内的 ADS-B/EONET/USGS 不因标题不含关键词而被丢弃。
 - `build_bundle(..., case_profile=profile)` 在抓取后、归档/组装前过滤，并按 `max_items` 截断（结果带 `truncated`）。
 - `IntelGateway(..., case_filter=profile)` 与 `set_case_filter()` 在消费时再次过滤，支持运行时移动 AOI；`IntelScheduler.manifest()` 记录 `case_id`/`case_filter_hash`。
 

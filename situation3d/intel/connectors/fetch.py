@@ -56,6 +56,7 @@ class FetchResult:
     statuses: Tuple[SourceStatus, ...]
     archives: Tuple[ArchiveRecord, ...]
     errors: Tuple[dict, ...]
+    warnings: Tuple[dict, ...] = ()
     truncated: bool = False
 
 
@@ -167,21 +168,24 @@ def _fetch_firms(spec, start, end, bbox, fetcher, map_key, fetched_at):
     return payloads, observations, errors
 
 
-def _fetch_adsb(spec, bbox, fetcher, fetched_at):
+def _fetch_adsb(spec, bbox, fetcher, fetched_at, end=None):
     points = adsb.sample_points(bbox)
     payloads = []
     observations = []
     errors = []
+    if end is not None and (parse_time(fetched_at) - parse_time(end)).total_seconds() > 300:
+        errors.append("ADS-B is a live snapshot; historical window is not supported")
     for index, (lat, lon) in enumerate(points):
         url = adsb.build_url(lat, lon)
         try:
             raw = _fetch(url, spec.host, fetcher)
+            payload = _decode_json(raw)
+            found = adsb.parse_payload(payload, fetched_at)
         except Exception as exc:
             errors.append("point %d: %s" % (index, exc))
             continue
-        payload = _decode_json(raw)
         payloads.append(("adsb_%d" % index, raw, "json"))
-        observations.extend(adsb.parse_payload(payload, fetched_at))
+        observations.extend(found)
     if not payloads:
         raise FetchError("; ".join(errors) or "no ADS-B point returned data")
     return payloads, observations, errors
@@ -239,6 +243,9 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
             source_ids = case_profile.sources
         if bbox is None:
             bbox = case_profile.bbox
+        # Fetch and pre-filter with the buffered AOI, otherwise observations
+        # in the declared buffer are silently dropped before matches() runs.
+        bbox = case_profile.expanded_bbox
     if source_ids is None:
         raise ValueError("source_ids or case_profile is required")
     if bbox is None:
@@ -269,6 +276,7 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
     statuses: List[SourceStatus] = []
     archives: List[ArchiveRecord] = []
     errors: List[dict] = []
+    warnings: List[dict] = []
 
     for source_id in sources:
         spec = get_source(source_id)
@@ -286,7 +294,7 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
                     fetched_dt)
             elif source_id == "adsb":
                 payloads, found, sensor_errors = _fetch_adsb(
-                    spec, bbox_tuple, fetcher, fetched_dt)
+                    spec, bbox_tuple, fetcher, fetched_dt, end_dt)
             elif source_id == "eonet":
                 payloads, found = _fetch_eonet(
                     spec, start_dt, end_dt, bbox_tuple, fetcher, fetched_dt)
@@ -348,9 +356,12 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
                 error=message,
             ))
             # A missing optional key is a configuration state, not a failed
-            # run: keep the source visible in health but let the bundle stand.
-            if not isinstance(exc, MissingCredential):
-                errors.append({"source_id": source_id, "error": message})
+            # run; optional feeds (GDELT) degrade the same way.
+            entry = {"source_id": source_id, "error": message}
+            if isinstance(exc, MissingCredential) or spec.optional:
+                warnings.append(entry)
+            else:
+                errors.append(entry)
 
     unique: Dict[str, Observation] = {}
     for obs in observations:
@@ -365,7 +376,7 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
         obs.observation_id))
     truncated = False
     if case_profile is not None and len(observations) > case_profile.max_items:
-        observations = observations[:case_profile.max_items]
+        observations = observations[-case_profile.max_items:]
         truncated = True
     observations = [
         dataclasses.replace(obs, ingest_seq=index)
@@ -394,5 +405,6 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
         statuses=tuple(statuses),
         archives=tuple(archives),
         errors=tuple(errors),
+        warnings=tuple(warnings),
         truncated=truncated,
     )

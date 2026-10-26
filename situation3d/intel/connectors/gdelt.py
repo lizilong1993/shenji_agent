@@ -21,7 +21,7 @@ def build_url(keywords: Sequence[str], start: Any, end: Any,
     terms = [str(term).strip() for term in keywords or [] if str(term).strip()]
     if not terms:
         raise ValueError("GDELT needs at least one case keyword")
-    query = " OR ".join('"%s"' % term.replace('"', "") for term in terms[:8])
+    query = " OR ".join('"%s"' % term.replace('"', "") for term in terms[:20])
     params = {
         "query": query,
         "mode": "artlist",

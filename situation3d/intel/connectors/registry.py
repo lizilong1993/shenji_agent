@@ -15,6 +15,7 @@ class SourceSpec:
     schedule_s: int
     parser_version: str
     requires_env: Optional[str] = None
+    optional: bool = False
 
 
 SOURCES = {
@@ -66,6 +67,7 @@ SOURCES = {
         attribution="The GDELT Project",
         schedule_s=300,
         parser_version="vgi-sources-1",
+        optional=True,
     ),
 }
 

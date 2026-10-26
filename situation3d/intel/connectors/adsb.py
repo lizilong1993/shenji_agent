@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, List, Optional, Sequence, Tuple
-from urllib.parse import quote
+from typing import Any, List, Sequence, Tuple
 
 from ..normalize import normalize_adsb
 

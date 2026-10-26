@@ -57,7 +57,7 @@ KINDS: Dict[str, KindSpec] = {
     "intel_bundle": KindSpec(
         "intel_bundle", "情报包（VGI 观测/线索，只作提示不作真值）",
         "advisory", 1.0, "msgeo.intel.v1",
-        ("local-scan", "usgs", "gdacs", "firms")),
+        ("local-scan", "usgs", "gdacs", "firms", "adsb", "eonet", "gdelt")),
     "bathymetry": KindSpec(
         "bathymetry", "水深栅格（GEBCO 或等价产品）",
         "advisory", 365.0, "msgeo.bathymetry",

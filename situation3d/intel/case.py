@@ -92,9 +92,9 @@ class CaseIntelProfile:
             sources=payload.get("sources") or (),
             keywords=payload.get("keywords") or (),
             countries=payload.get("countries") or (),
-            buffer_km=payload.get("buffer_km") or 0.0,
-            lookback_hours=payload.get("lookback_hours") or 24.0,
-            max_items=payload.get("max_items") or 5000,
+            buffer_km=payload.get("buffer_km", 0.0),
+            lookback_hours=payload.get("lookback_hours", 24.0),
+            max_items=payload.get("max_items", 5000),
         )
 
     def to_dict(self) -> dict:
@@ -166,7 +166,7 @@ class CaseIntelProfile:
         # centroid (GDELT) or only admin-level.  A geolocated observation
         # inside the AOI is already case-relevant; requiring its callsign or
         # title to contain a keyword would drop every ADS-B/AIS track.
-        coarse = (observation.geo_precision in ("unknown", "admin0")
+        coarse = (observation.geo_precision not in ("exact", "street")
                   or observation.is_centroid)
         text = None
         if self.keywords and coarse:

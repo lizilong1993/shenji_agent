@@ -41,6 +41,8 @@ class IntelScheduler:
                 "cue_count": len(batch.cues),
                 "cue_ids": [cue.cue_id for cue in batch.cues],
                 "log_hash": batch.log_hash,
+                "case_id": getattr(self.gateway.case_filter, "case_id", None),
+                "case_filter_hash": self.gateway.filter_hash,
             })
         return out
 

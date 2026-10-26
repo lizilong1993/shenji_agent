@@ -114,7 +114,7 @@ def main(argv=None) -> int:
             buffer_km=args.buffer_km,
             max_items=args.max_items,
         )
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
         print("fetch_intel: %s" % (exc,), file=sys.stderr)
         return 2
 
@@ -141,7 +141,7 @@ def main(argv=None) -> int:
             archive_root=None if args.no_archive else archive_root,
             case_profile=profile,
         )
-    except ValueError as exc:
+    except (TypeError, ValueError) as exc:
         print("fetch_intel: %s" % (exc,), file=sys.stderr)
         return 2
     qualified = not result.errors or args.allow_partial
@@ -158,6 +158,7 @@ def main(argv=None) -> int:
         "sources": [status.as_dict() for status in result.statuses],
         "archives": [record.as_dict() for record in result.archives],
         "errors": list(result.errors),
+        "warnings": list(result.warnings),
         "truncated": result.truncated,
     })
     summary = {
@@ -180,6 +181,7 @@ def main(argv=None) -> int:
             for status in result.statuses
         },
         "errors": list(result.errors),
+        "warnings": list(result.warnings),
     }
     print(json.dumps(summary, ensure_ascii=False, indent=1, sort_keys=True))
     if not qualified:

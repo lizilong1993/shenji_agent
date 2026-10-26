@@ -16,6 +16,7 @@ if SITUATION3D not in sys.path:
 from intel import (CaseIntelProfile, IntelBundle, IntelGateway,  # noqa: E402
                    Observation, load_case_profile)
 from intel.connectors import adsb, eonet, gdelt, build_bundle  # noqa: E402
+from intel.connectors.http import FetchError  # noqa: E402
 from intel.normalize import (normalize_adsb, normalize_eonet,  # noqa: E402
                              normalize_gdelt)
 
@@ -118,6 +119,42 @@ class CaseProfileTest(unittest.TestCase):
         self.assertLess(expanded[0], profile.bbox[0])
         self.assertGreater(expanded[2], profile.bbox[2])
 
+    def test_buffer_survives_bundle_prefilter(self):
+        profile = load_case_profile("taiwan_landing").with_overrides(
+            sources=("usgs",))
+        payload = {"features": [{
+            "id": "buffered",
+            "geometry": {"type": "Point", "coordinates": [121.3, 23.5]},
+            "properties": {"time": 1792800060000, "mag": 4.5,
+                           "place": "buffered edge"},
+        }]}
+
+        def fetch(url):
+            return json.dumps(payload).encode("utf-8")
+
+        result = build_bundle(start=START, end=END, fetched_at=FETCHED,
+                              fetcher=fetch, case_profile=profile)
+        self.assertEqual(len(result.bundle.observations), 1)
+        self.assertEqual(result.bundle.observations[0].observation_id,
+                         "usgs:buffered")
+
+    def test_eonet_uses_point_inside_aoi_not_latest_global(self):
+        payload = {"events": [{
+            "id": "EONET_cross",
+            "title": "Storm crossing the strait",
+            "categories": [{"id": "severeStorms"}],
+            "geometry": [
+                {"type": "Point", "coordinates": [120.5, 23.5],
+                 "date": "2026-10-24T10:00:00Z"},
+                {"type": "Point", "coordinates": [124.0, 27.0],
+                 "date": "2026-10-24T18:00:00Z"},
+            ],
+        }]}
+        observations = normalize_eonet(payload, FETCHED, bbox=TAIWAN,
+                                       start=START, end=END)
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(observations[0].lon, 120.5)
+
 
 class GlobalSourceTest(unittest.TestCase):
     def test_adsb_points_and_normalization(self):
@@ -183,6 +220,19 @@ class GlobalSourceTest(unittest.TestCase):
                               fetcher=fake_fetch, case_profile=profile)
         self.assertEqual(len(result.bundle.observations), 2)
         self.assertTrue(result.truncated)
+
+    def test_optional_gdelt_failure_is_a_warning(self):
+        profile = load_case_profile("taiwan_landing").with_overrides(
+            sources=("gdelt",))
+
+        def fetch(url):
+            raise FetchError("http 429 from api.gdeltproject.org")
+
+        result = build_bundle(start=START, end=END, fetched_at=FETCHED,
+                              fetcher=fetch, case_profile=profile)
+        self.assertEqual(result.errors, ())
+        self.assertEqual(len(result.warnings), 1)
+        self.assertEqual(result.statuses[0].state, "unavailable")
 
 
 class GatewayFilterTest(unittest.TestCase):

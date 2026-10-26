@@ -1,4 +1,4 @@
-"""Offline normalizers for USGS / GDACS / FIRMS payloads."""
+"""Offline normalizers for USGS / GDACS / FIRMS / ADS-B / EONET / GDELT."""
 
 from __future__ import annotations
 
@@ -274,7 +274,10 @@ def normalize_eonet(payload: Dict[str, Any], fetched_at: Any,
             category = categories[0] if categories else {}
             event_type = str(category.get("id") or "natural_event").lower()
             sources = event.get("sources") or []
-            source_url = str((sources[0] or {}).get("url") or event.get("link") or "")
+            source_url = ""
+            if sources:
+                source_url = str((sources[0] or {}).get("url") or "")
+            source_url = source_url or str(event.get("link") or "")
             native = str(event.get("id") or i)
             conf = trust.confidence("eonet", stamp, now, "hazard")
             out.append(Observation(
