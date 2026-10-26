@@ -509,6 +509,23 @@ def build_056a():
     wedge("056a_aft", (0, -16, deckz), (9.4, 20, 4.6), navy(), 0.95, 1.0)
     box("056a_flightdeck", (0, -33, deckz + 0.06), (10.2, 16.0, 0.12), deck())
     cyl("056a_helo_circle", (0, -33, deckz + 0.14), 2.8, 0.04, white(), verts=30)
+    # 烟囱（后倾）
+    wedge("056a_funnel", (0, -5.0, deckz + 2.4), (5.2, 7.0, 4.0), navy(), 0.82, 0.9)
+    box("056a_funnel_top", (0, -5.4, deckz + 6.5), (4.0, 5.4, 0.35), dark())
+    # 桅顶雷达罩
+    cyl("056a_radome", (0, 4, deckz + 16.2), 0.85, 0.9, white(), verts=18)
+    # 舷侧救生筏
+    for sx in (-1, 1):
+        for i in range(4):
+            cyl("056a_raft_%d_%d" % (sx, i), (sx * 4.6, -6.0 + i * 4.0, deckz + 1.6),
+                0.42, 0.8, white(), axis="X", verts=10)
+    # 舰艉 HQ-10
+    box("056a_hq10_base", (0, -23.0, deckz + 4.5), (2.2, 2.2, 0.5), navy())
+    for i in range(4):
+        box("056a_hq10_%d" % i, (-0.75 + 0.5 * i, -23.0, deckz + 5.0),
+            (0.42, 0.42, 0.8), dark())
+    # 右舷 RHIB
+    box("056a_rhib", (4.3, -8.0, deckz + 1.2), (1.4, 3.2, 0.8), mat("rhib", (0.18, 0.20, 0.21), 0.6))
     finish("t_056a", "water")
 
 

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": "2026-10-26T15:53:19",
+  "generated_at": "2026-10-26T16:22:18",
   "note": "由 tools/model_budget_test.py 生成；sha256 对应优化后的 GLB。",
   "assets": {
     "type_052c.glb": {
@@ -93,10 +93,10 @@
       }
     },
     "type_056a.glb": {
-      "sha256": "22b220c40a4d3b9ced8e85416734abe99b874c7447b4c36e5a34d944d3a3b731",
-      "bytes": 81684,
-      "mb": 0.08,
-      "tris": 1208,
+      "sha256": "f8ba89a1aa9d0337ab9f0618f62bcdae86c1ecd171c04175ed8417622237f122",
+      "bytes": 170168,
+      "mb": 0.16,
+      "tris": 1660,
       "prims": 3,
       "materials": 3,
       "images": 4,
