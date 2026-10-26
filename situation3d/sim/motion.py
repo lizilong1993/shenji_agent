@@ -48,6 +48,11 @@ def _footprint_ok(nav, prof, lon: float, lat: float, heading: float,
             continue
         if nav.building_only_block(prof, slon, slat):
             continue
+        exact = getattr(nav, "point_exact_ok", None)
+        if exact is not None and exact(prof, slon, slat):
+            # The coarse cell is blocked, but the exact authority at this
+            # sample is clear (sub-cell detour); match route_ok semantics.
+            continue
         return False
     return True
 

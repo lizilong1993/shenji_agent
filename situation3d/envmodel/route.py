@@ -17,6 +17,24 @@ from sim.entity import Pose, Route
 from .local_grid import plan_local
 
 
+def _footprint_clear(query: Any, profile: Any, lon: float, lat: float) -> bool:
+    """Half-width building clearance, same margin the local planner uses."""
+    if str(getattr(profile, "domain", "land")) not in ("land", "amphibious"):
+        return True
+    env = getattr(query, "env", None)
+    footprint = getattr(env, "building_footprint_at", None)
+    if footprint is None:
+        return True
+    half = min(10.0, max(0.5, float(getattr(profile, "width_m", 1.0) or 1.0) / 2.0))
+    kx = 111320.0 * math.cos(math.radians(lat))
+    ky = 110540.0
+    for dlon, dlat in ((0.0, 0.0), (half / kx, 0.0), (-half / kx, 0.0),
+                       (0.0, half / ky), (0.0, -half / ky)):
+        if footprint(lon + dlon, lat + dlat) is not None:
+            return False
+    return True
+
+
 def validate_route(query: Any, profile: Any, route: Route,
                    step_m: float = 3.0) -> bool:
     """Sample a route and require every point to pass ``passability``."""
@@ -26,10 +44,14 @@ def validate_route(query: Any, profile: Any, route: Route,
         pose = route.pose_at(s)
         if not query.passability(profile, pose.lon, pose.lat).value["allowed"]:
             return False
+        if not _footprint_clear(query, profile, pose.lon, pose.lat):
+            return False
         s += step_m
     if total > 0.0:
         pose = route.pose_at(total)
         if not query.passability(profile, pose.lon, pose.lat).value["allowed"]:
+            return False
+        if not _footprint_clear(query, profile, pose.lon, pose.lat):
             return False
     return True
 
@@ -88,7 +110,8 @@ def repair_route(query: Any, profile: Any, route: Route,
     Candidate validation uses the same fine step (3 m by default) as the final
     conformance check, so thin water or footprint strips cannot slip through.
     """
-    blocked_s = _first_blocked_s(query, profile, route, step_m=5.0)
+    blocked_s = _first_blocked_s(query, profile, route,
+                                 step_m=min(5.0, step_m))
     if blocked_s is None:
         return route
     idx = _nearest_index(route, blocked_s)
@@ -143,4 +166,8 @@ def plan_valid_route(nav: Any, query: Any, profile: Any, start, goal,
         return None
     if validate_route(query, profile, route, step_m=step_m):
         return route
-    return repair_route(query, profile, route, step_m=step_m)
+    repaired = repair_route(query, profile, route, step_m=step_m)
+    if repaired is None:
+        return None
+    return repaired if validate_route(query, profile, repaired,
+                                      step_m=step_m) else None

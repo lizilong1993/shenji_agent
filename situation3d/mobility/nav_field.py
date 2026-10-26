@@ -26,8 +26,8 @@ from typing import Dict, List, Optional, Tuple
 
 from env.service import LandCover
 from geo.geodesy import haversine_m, initial_bearing_deg
-from mobility.passability import (effective_speed_ms, passable,
-                                  road_edge_passable)
+from mobility.passability import (VEHICLE_BRIDGE_CLASSES, effective_speed_ms,
+                                  passable, road_edge_passable)
 from mobility.profile import PlatformProfile
 from sim.entity import Pose, Route
 
@@ -249,7 +249,8 @@ class NavField(object):
             pa, pb = nodes.get(edge.get("a")), nodes.get(edge.get("b"))
             if not pa or not pb:
                 continue
-            if edge.get("bridge"):
+            if (edge.get("bridge")
+                    and str(edge.get("class")) in VEHICLE_BRIDGE_CLASSES):
                 self.bridge_segments.append((pa, pb, edge))
             rank = _ROAD_RANK.get(str(edge.get("class")), 0)
             deck = rank > 0 and bool(edge.get("bridge") or edge.get("tunnel"))
@@ -419,12 +420,14 @@ class NavField(object):
 
     def _cell_passable(self, prof: PlatformProfile, i: int,
                        factors: List[float]) -> bool:
-        if prof.domain in ("land", "amphibious") and self.bridge[i]:
-            # Bridge/tunnel deck: water depth, slope and footprints below it
-            # do not apply; weight/height/width limits still do.
-            return self._limits_ok(prof, i)
         if self.building_h[i] > 0.0:
+            # Obstacles win over the bridge exemption: a deck cannot be
+            # driven where its own footprint cell is a building.
             return False
+        if prof.domain in ("land", "amphibious") and self.bridge[i]:
+            # Bridge/tunnel deck: water depth and slope do not apply;
+            # weight/height/width limits still do.
+            return self._limits_ok(prof, i)
         depth = self.depth[i]
         if prof.domain == "air":
             return True
@@ -1146,7 +1149,8 @@ class NavField(object):
                 for edge in edges:
                     pa = nodes.get(edge.get("a"))
                     pb = nodes.get(edge.get("b"))
-                    if pa and pb and edge.get("bridge"):
+                    if (pa and pb and edge.get("bridge")
+                            and str(edge.get("class")) in VEHICLE_BRIDGE_CLASSES):
                         segments.append((pa, pb, edge))
             self.bridge_segments = segments
         best = None
@@ -1163,35 +1167,36 @@ class NavField(object):
         """Fine authority check where the coarse mask says blocked.
 
         A 30 m cell is classified by its centre. A 3-4 m local detour that
-        only skims a cell corner is still legal when the exact geometry at the
-        sampled point is passable. Footprint collision remains the OBB check's
-        job at motion time, so this mirrors the gate contract's centre-point
-        test instead of inflating buildings again.
+        only skims a cell corner is still legal when the exact geometry around
+        the point is passable. Buildings are checked with a half-width
+        inflation (the same footprint margin the local planner uses), then
+        bridge decks may waive water/landcover/slope but never obstacles.
         """
         if i is None:
             i = self._index_of(lon, lat)
-        land_like = prof.domain in ("land", "amphibious")
-        if i is not None and self.bridge[i] and land_like:
-            return self._limits_ok(prof, i)
         env = self.env
-        getter = getattr(env, "road_edge_at", None)
-        if land_like and getter is not None:
-            try:
-                edge = getter(lon, lat, 25.0)
-            except TypeError:
-                edge = getter(lon, lat)
-            if edge and edge.get("bridge"):
-                return road_edge_passable(prof, edge)
-        if land_like:
-            deck = self._bridge_edge_at(lon, lat)
-            if deck is not None:
-                return road_edge_passable(prof, deck)
+        land_like = prof.domain in ("land", "amphibious")
         building_at = getattr(env, "building_at", None)
         footprint = getattr(env, "building_footprint_at", None)
         if building_at is not None and building_at(lon, lat) is not None:
             return False
-        if footprint is not None and footprint(lon, lat) is not None:
-            return False
+        if footprint is not None:
+            half = min(10.0, max(0.5, float(prof.width_m or 1.0) / 2.0))
+            offsets = [(0.0, 0.0), (half / self.m_lon, 0.0),
+                       (-half / self.m_lon, 0.0), (0.0, half / self.m_lat),
+                       (0.0, -half / self.m_lat)]
+            for dlon, dlat in offsets:
+                if footprint(lon + dlon, lat + dlat) is not None:
+                    return False
+        if land_like and getattr(self, "strict_roads", False):
+            if i is None or self.road[i] == 0:
+                return False
+        if i is not None and self.bridge[i] and land_like:
+            return self._limits_ok(prof, i)
+        if land_like:
+            deck = self._bridge_edge_at(lon, lat)
+            if deck is not None:
+                return road_edge_passable(prof, deck)
         depth_env = env
         fine_at = getattr(env, "landcover_polygon_at", None)
         if fine_at is not None and env.water_depth(lon, lat) is not None:
@@ -1200,6 +1205,11 @@ class NavField(object):
                 depth_env = _NoDepthEnv(env)
         return bool(passable(prof, lon, lat, depth_env,
                              depth_env.elevation(lon, lat)))
+
+    def point_exact_ok(self, prof: PlatformProfile, lon: float,
+                       lat: float) -> bool:
+        """Public fine-authority check used by motion footprint samples."""
+        return self._exact_point_ok(prof, lon, lat)
 
     def _points_ok_exact(self, prof: PlatformProfile, route: Route) -> bool:
         """Sample a route that failed the raster test against exact geometry."""

@@ -103,6 +103,15 @@ def evaluate_gates(profile, lon: float, lat: float, env,
     if is_water is None:
         is_water = bool(env.is_water(lon, lat))
     on_bridge = bool(on_bridge and domain in ("land", "amphibious"))
+    eff_depth = depth
+    if domain not in ("surface", "subsurface") and eff_depth is not None:
+        fine_at = getattr(env, "landcover_polygon_at", None)
+        if fine_at is not None:
+            fine = fine_at(lon, lat)
+            if fine is not None and fine != LandCover.WATER:
+                # Fine landcover overrides the coarse 2 km water fallback,
+                # the same rule the navigation raster applies at build time.
+                eff_depth = None
 
     if not on_bridge:
         if domain in ("surface", "subsurface"):
@@ -117,22 +126,29 @@ def evaluate_gates(profile, lon: float, lat: float, env,
                 return GateResult(False, ("water_depth",), ("water_depth",))
         else:
             wading = float(getattr(profile, "wading_depth_m", 0.0))
-            if is_water and depth is None:
+            if eff_depth is not None:
+                if eff_depth > wading:
+                    return GateResult(False, ("water_depth",), ("water_depth",))
+            elif is_water:
                 return _unknown_gate(policy, "water_depth", "water_depth")
-            if is_water and depth is not None and depth > wading:
-                return GateResult(False, ("water_depth",), ("water_depth",))
 
-    if not on_bridge and domain not in ("surface", "subsurface"):
-        if not is_water or depth is None:
-            # Same landcover rule as the navigation mask, so the gate and the
-            # route authority cannot disagree on forest/soft/water cells.
-            cover = env.landcover(lon, lat)
-            factor = float(profile.terrain_factor(cover))
-            road_bound = bool(getattr(profile, "road_bound", False))
-            on_road = bool(env.on_road(lon, lat))
-            if factor <= 0.0 and not (road_bound and on_road):
+    if (not on_bridge and domain not in ("surface", "subsurface")
+            and eff_depth is None):
+        # Same landcover rule as the navigation mask, so the gate and the
+        # route authority cannot disagree on forest/soft/water cells.
+        cover = env.landcover(lon, lat)
+        factor = float(profile.terrain_factor(cover))
+        road_bound = bool(getattr(profile, "road_bound", False))
+        if factor <= 0.0:
+            on_road = False
+            if road_bound:
+                getter = getattr(env, "on_road", None)
+                on_road = bool(getter(lon, lat)) if getter is not None else False
+            if not on_road:
                 return GateResult(False, ("landcover",), ("landcover",))
-            if cover == LandCover.URBAN and road_bound and not on_road:
+        elif cover == LandCover.URBAN and road_bound:
+            getter = getattr(env, "on_road", None)
+            if getter is not None and not getter(lon, lat):
                 return GateResult(False, ("road_bound",), ("landcover",))
 
     slope = float(env.slope_deg(lon, lat))

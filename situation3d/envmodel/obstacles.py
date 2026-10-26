@@ -12,6 +12,7 @@ import math
 from typing import Any, Dict, Optional, Tuple
 
 from .manifest import V3Manifest
+from mobility.passability import VEHICLE_BRIDGE_CLASSES
 
 
 def _point_segment_mt(lon: float, lat: float, a, b) -> Tuple[float, float]:
@@ -101,6 +102,10 @@ class BridgeSet:
         nodes, edges = env.road_graph()
         for edge in edges:
             if not edge.get("bridge"):
+                continue
+            if str(edge.get("class")) not in VEHICLE_BRIDGE_CLASSES:
+                # Footways/cycleways/paths are bridges too, but no vehicle
+                # deck; treating them as such would waive the water gate.
                 continue
             pa = nodes.get(edge.get("a"))
             pb = nodes.get(edge.get("b"))

@@ -68,21 +68,22 @@ NavField(30m) cold build ~8.2 s; cached ~0.013 s; 1k 路径一致性见 §3.1
 `scripts/check_paths_v3.py --pack envpacks/anping_v3 --routes 300`（道路节点起终点，30 m NavField，`blocked` 排除建筑中心，`safe_fallback=True`；失败时侧移，再做 ±120 m 窗口、4 m 网格、按车宽半宽膨胀建筑的局部 A*，最后用 3 m 精确 Gate 复验）：
 
 ```text
-planned/accepted 113
-no_path 187
-gate_rejected 183
-accepted route_ok 113 (100%)
-accepted gate_denied 0 / 685 sampled
-mean_length 276.7 m; plan_p95 72.4 ms
+planned/accepted 59
+no_path 241
+gate_rejected 151
+accepted route_ok 59 (100%)
+accepted gate_denied 0 / 316 sampled
+mean_length 242.2 m; plan_p95 74.4 ms
 ```
 
 本轮的权威统一改动：
 
-- `NavField.route_ok` 先走 30 m 超覆盖；失败时按 3 m 步长沿路线采样，在 mask 判阻处用精确几何复核（建筑中心点、细地类覆盖后的水深、OSM 桥面 25 m 甲板、道路限重限高限宽），只有精确几何也阻断才判失败。`motion_point_ok` 使用同一回退，修复路线在运动层不再被粗 mask 拦停。
-- `evaluate_gates` 增加与导航 mask 相同的 landcover 因子门（forest/soft/water 因子为 0 且非道路绑定则拒绝）。此前 30 m mask 会拦阻、Gate 却放行的水域/地类单元，现在两侧规则一致。
-- `validate_route`/`repair_route`/`plan_valid_route` 默认复验步长从 10/15 m 收紧到 3 m，细窄水域或建筑条带不会在采样间隙漏过。
+- `NavField.route_ok` 先走 30 m 超覆盖；失败时按 3 m 步长沿路线采样，在 mask 判阻处用精确几何复核（建筑中心与半车宽偏移、细地类覆盖后的水深、车辆等级白名单内的 OSM 桥面、道路限重限高限宽），只有精确几何也阻断才判失败。`motion_point_ok` 与 `sim/motion._footprint_ok` 使用同一精确回退，修复路线在运动层不再被粗 mask 拦停。
+- `evaluate_gates` 与导航 mask 共用同一规则：细地类多边形覆盖 2 km 水深回退；水深已知时按涉水判定（不论粗水多边形）；水深为空时按 landcover 因子（water/rock 为 0）与道路绑定判定。
+- 桥面只认车辆等级道路（`VEHICLE_BRIDGE_CLASSES`），人行道/自行车道/台阶桥不再豁免水深；建筑检查先于桥面豁免，桥 25 m 内也不能穿建筑。
+- `validate_route`/`repair_route`/`plan_valid_route` 默认复验步长收紧到 3 m，并对陆上/两栖平台追加半车宽建筑净空检查（与局部规划器一致）；`sim/motion` 的 footprint 样本在 mask 判阻时同样走精确回退。
 
-结果：accepted 路线的 `route_ok` 从 78.3% 提升到 100%，`gate_denied` 保持 0；代价是更严的 landcover 门使 `gate_rejected` 从 109 增到 183、接受率约 38%，且 300 条运行时间约 6 分钟（3 m 复验与更多修复尝试）。`no_path` 仍占 187，主要来自跨水域/长街区，需要更快/更长的局部绕行与网络连通性预判。
+结果：accepted 路线的 `route_ok` 从 78.3% 提升到 100%，`gate_denied` 保持 0。代价是接受数从 120 降到 59（约 20%）：半车宽建筑净空与更严格的 landcover/水深规则拒绝了大量贴建筑或跨窄水带的候选路线，`no_path` 增至 241。当前 30 m 全局 A* 并不做足迹级走廊规划，这是后续提高合法路线成功率的首要改造点。
 
 ## 4. 已知限制
 
@@ -93,13 +94,15 @@ mean_length 276.7 m; plan_p95 72.4 ms
 5. `passability()` 已接建筑/水深/坡度/地类/道路限重限高限宽门，`unknown_policy` 已从 manifest `gates` 和已批准 `Policy.gates` 读取；`World.authorize_engagement()` 已接通用 ROE/矩阵与 rolecard 武器类别，但尚未接入任务/战术层与目标选择。
 6. `safe_fallback` 只在同一 30 m mask 内回退；两个候选都失败时返回 None。精确回退解决了“mask 误阻但几何合法”的路线判定，但起终点仍可能被吸附到 30 m 单元中心，`no_path` 中的一部分来自该吸附与粗连通性。
 7. `tile()` 只返回图层路径元数据；未实现 COG/PMTiles/3D Tiles 范围读取。
+8. 3 m 点采样仍可能漏过窄于步长的水域/建筑条带；真实包上的建筑净空依赖 OSM footprint 精度（部分建筑多边形压路），接受率对数据质量敏感。
+9. `route_ok` 的快速路径（30 m 超覆盖通过）不再复核 Gate；`plan_hybrid` 可能返回 Gate 拒绝的粗路线。`check_paths_v3` 先过滤 Gate，因此 100% 指标是“Gate 合法集的路线权威一致性”，不是双向等价证明。
 
 ## 5. 下一步
 
 1. 把 Anping 的 `terrain` 换成 COG（NLSC/Copernicus）、`buildings/roads` 换成 GeoParquet/FlatGeobuf；保留 `source/license/confidence`。
 2. 把 `ObstacleSet` 扩展为建筑体块 + 桥面 + 树冠 + 动态事件；加 BVH/空间桶。
 3. 把 `passability()` 的 `unknown_policy` 接到 `Policy` 对象/审批/场景覆盖；统计合法路线成功率/假阻断率。
-4. 导航权威已统一（3 m 精确回退 + landcover 门 + 3 m 复验），`route_ok` 100%；下一步把 300 条扩展到 10k 回归，并按 `gate_rejected`/`no_path` 归因降低假阻断（起终点吸附、粗连通性、长街区绕行窗口）。
+4. 导航权威已统一（3 m 精确回退 + 共用 landcover/水深/桥面规则 + 半车宽净空），`route_ok` 100%；下一步把 300 条扩展到 10k 回归，并把 30 m 全局 A* 升级为足迹级走廊规划，以提升约 20% 的合法路线接受率。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
-> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + `0352255` + `7e66492` + `d1c5d6e` + `23de8e5` + `e37324c` + `476e299` + `dc4dcec` + `ce20b89` + `a2b8d13` + `443661c` + `6cd5de0` + `4b2467a` + `545e3b7` + `3f7ee5e` + `437b092` + `c8603bd` + `d19fb2b` + `bba2ef3` + `dfc6883` + `c3589df` + `d83bd2d` + `2aece9d` + `fbd4adc` + `c48c7b2` + `6c7d652` + `d12c7a9`。本地 D 盘副本只含本说明，代码以远程 worktree 为准。
+> 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + … + `d12c7a9` + `7d44e41` + 本轮权威修正提交。本地 D 盘副本只含本说明，代码以远程 worktree 为准。

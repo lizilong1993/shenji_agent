@@ -280,6 +280,59 @@ class NavFieldTest(unittest.TestCase):
         self.assertFalse(nav.route_ok(prof, through))
         self.assertFalse(nav.motion_point_ok(prof, lon_c, lat_c))
 
+    def test_vehicle_half_width_penetration_is_rejected(self):
+        base = NavField(FakeFineEnv(water=None), res_m=30.0, use_cache=False)
+        lon_c, lat_c = base._center(15, 15)
+        dlon, dlat = 10.0 / base.m_lon, 10.0 / base.m_lat  # 20 m x 20 m block
+        env = FakeFineEnv(water=None,
+                          buildings=[(lon_c - dlon, lat_c - dlat,
+                                      lon_c + dlon, lat_c + dlat, 12.0)])
+        nav = NavField(env, res_m=30.0, use_cache=False)
+        north = lat_c + 10.5 / base.m_lat  # centreline 10.5 m from centre
+        route = Route(points=[Pose(lon_c - 0.0002, north),
+                              Pose(lon_c + 0.0002, north)],
+                      speed_limits=[5.0], modes=["offroad"])
+        # The centreline is outside the 10 m half-block, but the tracked
+        # platform's half-width (1.75 m) reaches inside it.
+        self.assertFalse(nav.route_ok(self.prof, route))
+        self.assertFalse(nav.motion_point_ok(self.prof, lon_c, north))
+
+    def test_footway_bridge_does_not_carry_vehicles(self):
+        nodes = {"A": (120.007, 23.010), "B": (120.013, 23.010)}
+        edges = [{"a": "A", "b": "B", "class": "footway",
+                  "bridge": True, "tunnel": False,
+                  "maxweight": None, "maxheight": None, "width": None}]
+        nav = NavField(FakeFineEnv(roads=(nodes, edges)), res_m=30.0,
+                       use_cache=False)
+        self.assertFalse(nav.passable(self.prof, 120.010, 23.010))
+        self.assertFalse(nav.motion_point_ok(self.prof, 120.010, 23.010))
+        route = Route(points=[Pose(120.0095, 23.010), Pose(120.0105, 23.010)],
+                      speed_limits=[5.0], modes=["offroad"])
+        self.assertFalse(nav.route_ok(self.prof, route))
+
+    def test_building_inside_bridge_capsule_still_blocks(self):
+        nodes = {"A": (120.007, 23.010), "B": (120.013, 23.010)}
+        edges = [{"a": "A", "b": "B", "class": "residential",
+                  "bridge": True, "tunnel": False,
+                  "maxweight": None, "maxheight": None, "width": None}]
+        d = 0.00005
+        env = FakeFineEnv(
+            roads=(nodes, edges),
+            buildings=[(120.010 - d, 23.010 - d, 120.010 + d, 23.010 + d, 9.0)])
+        nav = NavField(env, res_m=30.0, use_cache=False)
+        self.assertFalse(nav.motion_point_ok(self.prof, 120.010, 23.010))
+        route = Route(points=[Pose(120.0095, 23.010), Pose(120.0105, 23.010)],
+                      speed_limits=[5.0], modes=["offroad"])
+        self.assertFalse(nav.route_ok(self.prof, route))
+
+    def test_strict_roads_blocks_exact_fallback_offroad(self):
+        nav = NavField(FakeFineEnv(water=None), res_m=30.0, use_cache=False)
+        nav.strict_roads = True
+        route = Route(points=[Pose(120.002, 23.008), Pose(120.018, 23.008)],
+                      speed_limits=[5.0], modes=["offroad"])
+        self.assertFalse(nav.route_ok(self.prof, route))
+        self.assertFalse(nav.motion_point_ok(self.prof, 120.010, 23.008))
+
 
 PACK = os.path.join(SITUATION3D, "envpacks", "anping_v2c")
 
