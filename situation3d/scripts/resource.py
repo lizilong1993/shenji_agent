@@ -114,18 +114,59 @@ def cmd_remove(args):
     return 0
 
 
+def _progress(done, total):
+    if done % (50 << 20) < (1 << 20):
+        print("[download] %.1f MB%s" % (
+            done / 1048576.0,
+            (" / %.1f MB" % (int(total) / 1048576.0)) if total else ""),
+            file=sys.stderr, flush=True)
+
+
 def cmd_fetch(args):
     store = _store(args)
     entry = store.get(args.entry_id)
     cache_root = args.cache_root or os.path.join(str(store.root), "cache")
+    pbf = args.osm_pbf
     try:
+        if args.pbf_url:
+            name = os.path.basename(args.pbf_url.split("?")[0]) \
+                or "download.osm.pbf"
+            dest = providers.pbf_cache_path(cache_root, name)
+            print("downloading %s -> %s" % (args.pbf_url, dest),
+                  file=sys.stderr, flush=True)
+            providers.download_osm_pbf(args.pbf_url, dest,
+                                       timeout_s=args.pbf_timeout,
+                                       progress=_progress)
+            pbf = dest
+        if pbf and not os.path.isfile(pbf):
+            print("error: osm pbf not found: %s" % pbf, file=sys.stderr)
+            return 1
         new = providers.refresh_envpack(
             store, entry, cache_root, mode=args.mode,
-            timeout_s=args.timeout, allow_degraded=args.allow_degraded)
+            timeout_s=args.timeout, osm_pbf=pbf,
+            allow_degraded=args.allow_degraded)
     except providers.ProviderError as exc:
         print("error: %s" % exc, file=sys.stderr)
         return 1
+    except Exception as exc:  # noqa: BLE001 - download/network failures
+        print("error: %s: %s" % (type(exc).__name__, exc), file=sys.stderr)
+        return 1
     print(json.dumps(new.as_dict(), ensure_ascii=False, indent=1))
+    return 0
+
+
+def cmd_download_pbf(args):
+    store = _store(args)
+    cache_root = args.cache_root or os.path.join(str(store.root), "cache")
+    name = os.path.basename(args.url.split("?")[0]) or "download.osm.pbf"
+    dest = args.out or providers.pbf_cache_path(cache_root, name)
+    try:
+        providers.download_osm_pbf(args.url, dest, timeout_s=args.timeout,
+                                   progress=_progress)
+    except Exception as exc:  # noqa: BLE001
+        print("error: %s: %s" % (type(exc).__name__, exc), file=sys.stderr)
+        return 1
+    print(json.dumps({"path": dest, "size": os.path.getsize(dest)}))
     return 0
 
 
@@ -191,8 +232,21 @@ def main(argv=None):
                    default="auto")
     p.add_argument("--cache-root", default=None)
     p.add_argument("--timeout", type=int, default=20)
+    p.add_argument("--osm-pbf", default=None,
+                   help="build from a local .osm.pbf (needs pyosmium)")
+    p.add_argument("--pbf-url", default=None,
+                   help="download this .osm.pbf first, then build")
+    p.add_argument("--pbf-timeout", type=int, default=900)
     p.add_argument("--allow-degraded", action="store_true")
     p.set_defaults(func=cmd_fetch)
+
+    p = sub.add_parser("download-pbf",
+                       help="download a public .osm.pbf into the cache")
+    p.add_argument("url")
+    p.add_argument("--out", default=None)
+    p.add_argument("--cache-root", default=None)
+    p.add_argument("--timeout", type=int, default=900)
+    p.set_defaults(func=cmd_download_pbf)
 
     p = sub.add_parser("provide", help="register a user-supplied envpack")
     p.add_argument("path")

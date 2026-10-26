@@ -22,7 +22,11 @@
 
 - 模板：现有 envpack 的 `manifest.json` + `base_map.json` + grid（不改变 AOI/网格/分辨率）。
 - 数据源：复用 `geodata` 现有实现——Overpass（`OsmSource`）、Terrarium DEM（`DemSource`）、
-  OSM PBF（如配置）与 GEBCO 可后续接入；HTTP 代理沿用环境变量。
+  OSM PBF（`PbfOsmSource`，需要 pyosmium）与 GEBCO 可后续接入；HTTP 代理沿用环境变量。
+- **公开下载优先**：Overpass 不可用时，可用 Geofabrik `taiwan-latest.osm.pbf`
+  （`scripts/resource.py download-pbf <url>`，urllib 走 `https_proxy`）先落到
+  `cache/osm_pbf/`，再用 `fetch --osm-pbf <path>` 重建。runner 的 auto 模式会复用
+  `SITUATION_OSM_PBF` 或缓存里 7 天内的同名 PBF，不自动下载（避免无提示的大流量）。
 - 输出：`<store>/cache/envpacks/<pack_id>@<UTC时间戳>/`；原始响应缓存在 `<store>/cache/_cache`。
 - 登记：内容哈希 + `as_of=重建日期` + `provider=online-refresh`，entry_id 带时间戳
   （`envpack:<pack>@<stamp>`），旧版本保留，历史 run 的路径/哈希不受影响。
@@ -30,6 +34,9 @@
 - **质量门**：若重建结果的 roads 层仍是 `fallback-basic`（Overpass 不可达/返回不完整），
   默认拒绝登记，并提示检查网络/代理或使用离线包；只有显式 `--allow-degraded` 才登记
   `quality=derived` 的包。
+- **回退策略继承**：模板 manifest 的 `fallback_basic_json=null` 会原样保留在新包中，
+  防止 pipeline 默认的 2 km `base_map.json` 在 AOI 内重新引入建筑/地类（实测若不继承，
+  20 tick 运行出现 922 个 building_hits；继承后降到 3 个瞬态命中）。
 
 ## 3. CLI
 
@@ -37,6 +44,12 @@
 python3 scripts/resource.py fetch envpack:taiwan_strait --mode auto --timeout 20
 python3 scripts/resource.py fetch envpack:taiwan_strait --allow-degraded
 python3 scripts/resource.py provide /path/to/envpack --entry-id envpack:manual
+
+# 公开下载 + PBF 重建（pyosmium 环境）
+python3 scripts/resource.py download-pbf \
+  https://download.geofabrik.de/asia/taiwan-latest.osm.pbf
+/remote-home/lizilong/jev_gpu/venv/bin/python scripts/resource.py fetch \
+  envpack:taiwan_strait --osm-pbf <cache>/osm_pbf/taiwan-latest.osm.pbf --mode online
 ```
 
 ## 4. 运行时行为与可追溯
@@ -47,14 +60,18 @@ python3 scripts/resource.py provide /path/to/envpack --entry-id envpack:manual
   记录 `resource_plan_hash`/`resources_status`。
 - 离线回退与 P2 相同：缓存条目按 `as_of` 选择；过期由用户决策。
 
-## 5. 网络现状（server155）
+## 5. 网络现状（server155，2026-10-26 经本机 Clash 反向隧道复测）
 
-- `probe_online` 使用一条极小 Overpass 查询（POST，3.5 s）而不是 TCP 连接：
-  TCP/TLS 能连通不代表请求可用（egress 代理会挂起）。
-- 实测：探针 4.0 s 返回 False；真实 Overpass 查询 61 s 后超时。因此 auto 模式在本机
-  不会发起完整重建，会在 4 s 内判定离线并进入 waiting，附带 “网络探测失败” 摘要。
-- Copernicus/GEBCO 的直连可达性沿用既有 `geodata` 结论；若 Overpass 经代理可用，
-  重建路径无需改代码。
+- 反向隧道：`ssh -R 27980:172.16.10.254:7897 situ155`，服务器侧 `https_proxy=http://127.0.0.1:27980`。
+- **Overpass**：隧道 CONNECT 成功（HTTP 200），但微小查询 30 s 无响应；直连探针 4.0 s 为 False、
+  真实查询 61 s 超时。结论：当前 Clash 出口下 Overpass 仍不可用。
+- **Geofabrik PBF（公开下载）**：经同一代理下载 `taiwan-latest.osm.pbf` 312.7 MB 成功
+  （HTTP 200/307 跟随，urllib 流式写入 `.part` 后原子改名）。
+- **Terrarium DEM**：服务器直连可用（在线抓取 → 缓存 → 离线回放逐值一致）。
+- 用 PBF + 在线 DEM 实测重建 TW2 envpack：32.3 MB、`osm=pbf`、`dem=online`、`fallback=false`、
+  `quality=measured`；16,856 建筑 / 67,157 道路边。20 tick 运行 completed，p95 1.99 s/tick，
+  `building_hits=3`（瞬态上限 2，接近通过；主要来自新数据建筑贴边）。
+- 因此 auto 模式在本机不会走 Overpass；要么显式下载 PBF 后重建，要么接受离线包/等待。
 
 ## 6. 已验证
 
@@ -64,7 +81,7 @@ python3 scripts/resource.py provide /path/to/envpack --entry-id envpack:manual
   - `allow_degraded` → 登记 derived；
   - `provide` 标记 `manual_override`；
   - 探针失败路径。
-- 全量 484 passed / 14 skipped。
+- 全量 510 passed / 14 skipped（合并 main 后）；新增 PBF 下载/重建测试。
 - CLI 离线模式：`fetch envpack:taiwan_strait --mode offline` 在数秒内被质量门拒绝，
   注册表保持原条目。
 

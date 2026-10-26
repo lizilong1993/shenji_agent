@@ -149,6 +149,21 @@ class RefreshTest(unittest.TestCase):
         self.assertTrue(entry.notes.get("manual_override"))
         self.assertEqual(entry.provider, "provided-file")
 
+    def test_template_null_fallback_is_preserved(self):
+        manifest_path = os.path.join(self.pack, "manifest.json")
+        with open(manifest_path, encoding="utf-8") as fh:
+            manifest = json.load(fh)
+        manifest["fallback_basic_json"] = None
+        write_json(manifest_path, manifest)
+        self.store.register(scan_envpack(self.pack), replace=True)
+        new = providers.refresh_envpack(
+            self.store, self.store.get(self.entry.entry_id), self.cache,
+            osm_source=FakeOsm(), dem_source=FakeDem())
+        path = os.path.join(new.path, "manifest.json")
+        with open(path, encoding="utf-8") as fh:
+            built = json.load(fh)
+        self.assertIsNone(built.get("fallback_basic_json"))
+
     def test_same_day_refresh_is_reused(self):
         first = providers.refresh_envpack(
             self.store, self.entry, self.cache,
@@ -168,6 +183,40 @@ class RefreshTest(unittest.TestCase):
             self.store, self.pack, entry_id="envpack:allowed",
             allowed_roots=[os.path.dirname(self.pack)])
         self.assertEqual(entry.entry_id, "envpack:allowed")
+
+    def test_download_osm_pbf_atomic(self):
+        src = os.path.join(self.tmp, "source.osm.pbf")
+        with open(src, "wb") as fh:
+            fh.write(b"PBF-TEST" * 1024)
+        dest = os.path.join(self.tmp, "cache", "osm_pbf", "taiwan.osm.pbf")
+        providers.download_osm_pbf("file://" + src, dest)
+        with open(dest, "rb") as fh:
+            self.assertEqual(fh.read(), b"PBF-TEST" * 1024)
+        self.assertFalse(os.path.exists(dest + ".part"))
+
+    def test_refresh_from_pbf_source(self):
+        from unittest import mock
+
+        class FakePbf(object):
+            fetched_network = True
+            provenance_label = "pbf"
+
+            def __init__(self, cache, path):
+                self.cache = cache
+                self.path = path
+
+            def features(self, bbox):
+                return FEATURES
+
+        pbf = os.path.join(self.tmp, "taiwan.osm.pbf")
+        with open(pbf, "wb") as fh:
+            fh.write(b"dummy")
+        with mock.patch("geodata.osm_pbf.PbfOsmSource", FakePbf):
+            new = providers.refresh_envpack(
+                self.store, self.entry, self.cache, osm_pbf=pbf,
+                dem_source=FakeDem())
+        self.assertTrue(new.entry_id.startswith("envpack:p1@"))
+        self.assertEqual(new.notes.get("roads_source"), "pbf")
 
     def test_probe_failure(self):
         self.assertFalse(providers.probe_online("127.0.0.1", 9, 0.2))
