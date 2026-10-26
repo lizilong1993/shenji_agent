@@ -39,24 +39,33 @@
 - 复用现有瞬时实体池（上限 80），900–1260 ms 自动回收；
 - 不依赖 ParticleSystem，暂停/拖动时间轴时与现有特效一致。
 
+
+### 1.5 通信链路（数据链）
+
+`targetCombatFx.js` 新增选中目标的数据链弧线：
+
+- 选中目标后，取同阵营、距离在 `min(influence_km,30 km)` 内最近的 6 个友军；
+- 用 `PolylineDashMaterialProperty` 画低亮度青色虚线，端点由 `currentGeo()` 每帧回调，目标移动时链路跟随；
+- 选中目标变化时重建，其他时候零逐帧计算；无选中/无友军时不建实体；
+- `TargetCombatFx.debug().comms` 可查当前链路数。
+
 ## 2. 验证
 
 - `node --check targetFx.js`、`node --check targetCombatFx.js` 通过。
 - Cesium 1.145 + headless Chromium 加载 `taiwan_dense_transfer_v1`（`autoplay=1`，tick=300）：
   - `TargetFx.debug()`：12 艘水面舰 `show=true` 且 `bow=true`；8 架飞机 `show=true`；48 个地面目标中 43 个移动目标 `dust=true`，5 个静止目标 `false`（符合门控）。
   - 页面无 JS `pageerror`；控制台 404 为 8859 工作树缺少 `web/tiles` 离线瓦片，与特效/模型无关。
+  - 选中 `TRS001` 时 `TargetCombatFx.debug().comms = 6`，扫描扇区 `range=60000`，无页面错误。
 - 凝结尾迹在 tick=300 未触发（该案例飞机高度 <7000 m），逻辑已就位；VLS 在当前两个案例中没有海基导弹事件，未做端到端触发验证。
 
 ## 3. 未完成
 
 - **轮系/履带**：HQ-9 的 `$wheel0..7` 节点共用一个远离轮心的原点，直接旋转会绕世界原点甩出；需要 Blender 重导出轮心节点或扩展 pivot 补偿。其余轮式模型轮子烘焙在车身，无法单独旋转。
 - **雷达旋转/炮塔/旋翼**：Z-10/HQ-16/YJ-62 已有；055、075、AH-64、HIMARS 等新资产尚未拆关节。
-- **通信链路**：选中目标的数据链弧线未实现。
 - **加力/起落架**：未做；现有尾气/凝结尾迹先覆盖高速飞行。
 
 ## 4. 下一批
 
 1. 轮系：从备份源文件给 ZTD-05/EQ240/HIMARS/HQ-9 拆 `wheel_*` 节点并登记 pivot；
 2. 055/075 的雷达/炮塔节点；AH-64 旋翼；
-3. 通信链路（选中目标 → 友军弧线）；
-4. LOD1（1.2–1.5 km）与实例化，真机 GPU 验收。
+3. LOD1（1.2–1.5 km）与实例化，真机 GPU 验收。

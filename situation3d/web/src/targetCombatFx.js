@@ -30,6 +30,8 @@
   var smoke = {};               // id -> {birth, ents[]}
   var smokeState = {};          // id -> level
   var scan = null;              // {entity, material, id, range}
+  var commEntities = {};        // peer id -> entity（选中目标的通信链路）
+  var commKey = null;           // 当前链路的选中目标 id
   var destroyed = {};           // id -> true
   var hitFlash = {};            // id -> {until, prevColor, prevSize}
   var statusCache = {};
@@ -167,6 +169,7 @@
         (smoke[id].ents || []).forEach(function (ent) { ctx.viewer.entities.remove(ent); });
       });
       if (scan && scan.entity) ctx.viewer.entities.remove(scan.entity);
+      Object.keys(commEntities).forEach(function (id) { ctx.viewer.entities.remove(commEntities[id]); });
       Object.keys(proxyEnts).forEach(function (id) { ctx.viewer.entities.remove(proxyEnts[id].entity); });
     }
     proxyEnts = {};
@@ -177,6 +180,8 @@
     destroyed = {};
     hitFlash = {};
     scan = null;
+    commEntities = {};
+    commKey = null;
     ctx = null;
     data = null;
     eventsByTick = {};
@@ -195,6 +200,7 @@
       (smoke[id].ents || []).forEach(function (ent) { ctx.viewer.entities.remove(ent); });
     });
     if (scan && scan.entity) ctx.viewer.entities.remove(scan.entity);
+    Object.keys(commEntities).forEach(function (id) { ctx.viewer.entities.remove(commEntities[id]); });
     Object.keys(proxyEnts).forEach(function (id) { ctx.viewer.entities.remove(proxyEnts[id].entity); });
     restoreDeaths();
     proxyEnts = {};
@@ -207,6 +213,8 @@
     statusCache = {};
     lastStatusTick = -1;
     scan = null;
+    commEntities = {};
+    commKey = null;
     // 恢复模型着色（重播/回拖时）
     Object.keys(origStyle).forEach(function (id) { restoreStyle(id); });
   }
@@ -463,6 +471,7 @@
     updateProxyGuns();
     updateDamageStates(tick);
     updateSmoke(tick);
+    updateComms(tick);
     updateScan(tick);
     updateHitFlashes();
   }
@@ -1056,6 +1065,69 @@
     scan.entity.ellipse.height = alt;
   }
 
+  // ------------------------------------------------------------------
+  // 选中目标的通信链路（数据链弧线）
+  // ------------------------------------------------------------------
+  function clearComms() {
+    Object.keys(commEntities).forEach(function (id) {
+      ctx.viewer.entities.remove(commEntities[id]);
+    });
+    commEntities = {};
+    commKey = null;
+  }
+
+  function commPositionsFor(a, b) {
+    return function () {
+      var pa = currentGeo(a);
+      var pb = currentGeo(b);
+      if (!pa || !pb) return [];
+      return [
+        Cesium.Cartesian3.fromDegrees(pa.lon, pa.lat, (pa.alt || 0) + 2.0),
+        Cesium.Cartesian3.fromDegrees(pb.lon, pb.lat, (pb.alt || 0) + 2.0),
+      ];
+    };
+  }
+
+  function updateComms(tick) {
+    var id = apiSelected();
+    if (!id) { clearComms(); return; }
+    if (commKey === id) return;
+    clearComms();
+    commKey = id;
+    var def = defById[id];
+    if (!def) return;
+    var range = Math.min(30, Number(def.influence_km) || 10) * 1000;
+    var here = currentGeo(id);
+    if (!here) return;
+    var rows = [];
+    (data.targets || []).forEach(function (t) {
+      if (!t || t.id === id || t.affiliation !== def.affiliation) return;
+      var p = currentGeo(t.id);
+      if (!p) return;
+      var d = Cesium.Cartesian3.distance(
+        Cesium.Cartesian3.fromDegrees(here.lon, here.lat, here.alt || 0),
+        Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt || 0));
+      if (d <= range) rows.push({ id: t.id, d: d });
+    });
+    rows.sort(function (a, b) { return a.d - b.d; });
+    rows.slice(0, 6).forEach(function (r) {
+      var ent = ctx.viewer.entities.add({
+        id: 'comm-' + id + '-' + r.id,
+        show: true,
+        polyline: {
+          positions: new Cesium.CallbackProperty(commPositionsFor(id, r.id), false),
+          width: 1.6,
+          material: new Cesium.PolylineDashMaterialProperty({
+            color: Cesium.Color.fromCssColorString('#4fd8ff').withAlpha(0.42),
+            dashLength: 14,
+          }),
+          clampToGround: false,
+        },
+      });
+      commEntities[r.id] = ent;
+    });
+  }
+
   function debug() {
     return {
       events: (data && data.events || []).length,
@@ -1063,6 +1135,7 @@
       projectiles: projectiles.length,
       smoke: Object.keys(smoke).length,
       scan: scan ? { id: scan.id, show: scan.entity.show, range: scan.range } : null,
+      comms: Object.keys(commEntities).length,
       destroyed: Object.keys(destroyed),
       rig: { z10: rigAngles.z10, hq16: rigAngles.hq16, yj62: rigAngles.yj62 },
       proxy: Object.keys(proxyEnts).map(function (id) { return { id: id, show: proxyEnts[id].entity.show, key: proxyEnts[id].key }; }),
