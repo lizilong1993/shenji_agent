@@ -4,6 +4,7 @@ from .fusion import FusedEvent, fuse
 from .gateway import CueBatch, IntelBundle, IntelCue, IntelGateway
 from .model import Observation, iso, parse_time
 from .normalize import normalize
+from .scheduler import IntelScheduler
 from .trust import components, confidence, recency
 
 __all__ = [
@@ -12,6 +13,7 @@ __all__ = [
     "IntelBundle",
     "IntelCue",
     "IntelGateway",
+    "IntelScheduler",
     "Observation",
     "components",
     "confidence",

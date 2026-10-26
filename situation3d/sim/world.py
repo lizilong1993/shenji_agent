@@ -122,6 +122,9 @@ class World(object):
         self.events: List[dict] = []
         self._event_id = 0
         self.intel: Dict[int, dict] = {}
+        self.intel_cues: Dict[int, List[dict]] = {}
+        self._intel_pending: Dict[int, List] = {}
+        self.intel_scheduler = None
         self._cell_cache: Dict[int, Tuple[int, int]] = {}
         self._cell_members: Dict[Tuple[int, int], List[Entity]] = {}
         self._kind_cache: Dict[int, str] = {}
@@ -851,7 +854,73 @@ class World(object):
         self.intel[int(side)] = dict(data)
 
     def intel_for(self, side: int) -> dict:
-        return dict(self.intel.get(int(side), {}))
+        data = dict(self.intel.get(int(side), {}))
+        if self.intel_scheduler is not None:
+            now = self.time_s
+            data["cues"] = [
+                dict(cue) for cue in self.intel_cues.get(int(side), [])
+                if float(cue.get("valid_to", float("inf"))) >= now
+            ]
+        return data
+
+    def set_intel_gateway(self, gateway, sides=(0, 1),
+                          lookahead_s: float = 300.0,
+                          watermark_lag_s: float = 0.0):
+        """Attach an intel gateway; cues are pulled once per tick.
+
+        ``world.time_s == 0`` is defined to correspond to
+        ``gateway.bundle.scenario_start``; callers must align the two.
+        """
+        from intel.scheduler import IntelScheduler
+        self.intel_scheduler = IntelScheduler(
+            gateway, sides=sides, lookahead_s=lookahead_s,
+            watermark_lag_s=watermark_lag_s)
+        self.intel_cues = {}
+        self._intel_pending = {}
+        return self.intel_scheduler
+
+    def _poll_intel(self, sim_time: float, min_lookahead: float) -> None:
+        if self.intel_scheduler is None:
+            return
+        lookahead = max(self.intel_scheduler.lookahead_s, float(min_lookahead))
+        batches = self.intel_scheduler.advance(sim_time, lookahead_s=lookahead)
+        for side, batch in batches.items():
+            if batch.cues:
+                self._intel_pending.setdefault(int(side), []).extend(
+                    batch.cues)
+
+    def _publish_intel(self) -> None:
+        if self.intel_scheduler is None:
+            return
+        now = self.time_s
+        for side, pending in list(self._intel_pending.items()):
+            due = [cue for cue in pending if cue.valid_from <= now + 1e-9]
+            if due:
+                self.intel_cues.setdefault(side, []).extend(
+                    cue.as_dict() for cue in due)
+            self._intel_pending[side] = [
+                cue for cue in pending if cue.valid_from > now + 1e-9]
+        for side, cues in list(self.intel_cues.items()):
+            self.intel_cues[side] = [
+                cue for cue in cues
+                if float(cue.get("valid_to", float("inf"))) >= now
+            ]
+
+    def _advance_clock(self, dt: float) -> None:
+        if self.intel_scheduler is None:
+            self.time_s += float(dt)
+            return
+        dt = float(dt)
+        self._poll_intel(self.time_s, min_lookahead=dt)
+        self.time_s += dt
+        self._publish_intel()
+
+    def intel_manifest(self) -> dict:
+        if self.intel_scheduler is None:
+            return {"enabled": False}
+        manifest = self.intel_scheduler.manifest()
+        manifest["enabled"] = True
+        return manifest
 
     # -- commander ----------------------------------------------------------
     def _commander_state(self, side: int) -> dict:
@@ -1767,7 +1836,7 @@ class World(object):
                     delta = target - self.time_s
                     self._tick_timers(delta)
                     self._logistics(delta)
-                    self.time_s = target
+                    self._advance_clock(delta)
                     continue
                 self.step(0.0)          # process the due event in place
                 continue
@@ -1838,7 +1907,7 @@ class World(object):
             self._sync_passengers()
             self._refresh_cell_cache()
             self._resolve_minefields()
-            self.time_s += d
+            self._advance_clock(d)
             remaining -= d
 
     # -- step ---------------------------------------------------------------
@@ -1865,5 +1934,5 @@ class World(object):
         self._engage(ctx)
         self._update_objectives()
         self._logistics(dt)
-        self.time_s += dt
+        self._advance_clock(dt)
         return self.events[before:]

@@ -116,7 +116,8 @@ class IntelGateway:
             return self._consume_fused(side, horizon, watermark)
         cues: List[IntelCue] = []
         for obs in self.bundle.observations:
-            if obs.observation_id in self._consumed:
+            key = (int(side), obs.observation_id)
+            if key in self._consumed:
                 continue
             sim = (obs.event_ms() - self._start_ms) / 1000.0
             if sim > horizon:
@@ -126,7 +127,7 @@ class IntelGateway:
                 continue
             if sim < watermark:
                 self.late.append(obs.observation_id)
-                self._consumed.add(obs.observation_id)
+                self._consumed.add(key)
                 continue
             cue = IntelCue(
                 cue_id="cue:" + obs.observation_id,
@@ -152,7 +153,7 @@ class IntelGateway:
                 sensor_model={},
             )
             cues.append(cue)
-            self._consumed.add(obs.observation_id)
+            self._consumed.add(key)
         cues.sort(key=lambda c: (c.event_time_ms, c.source_priority, c.cue_id))
         payload = [(c.cue_id, c.event_time_ms) for c in cues]
         digest = hashlib.sha256(
@@ -173,7 +174,8 @@ class IntelGateway:
         # evidence that is not yet knowable or that was already dropped.
         by_id: Dict[str, Observation] = {}
         for obs in self.bundle.observations:
-            if obs.observation_id in self._consumed:
+            key = (int(side), obs.observation_id)
+            if key in self._consumed:
                 continue
             obs_side = obs.properties.get("side")
             if obs_side is not None and int(obs_side) != int(side):
@@ -183,7 +185,7 @@ class IntelGateway:
                 continue
             if sim < watermark:
                 self.late.append(obs.observation_id)
-                self._consumed.add(obs.observation_id)
+                self._consumed.add(key)
                 continue
             current = by_id.get(obs.observation_id)
             if current is None or (
@@ -235,7 +237,7 @@ class IntelGateway:
             )
             cues.append(cue)
             for member in members:
-                self._consumed.add(member.observation_id)
+                self._consumed.add((int(side), member.observation_id))
         cues.sort(key=lambda c: (c.event_time_ms, c.source_priority, c.cue_id))
         payload = [(c.cue_id, c.event_time_ms) for c in cues]
         digest = hashlib.sha256(
