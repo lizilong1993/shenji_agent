@@ -110,7 +110,7 @@ def download_osm_pbf(url: str, dest: str, timeout_s: int = 900,
     return dest
 
 
-def pbf_cache_path(cache_root: str, name: str = "taiwan-latest.osm.pbf") -> str:
+def pbf_cache_path(cache_root: str, name: str = "download.osm.pbf") -> str:
     return os.path.join(cache_root, "osm_pbf", name)
 
 

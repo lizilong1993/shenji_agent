@@ -561,13 +561,23 @@ def _allowed_resource_roots(store):
 
 
 def _recent_pbf(store, max_age_days=7.0):
-    """A locally cached public .osm.pbf that is still reasonably fresh."""
+    """A locally cached public .osm.pbf that is still reasonably fresh.
+
+    The project covers all of China; never hard-code a Taiwan filename.  The
+    env var wins, otherwise any ``cache/osm_pbf/*.osm.pbf`` (newest first) is
+    eligible, so regional extracts (china-latest, province extracts, ...) work
+    without code changes.
+    """
     paths = []
     env_path = os.environ.get("SITUATION_OSM_PBF")
     if env_path:
         paths.append(env_path)
-    paths.append(os.path.join(str(store.root), "cache", "osm_pbf",
-                              "taiwan-latest.osm.pbf"))
+    pbf_dir = os.path.join(str(store.root), "cache", "osm_pbf")
+    if os.path.isdir(pbf_dir):
+        names = [n for n in os.listdir(pbf_dir) if n.endswith(".osm.pbf")]
+        names.sort(key=lambda n: os.path.getmtime(os.path.join(pbf_dir, n)),
+                   reverse=True)
+        paths.extend(os.path.join(pbf_dir, n) for n in names)
     for path in paths:
         if not os.path.isfile(path):
             continue
