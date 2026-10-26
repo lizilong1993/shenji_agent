@@ -25,7 +25,7 @@ situation3d/tests/
   fixtures/intel/{usgs,gdacs,firms}.json
 ```
 
-依赖方向：`gateway -> model`、`normalize -> model, trust`，无引擎内部依赖，可独立测试。
+依赖方向：`gateway -> model, fusion`、`normalize -> model, trust`，无引擎内部依赖，可独立测试。
 
 ## 3. Observation 模型
 
@@ -82,6 +82,8 @@ situation3d/tests/
 
 cue 排序键为 `(event_time_ms, source_priority, cue_id)`；批次携带 `log_hash`（cue_id + event_time_ms 的 SHA-256），用于回放一致性校验。
 
+`IntelGateway(bundle, fusion=(radius_m, window_s))` 开启融合模式：每次消费先按 side、`watermark ≤ 成员时间 ≤ horizon` 过滤观测并剔除已消费项，再对剩余观测调用 `fuse()`；每个簇产出一条 `cue_kind="fused"` 的 cue，`observation_id` 即 `cluster_id`，`provenance` 保留成员、来源和代表观测。因此 cue 不会包含未来成员，也不会吞掉已过 watermark 的成员；已被消费的成员不会在后续窗口重复融合。`knowledge_time_ms`/`ingest_seq` 取成员最大值，表示整簇信息齐备的时刻。默认 `fusion=None` 保持逐条观测语义。
+
 ## 8. 验证
 
 ```
@@ -89,12 +91,11 @@ cd situation3d
 python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py -v
 ```
 
-14 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝。
+19 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定。
 
 ## 9. 已知限制与下一步
 
 - 仅覆盖三个静态源的离线归一化；GDELT、AIS/ADS-B 等实时连接器未实现（P2）。
-- 融合结果尚未进入网关：`fuse()` 可合并同一事件，但 `IntelGateway` 仍逐条产出 cue；需要决定“融合后单 cue”还是“消费侧去重”，并把融合哈希写入 run-manifest。
-- 固定锚点避免了链式过合并，但可能欠合并（两个彼此接近、锚点相距较远的簇不会二次合并）；复杂度 O(N²)，10k 级以上观测需要空间索引。
+- 融合需显式开启（`fusion=(radius, window)`），默认仍逐条产出 cue；融合以消费窗口内未消费成员为输入，跨窗口到达的同一事件可能分成多条 cue；固定锚点可能欠合并，O(N²) 复杂度需在 10k 级以上观测前引入空间索引。
 - 未接入调度器：`IntelGateway` 尚未被 `engine`/`sim.world` 调用，需要 run-manifest 记录 bundle 哈希与每批 `log_hash`。
 - 置信度参数为经验值，待用历史数据校准。
