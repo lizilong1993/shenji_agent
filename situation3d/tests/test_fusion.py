@@ -130,7 +130,8 @@ class FusionTest(unittest.TestCase):
         gateway = IntelGateway(bundle, fusion=(10000.0, 3600.0))
         batch = gateway.consume(1, 0.0, -90000.0, 400.0)
         self.assertEqual(len(batch.cues), 5)
-        self.assertTrue(all(c.cue_kind == "fused" for c in batch.cues))
+        self.assertTrue(all(c.cue_kind == "observation" for c in batch.cues))
+        self.assertTrue(all(c.provenance.get("fused") is True for c in batch.cues))
         fused = [c for c in batch.cues
                  if len(c.provenance["member_ids"]) > 1]
         self.assertEqual(len(fused), 1)

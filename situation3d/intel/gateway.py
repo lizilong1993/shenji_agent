@@ -69,16 +69,45 @@ SOURCE_PRIORITY = {"usgs": 0, "gdacs": 1, "firms": 2}
 class IntelBundle:
     def __init__(self, bundle_id: str, scenario_id: str,
                  observations: Sequence[Observation], scenario_start: str,
-                 synthetic: bool = True):
+                 synthetic: bool = True, domain: str = "multi",
+                 bbox: Optional[Sequence[float]] = None,
+                 time_window: Optional[Sequence[str]] = None,
+                 source_allowlist: Optional[Sequence[str]] = None):
         self.bundle_id = bundle_id
         self.scenario_id = scenario_id
         self.scenario_start = scenario_start
         self.synthetic = bool(synthetic)
+        self.domain = str(domain or "multi")
         self.observations = sorted(
             observations,
             key=lambda o: (o.event_ms(), SOURCE_PRIORITY.get(o.source_id, 9),
                            o.observation_id),
         )
+        if bbox is None:
+            bbox = self._default_bbox()
+        self.bbox = tuple(float(value) for value in bbox)
+        if len(self.bbox) != 4:
+            raise ValueError("bbox must be (min_lon, min_lat, max_lon, max_lat)")
+        if time_window is None:
+            time_window = (scenario_start, self._last_event_time())
+        self.time_window = tuple(str(value) for value in time_window)
+        if len(self.time_window) != 2:
+            raise ValueError("time_window must be (start, end)")
+        if source_allowlist is None:
+            source_allowlist = sorted({obs.source_id for obs in self.observations})
+        self.source_allowlist = tuple(str(value) for value in source_allowlist)
+
+    def _default_bbox(self):
+        if not self.observations:
+            return (0.0, 0.0, 0.0, 0.0)
+        lons = [obs.lon for obs in self.observations]
+        lats = [obs.lat for obs in self.observations]
+        return (min(lons), min(lats), max(lons), max(lats))
+
+    def _last_event_time(self):
+        if not self.observations:
+            return self.scenario_start
+        return max(obs.event_time for obs in self.observations)
 
     @property
     def hash(self) -> str:
@@ -89,6 +118,10 @@ class IntelBundle:
         return {
             "bundle_id": self.bundle_id,
             "scenario_id": self.scenario_id,
+            "domain": self.domain,
+            "bbox": list(self.bbox),
+            "time_window": list(self.time_window),
+            "source_allowlist": list(self.source_allowlist),
             "scenario_start": self.scenario_start,
             "synthetic": self.synthetic,
             "hash": self.hash,
@@ -216,7 +249,7 @@ class IntelGateway:
                 event_time_ms=event_ms,
                 knowledge_time_ms=knowledge_ms,
                 source_priority=priority,
-                cue_kind="fused",
+                cue_kind="observation",
                 sim_time=sim,
                 valid_from=sim,
                 valid_to=sim + self.ttl_s,
@@ -232,6 +265,7 @@ class IntelGateway:
                     "member_ids": list(event.member_ids),
                     "sources": list(event.sources),
                     "representative_id": event.representative_id,
+                    "fused": True,
                 },
                 sensor_model={},
             )

@@ -1,6 +1,6 @@
-# VGI 情报垂直切片（P1，离线 fixtures）
+# VGI 情报垂直切片（P0 外部连接器 + P1 离线 fixtures）
 
-状态：2026-10-24 起始；`feat/vgi-intel`（融合）与 `feat/vgi-gateway-fusion`（网关融合）已合并 main；2026-10-26 `feat/intel-scheduler` 增加 `intel/scheduler.py` 与可选 World 接线。未接入线上 8848。
+状态：2026-10-24 起始；`feat/vgi-intel`（融合）、`feat/vgi-gateway-fusion`（网关融合）、`feat/intel-scheduler`（调度器与 World 接线）已合并 main；2026-10-26 `feat/vgi-connectors` 增加 `intel/connectors/`、`scripts/fetch_intel.py` 与原始归档。未接入线上 8848。
 
 ## 1. 定位
 
@@ -20,10 +20,21 @@ situation3d/intel/
   fusion.py     跨源时空聚类与置信度融合
   gateway.py    IntelBundle、IntelCue、IntelGateway
   scheduler.py  按 side 的确定性轮询与 run-manifest
+  connectors/
+    http.py      allow-list HTTPS、超时、大小上限、拒绝重定向
+    registry.py  源注册表（host/license/attribution/schedule）
+    archive.py   原始响应不可变归档（gzip + SHA-256）
+    usgs.py      USGS FDSN 查询 URL + 归一化
+    gdacs.py     GDACS 事件列表 URL + 归一化
+    firms.py     FIRMS area CSV URL、acq_date/acq_time 合并
+    fetch.py     抓取 → 归档 → 归一化 → IntelBundle
+situation3d/scripts/
+  fetch_intel.py  一次性抓取 CLI（可被 cron 调用）
 situation3d/tests/
   test_intel_v1.py
   test_fusion.py
   test_intel_scheduler.py
+  test_intel_connectors.py
   fixtures/intel/{usgs,gdacs,firms}.json
 ```
 
@@ -84,7 +95,7 @@ situation3d/tests/
 
 cue 排序键为 `(event_time_ms, source_priority, cue_id)`；批次携带 `log_hash`（cue_id + event_time_ms 的 SHA-256），用于回放一致性校验。
 
-`IntelGateway(bundle, fusion=(radius_m, window_s))` 开启融合模式：每次消费先按 side、`watermark ≤ 成员时间 ≤ horizon` 过滤观测并剔除已消费项，再对剩余观测调用 `fuse()`；每个簇产出一条 `cue_kind="fused"` 的 cue，`observation_id` 即 `cluster_id`，`provenance` 保留成员、来源和代表观测。因此 cue 不会包含未来成员，也不会吞掉已过 watermark 的成员；已被消费的成员不会在后续窗口重复融合。`knowledge_time_ms`/`ingest_seq` 取成员最大值，表示整簇信息齐备的时刻。默认 `fusion=None` 保持逐条观测语义。
+`IntelGateway(bundle, fusion=(radius_m, window_s))` 开启融合模式：每次消费先按 side、`watermark ≤ 成员时间 ≤ horizon` 过滤观测并剔除已消费项，再对剩余观测调用 `fuse()`；每个簇产出一条 `cue_kind="observation"`、`provenance.fused=true` 的 cue，`observation_id` 即 `cluster_id`，`provenance` 保留成员、来源和代表观测。因此 cue 不会包含未来成员，也不会吞掉已过 watermark 的成员；已被消费的成员不会在后续窗口重复融合。`knowledge_time_ms`/`ingest_seq` 取成员最大值，表示整簇信息齐备的时刻。默认 `fusion=None` 保持逐条观测语义。
 
 ## 8. 调度器与 World 接入
 
@@ -98,15 +109,37 @@ cue 排序键为 `(event_time_ms, source_priority, cue_id)`；批次携带 `log_
 
 ```
 cd situation3d
-python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py tests/test_intel_scheduler.py -v
+python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py tests/test_intel_scheduler.py tests/test_intel_connectors.py -v
 ```
 
-28 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定；调度器按 side 轮询、manifest 确定性与隔离、World 只发布到期 cue、多 side 中立观测、窗口内早事件不丢、`advance_to` 同步、未挂载时载荷不变。
+39 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定；调度器按 side 轮询、manifest 确定性与隔离、World 只发布到期 cue、多 side 中立观测、窗口内早事件不丢、`advance_to` 同步、未挂载时载荷不变；连接器 URL/allow-list、FIRMS 日期时间合并、归档往返、离线 bundle、契约字段、部分源失败与缺 key 上报。
 
 ## 10. 已知限制与下一步
 
-- 仅覆盖三个静态源的离线归一化；GDELT、AIS/ADS-B 等实时连接器未实现（P2）。
+- USGS/GDACS/FIRMS 已有外部连接器；GDELT、AIS/ADS-B 等实时连接器未实现（P2）。
 - 融合需显式开启（`fusion=(radius, window)`），默认仍逐条产出 cue；融合以消费窗口内未消费成员为输入，跨窗口到达的同一事件可能分成多条 cue；固定锚点可能欠合并，O(N²) 复杂度需在 10k 级以上观测前引入空间索引。
 - 时间基准需调用方保证：`world.time_s=0` 必须对应 `bundle.scenario_start`，当前没有自动校验或 offset 参数，只在 manifest 记录。
 - 批次日志每侧每 tick 追加一行，长跑 manifest 无界增长；cue 按 TTL 从 `intel_cues` 淘汰，但 `late_ids` 仍累积。
 - 调度器每 tick 全量扫描 bundle（融合模式 O(N²)），10k 级观测前需要时间索引/增量游标。
+
+## 11. 外部连接器（P0，2026-10-26）
+
+`intel/connectors/` 把“抓取—归档—归一化—bundle”放在仿真之外：
+
+- `registry.py`：USGS / GDACS / FIRMS 的 host、license、attribution、调度周期、parser 版本；FIRMS 需要 `FIRMS_MAP_KEY`。
+- `http.py`：只允许注册表 host、只允许 HTTPS/443、拒绝 URL 凭据、拒绝重定向、20 s 超时、8 MiB 响应上限；错误信息不包含带 key 的完整 URL。
+- `usgs.py`：FDSN `query?format=geojson`，按 bbox/时间窗查询。
+- `gdacs.py`：`gdacsapi/api/events/geteventlist/SEARCH`，事件类型 EQ/TC/FL/VO/WF/DR，告警级 Green/Orange/Red；列表接口无 bbox，抓取后本地过滤。
+- `firms.py`：`/api/area/csv`，四个 NRT 传感器；把 `acq_date` + `acq_time`（HHMM）合并为 ISO 时间；单个传感器失败不丢弃其他传感器，状态记 `degraded`。
+- `fetch.py`：`build_bundle(source_ids, bbox, start, end, ...)` 返回 `FetchResult(bundle, statuses, archives, errors)`；观测按 `(event_time, source_id, observation_id)` 排序后重排 `ingest_seq`；bundle 固定 `domain="hazard"`、bbox/time_window/source_allowlist。
+- `archive.py`：`var/intel/archive/<source>/<utc>.<ext>.gz` + 原始字节 SHA-256；`read_archive()` 可回放。
+- `scripts/fetch_intel.py`：一次性抓取，写 bundle 与 health JSON；`--allow-partial` 允许部分源失败仍产出 bundle。示例：
+
+```
+cd situation3d
+python3 scripts/fetch_intel.py --sources usgs,gdacs \
+  --bbox 119.0,21.5,123.0,26.5 --hours 24 \
+  --out var/intel/bundle.json --archive-root var/intel/archive
+```
+
+健康文件记录每个源的 `state`（nominal/degraded/unavailable）、count、bytes、error 和归档路径。仿真侧仍通过 `World.set_intel_gateway()` 消费 bundle；连接器不在 tick 内运行，也不访问网络。`var/intel/` 已加入 `.gitignore`。

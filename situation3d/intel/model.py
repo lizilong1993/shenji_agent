@@ -47,6 +47,10 @@ class Observation:
     is_centroid: bool = False
     status: str = "active"
     properties: Dict[str, Any] = field(default_factory=dict)
+    schema_version: str = "situation3d.intel.v1"
+    license: str = ""
+    attribution: str = ""
+    parser_version: str = "vgi-connectors-1"
 
     def event_dt(self) -> datetime:
         return parse_time(self.event_time)
@@ -71,6 +75,7 @@ class Observation:
     def as_dict(self) -> Dict[str, Any]:
         return {
             "observation_id": self.observation_id,
+            "schema_version": self.schema_version,
             "source_id": self.source_id,
             "source_native_id": self.source_native_id,
             "domain": self.domain,
@@ -87,5 +92,13 @@ class Observation:
             "is_centroid": self.is_centroid,
             "status": self.status,
             "content_hash": self.content_hash(),
+            "license": self.license,
+            "attribution": self.attribution,
+            "provenance": {
+                "raw_id": self.source_native_id,
+                "parser_version": self.parser_version,
+                "license": self.license,
+                "attribution": self.attribution,
+            },
             "properties": dict(self.properties),
         }
