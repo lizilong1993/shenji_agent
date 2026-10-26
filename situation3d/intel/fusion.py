@@ -33,9 +33,21 @@ TYPE_SYNONYMS = {
     "volcano": "volcano",
     "ts": "tsunami",
     "tsunami": "tsunami",
+    # NASA EONET category ids
+    "severestorms": "cyclone",
+    "wildfires": "fire",
+    "volcanoes": "volcano",
+    "floods": "flood",
+    "earthquakes": "earthquake",
+    "dusthaze": "dust",
+    "sealakeice": "ice",
+    "temperatureextremes": "extreme_temperature",
+    "manmade": "other",
+    "watercolor": "other",
 }
 
-SOURCE_PRIORITY = {"usgs": 0, "gdacs": 1, "firms": 2}
+SOURCE_PRIORITY = {"usgs": 0, "gdacs": 1, "firms": 2,
+                   "eonet": 3, "adsb": 4, "gdelt": 5}
 
 
 def _canonical_type(value: str) -> str:

@@ -15,6 +15,7 @@ class SourceSpec:
     schedule_s: int
     parser_version: str
     requires_env: Optional[str] = None
+    optional: bool = False
 
 
 SOURCES = {
@@ -42,6 +43,31 @@ SOURCES = {
         schedule_s=1800,
         parser_version="vgi-connectors-1",
         requires_env="FIRMS_MAP_KEY",
+    ),
+    "adsb": SourceSpec(
+        source_id="adsb",
+        host="api.adsb.lol",
+        license="ODbL 1.0",
+        attribution="adsb.lol (ODbL)",
+        schedule_s=30,
+        parser_version="vgi-sources-1",
+    ),
+    "eonet": SourceSpec(
+        source_id="eonet",
+        host="eonet.gsfc.nasa.gov",
+        license="NASA open data",
+        attribution="NASA EONET",
+        schedule_s=1800,
+        parser_version="vgi-sources-1",
+    ),
+    "gdelt": SourceSpec(
+        source_id="gdelt",
+        host="api.gdeltproject.org",
+        license="GDELT terms; citation required",
+        attribution="The GDELT Project",
+        schedule_s=300,
+        parser_version="vgi-sources-1",
+        optional=True,
     ),
 }
 
