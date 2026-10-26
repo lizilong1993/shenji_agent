@@ -23,6 +23,10 @@ if SITUATION3D not in sys.path:
 from resources import providers  # noqa: E402
 from resources.acquire import (AcquireError, acquire_tiles,  # noqa: E402
                                probe_report)
+from resources.adapters import (acquire_buildings, acquire_canopy,  # noqa: E402
+                                DatasetError)
+from resources.vectorproc import DatasetSpec  # noqa: E402
+from resources.enrichment import enrich_envpack  # noqa: E402
 from resources.processing import TilesetSpec  # noqa: E402
 from resources.sources import raster_candidate  # noqa: E402
 from resources.catalog import KINDS  # noqa: E402
@@ -286,6 +290,67 @@ def cmd_raster_tiles(args):
     return 0
 
 
+def cmd_buildings(args):
+    store = _store(args)
+    try:
+        spec = DatasetSpec(name=args.name, bbox=_parse_bbox(args.bbox),
+                           kind="building_footprints")
+        sources = [s.strip() for s in (args.sources or "gba,overture").split(",")
+                   if s.strip()]
+        result = acquire_buildings(
+            store, spec, sources,
+            args.cache_root or os.path.join(str(store.root), "cache"),
+            mode=args.mode)
+    except (DatasetError, ValueError) as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    print(json.dumps({
+        "entry": result["entry"].as_dict(),
+        "manifest": result["manifest"],
+        "stats": result["stats"],
+        "source": result["source"],
+        "errors": result["errors"],
+    }, ensure_ascii=False, indent=1))
+    return 0
+
+
+def cmd_canopy(args):
+    store = _store(args)
+    try:
+        spec = DatasetSpec(name=args.name, bbox=_parse_bbox(args.bbox),
+                           kind="canopy_height",
+                           resolution_m=args.resolution)
+        result = acquire_canopy(
+            store, spec,
+            args.cache_root or os.path.join(str(store.root), "cache"),
+            mode=args.mode, resolution_m=args.resolution)
+    except (DatasetError, ValueError) as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    print(json.dumps({"entry": result["entry"].as_dict(),
+                      "manifest": result["manifest"],
+                      "source": result["source"]},
+                     ensure_ascii=False, indent=1))
+    return 0
+
+
+def cmd_enrich(args):
+    store = _store(args)
+    try:
+        env = store.get(args.envpack)
+        buildings = store.get(args.buildings)
+        result = enrich_envpack(store, env, buildings, name=args.name,
+                                cache_root=args.cache_root)
+    except Exception as exc:  # noqa: BLE001
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    print(json.dumps({
+        "entry": result["entry"].as_dict(),
+        "stats": result["stats"],
+    }, ensure_ascii=False, indent=1))
+    return 0
+
+
 def cmd_kinds(args):
     rows = [KINDS[k].as_dict() for k in sorted(KINDS)]
     print(json.dumps(rows, ensure_ascii=False, indent=1))
@@ -357,6 +422,27 @@ def main(argv=None):
     p.add_argument("--entry-id", default=None)
     p.set_defaults(func=cmd_provide)
 
+    p = sub.add_parser("buildings",
+                       help="acquire building footprints (GBA/Overture)")
+    p.add_argument("--name", required=True)
+    p.add_argument("--bbox", required=True)
+    p.add_argument("--sources", default="gba,overture")
+    p.add_argument("--mode", choices=("auto", "offline", "online"),
+                   default="auto")
+    p.add_argument("--cache-root", default=None)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_buildings)
+
+    p = sub.add_parser("canopy", help="acquire CHMv2 canopy height raster")
+    p.add_argument("--name", required=True)
+    p.add_argument("--bbox", required=True)
+    p.add_argument("--resolution", type=float, default=1.2)
+    p.add_argument("--mode", choices=("auto", "offline", "online"),
+                   default="auto")
+    p.add_argument("--cache-root", default=None)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_canopy)
+
     p = sub.add_parser("tiles", help="acquire an XYZ tileset from parallel sources")
     p.add_argument("--name", required=True)
     p.add_argument("--bbox", required=True,
@@ -403,6 +489,14 @@ def main(argv=None):
     p.add_argument("--force", action="store_true")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_raster_tiles)
+
+    p = sub.add_parser("enrich-envpack",
+                       help="fill envpack default building heights from a footprint resource")
+    p.add_argument("--envpack", required=True)
+    p.add_argument("--buildings", required=True)
+    p.add_argument("--name", default=None)
+    p.add_argument("--cache-root", default=None)
+    p.set_defaults(func=cmd_enrich)
 
     p = sub.add_parser("kinds", help="list resource kinds")
     p.set_defaults(func=cmd_kinds)
