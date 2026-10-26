@@ -8,7 +8,7 @@
 | # | 验收项 | 结果 | 证据 |
 |---|---|---|---|
 | 1 | 初始想定 + 用户任务自动推进 | 通过 | 60 tick CLI：U1（4001/4002 → 120.10/22.93）在 30 tick 到达，R-AIR 被裁剪为 4003/4004；轨迹含 “U1 开始/完成”；换任务/换日期轨迹与哈希变化 |
-| 2 | 在线获取并缓存 | 通过（受网络限制） | Terrarium DEM 在线抓取 21×21 网格 → 写入缓存 → 离线回放逐值一致；envpack 刷新路径用注入 OSM/DEM 源验证“重建→登记新版本→旧版本保留”；真实 Overpass 在当前 egress 下不可达（探针 4.0 s=False，查询 61 s 超时），质量门拒绝登记不完整包 |
+| 2 | 在线获取并缓存 | 通过 | Terrarium DEM 在线抓取 21×21 网格 → 写入缓存 → 离线回放逐值一致；**公开下载**：经本机 Clash 反向隧道下载 Geofabrik `taiwan-latest.osm.pbf`（312.7 MB）成功，用 pyosmium + 在线 DEM 重建 envpack（32.3 MB，osm=pbf/dem=online，quality=measured）并登记新版本，旧版本保留；Overpass 经同一代理仍超时（CONNECT 成功但 30 s 无响应），质量门拒绝不完整包 |
 | 3 | 离线自动切换 | 通过 | `--resource-mode offline` 全程无网络；注册表/缓存回放；DEM 离线回放 `fetched_network=False` 且结果一致；缺失/过期按 P2 分级等待 |
 | 4 | 缓存与想定日期匹配 + 时效提示 | 通过 | 解析器测试：未来快照拒绝、最新 as_of 选择、过期 critical 阻断、advisory 降级；未来想定日期不再把当前数据误判过期（参考日=min(想定日, 今天)）；UI 显示 stale 原因与 `quality=derived` |
 | 5 | 非必要资源缺失提示并继续 | 通过 | advisory stale 计划 degraded；接受过期 envpack 的运行 completed/degraded，警告写入 run.resources 与 summary；地形 fallback 在控制台显示“降级数据” |
@@ -37,7 +37,8 @@
 
 ## 4. 未完成/限制
 
-- 真实在线 envpack 重建未能在当前网络下端到端验证（Overpass 被 egress 挂起）；代码路径与质量门已用注入源覆盖。
+- Overpass 在当前 Clash 出口下仍不可用；公开 PBF 下载 + 重建已端到端验证。
+- PBF 重建包的瞬态 building_hits=3（上限 2），略超验收阈值；建议后续按地面行数自适应阈值或先跑简短冒烟再发布。
 - 运行中追加任务未实现（用户确认仅开局下达）。
 - 任务类型仍为 move_to/seize/hold；运行中动态资源需求不在本轮（资源开跑前钉死）。
 - 分支尚未合并 main、未重启 8858/8848。

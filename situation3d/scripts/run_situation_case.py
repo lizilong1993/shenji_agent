@@ -560,6 +560,23 @@ def _allowed_resource_roots(store):
     return roots
 
 
+def _recent_pbf(store, max_age_days=7.0):
+    """A locally cached public .osm.pbf that is still reasonably fresh."""
+    paths = []
+    env_path = os.environ.get("SITUATION_OSM_PBF")
+    if env_path:
+        paths.append(env_path)
+    paths.append(os.path.join(str(store.root), "cache", "osm_pbf",
+                              "taiwan-latest.osm.pbf"))
+    for path in paths:
+        if not os.path.isfile(path):
+            continue
+        age_days = (time.time() - os.path.getmtime(path)) / 86400.0
+        if age_days <= max_age_days:
+            return path
+    return None
+
+
 def _check_task_points(missions, scenario, bbox):
     objectives = {}
     for item in scenario.get("objectives") or []:
@@ -774,15 +791,18 @@ def main(argv=None):
                                 key=lambda e: e.as_of or "", reverse=True)
             template = preflight.entry_for(plan, "envpack") or (
                 candidates[0] if candidates else None)
+            pbf = _recent_pbf(rstore)
             if template is None:
                 fetch_error = "没有可用于在线重建的环境包模板"
-            elif not providers.probe_online():
-                fetch_error = "网络探测失败（Overpass 不可达），已保留现有资源"
+            elif pbf is None and not providers.probe_online():
+                fetch_error = ("网络探测失败（Overpass 不可达），已保留现有资源；"
+                               "可先用 scripts/resource.py download-pbf 下载公开 PBF")
             else:
                 try:
                     providers.refresh_envpack(
                         rstore, template,
                         os.path.join(str(rstore.root), "cache"),
+                        osm_pbf=pbf,
                         mode=("online" if args.resource_mode == "online"
                               else "auto"))
                     plan = preflight.make_plan(
