@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from .fusion import fuse
 from .model import Observation, parse_time
 
 
@@ -99,17 +100,41 @@ class IntelGateway:
     """Consume observations as future-only cues, never as ground truth."""
 
     def __init__(self, bundle: IntelBundle, ttl_s: float = 3600.0,
-                 late_policy: str = "discard_and_log"):
+                 late_policy: str = "discard_and_log", fusion=None):
         self.bundle = bundle
         self.ttl_s = float(ttl_s)
         self.late_policy = late_policy
+        self.fusion = fusion
+        self._fused: Dict[int, List[Any]] = {}
         self._start_ms = int(parse_time(bundle.scenario_start).timestamp() * 1000)
         self._consumed = set()
         self.late = []
 
+    def _fused_events(self, side: int):
+        if self.fusion is None:
+            return None
+        if side in self._fused:
+            return self._fused[side]
+        if isinstance(self.fusion, dict):
+            radius = float(self.fusion.get("radius_m", 10000.0))
+            window = float(self.fusion.get("window_s", 3600.0))
+        else:
+            radius, window = (float(v) for v in self.fusion)
+        observations = [
+            obs for obs in self.bundle.observations
+            if obs.properties.get("side") is None
+            or int(obs.properties["side"]) == int(side)
+        ]
+        events = fuse(observations, radius_m=radius, window_s=window)
+        self._fused[side] = events
+        return events
+
     def consume(self, side: int, sim_time: float, watermark: float,
                 lookahead: float) -> CueBatch:
         horizon = float(sim_time) + float(lookahead)
+        events = self._fused_events(side)
+        if events is not None:
+            return self._consume_fused(events, side, horizon, watermark)
         cues: List[IntelCue] = []
         for obs in self.bundle.observations:
             if obs.observation_id in self._consumed:
@@ -149,6 +174,65 @@ class IntelGateway:
             )
             cues.append(cue)
             self._consumed.add(obs.observation_id)
+        cues.sort(key=lambda c: (c.event_time_ms, c.source_priority, c.cue_id))
+        payload = [(c.cue_id, c.event_time_ms) for c in cues]
+        digest = hashlib.sha256(
+            json.dumps(payload, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        return CueBatch(tuple(cues), float(watermark), self.late_policy, digest)
+
+    def _consume_fused(self, events, side: int, horizon: float,
+                       watermark: float) -> CueBatch:
+        by_id = {obs.observation_id: obs for obs in self.bundle.observations}
+        cues: List[IntelCue] = []
+        for event in events:
+            if event.cluster_id in self._consumed:
+                continue
+            event_ms = int(parse_time(event.event_time).timestamp() * 1000)
+            sim = (event_ms - self._start_ms) / 1000.0
+            if sim > horizon:
+                break
+            if sim < watermark:
+                self.late.append(event.cluster_id)
+                self._consumed.add(event.cluster_id)
+                continue
+            members = [by_id[i] for i in event.member_ids if i in by_id]
+            knowledge_ms = min(
+                int(parse_time(m.ingest_time).timestamp() * 1000)
+                for m in members
+            ) if members else event_ms
+            priority = min(
+                (SOURCE_PRIORITY.get(m.source_id, 9) for m in members),
+                default=9,
+            )
+            cue = IntelCue(
+                cue_id="cue:" + event.cluster_id,
+                observation_id=event.cluster_id,
+                ingest_seq=min((m.ingest_seq for m in members), default=0),
+                event_time_ms=event_ms,
+                knowledge_time_ms=knowledge_ms,
+                source_priority=priority,
+                cue_kind="fused",
+                sim_time=sim,
+                valid_from=sim,
+                valid_to=sim + self.ttl_s,
+                side=int(side),
+                geometry={"type": "Point",
+                          "coordinates": [event.lon, event.lat]},
+                domain=event.domain,
+                type=event.type,
+                confidence=event.confidence,
+                ttl_s=self.ttl_s,
+                provenance={
+                    "cluster_id": event.cluster_id,
+                    "member_ids": list(event.member_ids),
+                    "sources": list(event.sources),
+                    "representative_id": event.representative_id,
+                },
+                sensor_model={},
+            )
+            cues.append(cue)
+            self._consumed.add(event.cluster_id)
         cues.sort(key=lambda c: (c.event_time_ms, c.source_priority, c.cue_id))
         payload = [(c.cue_id, c.event_time_ms) for c in cues]
         digest = hashlib.sha256(
