@@ -7595,6 +7595,17 @@ function bindUI() {
   applyTargetLod(true);
   setTimeout(function () { applyTargetLod(true); }, 1200);
   setTimeout(function () { applyTargetLod(true); }, 3000);
+  // 程序化 setView（深链/复位/测试）不一定触发 camera.changed；每 500 ms
+  // 兜底比较相机高度，跨阈值时补一次 2D/3D 与 LOD 重算。
+  var lastCameraHeightProbe = cameraHeightMeters();
+  setInterval(function () {
+    if (!state.data) return;
+    var h = cameraHeightMeters();
+    if (typeof h !== 'number') return;
+    if (typeof lastCameraHeightProbe === 'number' && Math.abs(h - lastCameraHeightProbe) < 1) return;
+    lastCameraHeightProbe = h;
+    applyTargetLod(true);
+  }, 500);
 }
 
 // --------------------------------------------------------------------------

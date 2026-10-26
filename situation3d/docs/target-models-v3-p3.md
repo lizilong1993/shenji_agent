@@ -2,7 +2,7 @@
 
 2026-10-26 · 分支 `feat/target-models-v3` · 工作树 `/remote-home/lizilong/shenji_agent_models`
 
-对密集案例占比最大的 ZTD-05 与 EQ240 增加 LOD1，并在 1.2–3 km 相机高度切换；8848/8858 未改动。
+对密集案例主要高面模型（ZTD-05/EQ240/Perry/J-16/KJ-2000/KJ-500/E-2D/052C）增加 LOD1，并在 1.2–3 km 相机高度切换；8848/8858 未改动。
 
 ## 1. LOD1 资产
 
@@ -21,13 +21,14 @@ LOD1 与 LOD0 同朝向、同原点、同 yaw fix；`lod1_*` 文件不参与 `ty
 
 ## 2. 运行时切换
 
-- `EntityLod.lod1UrlFor(def)` 登记 ZTD-05/EQ240/Perry/J-16/KJ-2000/KJ-500/E-2D/052C；其他型号返回 null。071/054A/055 因 simplify 后仍约 2.2–3.2 万面、收益不足，暂不登记。
+- `EntityLod.lod1UrlFor(def)` 登记 ZTD-05/EQ240/Perry/J-16/KJ-2000/KJ-500/E-2D/052C；其他型号返回 null；052D 经 052C 回退同样获得 LOD1。071/054A/055 因 simplify 后仍约 2.2–3.2 万面、收益不足，暂不登记。
 - `app.js` 新增 `applyTargetModelLod()`：
   - 相机高度 **1.2–3 km** 时，对登记型号把 `entity.model.uri` 切到 LOD1；
   - 低于 1.2 km 回 LOD0；高于 3 km 回 LOD0（此时通常已回 2D 图标）；
-  - 由 `camera.changed` 现有的 250 ms 节流调用，不新增帧循环；
+  - 由 `camera.changed` 现有的 250 ms 节流调用；另加 500 ms 相机高度兜底（程序化 setView 不触发 changed 时也能切换）；
   - 只改 URI，不重建实体；方向/位置/标牌/轨迹属性不变。
 - 3 km 以上仍由现有 2D 图标形态接管；1.2 km 以下保持 LOD0。
+- **行为变更**：基线 4dc9e1d 的 `EntityLod.DEFAULTS` 是 `1e9`（always show models）；本分支按用户确认恢复 3000/3600 m，高空改回 2D 图标。合并前需知悉这是全局 UI 行为变化。
 
 ## 3. 验证
 
@@ -42,7 +43,7 @@ LOD1 与 LOD0 同朝向、同原点、同 yaw fix；`lod1_*` 文件不参与 `ty
 
 - 八型有 LOD1；071/054A/055 简化收益不足未做；056A 面数过低不需要。
 - LOD1 不减 primitive，只减三角面；draw calls 需靠实例化/合批。
-- 60 个目标在阈值处同时换 URI，资源已缓存但仍可能有一次加载抖动；未做真机 GPU 帧时间验收。
+- 69 个目标在阈值处同时换 URI，资源已缓存但仍可能有一次加载抖动；未做真机 GPU 帧时间验收。
 - LOD1 的 EQ240 车轮细节更简化，1.2 km 近边界需目视复核。
 
 ## 5. 下一批
