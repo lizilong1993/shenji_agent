@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from datetime import datetime, timezone
 import importlib.util
 import json
 import math
@@ -36,6 +37,7 @@ from engine.rolecards.legacy import card_from_legacy  # noqa: E402
 from engine import symbology  # noqa: E402
 from geo.geodesy import haversine_m  # noqa: E402
 from sim.mission import MissionRunner  # noqa: E402
+from sim import tasking  # noqa: E402
 from sim.scenario import build_world  # noqa: E402
 from sim.collision import obbs_overlap  # noqa: E402
 from sim.motion import entity_profile  # noqa: E402
@@ -96,6 +98,19 @@ def _envpack_hash(path):
             for chunk in iter(lambda: fh.read(1024 * 1024), b""):
                 h.update(chunk)
     return h.hexdigest()
+
+
+def _envpack_bbox(path):
+    manifest = os.path.join(path, "manifest.json")
+    try:
+        with open(manifest, encoding="utf-8") as fh:
+            doc = json.load(fh)
+        bbox = doc.get("bbox")
+        if isinstance(bbox, list) and len(bbox) == 4:
+            return [float(v) for v in bbox]
+    except (OSError, ValueError, TypeError):
+        return None
+    return None
 
 
 def _clear_subcell_buildings(world):
@@ -503,20 +518,44 @@ def main(argv=None):
     ap.add_argument("--run-id", default=None,
                     help="reserved run id (created by the test console)")
     ap.add_argument("--envpack", default=DEFAULT_ENVPACK)
+    ap.add_argument("--scenario-date", default=None,
+                    help="ISO 8601 start time; default is the current UTC time")
+    ap.add_argument("--tasks-file", default=None,
+                    help="JSON task request (see sim/tasking.py)")
+    ap.add_argument("--task-mode", choices=("default", "user", "mixed"),
+                    default=None, help="override the request mode")
+    ap.add_argument("--side", type=int, choices=(0, 1), default=0,
+                    help="default side for tasks without an explicit side")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args(argv)
 
-    plugin = load_plugin(args.case)
-    scenario = plugin.scenario_dict()
-    meta = plugin.target_meta()
-    cm = plugin.case_meta()
-    missions = plugin.missions()
-    tick_seconds = float(cm.get("tick_seconds") or 30)
-    tick_count = int(args.ticks or cm.get("tick_count") or 1440)
     envpack = os.path.abspath(args.envpack)
     if not os.path.isdir(envpack):
         raise SystemExit("envpack not found: %s" % envpack)
+    scenario_date = args.scenario_date
+    if not scenario_date:
+        # Resolve "now" once so the scenario snapshot and the replay clock agree.
+        scenario_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    plugin = load_plugin(args.case)
+    scenario = plugin.scenario_dict(scenario_date=scenario_date)
+    meta = plugin.target_meta()
+    cm = plugin.case_meta(scenario_date=scenario_date)
+    tick_seconds = float(cm.get("tick_seconds") or 30)
+    tick_count = int(args.ticks or cm.get("tick_count") or 1440)
     scenario["duration_s"] = tick_seconds * tick_count
+    if args.tasks_file:
+        request = tasking.load_request(args.tasks_file, default_side=args.side)
+    else:
+        request = tasking.parse_request(None, default_side=args.side)
+    if args.task_mode:
+        request["mode"] = args.task_mode
+    try:
+        missions, tasking_summary = tasking.merge_missions(
+            plugin.missions(), request, scenario, bbox=_envpack_bbox(envpack))
+    except tasking.TaskError as exc:
+        raise SystemExit("task request rejected: %s" % exc)
+    scenario["missions"] = missions
+    scenario["tasking"] = tasking_summary
     scenario_bytes = json.dumps(scenario, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     scenario_hash = _sha256_bytes(scenario_bytes)
     engine_commit = _git_commit()
@@ -526,6 +565,8 @@ def main(argv=None):
     store = RunStore(runs_dir)
     config = {"tick_seconds": tick_seconds, "ticks": tick_count,
               "envpack": os.path.basename(envpack),
+              "scenario_date": cm.get("start_time_utc"),
+              "tasking": tasking_summary,
               "engine": scenario.get("engine")}
     if args.run_id:
         run_id = args.run_id

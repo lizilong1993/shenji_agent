@@ -328,20 +328,57 @@ def _watch_run(case_id, run_id, proc, log_fh):
 
 
 def _launch_run(body):
-    case_id = str((body or {}).get("case_id") or "")
+    body = body or {}
+    case_id = str(body.get("case_id") or "")
     if case_id not in ENGINE_CASES:
         raise RunError("unknown engine case: %s" % case_id)
     try:
-        seed = int((body or {}).get("seed") or 20261023)
-        ticks = int((body or {}).get("ticks") or 1440)
+        seed = int(body.get("seed") or 20261023)
+        ticks = int(body.get("ticks") or 1440)
     except (TypeError, ValueError):
         raise RunError("seed/ticks must be integers")
     if ticks < 10 or ticks > MAX_TEST_TICKS:
         raise RunError("ticks must be between 10 and %d" % MAX_TEST_TICKS)
+    scenario_date = body.get("scenario_date")
+    if scenario_date is not None and not isinstance(scenario_date, str):
+        raise RunError("scenario_date must be an ISO 8601 string")
+    scenario_date = (scenario_date or "").strip() or None
+    if scenario_date and len(scenario_date) > 64:
+        raise RunError("scenario_date is too long")
+    task_mode = body.get("task_mode")
+    if task_mode not in (None, "default", "user", "mixed"):
+        raise RunError("task_mode must be default/user/mixed")
+    try:
+        side = int(body.get("side", 0))
+    except (TypeError, ValueError):
+        raise RunError("side must be 0 or 1")
+    if side not in (0, 1):
+        raise RunError("side must be 0 or 1")
+    tasks_doc = None
+    task_count = 0
+    tasks = body.get("tasks")
+    if tasks is not None:
+        if isinstance(tasks, list):
+            tasks_doc = {"tasks": tasks}
+        elif isinstance(tasks, dict):
+            tasks_doc = tasks
+        else:
+            raise RunError("tasks must be an object or a list")
+        task_list = tasks_doc.get("tasks") or []
+        if not isinstance(task_list, list):
+            raise RunError("tasks.tasks must be a list")
+        task_count = len(task_list)
+        if task_count > 200:
+            raise RunError("too many tasks (max 200)")
     # Reserve and check the active-slot invariant under one store lock, so two
     # concurrent launches cannot both pass the check.
     run_id = RUN_STORE.create_run(case_id, seed=seed,
-                                  config={"ticks": ticks, "seed": seed},
+                                  config={"ticks": ticks, "seed": seed,
+                                          "scenario_date": scenario_date,
+                                          "tasking": {"mode": task_mode
+                                                       or (tasks_doc or {}).get("mode"),
+                                                       "side": side,
+                                                       "tasks": task_count}},
                                   reject_active=True)
     script = os.path.join(_PKG_ROOT, "scripts", "run_situation_case.py")
     log_path = _run_log_path(case_id, run_id)
@@ -351,7 +388,20 @@ def _launch_run(body):
         log_fh = open(log_path, "a", encoding="utf-8")
         cmd = [sys.executable, script, "--case", case_id, "--seed", str(seed),
                "--ticks", str(ticks), "--runs-dir", RUNS_DIR,
-               "--run-id", run_id, "--quiet"]
+               "--run-id", run_id, "--side", str(side), "--quiet"]
+        if scenario_date:
+            cmd += ["--scenario-date", scenario_date]
+        if task_mode:
+            cmd += ["--task-mode", task_mode]
+        if tasks_doc is not None:
+            payload = json.dumps(tasks_doc, ensure_ascii=False).encode("utf-8")
+            if len(payload) > 1000000:
+                raise RunError("task request too large (max 1 MB)")
+            tasks_path = os.path.join(os.path.dirname(log_path),
+                                      "tasks.request.json")
+            with open(tasks_path, "wb") as fh:
+                fh.write(payload)
+            cmd += ["--tasks-file", tasks_path]
         proc = subprocess.Popen(cmd, cwd=_PKG_ROOT, stdout=log_fh,
                                 stderr=subprocess.STDOUT,
                                 env=dict(os.environ, PYTHONUNBUFFERED="1"))
@@ -363,7 +413,10 @@ def _launch_run(body):
         raise RunError("spawn failed: %s" % exc)
     threading.Thread(target=_watch_run,
                      args=(case_id, run_id, proc, log_fh), daemon=True).start()
-    return {"run_id": run_id, "status": "queued", "seed": seed, "ticks": ticks}
+    return {"run_id": run_id, "status": "queued", "seed": seed,
+            "ticks": ticks, "scenario_date": scenario_date,
+            "tasking": {"mode": task_mode or (tasks_doc or {}).get("mode"),
+                         "side": side, "tasks": task_count}}
 
 # `_api_situations` 的索引缓存：键 = 目录里各 .json 的 (名字, 大小, mtime_ns)，值 = 响应体。
 # 见该方法的注释：不缓存的话，每次进系统都要白白解析 53.6 MB 的案例数据（10.5 s）。

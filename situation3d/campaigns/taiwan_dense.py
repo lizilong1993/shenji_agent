@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 import os
 import sys
+from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITUATION3D = os.path.dirname(HERE)
@@ -205,6 +206,29 @@ def _op(uid, case_id, cls_key, color, domain, lon, lat, alt=0.0,
     if carrier is not None:
         op["carrier"] = int(carrier)
     return op
+
+
+def parse_scenario_date(value=None):
+    """Parse a scenario start time; default is the current UTC instant."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return datetime.now(timezone.utc).replace(microsecond=0)
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        text = str(value).strip()
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(text)
+        except ValueError:
+            raise ValueError("scenario_date must be ISO 8601: %r" % (value,))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).replace(microsecond=0)
+
+
+def scenario_start_utc(value=None):
+    return parse_scenario_date(value).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def build():
@@ -458,8 +482,14 @@ def missions():
     return out
 
 
-def scenario_dict():
+def scenario_dict(scenario_date=None, missions=None, tasking=None):
     scenario, _meta, _missions = build()
+    scenario = dict(scenario)
+    scenario["start_time_utc"] = scenario_start_utc(scenario_date)
+    if missions is not None:
+        scenario["missions"] = list(missions)
+    if tasking is not None:
+        scenario["tasking"] = dict(tasking)
     return scenario
 
 
@@ -468,7 +498,7 @@ def target_meta():
     return meta
 
 
-def case_meta():
+def case_meta(scenario_date=None):
     return {
         "case_id": CASE_ID,
         "case_name": "TW2",
@@ -478,7 +508,7 @@ def case_meta():
         "tick_seconds": TICK_SECONDS,
         "tick_count": TICK_COUNT,
         "terminal_tick": TERMINAL_TICK,
-        "start_time_utc": "2026-09-15T00:00:00Z",
+        "start_time_utc": scenario_start_utc(scenario_date),
         "camera": {"lon": 120.17, "lat": 22.972, "height": 12000.0,
                    "heading": 0.0, "pitch": -60.0},
         "phases": PHASES,
