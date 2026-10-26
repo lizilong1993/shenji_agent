@@ -21,6 +21,10 @@ if SITUATION3D not in sys.path:
     sys.path.insert(0, SITUATION3D)
 
 from resources import providers  # noqa: E402
+from resources.acquire import (AcquireError, acquire_tiles,  # noqa: E402
+                               probe_report)
+from resources.processing import TilesetSpec  # noqa: E402
+from resources.sources import raster_candidate  # noqa: E402
 from resources.catalog import KINDS  # noqa: E402
 from resources.scanners import scan_repo  # noqa: E402
 from resources.store import ResourceError, ResourceStore  # noqa: E402
@@ -182,6 +186,106 @@ def cmd_provide(args):
     return 0
 
 
+def _parse_bbox(text):
+    values = [float(v) for v in str(text).split(",")]
+    if len(values) != 4:
+        raise ValueError("bbox must be west,south,east,north")
+    return tuple(values)
+
+
+def _parse_zooms(text):
+    value = str(text).strip()
+    if "-" in value:
+        lo, hi = value.split("-", 1)
+        return int(lo), int(hi)
+    return int(value), int(value)
+
+
+def _spec_from_args(args, layer=None):
+    lo, hi = _parse_zooms(args.zooms)
+    return TilesetSpec(name=args.name, bbox=_parse_bbox(args.bbox),
+                       min_zoom=lo, max_zoom=hi,
+                       layer=(layer or getattr(args, "layer", "imagery")))
+
+
+def cmd_tiles(args):
+    store = _store(args)
+    try:
+        spec = _spec_from_args(args)
+        sources = [s.strip() for s in (args.sources or "").split(",") if s.strip()]
+        result = acquire_tiles(
+            store, spec, mode=args.mode,
+            source_ids=sources or None,
+            raster_urls=args.raster_url or None,
+            min_bps=args.min_bps, force=args.force,
+            workers=args.workers, probe_timeout_s=args.probe_timeout,
+            timeout_s=args.timeout)
+    except (AcquireError, KeyError, ValueError) as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(result.as_dict(), ensure_ascii=False, indent=1))
+    else:
+        manifest = result.manifest or {}
+        print("tileset: %s" % (result.entry.entry_id if result.entry else spec.name))
+        print("  path:    %s" % (result.entry.path if result.entry else "-"))
+        print("  source:  %s" % (result.source.get("source_id"),
+                                 result.source.get("method")))
+        print("  cached:  %s  tiles: %s  nonempty: %s" % (
+            result.cached, manifest.get("tile_count"),
+            manifest.get("nonempty_tiles")))
+        print("  elapsed: %.1f s" % result.elapsed_s)
+        for attempt in result.attempts:
+            print("  attempt: %s probe=%sms speed=%.0fKB/s result=%s" % (
+                attempt.get("source_id"), attempt.get("latency_ms"),
+                float(attempt.get("speed_bps") or 0) / 1024.0,
+                attempt.get("result")))
+    return 0
+
+
+def cmd_probe_tiles(args):
+    try:
+        spec = _spec_from_args(args)
+        sources = [s.strip() for s in (args.sources or "").split(",") if s.strip()]
+        rows = probe_report(spec, sources or None, args.raster_url or None,
+                            timeout_s=args.probe_timeout)
+    except (KeyError, ValueError) as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(rows, ensure_ascii=False, indent=1))
+        return 0
+    for row in rows:
+        print("%-4s %-12s %-6s ok=%-5s latency=%8.1fms speed=%8.0fKB/s %s" % (
+            row.get("rank") or "-", row.get("source_id"), row.get("method"),
+            row.get("ok"), float(row.get("latency_ms") or 0),
+            float(row.get("speed_bps") or 0) / 1024.0,
+            row.get("detail") or ""))
+    return 0
+
+
+def cmd_raster_tiles(args):
+    store = _store(args)
+    try:
+        spec = _spec_from_args(args, layer=args.layer)
+        result = acquire_tiles(
+            store, spec, mode=args.mode,
+            candidates=[raster_candidate(args.url)],
+            force=args.force, workers=args.workers,
+            probe_timeout_s=args.probe_timeout, timeout_s=args.timeout)
+    except (AcquireError, ValueError) as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    print(json.dumps({
+        "entry": result.entry.as_dict() if result.entry else None,
+        "manifest": result.manifest,
+        "cached": result.cached,
+        "attempts": result.attempts,
+        "elapsed_s": result.elapsed_s,
+    }, ensure_ascii=False, indent=1))
+    return 0
+
+
 def cmd_kinds(args):
     rows = [KINDS[k].as_dict() for k in sorted(KINDS)]
     print(json.dumps(rows, ensure_ascii=False, indent=1))
@@ -252,6 +356,53 @@ def main(argv=None):
     p.add_argument("path")
     p.add_argument("--entry-id", default=None)
     p.set_defaults(func=cmd_provide)
+
+    p = sub.add_parser("tiles", help="acquire an XYZ tileset from parallel sources")
+    p.add_argument("--name", required=True)
+    p.add_argument("--bbox", required=True,
+                   help="west,south,east,north")
+    p.add_argument("--zooms", default="6-10", help="min-max or single zoom")
+    p.add_argument("--layer", choices=("imagery", "terrain"), default="imagery")
+    p.add_argument("--sources", default="esri,eox-s2,gibs-modis")
+    p.add_argument("--raster-url", action="append", default=None,
+                   help="also consider a full raster URL (repeatable)")
+    p.add_argument("--mode", choices=("auto", "offline", "online"),
+                   default="auto")
+    p.add_argument("--min-bps", type=float, default=0.0)
+    p.add_argument("--workers", type=int, default=8)
+    p.add_argument("--probe-timeout", type=float, default=5.0)
+    p.add_argument("--timeout", type=int, default=900)
+    p.add_argument("--force", action="store_true")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_tiles)
+
+    p = sub.add_parser("probe-tiles",
+                       help="probe tile sources in parallel and rank them")
+    p.add_argument("--name", default="probe")
+    p.add_argument("--bbox", required=True)
+    p.add_argument("--zooms", default="6-10")
+    p.add_argument("--layer", choices=("imagery", "terrain"), default="imagery")
+    p.add_argument("--sources", default="esri,eox-s2,gibs-modis")
+    p.add_argument("--raster-url", action="append", default=None)
+    p.add_argument("--probe-timeout", type=float, default=5.0)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_probe_tiles)
+
+    p = sub.add_parser("raster-tiles",
+                       help="download a full raster and tile it locally")
+    p.add_argument("--name", required=True)
+    p.add_argument("--url", required=True)
+    p.add_argument("--bbox", required=True)
+    p.add_argument("--zooms", default="6-10")
+    p.add_argument("--layer", choices=("imagery", "terrain"), default="terrain")
+    p.add_argument("--mode", choices=("auto", "offline", "online"),
+                   default="auto")
+    p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--probe-timeout", type=float, default=6.0)
+    p.add_argument("--timeout", type=int, default=900)
+    p.add_argument("--force", action="store_true")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_raster_tiles)
 
     p = sub.add_parser("kinds", help="list resource kinds")
     p.set_defaults(func=cmd_kinds)
