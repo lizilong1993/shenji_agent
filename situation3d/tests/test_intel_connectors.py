@@ -189,6 +189,32 @@ class ConnectorTest(unittest.TestCase):
         self.assertTrue(all(cue.provenance.get("fused") is True
                             for cue in batch.cues))
 
+    def test_usgs_two_dimensional_point_is_kept(self):
+        payload = {"features": [{
+            "id": "two-d",
+            "geometry": {"type": "Point", "coordinates": [120.1, 23.0]},
+            "properties": {"time": 1792800060000, "mag": 4.5,
+                           "place": "two dimensional"},
+        }]}
+        observations = normalize_usgs(payload, FETCHED)
+        self.assertEqual(len(observations), 1)
+        self.assertIsNone(observations[0].properties["depth_km"])
+
+    def test_firms_window_uses_utc_dates(self):
+        url = firms.build_url(
+            "TESTKEY", "VIIRS_SNPP_NRT", BBOX,
+            "2026-10-24T00:00:00+08:00", "2026-10-25T00:00:00+08:00")
+        self.assertIn("/2/2026-10-23", url)
+
+    def test_firms_window_over_five_days_degrades(self):
+        result = build_bundle(
+            source_ids=("firms",), bbox=BBOX,
+            start="2026-10-18T00:00:00Z", end=END,
+            fetched_at=FETCHED, fetcher=fake_fetch, firms_map_key="TESTKEY")
+        status = result.statuses[0]
+        self.assertEqual(status.state, "degraded")
+        self.assertIn("5-day", status.error)
+
     def test_bundle_derives_missing_contract_fields(self):
         observations = normalize_usgs(load("usgs.json"), FETCHED)
         bundle = IntelBundle("b1", "s1", observations, START)

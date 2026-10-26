@@ -114,7 +114,7 @@ cd situation3d
 python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py tests/test_intel_scheduler.py tests/test_intel_connectors.py -v
 ```
 
-42 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定；调度器按 side 轮询、manifest 确定性与隔离、World 只发布到期 cue、多 side 中立观测、窗口内早事件不丢、`advance_to` 同步、未挂载时载荷不变；连接器 URL/allow-list、FIRMS 日期时间合并与跨日跨度、进行中 GDACS 事件、归档往返、离线 bundle、契约字段与 `from_dict` 往返、部分源失败与缺 key 上报。
+44 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定；调度器按 side 轮询、manifest 确定性与隔离、World 只发布到期 cue、多 side 中立观测、窗口内早事件不丢、`advance_to` 同步、未挂载时载荷不变；连接器 URL/allow-list、FIRMS 日期时间合并与跨日跨度/UTC 锚点、进行中 GDACS 事件、二维点几何、归档往返、离线 bundle、契约字段与 `from_dict` 往返、部分源失败与缺 key 上报。
 
 ## 10. 已知限制与下一步
 

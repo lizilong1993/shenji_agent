@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List
 
@@ -37,9 +38,12 @@ def _url_value(value: Any) -> str:
 
 def _as_float(value: Any):
     try:
-        return float(value)
+        number = float(value)
     except (TypeError, ValueError):
         return None
+    if not math.isfinite(number):
+        return None
+    return number
 
 
 def normalize_usgs(payload: Dict[str, Any], fetched_at: Any,
@@ -57,6 +61,8 @@ def normalize_usgs(payload: Dict[str, Any], fetched_at: Any,
             native = str(feature.get("id") or props.get("code") or i)
             event_type = str(props.get("type") or "earthquake").lower()
             event_type = event_type.replace(" ", "_")
+            coords = (feature.get("geometry") or {}).get("coordinates") or []
+            depth = coords[2] if len(coords) > 2 else None
             conf = trust.confidence("usgs", event, now, "hazard")
             out.append(Observation(
                 observation_id="usgs:" + native,
@@ -74,11 +80,11 @@ def normalize_usgs(payload: Dict[str, Any], fetched_at: Any,
                 title=str(props.get("place") or "earthquake"),
                 properties={
                     "magnitude": props.get("mag"),
-                    "depth_km": (feature.get("geometry") or {}).get(
-                        "coordinates", [None, None, None])[2],
+                    "depth_km": depth,
                 },
             ))
-        except (TypeError, ValueError, KeyError, AttributeError):
+        except (TypeError, ValueError, KeyError, AttributeError,
+                IndexError, OverflowError, OSError):
             continue
     return out
 
@@ -126,7 +132,8 @@ def normalize_gdacs(payload: Dict[str, Any], fetched_at: Any,
                     "to_time": iso(event_end),
                 },
             ))
-        except (TypeError, ValueError, KeyError, AttributeError):
+        except (TypeError, ValueError, KeyError, AttributeError,
+                IndexError, OverflowError, OSError):
             continue
     return out
 
@@ -171,7 +178,8 @@ def normalize_firms(payload: Iterable[Dict[str, Any]], fetched_at: Any,
                     "satellite": item.get("satellite") or None,
                 },
             ))
-        except (TypeError, ValueError, KeyError, AttributeError):
+        except (TypeError, ValueError, KeyError, AttributeError,
+                IndexError, OverflowError, OSError):
             continue
     return out
 

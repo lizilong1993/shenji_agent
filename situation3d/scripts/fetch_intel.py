@@ -78,7 +78,8 @@ def main(argv=None) -> int:
                         help="write the bundle even if a source failed")
     args = parser.parse_args(argv)
 
-    end = parse_time(args.end) if args.end else datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    end = parse_time(args.end) if args.end else now
     start = (parse_time(args.start) if args.start
              else end - timedelta(hours=max(0.0, args.hours)))
     try:
@@ -87,7 +88,7 @@ def main(argv=None) -> int:
             bbox=args.bbox,
             start=start,
             end=end,
-            fetched_at=end,
+            fetched_at=now,
             bundle_id=args.bundle_id,
             scenario_id=args.scenario_id,
             archive_root=None if args.no_archive else args.archive_root,
@@ -100,7 +101,7 @@ def main(argv=None) -> int:
     health_out = args.health_out if qualified else args.health_out + ".partial"
     _write_json(bundle_out, result.bundle.as_dict())
     _write_json(health_out, {
-        "generated_at": iso(end),
+        "generated_at": iso(now),
         "bbox": list(args.bbox),
         "time_window": [iso(start), iso(end)],
         "sources": [status.as_dict() for status in result.statuses],
@@ -114,7 +115,7 @@ def main(argv=None) -> int:
         "observations": len(result.bundle.observations),
         "out": bundle_out,
         "health_out": health_out,
-        "partial": not qualified,
+        "partial": bool(result.errors),
         "sources": {
             status.source_id: {
                 "state": status.state,

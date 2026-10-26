@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
 from urllib.parse import quote
 
@@ -23,8 +23,8 @@ SENSORS = (
 
 def day_span(start: Any, end: Any) -> int:
     """Calendar days covered by ``[start, end]``; FIRMS accepts 1..5."""
-    start_dt = parse_time(start)
-    end_dt = parse_time(end)
+    start_dt = parse_time(start).astimezone(timezone.utc)
+    end_dt = parse_time(end).astimezone(timezone.utc)
     return max(1, min(5, (end_dt.date() - start_dt.date()).days + 1))
 
 
@@ -41,7 +41,7 @@ def build_url(map_key: str, sensor: str, bbox: Optional[Sequence[float]],
         if west > east or south > north:
             raise ValueError("bbox min values must not exceed max values")
         area = ",".join("%.6f" % v for v in (west, south, east, north))
-    start_dt = parse_time(start)
+    start_dt = parse_time(start).astimezone(timezone.utc)
     date = start_dt.strftime("%Y-%m-%d")
     return "%s/%s/%s/%s/%d/%s" % (
         API_ROOT,

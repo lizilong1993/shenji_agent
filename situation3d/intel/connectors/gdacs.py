@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timezone
 from typing import Any, Optional, Sequence
 from urllib.parse import urlencode
 
@@ -23,8 +24,8 @@ def build_url(start: Any, end: Any,
     """
     if bbox is not None and len(bbox) != 4:
         raise ValueError("bbox must be (min_lon, min_lat, max_lon, max_lat)")
-    start_dt = parse_time(start)
-    end_dt = parse_time(end)
+    start_dt = parse_time(start).astimezone(timezone.utc)
+    end_dt = parse_time(end).astimezone(timezone.utc)
     params = {
         "eventlist": EVENT_TYPES,
         "fromdate": start_dt.strftime("%Y-%m-%d"),

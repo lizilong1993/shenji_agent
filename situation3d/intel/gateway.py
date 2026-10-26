@@ -254,6 +254,12 @@ class IntelGateway:
                 provenance={
                     "source_id": obs.source_id,
                     "source_url": obs.source_url,
+                    **{
+                        key: obs.properties[key]
+                        for key in ("event_start_time", "alert_level",
+                                    "from_time", "to_time")
+                        if key in obs.properties
+                    },
                 },
                 sensor_model={},
             )

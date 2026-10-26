@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
@@ -138,6 +139,11 @@ def _fetch_firms(spec, start, end, bbox, fetcher, map_key, fetched_at):
     payloads = []
     observations = []
     errors = []
+    start_utc = parse_time(start).astimezone(timezone.utc)
+    end_utc = parse_time(end).astimezone(timezone.utc)
+    span_days = (end_utc.date() - start_utc.date()).days + 1
+    if span_days > 5:
+        errors.append("window exceeds FIRMS 5-day limit; only 5 days requested")
     for sensor in firms.SENSORS:
         url = firms.build_url(map_key, sensor, bbox, start, end)
         try:
@@ -282,6 +288,11 @@ def build_bundle(source_ids: Sequence[str], bbox: Sequence[float],
     observations = [
         dataclasses.replace(obs, ingest_seq=index)
         for index, obs in enumerate(observations)
+    ]
+    counts = Counter(obs.source_id for obs in observations)
+    statuses = [
+        dataclasses.replace(status, count=counts.get(status.source_id, 0))
+        for status in statuses
     ]
     bundle = IntelBundle(
         bundle_id=bundle_id or ("vgi-" + fetched_dt.strftime("%Y%m%dT%H%M%SZ")),
