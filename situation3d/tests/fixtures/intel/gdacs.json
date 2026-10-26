@@ -3,12 +3,12 @@
   "metadata": {"synthetic": true},
   "features": [
     {
-      "geometry": {"type": "Point", "coordinates": [120.4, 23.3]},
+      "geometry": {"type": "Point", "coordinates": [120.101, 23.001]},
       "properties": {
         "eventid": "gd1",
         "eventtype": "EQ",
         "alertlevel": "Orange",
-        "fromdate": "2026-10-24T00:00:00Z",
+        "fromdate": "2026-10-24T00:02:00Z",
         "name": "fictional GDACS",
         "url": "https://example.invalid/gd1"
       }

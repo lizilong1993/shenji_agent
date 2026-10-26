@@ -17,9 +17,11 @@ situation3d/intel/
   model.py      Observation 数据类、时间解析/序列化
   trust.py      源可靠度、时间衰减、地理精度因子
   normalize.py  USGS / GDACS / FIRMS 归一化器
+  fusion.py     跨源时空聚类与置信度融合
   gateway.py    IntelBundle、IntelCue、IntelGateway
 situation3d/tests/
   test_intel_v1.py
+  test_fusion.py
   fixtures/intel/{usgs,gdacs,firms}.json
 ```
 
@@ -60,7 +62,13 @@ situation3d/tests/
 
 `normalize(source, payload, fetched_at)` 为统一入口；未知源抛 `ValueError`。
 
-## 6. 情报网关
+## 6. 跨源融合
+
+`fuse(observations, radius_m=10000, window_s=3600)` 先把观测按事件时间排序，再贪心聚类：domain 相同、规范化类型相同（`EQ`/`earthquake` 等走同义词表），且与簇锚点（最高置信度成员）的时空距离都在阈值内则合并，否则新建簇。`FusedEvent` 用锚点坐标/时间代表事件，保留全部 `member_ids` 与 `sources`，`cluster_id` 为成员 id 排序后的 SHA-256 前缀，`confidence` 为 `1-Π(1-ci)`（上限 0.999）。输入顺序不影响结果，簇 id 内容寻址。
+
+当前网关尚未消费 `FusedEvent`：同一事件融合后仍需决定是作为单条 cue，还是保留各源 cue 并在消费侧去重，留待网关集成时处理。
+
+## 7. 情报网关
 
 `IntelBundle` 按 `(event_ms, 源优先级, observation_id)` 排序，`hash` 为各观测 `content_hash` 的 SHA-256，观测顺序不影响结果。
 
@@ -74,18 +82,18 @@ situation3d/tests/
 
 cue 排序键为 `(event_time_ms, source_priority, cue_id)`；批次携带 `log_hash`（cue_id + event_time_ms 的 SHA-256），用于回放一致性校验。
 
-## 7. 验证
+## 8. 验证
 
 ```
 cd situation3d
-python3 -m unittest tests/test_intel_v1.py -v
+python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py -v
 ```
 
-6 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定。
+11 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址。
 
-## 8. 已知限制与下一步
+## 9. 已知限制与下一步
 
 - 仅覆盖三个静态源的离线归一化；GDELT、AIS/ADS-B 等实时连接器未实现（P2）。
-- 无跨源去重/融合：同一事件来自 USGS 与 GDACS 时目前会产出两条 cue，需按时空邻近聚类合并（报告中 anchor-proximity 方案）。
+- 融合结果尚未进入网关：`fuse()` 可合并同一事件，但 `IntelGateway` 仍逐条产出 cue；需要决定“融合后单 cue”还是“消费侧去重”，并把融合哈希写入 run-manifest。
 - 未接入调度器：`IntelGateway` 尚未被 `engine`/`sim.world` 调用，需要 run-manifest 记录 bundle 哈希与每批 `log_hash`。
 - 置信度参数为经验值，待用历史数据校准。
