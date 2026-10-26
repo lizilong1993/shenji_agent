@@ -1,8 +1,9 @@
 """Allow-listed HTTPS fetching for VGI connectors.
 
 The connectors only talk to a small fixed set of public hosts.  This module is
-deliberately small: no proxy settings, no cookies, no redirects, no credentials
-in URLs.  It is the Python-side equivalent of the GEV service proxy rules.
+deliberately small: environment proxies are ignored, no cookies, no redirects,
+no credentials in URLs.  It is the Python-side equivalent of the GEV service
+proxy rules.
 """
 
 from __future__ import annotations
@@ -28,7 +29,12 @@ class MissingCredential(FetchError):
 
 def validate_url(url: str, allowed_hosts: Iterable[str]) -> str:
     """Return ``url`` if it is https on an allowed default-port host."""
-    parsed = urlparse(str(url or ""))
+    text = str(url or "").strip()
+    if not text:
+        raise FetchError("empty URL")
+    if any(ord(ch) < 32 or ch.isspace() for ch in text):
+        raise FetchError("URL contains whitespace or control characters")
+    parsed = urlparse(text)
     if parsed.scheme != "https":
         raise FetchError("only https is allowed")
     if parsed.username or parsed.password:
@@ -37,9 +43,13 @@ def validate_url(url: str, allowed_hosts: Iterable[str]) -> str:
     allowed = {str(item).lower().rstrip(".") for item in allowed_hosts}
     if host not in allowed:
         raise FetchError("host is not allow-listed: %s" % (host or "?"))
-    if parsed.port not in (None, 443):
+    try:
+        port = parsed.port
+    except ValueError:
+        raise FetchError("invalid port") from None
+    if port not in (None, 443):
         raise FetchError("only the default HTTPS port is allowed")
-    return url
+    return text
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -59,7 +69,10 @@ def fetch_bytes(url: str, allowed_hosts: Iterable[str],
         url,
         headers={"User-Agent": user_agent, "Accept": "*/*"},
     )
-    opener = urllib.request.build_opener(_NoRedirect())
+    # An explicit empty ProxyHandler disables HTTP(S)_PROXY; the FIRMS key is
+    # in the URL path and must not be exposed to an environment proxy.
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}), _NoRedirect())
     try:
         with opener.open(request, timeout=float(timeout_s)) as response:
             payload = response.read(int(max_bytes) + 1)

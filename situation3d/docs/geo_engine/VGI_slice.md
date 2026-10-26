@@ -56,8 +56,10 @@ situation3d/tests/
 | `geo_precision` / `geo_uncertainty_m` / `is_centroid` | 地理精度档位、误差半径、是否质心 |
 | `status` | 默认 `active`（预留失效/撤回） |
 | `source_url` / `title` / `properties` | 溯源与源特有字段 |
+| `schema_version` / `license` / `attribution` | 契约版本与来源许可（连接器从注册表写入） |
+| `provenance` | `raw_id`、`parser_version`、`license`、`attribution`，写入 `as_dict()` |
 
-`content_hash()` 只取稳定字段，用于 bundle 哈希；`as_dict()` 用于落盘。
+`content_hash()` 只取稳定字段，用于 bundle 哈希；`as_dict()` 用于落盘，并输出 `schema_version`、`license`、`attribution`、`provenance`。
 
 ## 4. 可信度
 
@@ -79,11 +81,11 @@ situation3d/tests/
 
 `fuse(observations, radius_m=10000, window_s=3600)` 先按 `observation_id` 去重（保留置信度更高者），再按置信度降序处理：每个簇的首个成员即固定锚点（不随成员变化而漂移），domain 相同、规范化类型相同（`EQ`/`earthquake` 等走同义词表），且与锚点的时空距离都在阈值内则加入最近簇，否则新建簇。因此每个成员都在其锚点的半径/时间窗内，不会通过链式相邻把远端事件并进来。`FusedEvent` 用锚点坐标/时间代表事件，保留全部 `member_ids` 与 `sources`，`cluster_id` 为成员 `content_hash` 排序后的 SHA-256 前缀，`confidence` 为 `1-Π(1-ci)`（上限 0.999）。融合前校验经纬度与置信度必须有限且在合法范围。输入顺序不影响结果。
 
-当前网关尚未消费 `FusedEvent`：同一事件融合后仍需决定是作为单条 cue，还是保留各源 cue 并在消费侧去重，留待网关集成时处理。
+网关通过 `IntelGateway(bundle, fusion=(radius, window))` 消费融合结果；默认 `fusion=None` 仍逐条输出，保留各源 cue。
 
 ## 7. 情报网关
 
-`IntelBundle` 按 `(event_ms, 源优先级, observation_id)` 排序，`hash` 为各观测 `content_hash` 的 SHA-256，观测顺序不影响结果。
+`IntelBundle` 按 `(event_ms, 源优先级, observation_id)` 排序；`hash` 为各观测 `content_hash` 的 SHA-256，观测顺序不影响结果。`envelope_hash` 另外覆盖 `bundle_id/scenario_id/domain/bbox/time_window/source_allowlist/scenario_start/synthetic`，调度器 manifest 同时记录两者，避免观测相同但窗口/范围不同的两次运行无法区分。`from_dict()` 可重新载入 `fetch_intel.py` 写出的 bundle。
 
 `IntelGateway.consume(side, sim_time, watermark, lookahead)`：
 
@@ -112,7 +114,7 @@ cd situation3d
 python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py tests/test_intel_scheduler.py tests/test_intel_connectors.py -v
 ```
 
-39 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定；调度器按 side 轮询、manifest 确定性与隔离、World 只发布到期 cue、多 side 中立观测、窗口内早事件不丢、`advance_to` 同步、未挂载时载荷不变；连接器 URL/allow-list、FIRMS 日期时间合并、归档往返、离线 bundle、契约字段、部分源失败与缺 key 上报。
+42 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定；调度器按 side 轮询、manifest 确定性与隔离、World 只发布到期 cue、多 side 中立观测、窗口内早事件不丢、`advance_to` 同步、未挂载时载荷不变；连接器 URL/allow-list、FIRMS 日期时间合并与跨日跨度、进行中 GDACS 事件、归档往返、离线 bundle、契约字段与 `from_dict` 往返、部分源失败与缺 key 上报。
 
 ## 10. 已知限制与下一步
 
@@ -130,10 +132,10 @@ python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py tests/test_intel
 - `http.py`：只允许注册表 host、只允许 HTTPS/443、拒绝 URL 凭据、拒绝重定向、20 s 超时、8 MiB 响应上限；错误信息不包含带 key 的完整 URL。
 - `usgs.py`：FDSN `query?format=geojson`，按 bbox/时间窗查询。
 - `gdacs.py`：`gdacsapi/api/events/geteventlist/SEARCH`，事件类型 EQ/TC/FL/VO/WF/DR，告警级 Green/Orange/Red；列表接口无 bbox，抓取后本地过滤。
-- `firms.py`：`/api/area/csv`，四个 NRT 传感器；把 `acq_date` + `acq_time`（HHMM）合并为 ISO 时间；单个传感器失败不丢弃其他传感器，状态记 `degraded`。
-- `fetch.py`：`build_bundle(source_ids, bbox, start, end, ...)` 返回 `FetchResult(bundle, statuses, archives, errors)`；观测按 `(event_time, source_id, observation_id)` 排序后重排 `ingest_seq`；bundle 固定 `domain="hazard"`、bbox/time_window/source_allowlist。
-- `archive.py`：`var/intel/archive/<source>/<utc>.<ext>.gz` + 原始字节 SHA-256；`read_archive()` 可回放。
-- `scripts/fetch_intel.py`：一次性抓取，写 bundle 与 health JSON；`--allow-partial` 允许部分源失败仍产出 bundle。示例：
+- `firms.py`：`/api/area/csv`，四个 NRT 传感器；按 `[start.date, end.date]` 计算 1–5 天窗口（FIRMS 上限 5 天），把 `acq_date` + `acq_time`（HHMM）合并为 ISO 时间；单个传感器失败不丢弃其他传感器，状态记 `degraded`；非 CSV 响应直接判错。
+- `fetch.py`：`build_bundle(source_ids, bbox, start, end, ...)` 返回 `FetchResult(bundle, statuses, archives, errors)`；观测先按 `(event_time, source priority, observation_id)` 排序、按 id 去重，再重排连续 `ingest_seq`；bundle 固定 `domain="hazard"`、bbox/time_window/source_allowlist，并提供 `envelope_hash`。
+- `archive.py`：`var/intel/archive/<label>/<utc>.<ext>.gz` + 原始字节 SHA-256；FIRMS 的 label 为 `firms_<SENSOR>`；`read_archive()` 可回放。
+- `scripts/fetch_intel.py`：一次性抓取，写 bundle 与 health JSON；默认 `usgs,gdacs`，FIRMS 需显式加入并配置 `FIRMS_MAP_KEY`；`--allow-partial` 允许部分源失败仍写 canonical bundle，否则写 `*.partial` 并保留上一次好文件。示例：
 
 ```
 cd situation3d

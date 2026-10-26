@@ -71,10 +71,13 @@ class ConnectorTest(unittest.TestCase):
         gdacs_url = gdacs.build_url(START, END, BBOX)
         self.assertIn("fromdate=2026-10-24", gdacs_url)
         self.assertIn("eventlist=EQ,TC,FL,VO,WF,DR", gdacs_url)
-        firms_url = firms.build_url("TESTKEY", "VIIRS_SNPP_NRT", BBOX, 1, END)
+        firms_url = firms.build_url("TESTKEY", "VIIRS_SNPP_NRT", BBOX,
+                                    START, END)
         self.assertIn("VIIRS_SNPP_NRT", firms_url)
         self.assertIn("119.500000,22.500000,120.500000,23.500000", firms_url)
-        self.assertIn("2026-10-24", firms_url)
+        self.assertIn("/1/2026-10-24", firms_url)
+        self.assertEqual(firms.day_span("2026-10-24T12:00:00Z",
+                                        "2026-10-25T12:00:00Z"), 2)
 
     def test_firms_rows_convert_date_and_time(self):
         rows = firms.prepare_rows(firms.parse_csv(FIRMS_CSV))
@@ -194,6 +197,67 @@ class ConnectorTest(unittest.TestCase):
         self.assertEqual(payload["source_allowlist"], ["usgs"])
         self.assertEqual(payload["time_window"][0], START)
         self.assertLessEqual(payload["bbox"][0], payload["bbox"][2])
+
+    def test_bundle_roundtrip_from_dict(self):
+        observations = normalize_usgs(load("usgs.json"), FETCHED)
+        bundle = IntelBundle("b1", "s1", observations, START,
+                             bbox=(119.0, 22.0, 121.0, 24.0),
+                             time_window=(START, END),
+                             source_allowlist=("usgs",))
+        restored = IntelBundle.from_dict(bundle.as_dict())
+        self.assertEqual(restored.hash, bundle.hash)
+        self.assertEqual(restored.envelope_hash, bundle.envelope_hash)
+        self.assertEqual(restored.bbox, bundle.bbox)
+        self.assertEqual(restored.source_allowlist, bundle.source_allowlist)
+
+    def test_ongoing_gdacs_event_is_kept(self):
+        payload = {
+            "type": "FeatureCollection",
+            "features": [{
+                "geometry": {"type": "Point", "coordinates": [120.1, 23.0]},
+                "properties": {
+                    "eventid": "ongoing",
+                    "eventtype": "TC",
+                    "eventname": "ONGOING-26",
+                    "alertlevel": "Red",
+                    "fromdate": "2026-10-20T00:00:00",
+                    "todate": "2026-10-26T00:00:00",
+                    "url": {"report": "https://example.invalid/ongoing"},
+                },
+            }],
+        }
+
+        def fetch(url):
+            return json.dumps(payload).encode("utf-8")
+
+        result = build_bundle(
+            source_ids=("gdacs",), bbox=BBOX,
+            start="2026-10-24T00:00:00Z", end="2026-10-26T23:59:59Z",
+            fetched_at=FETCHED, fetcher=fetch)
+        self.assertEqual(len(result.bundle.observations), 1)
+        observation = result.bundle.observations[0]
+        self.assertEqual(observation.event_time, "2026-10-24T00:00:00Z")
+        self.assertEqual(observation.properties["event_start_time"],
+                         "2026-10-20T00:00:00Z")
+        self.assertEqual(observation.properties["from_time"],
+                         "2026-10-20T00:00:00Z")
+        self.assertEqual(observation.properties["to_time"],
+                         "2026-10-26T00:00:00Z")
+        self.assertEqual(observation.source_url,
+                         "https://example.invalid/ongoing")
+
+    def test_unknown_source_is_rejected_before_fetch(self):
+        calls = []
+
+        def fetch(url):
+            calls.append(url)
+            return b"{}"
+
+        with self.assertRaises(ValueError):
+            build_bundle(
+                source_ids=("usgs", "bogus"), bbox=BBOX,
+                start=START, end=END, fetcher=fetch)
+        self.assertEqual(calls, [])
 
 
 if __name__ == "__main__":

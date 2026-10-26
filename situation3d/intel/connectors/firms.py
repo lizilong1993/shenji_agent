@@ -21,13 +21,15 @@ SENSORS = (
 )
 
 
-def day_range(hours: float) -> int:
-    """FIRMS accepts 1..10 trailing days; round a hour window up."""
-    return max(1, min(10, int(math.ceil(max(0.0, float(hours)) / 24.0))))
+def day_span(start: Any, end: Any) -> int:
+    """Calendar days covered by ``[start, end]``; FIRMS accepts 1..5."""
+    start_dt = parse_time(start)
+    end_dt = parse_time(end)
+    return max(1, min(5, (end_dt.date() - start_dt.date()).days + 1))
 
 
 def build_url(map_key: str, sensor: str, bbox: Optional[Sequence[float]],
-              days: int, end: Any) -> str:
+              start: Any, end: Any) -> str:
     if not map_key:
         raise ValueError("FIRMS MAP_KEY is empty")
     if bbox is None:
@@ -39,20 +41,26 @@ def build_url(map_key: str, sensor: str, bbox: Optional[Sequence[float]],
         if west > east or south > north:
             raise ValueError("bbox min values must not exceed max values")
         area = ",".join("%.6f" % v for v in (west, south, east, north))
-    date = parse_time(end).strftime("%Y-%m-%d")
+    start_dt = parse_time(start)
+    date = start_dt.strftime("%Y-%m-%d")
     return "%s/%s/%s/%s/%d/%s" % (
         API_ROOT,
         quote(str(map_key), safe=""),
         quote(str(sensor), safe=""),
         quote(area, safe=","),
-        int(days),
+        day_span(start, end),
         date,
     )
 
 
 def parse_csv(text: str) -> List[Dict[str, str]]:
     """Parse a FIRMS CSV response into a list of dicts."""
-    reader = csv.DictReader(io.StringIO(text.lstrip("﻿")))
+    if text.startswith("﻿"):
+        text = text[1:]
+    reader = csv.DictReader(io.StringIO(text))
+    fieldnames = {str(name).strip().lower() for name in (reader.fieldnames or [])}
+    if "latitude" not in fieldnames or "longitude" not in fieldnames:
+        raise ValueError("FIRMS response is not a CSV with lat/lon columns")
     rows = []
     for row in reader:
         if not row:

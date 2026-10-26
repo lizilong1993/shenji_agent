@@ -56,7 +56,8 @@ def _sources(text: str):
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sources", type=_sources,
-                        default=("usgs", "gdacs", "firms"))
+                        default=("usgs", "gdacs"),
+                        help="usgs,gdacs,firms (FIRMS also needs FIRMS_MAP_KEY)")
     parser.add_argument("--bbox", type=_bbox,
                         default=(119.0, 21.5, 123.0, 26.5))
     parser.add_argument("--hours", type=float, default=24.0)
@@ -80,18 +81,25 @@ def main(argv=None) -> int:
     end = parse_time(args.end) if args.end else datetime.now(timezone.utc)
     start = (parse_time(args.start) if args.start
              else end - timedelta(hours=max(0.0, args.hours)))
-    result = build_bundle(
-        source_ids=args.sources,
-        bbox=args.bbox,
-        start=start,
-        end=end,
-        fetched_at=end,
-        bundle_id=args.bundle_id,
-        scenario_id=args.scenario_id,
-        archive_root=None if args.no_archive else args.archive_root,
-    )
-    _write_json(args.out, result.bundle.as_dict())
-    _write_json(args.health_out, {
+    try:
+        result = build_bundle(
+            source_ids=args.sources,
+            bbox=args.bbox,
+            start=start,
+            end=end,
+            fetched_at=end,
+            bundle_id=args.bundle_id,
+            scenario_id=args.scenario_id,
+            archive_root=None if args.no_archive else args.archive_root,
+        )
+    except ValueError as exc:
+        print("fetch_intel: %s" % (exc,), file=sys.stderr)
+        return 2
+    qualified = not result.errors or args.allow_partial
+    bundle_out = args.out if qualified else args.out + ".partial"
+    health_out = args.health_out if qualified else args.health_out + ".partial"
+    _write_json(bundle_out, result.bundle.as_dict())
+    _write_json(health_out, {
         "generated_at": iso(end),
         "bbox": list(args.bbox),
         "time_window": [iso(start), iso(end)],
@@ -102,9 +110,11 @@ def main(argv=None) -> int:
     summary = {
         "bundle_id": result.bundle.bundle_id,
         "hash": result.bundle.hash,
+        "envelope_hash": result.bundle.envelope_hash,
         "observations": len(result.bundle.observations),
-        "out": args.out,
-        "health_out": args.health_out,
+        "out": bundle_out,
+        "health_out": health_out,
+        "partial": not qualified,
         "sources": {
             status.source_id: {
                 "state": status.state,
@@ -116,7 +126,7 @@ def main(argv=None) -> int:
         "errors": list(result.errors),
     }
     print(json.dumps(summary, ensure_ascii=False, indent=1, sort_keys=True))
-    if result.errors and not args.allow_partial:
+    if not qualified:
         return 1
     return 0
 

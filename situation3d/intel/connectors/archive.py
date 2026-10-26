@@ -50,8 +50,12 @@ def archive_raw(root: str, source_id: str, payload: bytes,
     while os.path.exists(path):
         path = os.path.join(directory, "%s-%d.gz" % (base, counter))
         counter += 1
-    with gzip.open(path, "wb") as handle:
-        handle.write(body)
+    temporary = path + ".tmp"
+    with open(temporary, "wb") as raw:
+        with gzip.GzipFile(filename="", mode="wb", fileobj=raw,
+                           mtime=0) as handle:
+            handle.write(body)
+    os.replace(temporary, path)
     return ArchiveRecord(
         source_id=str(source_id),
         path=path,

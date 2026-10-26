@@ -85,6 +85,8 @@ class IntelBundle:
         )
         if bbox is None:
             bbox = self._default_bbox()
+        if isinstance(bbox, str):
+            raise ValueError("bbox must be a numeric sequence")
         self.bbox = tuple(float(value) for value in bbox)
         if len(self.bbox) != 4:
             raise ValueError("bbox must be (min_lon, min_lat, max_lon, max_lat)")
@@ -99,7 +101,7 @@ class IntelBundle:
 
     def _default_bbox(self):
         if not self.observations:
-            return (0.0, 0.0, 0.0, 0.0)
+            return (-180.0, -90.0, 180.0, 90.0)
         lons = [obs.lon for obs in self.observations]
         lats = [obs.lat for obs in self.observations]
         return (min(lons), min(lats), max(lons), max(lats))
@@ -114,6 +116,22 @@ class IntelBundle:
         payload = [o.content_hash() for o in self.observations]
         return hashlib.sha256("|".join(payload).encode("utf-8")).hexdigest()
 
+    @property
+    def envelope_hash(self) -> str:
+        """Hash of the bundle envelope, not only its observations."""
+        payload = {
+            "bundle_id": self.bundle_id,
+            "scenario_id": self.scenario_id,
+            "domain": self.domain,
+            "bbox": list(self.bbox),
+            "time_window": list(self.time_window),
+            "source_allowlist": list(self.source_allowlist),
+            "scenario_start": self.scenario_start,
+            "synthetic": self.synthetic,
+        }
+        text = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
     def as_dict(self) -> Dict[str, Any]:
         return {
             "bundle_id": self.bundle_id,
@@ -125,8 +143,62 @@ class IntelBundle:
             "scenario_start": self.scenario_start,
             "synthetic": self.synthetic,
             "hash": self.hash,
+            "envelope_hash": self.envelope_hash,
             "observations": [o.as_dict() for o in self.observations],
         }
+
+    @classmethod
+    def from_dict(cls, payload: Dict[str, Any]) -> "IntelBundle":
+        """Rebuild a bundle written by ``fetch_intel.py``."""
+        if not isinstance(payload, dict):
+            raise ValueError("bundle payload must be an object")
+        observations = []
+        for index, item in enumerate(payload.get("observations") or []):
+            if not isinstance(item, dict):
+                continue
+            geometry = item.get("geometry") or {}
+            coords = geometry.get("coordinates") or []
+            lat = item.get("lat", coords[1] if len(coords) > 1 else None)
+            lon = item.get("lon", coords[0] if len(coords) > 0 else None)
+            if lat is None or lon is None:
+                continue
+            provenance = item.get("provenance") or {}
+            observations.append(Observation(
+                observation_id=str(item.get("observation_id") or "unknown:%d" % index),
+                source_id=str(item.get("source_id") or "unknown"),
+                source_native_id=str(item.get("source_native_id") or ""),
+                domain=str(item.get("domain") or "other"),
+                type=str(item.get("type") or "unknown"),
+                lat=float(lat),
+                lon=float(lon),
+                event_time=str(item.get("event_time") or payload.get("scenario_start") or ""),
+                ingest_time=str(item.get("ingest_time") or payload.get("scenario_start") or ""),
+                ingest_seq=int(item.get("ingest_seq", index)),
+                confidence=float(item.get("confidence") or 0.0),
+                source_url=str(item.get("source_url") or ""),
+                title=str(item.get("title") or ""),
+                geo_precision=str(item.get("geo_precision") or "exact"),
+                geo_uncertainty_m=float(item.get("geo_uncertainty_m") or 0.0),
+                is_centroid=bool(item.get("is_centroid")),
+                status=str(item.get("status") or "active"),
+                properties=dict(item.get("properties") or {}),
+                schema_version=str(item.get("schema_version") or "situation3d.intel.v1"),
+                license=str(item.get("license") or ""),
+                attribution=str(item.get("attribution") or ""),
+                parser_version=str(provenance.get("parser_version")
+                                   or "vgi-connectors-1"),
+            ))
+        return cls(
+            bundle_id=str(payload.get("bundle_id") or "bundle"),
+            scenario_id=str(payload.get("scenario_id") or "scenario"),
+            observations=observations,
+            scenario_start=str(payload.get("scenario_start") or ""),
+            synthetic=bool(payload.get("synthetic", True)),
+            domain=str(payload.get("domain") or "multi"),
+            bbox=payload.get("bbox") or None,
+            time_window=payload.get("time_window") or None,
+            source_allowlist=payload.get("source_allowlist") or None,
+        )
 
 
 class IntelGateway:

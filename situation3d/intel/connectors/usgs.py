@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Optional, Sequence, Tuple
 from urllib.parse import urlencode
 
@@ -30,6 +29,7 @@ def build_url(start: Any, end: Any, bbox: Optional[Sequence[float]] = None,
         "format": "geojson",
         "starttime": iso(parse_time(start)),
         "endtime": iso(parse_time(end)),
+        "eventtype": "earthquake",
         "orderby": "time",
         "limit": int(limit),
     }
