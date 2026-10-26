@@ -242,6 +242,43 @@ class EnvModelTest(unittest.TestCase):
         self.assertFalse(r.value["allowed"])
         self.assertIn("road_maxweight", r.value["reason_codes"])
 
+    def test_gates_landcover_matches_nav_mask(self):
+        from env.service import LandCover
+
+        class _CoverEnv(object):
+            def __init__(self, cover):
+                self.cover = cover
+
+            def building_at(self, lon, lat):
+                return None
+
+            def is_water(self, lon, lat):
+                return False
+
+            def water_depth(self, lon, lat):
+                return None
+
+            def slope_deg(self, lon, lat):
+                return 0.0
+
+            def landcover(self, lon, lat):
+                return self.cover
+
+            def on_road(self, lon, lat):
+                return True
+
+            def road_edge_at(self, lon, lat, tolerance_m=25.0):
+                return None
+
+        profile = profile_for("vehicle", "land")
+        denied = evaluate_gates(profile, 0.0, 0.0, _CoverEnv(LandCover.WATER),
+                                depth_kind="unknown")
+        self.assertFalse(denied.allowed)
+        self.assertIn("landcover", denied.reason_codes)
+        opened = evaluate_gates(profile, 0.0, 0.0, _CoverEnv(LandCover.OPEN),
+                                depth_kind="unknown")
+        self.assertTrue(opened.allowed)
+
     def test_gates_unknown_policy_advisory(self):
         profile = profile_for("vehicle", "land")
         r = evaluate_gates(

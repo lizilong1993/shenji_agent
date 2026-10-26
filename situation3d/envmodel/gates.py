@@ -12,6 +12,7 @@ from typing import Dict, Optional, Tuple
 
 from mobility.passability import passable as _passable
 from mobility.passability import road_edge_passable
+from env.service import LandCover
 
 DOMAIN_ALIASES = {
     "maritime_surface": "surface",
@@ -120,6 +121,19 @@ def evaluate_gates(profile, lon: float, lat: float, env,
                 return _unknown_gate(policy, "water_depth", "water_depth")
             if is_water and depth is not None and depth > wading:
                 return GateResult(False, ("water_depth",), ("water_depth",))
+
+    if not on_bridge and domain not in ("surface", "subsurface"):
+        if not is_water or depth is None:
+            # Same landcover rule as the navigation mask, so the gate and the
+            # route authority cannot disagree on forest/soft/water cells.
+            cover = env.landcover(lon, lat)
+            factor = float(profile.terrain_factor(cover))
+            road_bound = bool(getattr(profile, "road_bound", False))
+            on_road = bool(env.on_road(lon, lat))
+            if factor <= 0.0 and not (road_bound and on_road):
+                return GateResult(False, ("landcover",), ("landcover",))
+            if cover == LandCover.URBAN and road_bound and not on_road:
+                return GateResult(False, ("road_bound",), ("landcover",))
 
     slope = float(env.slope_deg(lon, lat))
     max_slope = float(getattr(profile, "max_gradient_deg", 0.0) or 0.0)

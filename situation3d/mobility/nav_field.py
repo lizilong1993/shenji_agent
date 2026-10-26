@@ -26,7 +26,8 @@ from typing import Dict, List, Optional, Tuple
 
 from env.service import LandCover
 from geo.geodesy import haversine_m, initial_bearing_deg
-from mobility.passability import effective_speed_ms, passable
+from mobility.passability import (effective_speed_ms, passable,
+                                  road_edge_passable)
 from mobility.profile import PlatformProfile
 from sim.entity import Pose, Route
 
@@ -62,6 +63,22 @@ DIRECTIONS = [
 ]
 
 
+def _segment_distance_mt(lon: float, lat: float, a, b):
+    """Distance from a point to segment ``a-b`` and its projection ratio."""
+    kx = 111320.0 * math.cos(math.radians(lat))
+    ky = 110540.0
+    px, py = lon * kx, lat * ky
+    ax, ay = a[0] * kx, a[1] * ky
+    bx, by = b[0] * kx, b[1] * ky
+    dx, dy = bx - ax, by - ay
+    denom = dx * dx + dy * dy
+    if denom <= 1e-12:
+        return math.hypot(px - ax, py - ay), 0.0
+    t = ((px - ax) * dx + (py - ay) * dy) / denom
+    tc = max(0.0, min(1.0, t))
+    return math.hypot(px - (ax + tc * dx), py - (ay + tc * dy)), t
+
+
 def _measure(value) -> float:
     if value is None:
         return 0.0
@@ -76,6 +93,26 @@ def _measure(value) -> float:
         return float(num)
     except ValueError:
         return 0.0
+
+
+class _NoDepthEnv(object):
+    """Env proxy that hides the coarse water-depth fallback.
+
+    The raster build already drops the legacy 2 km water depth when the fine
+    landcover polygon says land; the exact passability predicate needs the
+    same view or it re-blocks cells the mask has (correctly) cleared.
+    """
+
+    __slots__ = ("_env",)
+
+    def __init__(self, env):
+        self._env = env
+
+    def __getattr__(self, name):
+        return getattr(self._env, name)
+
+    def water_depth(self, lon, lat):
+        return None
 
 
 class NavField(object):
@@ -199,6 +236,7 @@ class NavField(object):
         n = self.rows * self.cols
         self.road = bytearray(n)          # 0 none, 1..3 class rank
         self.bridge = bytearray(n)        # 1 = bridge/tunnel deck
+        self.bridge_segments = []
         # 0 = no one-way info; 1..255 = edge bearing (a->b) quantised.
         self.oneway = bytearray(n)
         self.limits: Dict[int, dict] = {}
@@ -211,6 +249,8 @@ class NavField(object):
             pa, pb = nodes.get(edge.get("a")), nodes.get(edge.get("b"))
             if not pa or not pb:
                 continue
+            if edge.get("bridge"):
+                self.bridge_segments.append((pa, pb, edge))
             rank = _ROAD_RANK.get(str(edge.get("class")), 0)
             deck = rank > 0 and bool(edge.get("bridge") or edge.get("tunnel"))
             limits = {}
@@ -1089,11 +1129,103 @@ class NavField(object):
         return True
 
     def route_ok(self, prof: PlatformProfile, route: Route) -> bool:
-        return self._points_ok(prof, route.points)
+        if self._points_ok(prof, route.points):
+            return True
+        return self._points_ok_exact(prof, route)
+
+    def _bridge_edge_at(self, lon: float, lat: float,
+                        tolerance_m: float = 25.0):
+        """Bridge deck edge covering a point (same 25 m rule as the gate)."""
+        segments = getattr(self, "bridge_segments", None)
+        if segments is None:
+            # Restored from an older cache: rebuild the short bridge list.
+            segments = []
+            graph = getattr(self.env, "road_graph", None)
+            if graph is not None:
+                nodes, edges = graph()
+                for edge in edges:
+                    pa = nodes.get(edge.get("a"))
+                    pb = nodes.get(edge.get("b"))
+                    if pa and pb and edge.get("bridge"):
+                        segments.append((pa, pb, edge))
+            self.bridge_segments = segments
+        best = None
+        best_m = tolerance_m
+        for pa, pb, edge in segments:
+            dist, t = _segment_distance_mt(lon, lat, pa, pb)
+            if -1e-9 <= t <= 1.0 + 1e-9 and dist <= best_m:
+                best = edge
+                best_m = dist
+        return best
+
+    def _exact_point_ok(self, prof: PlatformProfile, lon: float, lat: float,
+                        i: Optional[int] = None) -> bool:
+        """Fine authority check where the coarse mask says blocked.
+
+        A 30 m cell is classified by its centre. A 3-4 m local detour that
+        only skims a cell corner is still legal when the exact geometry at the
+        sampled point is passable. Footprint collision remains the OBB check's
+        job at motion time, so this mirrors the gate contract's centre-point
+        test instead of inflating buildings again.
+        """
+        if i is None:
+            i = self._index_of(lon, lat)
+        land_like = prof.domain in ("land", "amphibious")
+        if i is not None and self.bridge[i] and land_like:
+            return self._limits_ok(prof, i)
+        env = self.env
+        getter = getattr(env, "road_edge_at", None)
+        if land_like and getter is not None:
+            try:
+                edge = getter(lon, lat, 25.0)
+            except TypeError:
+                edge = getter(lon, lat)
+            if edge and edge.get("bridge"):
+                return road_edge_passable(prof, edge)
+        if land_like:
+            deck = self._bridge_edge_at(lon, lat)
+            if deck is not None:
+                return road_edge_passable(prof, deck)
+        building_at = getattr(env, "building_at", None)
+        footprint = getattr(env, "building_footprint_at", None)
+        if building_at is not None and building_at(lon, lat) is not None:
+            return False
+        if footprint is not None and footprint(lon, lat) is not None:
+            return False
+        depth_env = env
+        fine_at = getattr(env, "landcover_polygon_at", None)
+        if fine_at is not None and env.water_depth(lon, lat) is not None:
+            fine = fine_at(lon, lat)
+            if fine is not None and fine != LandCover.WATER:
+                depth_env = _NoDepthEnv(env)
+        return bool(passable(prof, lon, lat, depth_env,
+                             depth_env.elevation(lon, lat)))
+
+    def _points_ok_exact(self, prof: PlatformProfile, route: Route) -> bool:
+        """Sample a route that failed the raster test against exact geometry."""
+        mask = self.profile_mask(prof)[0]
+        step = max(1.0, min(3.0, self.res_m / 10.0))
+        total = route.total_m
+        s = 0.0
+        while s < total:
+            pose = route.pose_at(s)
+            i = self._index_of(pose.lon, pose.lat)
+            if i is not None and not mask[i]:
+                if not self._exact_point_ok(prof, pose.lon, pose.lat, i):
+                    return False
+            s += step
+        pose = route.pose_at(total)
+        i = self._index_of(pose.lon, pose.lat)
+        if i is not None and not mask[i]:
+            if not self._exact_point_ok(prof, pose.lon, pose.lat, i):
+                return False
+        return True
 
     def motion_point_ok(self, prof: PlatformProfile, lon: float, lat: float) -> bool:
         """Substep check used by ``sim.motion`` inside coverage."""
         i = self._index_of(lon, lat)
         if i is None:
             return passable(prof, lon, lat, self.env, self.env.elevation(lon, lat))
-        return bool(self.profile_mask(prof)[0][i])
+        if self.profile_mask(prof)[0][i]:
+            return True
+        return self._exact_point_ok(prof, lon, lat, i)

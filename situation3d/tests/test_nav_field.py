@@ -22,7 +22,7 @@ from geo.geodesy import haversine_m  # noqa: E402
 from mobility.nav_field import NavField  # noqa: E402
 from mobility.planner import GridPlanner  # noqa: E402
 from mobility.profile import PROFILES  # noqa: E402
-from sim.entity import Entity, Pose  # noqa: E402
+from sim.entity import Entity, Pose, Route  # noqa: E402
 from sim.motion import integrate  # noqa: E402
 
 BBOX = (120.0, 23.0, 120.02, 23.02)
@@ -252,6 +252,33 @@ class NavFieldTest(unittest.TestCase):
         self.assertTrue(nav.passable(self.prof, 120.010, 23.010))
         # Off the bridge the water still blocks.
         self.assertFalse(nav.passable(self.prof, 120.010, 23.006))
+
+    def test_subcell_detour_passes_exact_authority(self):
+        # A small footprint at the centre blocks the whole 30 m cell, but a
+        # local detour skimming the cell edge stays outside the building.
+        base = NavField(FakeFineEnv(water=None), res_m=30.0, use_cache=False)
+        lon_c, lat_c = base._center(15, 15)
+        d = 0.00005  # ~5 m half-size footprint
+        env = FakeFineEnv(water=None,
+                          buildings=[(lon_c - d, lat_c - d,
+                                      lon_c + d, lat_c + d, 10.0)])
+        nav = NavField(env, res_m=30.0, use_cache=False)
+        prof = self.prof
+        self.assertFalse(nav.passable(prof, lon_c, lat_c))
+
+        north = lat_c + 0.00012  # ~13 m north: same row, outside footprint
+        detour = Route(points=[Pose(lon_c - 0.00025, north),
+                               Pose(lon_c + 0.00025, north)],
+                       speed_limits=[5.0], modes=["offroad"])
+        self.assertFalse(nav._points_ok(prof, detour.points))
+        self.assertTrue(nav.route_ok(prof, detour))
+        self.assertTrue(nav.motion_point_ok(prof, lon_c, north))
+
+        through = Route(points=[Pose(lon_c - 0.00025, lat_c),
+                                Pose(lon_c + 0.00025, lat_c)],
+                        speed_limits=[5.0], modes=["offroad"])
+        self.assertFalse(nav.route_ok(prof, through))
+        self.assertFalse(nav.motion_point_ok(prof, lon_c, lat_c))
 
 
 PACK = os.path.join(SITUATION3D, "envpacks", "anping_v2c")

@@ -18,7 +18,7 @@ from .local_grid import plan_local
 
 
 def validate_route(query: Any, profile: Any, route: Route,
-                   step_m: float = 10.0) -> bool:
+                   step_m: float = 3.0) -> bool:
     """Sample a route and require every point to pass ``passability``."""
     total = float(route.total_m)
     s = 0.0
@@ -80,13 +80,13 @@ def _detour_point(route: Route, idx: int, offset_m: float) -> Optional[Pose]:
 
 
 def repair_route(query: Any, profile: Any, route: Route,
-                 step_m: float = 15.0,
+                 step_m: float = 3.0,
                  offsets: Sequence[float] = (10.0, 30.0)
                  ) -> Optional[Route]:
     """Try shifting the first blocked route vertex sideways.
 
-    Candidate validation uses a coarser step (15 m) than the final conformance
-    check; the caller should still re-check with its own step.
+    Candidate validation uses the same fine step (3 m by default) as the final
+    conformance check, so thin water or footprint strips cannot slip through.
     """
     blocked_s = _first_blocked_s(query, profile, route, step_m=5.0)
     if blocked_s is None:
@@ -135,7 +135,7 @@ def repair_route(query: Any, profile: Any, route: Route,
 
 
 def plan_valid_route(nav: Any, query: Any, profile: Any, start, goal,
-                     blocked=None, step_m: float = 10.0) -> Optional[Route]:
+                     blocked=None, step_m: float = 3.0) -> Optional[Route]:
     """Plan with the 30 m field, then validate and try a local point repair."""
     route = nav.plan(profile, start, goal, blocked=blocked,
                      safe_fallback=True)

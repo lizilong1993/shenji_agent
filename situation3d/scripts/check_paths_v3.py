@@ -87,7 +87,7 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
         if not validate_route(query, profile, route):
             repaired = repair_route(query, profile, route)
             if repaired is None or not validate_route(
-                    query, profile, repaired, step_m=10.0):
+                    query, profile, repaired, step_m=3.0):
                 gate_rejected += 1
                 continue
             route = repaired
