@@ -18,6 +18,7 @@ from sim.sensors import Sensor
 
 _REGISTRY = None
 _TABLES = None
+_CATALOG = None
 
 DOMAIN_KEYS = {
     "land": "land",
@@ -73,6 +74,18 @@ def registry():
     if _REGISTRY is None:
         _REGISTRY = load_registry()
     return _REGISTRY
+
+
+def capability_catalog():
+    global _CATALOG
+    if _CATALOG is None:
+        from capabilities import CapabilityCatalog
+        _CATALOG = CapabilityCatalog(registry())
+    return _CATALOG
+
+
+def entity_type_for(subclass_id: str):
+    return capability_catalog().get(subclass_id)
 
 
 def weapon_tables() -> WeaponTables:
@@ -226,8 +239,10 @@ def weapons_from_card(card: dict) -> Tuple[List[WeaponView], Dict[str, int]]:
 
 
 __all__ = [
+    "capability_catalog",
     "card_for_operator",
     "domain_from_card",
+    "entity_type_for",
     "profile_from_card",
     "sensors_from_card",
     "subclass_for_operator",

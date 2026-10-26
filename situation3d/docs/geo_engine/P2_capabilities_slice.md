@@ -1,6 +1,6 @@
 # P2 目标能力目录垂直切片
 
-状态：2026-10-24，分支 `feat/entity-catalog`（基于 `4dc9e1d`）。新增 `situation3d/capabilities/` 与 14 项测试，未修改角色卡数据、未接入引擎默认路径，现有 370 项测试通过（14 跳过）。
+状态：2026-10-24 起始，分支 `feat/entity-catalog` 已合并 main；2026-10-26 在 `feat/catalog-engine` 增加可选引擎接线。新增 `situation3d/capabilities/`、`tests/test_capabilities_v1.py`（14 项）与 `tests/test_catalog_engine.py`（9 项）；未修改角色卡数据，默认路径行为不变，现有 426 项测试通过（14 跳过）。
 
 ## 1. 定位
 
@@ -64,15 +64,24 @@ situation3d/tests/test_capabilities_v1.py
 
 ```
 cd situation3d
-python3 -m unittest tests/test_capabilities_v1.py -v
+python3 -m unittest tests/test_capabilities_v1.py tests/test_catalog_engine.py -v
 ```
 
 覆盖：61 个小类全部可投影、已知量均有单位与来源、坦克/驱逐舰关键量、注册表四张表不被修改且 `sdk` 无共享引用、非法门策略回退、legacy/new 双读、六类门的边界与缺失值、缺量不掩盖违规、两栖泳深优先、潜艇深度上限、未知门报错。
 
-## 7. 已知限制与下一步
+## 7. 引擎接线（可选）
 
-- 引擎未接线：`sim`/`mobility` 仍走 `card_profile`，本切片仅提供可替换的数据层。接线需在 `card_profile` 与通行层引入模式开关，并以金标准测试证明 legacy 哈希不变。
+想定 `engine.catalog_mode` 控制投影方式：
+
+- `legacy`（默认，含缺省/非法值）：`profile_from_card(card, key)` 完全保持旧算法；61 张卡的 30 个 `PlatformProfile` 字段与合并前逐字段一致，测试 `test_legacy_fields_match_old_rules_for_all_cards` 锁定。
+- `new`：`profile_from_card(card, key, entity=EntityType)` 用目录量覆盖尺寸与门限——`length_m/width_m/height_m` 取 `identity.dimensions`，陆上/水面 `beam_m` 取 `sea.beam_m` 或车宽，`vehicle_height_m` 与 `weight_t` 取卡值（质量目前均未知，保持 0）。空中平台不设置 beam。
+- 场景 GLB 覆盖 `length_m/width_m` 时，`new` 模式同步 `beam_m`，避免碰撞宽度与道路限宽门不一致。
+- 目录在 `sim/rolecards_bridge` 内按进程缓存；`entity_type_for` 失败时场景回退 `legacy`。
+
+## 8. 已知限制与下一步
+
+- 引擎接线仍是 opt-in：新想定需显式设置 `catalog_mode: "new"`；报告计划中的“新想定默认 new、旧想定 pin legacy”尚未切换。
 - 门策略尚无数据：61 张卡都没有 `values.gates.unknown_policy`，当前全部按默认 `deny` 处理；advisory 语义需后续补数据或由调用方逐次覆盖。
-- 质量数据缺失：61 张卡均无 `weight_t`，桥梁限重门目前只会返回 unknown；需补装备/参考型号数据并加来源。
+- 质量数据缺失：61 张卡均无 `weight_t`，`new` 模式 `weight_t` 仍为 0，桥梁限重门只返回 unknown；需补装备/参考型号数据并加来源。
 - 未覆盖报告中的 MLC 语义、森林密度分级、软地压强、逐值类型化（`Quantity` 之外的枚举/区间）；这些需要新增卡字段，不在本切片内改数据。
 - `sea_state` 门尚未接入 `envmodel` 的海况查询；待环境分支合并后由网关调用。
