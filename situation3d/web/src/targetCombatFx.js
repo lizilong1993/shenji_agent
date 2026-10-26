@@ -32,6 +32,7 @@
   var scan = null;              // {entity, material, id, range}
   var commEntities = {};        // peer id -> entity（选中目标的通信链路）
   var commKey = null;           // 当前链路的选中目标 id
+  var commBuildTick = -999;     // 上次重建链路的 tick
   var destroyed = {};           // id -> true
   var hitFlash = {};            // id -> {until, prevColor, prevSize}
   var statusCache = {};
@@ -616,7 +617,10 @@
     spawnFlash(m, 1.0);
     var sdef = defById[shooter] || {};
     var isShip = /sea|naval|maritime/.test(String(sdef.domain || '').toLowerCase());
-    if (isShip && /导弹|反舰|火箭/.test(ev.weapon || '')) spawnVlsPlume(m);
+    var vlsText = String(sdef.model || '') + ' ' + String(sdef.platform_class || '');
+    var isVlsShip = isShip && /052[cd]?|055|054a|luyang|renhai/i.test(vlsText)
+      && !/071/i.test(vlsText);
+    if (isVlsShip && /导弹|反舰|火箭/.test(ev.weapon || '')) spawnVlsPlume(m);
     var impact = impactByFire[ev.id];
     if (impact) {
       var isMissile = /导弹|火箭弹/.test(ev.weapon || '');
@@ -1074,6 +1078,7 @@
     });
     commEntities = {};
     commKey = null;
+    commBuildTick = -999;
   }
 
   function commPositionsFor(a, b) {
@@ -1091,9 +1096,11 @@
   function updateComms(tick) {
     var id = apiSelected();
     if (!id) { clearComms(); return; }
-    if (commKey === id) return;
+    // 选中不变时也每 10 tick 重建一次，避免时间轴跳转后拓扑过期
+    if (commKey === id && Math.abs(tick - commBuildTick) < 10) return;
     clearComms();
     commKey = id;
+    commBuildTick = tick;
     var def = defById[id];
     if (!def) return;
     var range = Math.min(30, Number(def.influence_km) || 10) * 1000;
@@ -1107,7 +1114,7 @@
       var d = Cesium.Cartesian3.distance(
         Cesium.Cartesian3.fromDegrees(here.lon, here.lat, here.alt || 0),
         Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.alt || 0));
-      if (d <= range) rows.push({ id: t.id, d: d });
+      if (d > 50 && d <= range) rows.push({ id: t.id, d: d });
     });
     rows.sort(function (a, b) { return a.d - b.d; });
     rows.slice(0, 6).forEach(function (r) {

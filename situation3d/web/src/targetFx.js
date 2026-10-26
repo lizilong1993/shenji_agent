@@ -521,9 +521,11 @@
     }
 
     function scaleFor() {
+      // Billboard.scale 是像素倍率（64 px 贴图），不是米；保持 8–19 px
+      // 的屏幕尺寸，避免默认 12 km 视距下整屏棕雾。
       var sample = ctx.api.sample ? ctx.api.sample(id) : null;
       var speed = sample ? Math.max(0, Number(sample.speed_kn) || 0) : 0;
-      return Math.min(18, 5 + speed * 0.35);
+      return Math.min(0.30, 0.12 + speed * 0.004);
     }
 
     var billboard = ctx.viewer.entities.add({

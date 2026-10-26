@@ -20,7 +20,7 @@
 
 - 位置在目标后方 `0.35×车长`，贴地 +0.6 m；
 - 速度 >2 kn、相机高度 <30 km、距离 <25 km 且正在播放时显示；
-- 缩放随速度 5→18 m，使用 canvas 生成的沙尘贴图；
+- Billboard.scale 按像素倍率 0.12→0.30（约 8–19 px），使用 canvas 沙尘贴图；**不是米制**，避免 12 km 视距整屏棕雾；
 - 80 目标场景最多 80 个 billboard，无逐粒子开销。
 
 ### 1.3 高空凝结尾迹
@@ -35,7 +35,7 @@
 
 `targetCombatFx.js` 新增 `spawnVlsPlume()`：
 
-- 水面舰发射 `导弹/反舰/火箭` 时，在炮口/发射位置沿地表法线叠加 4 团火光/烟团（0–16.5 m）；
+- 052C/052D/054A/055 等带 VLS 的舰发射 `导弹/反舰/火箭` 时，在炮口/发射位置沿地表法线叠加 4 团火光/烟团（0–16.5 m）；071 等无 VLS 平台不触发；
 - 复用现有瞬时实体池（上限 80），900–1260 ms 自动回收；
 - 不依赖 ParticleSystem，暂停/拖动时间轴时与现有特效一致。
 
@@ -46,16 +46,16 @@
 
 - 选中目标后，取同阵营、距离在 `min(influence_km,30 km)` 内最近的 6 个友军；
 - 用 `PolylineDashMaterialProperty` 画低亮度青色虚线，端点由 `currentGeo()` 每帧回调，目标移动时链路跟随；
-- 选中目标变化时重建，其他时候零逐帧计算；无选中/无友军时不建实体；
+- 选中目标变化或每 10 tick 重建拓扑；每帧只更新 6 条链路的端点；过滤 <50 m 的零长度链路；无选中/无友军时不建实体；
 - `TargetCombatFx.debug().comms` 可查当前链路数。
 
 ## 2. 验证
 
 - `node --check targetFx.js`、`node --check targetCombatFx.js` 通过。
 - Cesium 1.145 + headless Chromium 加载 `taiwan_dense_transfer_v1`（`autoplay=1`，tick=300）：
-  - `TargetFx.debug()`：12 艘水面舰 `show=true` 且 `bow=true`；8 架飞机 `show=true`；48 个地面目标中 43 个移动目标 `dust=true`，5 个静止目标 `false`（符合门控）。
+  - 默认 12 km 相机、无 `panel` 参数：`TargetFx.debug()` 中 12 艘水面舰 `show=true` 且 `bow=true`；8 架飞机 `show=true`；60 个地面目标中 54 个移动目标 `dust=true`，6 个静止目标（TRV023–028）`false`（符合门控）。
   - 页面无 JS `pageerror`；控制台 404 为 8859 工作树缺少 `web/tiles` 离线瓦片，与特效/模型无关。
-  - 选中 `TRS001` 时 `TargetCombatFx.debug().comms = 6`，扫描扇区 `range=60000`，无页面错误。
+  - 用 `?panel=TRS001` 选中时相机拉到 120 km，四类运动特效会被高度门控关掉；此时 `TargetCombatFx.debug().comms = 6`、扫描扇区 `range=60000`，无页面错误。选中后链路每 10 tick 重建，时间轴跳转不会保留过期拓扑。
 - 凝结尾迹在 tick=300 未触发（该案例飞机高度 <7000 m），逻辑已就位；VLS 在当前两个案例中没有海基导弹事件，未做端到端触发验证。
 
 ## 3. 未完成
