@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": "2026-10-26T13:14:49",
+  "generated_at": "2026-10-26T15:53:19",
   "note": "由 tools/model_budget_test.py 生成；sha256 对应优化后的 GLB。",
   "assets": {
     "type_052c.glb": {
@@ -703,31 +703,31 @@
       }
     },
     "type_m777.glb": {
-      "sha256": "fe9d7629bdf152cb91676965622a2197acc5c01a1a871b3c6e5cd1ebd0404ac4",
-      "bytes": 56304,
-      "mb": 0.05,
-      "tris": 972,
+      "sha256": "a4f52e577a85b10ce9e6777d19fb6296f0e714e0603ac691362f58fc29ac1ec7",
+      "bytes": 93592,
+      "mb": 0.09,
+      "tris": 8379,
       "prims": 3,
-      "materials": 3,
-      "images": 1,
+      "materials": 1,
+      "images": 0,
       "extensions": [
         "EXT_meshopt_compression",
-        "EXT_texture_webp",
         "KHR_mesh_quantization"
       ],
       "animations": 0,
       "class": "ground_truck",
       "public": {
         "public_length_m": 10.2,
-        "public_width_m": 2.77
+        "public_width_m": 2.77,
+        "notes": "M777 展开射击状态；源模型含 2 发炮弹"
       },
       "license": {
-        "source": "自建（tools/modelgen/build_custom.py）",
-        "author": "本项目",
-        "license": "项目内部",
-        "use": "M777 超轻型榴弹炮",
+        "source": "[M777 howitzer](https://sketchfab.com/models/2a2c381888ef4e4790ed883cddda0aca)",
+        "author": "miloschnack",
+        "license": "CC Attribution",
+        "use": "M777 超轻型榴弹炮（展开射击状态，含 2 发炮弹）",
         "risk": [],
-        "source_url": null
+        "source_url": "https://sketchfab.com/models/2a2c381888ef4e4790ed883cddda0aca"
       }
     },
     "type_mq9.glb": {

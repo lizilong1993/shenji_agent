@@ -243,12 +243,12 @@
       "source_url": null
     },
     "type_m777.glb": {
-      "source": "自建（tools/modelgen/build_custom.py）",
-      "author": "本项目",
-      "license": "项目内部",
-      "use": "M777 超轻型榴弹炮",
+      "source": "[M777 howitzer](https://sketchfab.com/models/2a2c381888ef4e4790ed883cddda0aca)",
+      "author": "miloschnack",
+      "license": "CC Attribution",
+      "use": "M777 超轻型榴弹炮（展开射击状态，含 2 发炮弹）",
       "risk": [],
-      "source_url": null
+      "source_url": "https://sketchfab.com/models/2a2c381888ef4e4790ed883cddda0aca"
     },
     "type_075.glb": {
       "source": "自建（tools/modelgen/build_custom.py `build_075()`）",

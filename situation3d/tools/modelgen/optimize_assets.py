@@ -66,7 +66,7 @@ CFG = {
     "type_pac3": ("ground_truck", 8000, True, True, True),
     "type_ztd05": ("ground_tank", 9000, True, True, True),
     "type_eq240": ("ground_truck", 7000, True, True, True),
-    "type_m777": ("ground_truck", 8000, True, False, True),
+    "type_m777": ("ground_truck", 8000, True, True, True),
     "type_himars": ("ground_truck", 7000, True, True, True),
     # 带关节：只做纹理压缩（保持节点名与几何）
     "type_z10": ("rigged", 0, False, False, False),

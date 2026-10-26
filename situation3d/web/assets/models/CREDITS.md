@@ -33,7 +33,7 @@
 | `type_kidd.glb` | 自建（tools/modelgen/build_custom.py） | 本项目 | 项目内部 | 基隆级（Kidd）驱逐舰 |
 | `type_hq16.glb` | 自建（tools/modelgen/build_custom.py） | 本项目 | 项目内部 | 红旗-16 发射车 |
 | `type_yj62.glb` | 自建（tools/modelgen/build_custom.py） | 本项目 | 项目内部 | 鹰击-62 岸舰导弹发射车 |
-| `type_m777.glb` | 自建（tools/modelgen/build_custom.py） | 本项目 | 项目内部 | M777 超轻型榴弹炮 |
+| `type_m777.glb` | [M777 howitzer](https://sketchfab.com/models/2a2c381888ef4e4790ed883cddda0aca) | miloschnack | CC Attribution | M777 超轻型榴弹炮（展开射击状态，含 2 发炮弹） |
 | `type_075.glb` | 自建（tools/modelgen/build_custom.py `build_075()`） | 本项目 | 项目内部 | 075 两栖攻击舰（近似） |
 | `type_kj500.glb` | KJ-2000 (DCS World) 缩比近似 | KojfDiscord | CC Attribution | 空警-500（近似） |
 | `type_ztq15.glb` | Type 99 MBT 缩比近似 | philano | CC Attribution | 15 式轻型坦克（近似） |

@@ -144,7 +144,8 @@
     "type_m777.glb": {
       "class": "ground_truck",
       "public_length_m": 10.2,
-      "public_width_m": 2.77
+      "public_width_m": 2.77,
+      "notes": "M777 展开射击状态；源模型含 2 发炮弹"
     },
     "type_ztd05.glb": {
       "class": "ground_tank",
