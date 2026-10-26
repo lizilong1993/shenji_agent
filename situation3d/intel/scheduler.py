@@ -47,9 +47,14 @@ class IntelScheduler:
     def manifest(self) -> dict:
         return {
             "bundle_hash": self.gateway.bundle.hash,
+            "bundle_envelope_hash": self.gateway.bundle.envelope_hash,
             "bundle_id": self.gateway.bundle.bundle_id,
             "scenario_id": self.gateway.bundle.scenario_id,
             "scenario_start": self.gateway.bundle.scenario_start,
+            "domain": self.gateway.bundle.domain,
+            "bbox": list(self.gateway.bundle.bbox),
+            "time_window": list(self.gateway.bundle.time_window),
+            "source_allowlist": list(self.gateway.bundle.source_allowlist),
             "synthetic": self.gateway.bundle.synthetic,
             "lookahead_s": self.lookahead_s,
             "watermark_lag_s": self.watermark_lag_s,

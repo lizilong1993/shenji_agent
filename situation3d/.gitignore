@@ -38,3 +38,6 @@ web/vendor
 web/tiles
 web/tiles3d
 envpacks/
+
+# VGI raw archive / live bundles (fetched at runtime; never commit)
+var/intel/
