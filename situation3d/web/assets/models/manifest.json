@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": "2026-10-26T16:22:18",
+  "generated_at": "2026-10-26T17:21:02",
   "note": "由 tools/model_budget_test.py 生成；sha256 对应优化后的 GLB。",
   "assets": {
     "type_052c.glb": {
@@ -178,10 +178,10 @@
       }
     },
     "type_903.glb": {
-      "sha256": "ff6ca43790f63c15203006ecd4cb14ed2d8381564fac0d7cb2275da243105ca1",
-      "bytes": 77460,
-      "mb": 0.07,
-      "tris": 912,
+      "sha256": "34a37852053eed56ff4f24bc22cb8b3e2483c18a6a1583ea6b6efdd8f5c00f3d",
+      "bytes": 175240,
+      "mb": 0.17,
+      "tris": 1976,
       "prims": 3,
       "materials": 3,
       "images": 4,
@@ -497,10 +497,10 @@
       }
     },
     "type_kidd.glb": {
-      "sha256": "81575e843f5b431adc31f6f009724a187a536c150e79628df397eb6261a10b92",
-      "bytes": 79960,
-      "mb": 0.08,
-      "tris": 1080,
+      "sha256": "f60c1dfda7fd2f55504129326f5766ea0325bc6b4e9758d24da87a015fcae9af",
+      "bytes": 186468,
+      "mb": 0.18,
+      "tris": 2716,
       "prims": 3,
       "materials": 3,
       "images": 4,
@@ -820,10 +820,10 @@
       }
     },
     "type_panshi.glb": {
-      "sha256": "4ba7728671f9cec222e289e0dc9cabe308f9cbc0190091246e84a3dd1ba99d9f",
-      "bytes": 76936,
-      "mb": 0.07,
-      "tris": 900,
+      "sha256": "e4f50308586c66d0f502a19d24a2f3aad053c05beb80b0f0a2a3dc2eb4791508",
+      "bytes": 174932,
+      "mb": 0.17,
+      "tris": 1936,
       "prims": 3,
       "materials": 3,
       "images": 4,
@@ -966,13 +966,13 @@
       }
     },
     "type_tuochiang.glb": {
-      "sha256": "c53d9cf3446c731b24a9b77b3e11881663be19f5169c582eb3b89427741be296",
-      "bytes": 96544,
-      "mb": 0.09,
-      "tris": 1556,
-      "prims": 6,
-      "materials": 6,
-      "images": 3,
+      "sha256": "315632580b0326457f99d46cf5c45b49df95297a3f5148a78313e2ee18373116",
+      "bytes": 183844,
+      "mb": 0.18,
+      "tris": 2336,
+      "prims": 3,
+      "materials": 3,
+      "images": 4,
       "extensions": [
         "EXT_meshopt_compression",
         "EXT_texture_webp",

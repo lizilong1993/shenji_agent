@@ -558,6 +558,48 @@ def build_903():
     # 直升机甲板
     box("903_flightdeck", (0, -76, deckz + 0.08), (20.0, 22.0, 0.16), deck())
     cyl("903_helo_circle", (0, -76, deckz + 0.2), 4.4, 0.05, white(), verts=40)
+    # --- 细节补强：翼台/舷窗/横向补给站/近防/救生筏/RHIB ---
+    for sx in (-1, 1):
+        box("903_bridgewing_%d" % sx, (sx * 7.6, 66.0, deckz + 3.0), (3.4, 7.0, 0.3), navy())
+        box("903_deckhouse_win_%d" % sx, (sx * 6.9, 56.0, deckz + 2.2),
+            (0.16, 10.0, 0.9), glass())
+        box("903_super_side_win_%d" % sx, (sx * 8.2, -46.0, deckz + 9.4),
+            (0.16, 14.0, 1.1), glass())
+    # 舰桥前窗（原有窗带嵌在体块内，补一条真正露在外面的）
+    box("903_bridge_win_f", (0, 75.9, deckz + 3.8), (9.6, 0.8, 1.2), glass())
+    box("903_super_win_f", (0, -30.3, deckz + 9.0), (13.6, 0.8, 2.4), glass())
+    # 舯部横向补给站：两舷各两组门架 + 外伸吊臂
+    for sx in (-1, 1):
+        for yy in (16.0, -14.0):
+            cyl("903_kingpost_%d_%d" % (sx, int(yy)), (sx * 9.6, yy, deckz + 6.5),
+                0.32, 13.0, navy(), verts=10)
+            cyl("903_rasboom_%d_%d" % (sx, int(yy)), (sx * 14.2, yy, deckz + 12.4),
+                0.22, 8.6, navy(), axis="X", verts=8)
+            box("903_rashead_%d_%d" % (sx, int(yy)), (sx * 18.2, yy, deckz + 12.1),
+                (0.9, 1.4, 0.7), dark())
+    # 第三货舱口盖
+    box("903_hatch2", (0, -8.0, deckz + 0.4), (12.0, 8.0, 0.8),
+        mat("hatch", (0.32, 0.34, 0.33), 0.7))
+    # 艏部防浪板/锚机
+    box("903_breakwater", (0, 78.2, deckz + 0.7), (9.0, 0.4, 1.4), navy())
+    for sx in (-1, 1):
+        box("903_windlass_%d" % sx, (sx * 5.0, 72.0, deckz + 0.9), (1.8, 2.4, 1.0), dark())
+    # 30 mm 近防：艏部两舷 + 艉部上层建筑顶
+    for sx in (-1, 1):
+        cyl("903_gun30_f_%d_b" % sx, (sx * 8.6, 52.0, deckz + 0.5), 0.8, 1.0, white(), verts=14)
+        cyl("903_gun30_f_%d_g" % sx, (sx * 8.6, 51.0, deckz + 1.3), 0.12, 1.4, dark(), axis="Y", verts=8)
+        cyl("903_gun30_a_%d_b" % sx, (sx * 6.0, -52.0, deckz + 12.6), 0.8, 1.0, white(), verts=14)
+        cyl("903_gun30_a_%d_g" % sx, (sx * 6.0, -53.0, deckz + 13.4), 0.12, 1.4, dark(), axis="Y", verts=8)
+    # 救生筏
+    for sx in (-1, 1):
+        for i in range(4):
+            cyl("903_raft_%d_%d" % (sx, i), (sx * 10.3, -38.0 - i * 5.0, deckz + 1.8),
+                0.45, 1.0, white(), axis="X", verts=8)
+    # RHIB
+    box("903_rhib", (9.7, -18.0, deckz + 1.2), (1.5, 4.6, 0.9),
+        mat("rhib", (0.18, 0.20, 0.21), 0.6))
+    # 桅顶导航雷达
+    cyl("903_navradar", (0, 62.0, deckz + 13.6), 0.9, 0.16, dark(), verts=16)
     finish("t_903", "water")
 
 
@@ -583,6 +625,55 @@ def build_panshi():
     box("panshi_funnel_top", (0, -50, deckz + 16.0), (6.0, 6.5, 0.4), dark())
     box("panshi_flightdeck", (0, -82, deckz + 0.08), (21.0, 24.0, 0.16), deck())
     cyl("panshi_helo", (0, -82, deckz + 0.2), 4.6, 0.05, white(), verts=40)
+    # --- 细节补强：机库/烟囱基座/补给站/吊车/近防/救生筏/RHIB ---
+    # 烟囱基座（原烟囱悬空于甲板之上）
+    box("panshi_funnel_base", (0, -50.0, deckz + 4.0), (9.0, 10.0, 8.0), navy())
+    # 艉部机库
+    wedge("panshi_hangar", (0, -61.0, deckz), (14.0, 16.0, 5.6), navy(), 0.95, 1.0)
+    box("panshi_hangar_door", (0, -68.7, deckz + 2.2), (8.0, 0.5, 3.6), dark())
+    for sx in (-1, 1):
+        box("panshi_hangar_win_%d" % sx, (sx * 5.75, -61.0, deckz + 4.6),
+            (0.16, 10.0, 0.9), glass())
+    # 舰桥翼台/侧窗/前窗
+    for sx in (-1, 1):
+        box("panshi_bridgewing_%d" % sx, (sx * 8.6, 56.0, deckz + 3.2), (3.2, 6.0, 0.3), navy())
+        box("panshi_bridge_sidewin_%d" % sx, (sx * 7.1, 48.0, deckz + 10.6),
+            (0.16, 12.0, 1.1), glass())
+    box("panshi_bridge_win_f", (0, 63.5, deckz + 10.2), (10.0, 0.8, 1.2), glass())
+    # 两舷横向补给站
+    for sx in (-1, 1):
+        for yy in (10.0, -18.0):
+            cyl("panshi_kingpost_%d_%d" % (sx, int(yy)), (sx * 10.0, yy, deckz + 7.0),
+                0.34, 14.0, navy(), verts=10)
+            cyl("panshi_rasboom_%d_%d" % (sx, int(yy)), (sx * 14.8, yy, deckz + 13.4),
+                0.24, 9.0, navy(), axis="X", verts=8)
+            box("panshi_rashead_%d_%d" % (sx, int(yy)), (sx * 19.4, yy, deckz + 13.0),
+                (0.9, 1.4, 0.7), dark())
+    # 甲板吊车
+    for i, (cx, cy) in enumerate(((7.2, 26.0), (-7.2, -12.0))):
+        cyl("panshi_crane%d_base" % i, (cx, cy, deckz + 1.8), 0.7, 3.6, navy(), verts=10)
+        box("panshi_crane%d_cab" % i, (cx, cy, deckz + 4.1), (1.5, 1.7, 1.2), navy())
+        box("panshi_crane%d_jib" % i, (cx - 2.9 if cx > 0 else cx + 2.9, cy, deckz + 4.6),
+            (5.4, 0.5, 0.5), navy())
+    # 30 mm 近防（舰桥翼台）
+    for sx in (-1, 1):
+        cyl("panshi_gun30_%d_b" % sx, (sx * 8.6, 56.0, deckz + 3.65), 0.7, 0.9, white(), verts=14)
+        cyl("panshi_gun30_%d_g" % sx, (sx * 8.6, 55.2, deckz + 4.35), 0.11, 1.2, dark(), axis="Y", verts=8)
+    # 救生筏
+    for sx in (-1, 1):
+        for i in range(4):
+            cyl("panshi_raft_%d_%d" % (sx, i), (sx * 9.3, 40.0 - i * 5.5, deckz + 1.9),
+                0.46, 1.0, white(), axis="X", verts=8)
+    # 两舷补给管线
+    for sx in (-1, 1):
+        box("panshi_pipe_%d" % sx, (sx * 10.8, -8.0, deckz + 0.35),
+            (0.18, 96.0, 0.18), dark())
+    # 舷侧 RHIB
+    for sx in (-1, 1):
+        box("panshi_rhib_%d" % sx, (sx * 10.6, 28.0, deckz + 1.2), (1.4, 4.4, 0.85),
+            mat("rhib", (0.18, 0.20, 0.21), 0.6))
+    # 桅顶导航雷达
+    cyl("panshi_navradar", (0, 45.0, deckz + 22.4), 0.9, 0.16, dark(), verts=16)
     finish("t_panshi", "water")
 
 
@@ -613,6 +704,38 @@ def build_tuochiang():
         for i in range(2):
             cyl("tc_assm_%d_%d" % (sx, i), (sx * 3.2, -12.0 + i * 1.3, deckz + 3.2), 0.5, 4.6,
                 mat("assm", (0.24, 0.27, 0.26), 0.5), axis="Y", verts=12)
+    # --- 细节补强：翼台/侧窗/第二组反舰弹/雷达/救生筏/喷水口/艉部 ---
+    for sx in (-1, 1):
+        box("tc_bridgewing_%d" % sx, (sx * 4.2, 14.0, deckz + 3.0), (2.0, 4.0, 0.25), navy())
+        box("tc_sidewin_%d" % sx, (sx * 3.65, 6.0, deckz + 4.4), (0.14, 9.0, 0.7), glass())
+    # 舰桥前窗（原有窗带嵌在体块内）
+    box("tc_win_f", (0, 17.0, deckz + 5.6), (4.8, 0.8, 1.0), glass())
+    # 雷达/桅顶
+    cyl("tc_radar", (0, 8.0, deckz + 11.4), 1.1, 0.2, mat("radar", (0.22, 0.24, 0.24), 0.4), verts=20)
+    cyl("tc_esm", (0, 8.0, deckz + 14.6), 0.18, 0.9, dark(), verts=8)
+    # 反舰导弹：每舷 4 管（第二组 + 共用底座）
+    for sx in (-1, 1):
+        box("tc_asm_base_%d" % sx, (sx * 3.2, -12.7, deckz + 2.4), (2.6, 7.4, 0.8), navy())
+        for i in range(2):
+            cyl("tc_assm2_%d_%d" % (sx, i), (sx * 3.2, -16.0 + i * 1.3, deckz + 3.2),
+                0.5, 4.6, mat("assm", (0.24, 0.27, 0.26), 0.5), axis="Y", verts=12)
+    # 救生筏
+    for sx in (-1, 1):
+        for i in range(4):
+            cyl("tc_raft_%d_%d" % (sx, i), (sx * 6.9, -14.0 + i * 4.4, deckz + 1.3),
+                0.34, 1.1, white(), axis="X", verts=8)
+    # 喷水推进出口
+    for sx in (-1, 1):
+        for k in range(2):
+            cyl("tc_jet_%d_%d" % (sx, k), (sx * (3.4 + k * 2.4), -30.6, 3.0),
+                0.36, 1.2, dark(), axis="Y", verts=10)
+    # 艉部低甲板 + RHIB
+    box("tc_stern_deck", (0, -26.0, 3.5), (6.0, 6.0, 0.2), deck())
+    box("tc_rhib", (0, -26.0, 3.95), (1.3, 3.8, 0.8),
+        mat("rhib", (0.18, 0.20, 0.21), 0.6))
+    # 锚机
+    for sx in (-1, 1):
+        box("tc_hawse_%d" % sx, (sx * 4.7, 28.6, 3.6), (0.7, 1.1, 0.8), dark())
     finish("t_tuochiang", "water")
 
 
@@ -648,6 +771,59 @@ def build_kidd():
     cyl("kidd_mk26_a", (0, -66, deckz + 1.6), 2.6, 1.8, navy(), verts=20)
     box("kidd_flightdeck", (0, -78, deckz + 0.08), (14.0, 20.0, 0.14), deck())
     cyl("kidd_helo", (0, -78, deckz + 0.2), 4.2, 0.05, white(), verts=36)
+    # --- 细节补强：翼台/舷窗/鱼叉/照射雷达/密集阵/鱼雷管/后桅 ---
+    for sx in (-1, 1):
+        box("kidd_bridgewing_%d" % sx, (sx * 7.4, 40.0, deckz + 3.0), (2.6, 6.0, 0.3), navy())
+        box("kidd_mid_win_%d" % sx, (sx * 6.0, -8.0, deckz + 4.8), (0.16, 12.0, 1.0), glass())
+        box("kidd_hangar_win_%d" % sx, (sx * 5.95, -46.0, deckz + 5.4), (0.16, 16.0, 1.1), glass())
+    # 鱼叉 2x4（中层甲板顶，两舷）
+    for sx in (-1, 1):
+        box("kidd_harpoon_base_%d" % sx, (sx * 4.2, -9.0, deckz + 6.9), (2.6, 5.6, 0.8), navy())
+        for iy in (-1, 0):
+            for iz in (0, 1):
+                cyl("kidd_harpoon_%d_%d_%d" % (sx, iy, iz),
+                    (sx * 4.2 + iy * 0.75, -9.0, deckz + 7.7 + iz * 0.8),
+                    0.3, 5.2, mat("harpoon", (0.22, 0.25, 0.25), 0.5), axis="Y", verts=10)
+    # SPG-51 照射雷达（前 1 后 2）
+    for key, (px, py, pz) in (("f", (0.0, 33.0, deckz + 9.0)),
+                              ("a1", (-3.0, -32.0, deckz + 7.6)),
+                              ("a2", (3.0, -32.0, deckz + 7.6))):
+        cyl("kidd_spg_%s_ped" % key, (px, py, pz), 0.28, 1.8, navy(), verts=8)
+        cyl("kidd_spg_%s_dish" % key, (px, py, pz + 1.5), 1.05, 0.26, white(), axis="Y", verts=18)
+    # 密集阵
+    ciws("kidd_ciws_f", 57.0, deckz + 0.6)
+    ciws("kidd_ciws_a", -40.0, deckz + 7.6)
+    # 鱼雷发射管（两舷各 3 管）
+    for sx in (-1, 1):
+        box("kidd_tt_base_%d" % sx, (sx * 5.4, -24.0, deckz + 1.1), (1.2, 3.6, 0.9), navy())
+        for k in range(3):
+            cyl("kidd_tt_%d_%d" % (sx, k), (sx * 5.5, -23.2 + k * 1.0, deckz + 1.7),
+                0.26, 2.6, dark(), axis="Y", verts=8)
+    # 后桅 + SPS-49
+    mast("kidd_mast2", -34.0, deckz + 7.5, 8.0)
+    box("kidd_sps49", (0, -34.0, deckz + 16.4), (5.4, 0.35, 2.6),
+        mat("radar", (0.22, 0.24, 0.24), 0.4))
+    # Mk26 装填舱
+    box("kidd_mk26_f_house", (0, 30.6, deckz + 1.3), (3.6, 3.0, 2.2), navy())
+    box("kidd_mk26_a_house", (0, -63.8, deckz + 2.0), (3.6, 3.0, 2.2), navy())
+    box("kidd_arm_a", (0, -64.8, deckz + 2.6), (1.0, 5.0, 0.35), dark())
+    # 救生筏
+    for sx in (-1, 1):
+        for i in range(4):
+            cyl("kidd_raft_%d_%d" % (sx, i), (sx * 7.2, -38.0 - i * 5.0, deckz + 1.6),
+                0.42, 0.9, white(), axis="X", verts=8)
+    # 舷侧 RHIB
+    box("kidd_rhib", (7.75, -10.0, deckz + 1.2), (1.4, 4.2, 0.85),
+        mat("rhib", (0.18, 0.20, 0.21), 0.6))
+    # 锚孔
+    for sx in (-1, 1):
+        box("kidd_hawse_%d" % sx, (sx * 2.6, 79.0, deckz - 0.8), (0.9, 1.3, 1.0), dark())
+    # 前桅基座甲板室与 2 号烟囱基座（原结构悬空于甲板之上）
+    wedge("kidd_fwd_house", (0, 20.0, deckz), (7.0, 8.0, 8.5), navy(), 0.9, 1.0)
+    for sx in (-1, 1):
+        box("kidd_fwd_house_win_%d" % sx, (sx * 3.55, 20.0, deckz + 5.7),
+            (0.14, 5.0, 1.0), glass())
+    box("kidd_funnel2_base", (0, -22.0, deckz + 3.25), (8.0, 9.0, 6.5), navy())
     finish("t_kidd", "water")
 
 
