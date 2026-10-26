@@ -140,6 +140,18 @@ for (const k of Object.keys(L.MODEL_MAP)) {
   else failures.push(k + ' 缺少 REAL_LENGTH_M（targetFx 尾流会退化）');
 }
 
+// --- 8c. LOD1 映射 ---
+eq(L.lod1UrlFor({ domain: 'land', model: 'ZTD-05 两栖突击车' }),
+  './assets/models/lod1_ztd05.glb', 'ZTD-05 -> lod1');
+eq(L.lod1UrlFor({ domain: 'land', model: 'EQ240 运输车' }),
+  './assets/models/lod1_eq240.glb', 'EQ240 -> lod1');
+eq(L.lod1UrlFor({ domain: 'sea', model: '071 型船坞登陆舰' }), null, '071 无 lod1');
+for (const u of ['./assets/models/lod1_ztd05.glb', './assets/models/lod1_eq240.glb']) {
+  const fp = path.join(__dirname, '..', 'web', u.replace(/^\.\//, ''));
+  if (fs.existsSync(fp)) pass++;
+  else failures.push('LOD1 文件不存在: ' + fp);
+}
+
 // --- 9. 尺度：资产按米归一，scale 恒为 1 ---
 for (const k of Object.keys(L.MODEL_MAP)) {
   eq(L.scaleFor(k), 1, `${k} scale=1`);

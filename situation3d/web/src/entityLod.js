@@ -255,6 +255,20 @@
     return (url && MODEL_YAW_FIX_DEG[url]) || 0;
   }
 
+  /**
+   * 高频目标的 LOD1（1.2–3 km 相机高度）。只登记确实做了低模的资产；
+   * 其余返回 null，运行时继续用 LOD0。LOD1 与 LOD0 同朝向、同原点。
+   */
+  var LOD1_MAP = {
+    './assets/models/type_ztd05.glb': './assets/models/lod1_ztd05.glb',
+    './assets/models/type_eq240.glb': './assets/models/lod1_eq240.glb',
+  };
+
+  function lod1UrlFor(def) {
+    var url = modelUrlFor(def);
+    return (url && LOD1_MAP[url]) || null;
+  }
+
   /** 新资产没有可命名的轮节点（轮子烘焙在车身网格里），返回空表。 */
   function wheelNodes() {
     return [];
@@ -285,6 +299,7 @@
     formClassOf: formClassOf,
     forwardAxis: forwardAxis,
     modelYawOffset: modelYawOffset,
+    lod1UrlFor: lod1UrlFor,
     wheelNodes: wheelNodes,
     MODEL_MAP: MODEL_MAP,
     TYPE_RULES: TYPE_RULES,
