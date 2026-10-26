@@ -157,9 +157,11 @@ elif ANCHOR == "center":
 else:
     dz = 0.0
 dx = (mn.x + mx.x) / 2.0
+dy = (mn.y + mx.y) / 2.0
 for o in objs:
     m = o.matrix_world.copy()
     m.translation.x -= dx
+    m.translation.y -= dy
     m.translation.z -= dz
     o.matrix_world = m
 

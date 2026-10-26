@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": "2026-10-26T12:53:02",
+  "generated_at": "2026-10-26T13:14:49",
   "note": "由 tools/model_budget_test.py 生成；sha256 对应优化后的 GLB。",
   "assets": {
     "type_052c.glb": {
@@ -64,10 +64,10 @@
       }
     },
     "type_055.glb": {
-      "sha256": "2b65552a61973e5b47d8cdb0e6a25416fba0e338d4dfc2a8a66c878065764bc1",
-      "bytes": 285588,
+      "sha256": "80ae593bc5e147ab1d52b7b80ff14d3ff272052feadbb48e8556f0c2e31b777c",
+      "bytes": 286796,
       "mb": 0.27,
-      "tris": 33728,
+      "tris": 33958,
       "prims": 5,
       "materials": 5,
       "images": 2,
@@ -81,15 +81,15 @@
       "public": {
         "public_length_m": 180.0,
         "public_width_m": 20.0,
-        "notes": "055 型驱逐舰"
+        "notes": "055 型驱逐舰；模型 bbox 宽 26.3 m，待目视复核"
       },
       "license": {
-        "source": "Type-055 Destroyer",
+        "source": "[Type-055 Destroyer](https://sketchfab.com/models/f0a96b2475da407eb6ea2b430ba9ea85)",
         "author": "hrd4588",
         "license": "CC Attribution",
         "use": "055 型驱逐舰",
         "risk": [],
-        "source_url": null
+        "source_url": "https://sketchfab.com/models/f0a96b2475da407eb6ea2b430ba9ea85"
       }
     },
     "type_056a.glb": {
@@ -228,12 +228,12 @@
         "notes": "AH-64D 近似 AH-64E"
       },
       "license": {
-        "source": "Boeing AH-64D Apache Combat Helicopter",
+        "source": "[Boeing AH-64D Apache Combat Helicopter](https://sketchfab.com/models/c3b58008c46b45048fdd7dd283a3c8c8)",
         "author": "MirzaArrafiERV_45",
         "license": "CC Attribution",
         "use": "AH-64E 近似",
         "risk": [],
-        "source_url": null
+        "source_url": "https://sketchfab.com/models/c3b58008c46b45048fdd7dd283a3c8c8"
       }
     },
     "type_e2d.glb": {
@@ -324,10 +324,10 @@
       }
     },
     "type_himars.glb": {
-      "sha256": "e3b0d8ed84e436d52089a7a9ea8514fcf2b6bde5d5ccb7003db3bbef28987f48",
-      "bytes": 390508,
+      "sha256": "4872f2591cc071424daff7d7500365e4fc21280536d729b0ddaec97bc3e1d4e1",
+      "bytes": 390516,
       "mb": 0.37,
-      "tris": 7470,
+      "tris": 7472,
       "prims": 7,
       "materials": 6,
       "images": 4,
@@ -346,14 +346,14 @@
         "notes": "M142 HIMARS"
       },
       "license": {
-        "source": "Ukrainian M142 HIMARS（作者注明 Not my model）",
+        "source": "[Ukrainian M142 HIMARS](https://sketchfab.com/models/95d255cd685e4cc5afc35ba5f58679d4)（作者注明 Not my model）",
         "author": "42manako",
         "license": "CC Attribution",
         "use": "M142 HIMARS",
         "risk": [
           "provenance-unclear"
         ],
-        "source_url": null
+        "source_url": "https://sketchfab.com/models/95d255cd685e4cc5afc35ba5f58679d4"
       }
     },
     "type_hq16.glb": {
@@ -468,8 +468,8 @@
       }
     },
     "type_j20.glb": {
-      "sha256": "c3b33f4efc3b95d1dd5018aae0523fc7b8db9277a85059672ccb99a7544e3cfc",
-      "bytes": 294592,
+      "sha256": "4052e52cdded580c2c539adb51bfe8817d88fe565779f4eff66305ded6c35544",
+      "bytes": 294400,
       "mb": 0.28,
       "tris": 18885,
       "prims": 2,
@@ -488,12 +488,12 @@
         "notes": "J-20"
       },
       "license": {
-        "source": "Chengdu J-20 fighter",
+        "source": "[Chengdu J-20 fighter](https://sketchfab.com/models/735da22f59d04542b5b33e5b8fd699b1)",
         "author": "miopass",
         "license": "CC Attribution",
         "use": "J-20",
         "risk": [],
-        "source_url": null
+        "source_url": "https://sketchfab.com/models/735da22f59d04542b5b33e5b8fd699b1"
       }
     },
     "type_kidd.glb": {
@@ -673,8 +673,8 @@
       }
     },
     "type_m60a3.glb": {
-      "sha256": "502babefa88ff4a67e58cd7b75bafdf8828c243afb0581ca91c0228361de8910",
-      "bytes": 201740,
+      "sha256": "b8a77a256b35adf8631bcc3327464c058560ebd74d8df5c25f40d131e73889a2",
+      "bytes": 201744,
       "mb": 0.19,
       "tris": 9439,
       "prims": 2,
@@ -694,12 +694,12 @@
         "notes": "M60A3；CM-11 近似（M60A3 炮塔）"
       },
       "license": {
-        "source": "M60A3 Patton Medium Tank - Toshueyi",
+        "source": "[M60A3 Patton Medium Tank - Toshueyi](https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803)",
         "author": "jonathanto99",
         "license": "CC Attribution",
         "use": "M60A3 / CM-11 近似",
         "risk": [],
-        "source_url": null
+        "source_url": "https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803"
       }
     },
     "type_m777.glb": {
@@ -759,7 +759,7 @@
       }
     },
     "type_p3c.glb": {
-      "sha256": "ad0c53e1e806c0d298ff680b7528c375ce0aa6bb6d44cfe1c00fe708f4eb97ea",
+      "sha256": "406ac8dd2c5c5e7f18bea9176de2205159f8b5126617ef82ff4a706c76e7e02f",
       "bytes": 245812,
       "mb": 0.23,
       "tris": 23096,
@@ -776,17 +776,17 @@
       "public": {
         "public_length_m": 35.6,
         "public_width_m": 30.37,
-        "notes": "P-3C 反潜巡逻机"
+        "notes": "P-3C 反潜巡逻机；运行时 180° yaw 修正"
       },
       "license": {
-        "source": "Lockheed P-3C 2 \"Orion\"（模型 by mandun/3D Warehouse，来源链待核）",
+        "source": "[Lockheed P-3C 2 \"Orion\"](https://sketchfab.com/models/be11ab6c970741d78e62c9d8ff2e33e8)（模型 by mandun/3D Warehouse，来源链待核）",
         "author": "ammardhamiri1",
         "license": "CC Attribution",
         "use": "P-3C 反潜巡逻机",
         "risk": [
           "provenance-unclear"
         ],
-        "source_url": null
+        "source_url": "https://sketchfab.com/models/be11ab6c970741d78e62c9d8ff2e33e8"
       }
     },
     "type_pac3.glb": {

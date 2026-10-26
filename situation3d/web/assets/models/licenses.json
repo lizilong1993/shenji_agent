@@ -277,56 +277,56 @@
       "source_url": null
     },
     "type_055.glb": {
-      "source": "Type-055 Destroyer",
+      "source": "[Type-055 Destroyer](https://sketchfab.com/models/f0a96b2475da407eb6ea2b430ba9ea85)",
       "author": "hrd4588",
       "license": "CC Attribution",
       "use": "055 型驱逐舰",
       "risk": [],
-      "source_url": null
+      "source_url": "https://sketchfab.com/models/f0a96b2475da407eb6ea2b430ba9ea85"
     },
     "type_p3c.glb": {
-      "source": "Lockheed P-3C 2 \"Orion\"（模型 by mandun/3D Warehouse，来源链待核）",
+      "source": "[Lockheed P-3C 2 \"Orion\"](https://sketchfab.com/models/be11ab6c970741d78e62c9d8ff2e33e8)（模型 by mandun/3D Warehouse，来源链待核）",
       "author": "ammardhamiri1",
       "license": "CC Attribution",
       "use": "P-3C 反潜巡逻机",
       "risk": [
         "provenance-unclear"
       ],
-      "source_url": null
+      "source_url": "https://sketchfab.com/models/be11ab6c970741d78e62c9d8ff2e33e8"
     },
     "type_ah64e.glb": {
-      "source": "Boeing AH-64D Apache Combat Helicopter",
+      "source": "[Boeing AH-64D Apache Combat Helicopter](https://sketchfab.com/models/c3b58008c46b45048fdd7dd283a3c8c8)",
       "author": "MirzaArrafiERV_45",
       "license": "CC Attribution",
       "use": "AH-64E 近似",
       "risk": [],
-      "source_url": null
+      "source_url": "https://sketchfab.com/models/c3b58008c46b45048fdd7dd283a3c8c8"
     },
     "type_j20.glb": {
-      "source": "Chengdu J-20 fighter",
+      "source": "[Chengdu J-20 fighter](https://sketchfab.com/models/735da22f59d04542b5b33e5b8fd699b1)",
       "author": "miopass",
       "license": "CC Attribution",
       "use": "J-20",
       "risk": [],
-      "source_url": null
+      "source_url": "https://sketchfab.com/models/735da22f59d04542b5b33e5b8fd699b1"
     },
     "type_m60a3.glb": {
-      "source": "M60A3 Patton Medium Tank - Toshueyi",
+      "source": "[M60A3 Patton Medium Tank - Toshueyi](https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803)",
       "author": "jonathanto99",
       "license": "CC Attribution",
       "use": "M60A3 / CM-11 近似",
       "risk": [],
-      "source_url": null
+      "source_url": "https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803"
     },
     "type_himars.glb": {
-      "source": "Ukrainian M142 HIMARS（作者注明 Not my model）",
+      "source": "[Ukrainian M142 HIMARS](https://sketchfab.com/models/95d255cd685e4cc5afc35ba5f58679d4)（作者注明 Not my model）",
       "author": "42manako",
       "license": "CC Attribution",
       "use": "M142 HIMARS",
       "risk": [
         "provenance-unclear"
       ],
-      "source_url": null
+      "source_url": "https://sketchfab.com/models/95d255cd685e4cc5afc35ba5f58679d4"
     }
   }
 }

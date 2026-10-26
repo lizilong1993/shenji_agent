@@ -39,13 +39,14 @@ def main():
             risk.append("sketchfab-free-standard-redistribution")
         if "not my model" in text or "来源链待核" in text:
             risk.append("provenance-unclear")
+        murl = re.search(r"\((https?://[^)]+)\)", source)
         assets[name] = {
             "source": source,
             "author": author,
             "license": license,
             "use": use,
             "risk": risk,
-            "source_url": None,
+            "source_url": murl.group(1) if murl else None,
         }
 
     specs = json.load(open(os.path.join(MODELS, "specs.json"), encoding="utf-8"))["assets"]

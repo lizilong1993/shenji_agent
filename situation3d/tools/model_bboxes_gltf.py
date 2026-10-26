@@ -52,7 +52,7 @@ def main(root):
         }
         print(fn, models[fn]["length_m"], models[fn]["width_m"], models[fn]["height_m"])
     if len(models) != 39:
-        print("expected 33 main models, got %d" % len(models), file=sys.stderr)
+        print("expected 39 main models, got %d" % len(models), file=sys.stderr)
         return 1
     doc = {"schema": "situation3d.model_bboxes.v1", "models": models}
     for path in (out_engine, out_web):

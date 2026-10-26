@@ -185,13 +185,13 @@
       "class": "ship_large",
       "public_length_m": 180.0,
       "public_width_m": 20.0,
-      "notes": "055 型驱逐舰"
+      "notes": "055 型驱逐舰；模型 bbox 宽 26.3 m，待目视复核"
     },
     "type_p3c.glb": {
       "class": "aircraft_aew",
       "public_length_m": 35.6,
       "public_width_m": 30.37,
-      "notes": "P-3C 反潜巡逻机"
+      "notes": "P-3C 反潜巡逻机；运行时 180° yaw 修正"
     },
     "type_ah64e.glb": {
       "class": "aircraft_fighter",

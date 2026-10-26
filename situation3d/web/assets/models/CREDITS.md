@@ -37,16 +37,16 @@
 | `type_075.glb` | 自建（tools/modelgen/build_custom.py `build_075()`） | 本项目 | 项目内部 | 075 两栖攻击舰（近似） |
 | `type_kj500.glb` | KJ-2000 (DCS World) 缩比近似 | KojfDiscord | CC Attribution | 空警-500（近似） |
 | `type_ztq15.glb` | Type 99 MBT 缩比近似 | philano | CC Attribution | 15 式轻型坦克（近似） |
-| `type_055.glb` | Type-055 Destroyer | hrd4588 | CC Attribution | 055 型驱逐舰 |
-| `type_p3c.glb` | Lockheed P-3C 2 "Orion"（模型 by mandun/3D Warehouse，来源链待核） | ammardhamiri1 | CC Attribution | P-3C 反潜巡逻机 |
-| `type_ah64e.glb` | Boeing AH-64D Apache Combat Helicopter | MirzaArrafiERV_45 | CC Attribution | AH-64E 近似 |
-| `type_j20.glb` | Chengdu J-20 fighter | miopass | CC Attribution | J-20 |
-| `type_m60a3.glb` | M60A3 Patton Medium Tank - Toshueyi | jonathanto99 | CC Attribution | M60A3 / CM-11 近似 |
-| `type_himars.glb` | Ukrainian M142 HIMARS（作者注明 Not my model） | 42manako | CC Attribution | M142 HIMARS |
+| `type_055.glb` | [Type-055 Destroyer](https://sketchfab.com/models/f0a96b2475da407eb6ea2b430ba9ea85) | hrd4588 | CC Attribution | 055 型驱逐舰 |
+| `type_p3c.glb` | [Lockheed P-3C 2 "Orion"](https://sketchfab.com/models/be11ab6c970741d78e62c9d8ff2e33e8)（模型 by mandun/3D Warehouse，来源链待核） | ammardhamiri1 | CC Attribution | P-3C 反潜巡逻机 |
+| `type_ah64e.glb` | [Boeing AH-64D Apache Combat Helicopter](https://sketchfab.com/models/c3b58008c46b45048fdd7dd283a3c8c8) | MirzaArrafiERV_45 | CC Attribution | AH-64E 近似 |
+| `type_j20.glb` | [Chengdu J-20 fighter](https://sketchfab.com/models/735da22f59d04542b5b33e5b8fd699b1) | miopass | CC Attribution | J-20 |
+| `type_m60a3.glb` | [M60A3 Patton Medium Tank - Toshueyi](https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803) | jonathanto99 | CC Attribution | M60A3 / CM-11 近似 |
+| `type_himars.glb` | [Ukrainian M142 HIMARS](https://sketchfab.com/models/95d255cd685e4cc5afc35ba5f58679d4)（作者注明 Not my model） | 42manako | CC Attribution | M142 HIMARS |
 
 ## 说明
 
-- 052D 无公开可下载的精确资产，使用同族 052C 模型；空警-500 使用 KJ-2000 缩比（`type_kj500`）；15 式使用 99A 缩比（`type_ztq15`）；歼-16 使用 Su-30MKK；F-16V 使用 F-16C；CM-11 使用 M48A5。
+- 052D 无公开可下载的精确资产，使用同族 052C 模型；空警-500 使用 KJ-2000 缩比（`type_kj500`）；15 式使用 99A 缩比（`type_ztq15`）；歼-16 使用 Su-30MKK；F-16V 使用 F-16C；CM-11 使用 M60A3 近似。
 - 所有 GLB 均按公开全长（舰长/机长/车长含炮管）归一为 1 单位 = 1 米，原点在水线/地面/机体中心，艏/头朝 Blender +Y。
 - Sketchfab 模型已按 CC-BY / Free Standard 许可署名；二次分发时请保留本文件。
 

@@ -26,7 +26,16 @@
 | `type_kidd.glb` | 基隆级（Kidd） | 自建 |
 | `type_ztz99a.glb` | 99A | Sketchfab |
 | `type_m1a2.glb` | M1A2 | Sketchfab |
-| `type_m48a5.glb` | M48A5（CM-11 近似） | Sketchfab |
+| `type_m48a5.glb` | M48A5 本体 | Sketchfab |
+| `type_m60a3.glb` | M60A3 / CM-11 近似 | Sketchfab |
+| `type_055.glb` | 055 型驱逐舰 | Sketchfab |
+| `type_075.glb` | 075 两栖攻击舰 | 自建 |
+| `type_kj500.glb` | 空警-500（KJ-2000 缩比） | 自建 |
+| `type_ztq15.glb` | 15 式（99A 缩比） | 自建 |
+| `type_p3c.glb` | P-3C | Sketchfab |
+| `type_ah64e.glb` | AH-64E（AH-64D 近似） | Sketchfab |
+| `type_himars.glb` | M142 HIMARS | Sketchfab |
+| `type_j20.glb` | 歼-20 | Sketchfab |
 | `type_ztd05.glb` | 05 式两栖突击车 | Sketchfab |
 | `type_plz05.glb` | PLZ-05 | Sketchfab |
 | `type_m109a6.glb` | M109A6 | Sketchfab |
@@ -97,9 +106,7 @@ node tools/entity_lod_test.js
 
 ## 已知近似
 
-- 052D → 052C；空警-500 → KJ-2000；歼-16 → Su-30MKK；F-16V → F-16C；
-  CM-11 → M48A5；15 式 → 99A 大类。
-- 15 式 Sketchfab 资产是带木质展台的三维扫描件，裁切后仍无法分离，弃用。
+- 052D → 052C；空警-500 → KJ-2000 缩比；15 式 → 99A 缩比；歼-16 → Su-30MKK；F-16V → F-16C；CM-11 → M60A3；AH-64E → AH-64D。
 
 ## 旧脚本
 

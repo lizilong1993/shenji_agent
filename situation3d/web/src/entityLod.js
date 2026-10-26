@@ -115,7 +115,7 @@
     [/99a|ztz-?99/i, 'type_ztz99a'],
     [/m1a2/i, 'type_m1a2'],
     [/m60a?3/i, 'type_m60a3'],
-    [/cm-?11/i, 'type_m60a3'],
+    [/cm-?11|m48h/i, 'type_m60a3'],
     [/m48/i, 'type_m48a5'],
     [/05\s*式|ztd-?05|zbd-?05/i, 'type_ztd05'],
     [/plz-?05/i, 'type_plz05'],
@@ -129,7 +129,7 @@
     [/himars|m142|海马斯/i, 'type_himars'],
     [/运输|车队|ural|卡车|truck|eq240|东风/i, 'type_eq240'],
     // 空中
-    [/歼-?20|j-?20/i, 'type_j20'],
+    [/歼-?20|j-?20(?!\d)/i, 'type_j20'],
     [/歼-?16|j-?16|su-?30/i, 'type_j16'],
     [/f-?16/i, 'type_f16c'],
     [/idf|经国|f-?ck-?1/i, 'type_idf'],
@@ -247,6 +247,7 @@
   var MODEL_YAW_FIX_DEG = {
     './assets/models/type_ztd05.glb': 180,
     './assets/models/type_eq240.glb': 180,
+    './assets/models/type_p3c.glb': 180,
   };
 
   function modelYawOffset(def) {
