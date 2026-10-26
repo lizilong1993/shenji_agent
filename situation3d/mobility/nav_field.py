@@ -51,9 +51,11 @@ for _name, _code in _COVER_CODES.items():
     _COVER_NAMES[_code] = _name
 
 _ROAD_RANK = {
-    "motorway": 3, "trunk": 3, "primary": 2, "secondary": 2,
-    "tertiary": 1, "living_street": 1, "residential": 1, "unclassified": 1,
-    "service": 1, "track": 1, "legacy": 1,
+    "motorway": 3, "motorway_link": 3, "trunk": 3, "trunk_link": 3,
+    "primary": 2, "primary_link": 2, "secondary": 2, "secondary_link": 2,
+    "tertiary": 1, "tertiary_link": 1, "living_street": 1,
+    "residential": 1, "unclassified": 1, "service": 1, "track": 1,
+    "road": 1, "legacy": 1,
 }
 
 DIRECTIONS = [
@@ -1182,9 +1184,9 @@ class NavField(object):
             return False
         if footprint is not None:
             half = min(10.0, max(0.5, float(prof.width_m or 1.0) / 2.0))
-            offsets = [(0.0, 0.0), (half / self.m_lon, 0.0),
-                       (-half / self.m_lon, 0.0), (0.0, half / self.m_lat),
-                       (0.0, -half / self.m_lat)]
+            dx, dy = half / self.m_lon, half / self.m_lat
+            offsets = [(0.0, 0.0), (dx, 0.0), (-dx, 0.0), (0.0, dy),
+                       (0.0, -dy), (dx, dy), (dx, -dy), (-dx, dy), (-dx, -dy)]
             for dlon, dlat in offsets:
                 if footprint(lon + dlon, lat + dlat) is not None:
                     return False

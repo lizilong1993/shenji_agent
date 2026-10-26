@@ -28,8 +28,9 @@ def _footprint_clear(query: Any, profile: Any, lon: float, lat: float) -> bool:
     half = min(10.0, max(0.5, float(getattr(profile, "width_m", 1.0) or 1.0) / 2.0))
     kx = 111320.0 * math.cos(math.radians(lat))
     ky = 110540.0
-    for dlon, dlat in ((0.0, 0.0), (half / kx, 0.0), (-half / kx, 0.0),
-                       (0.0, half / ky), (0.0, -half / ky)):
+    dx, dy = half / kx, half / ky
+    for dlon, dlat in ((0.0, 0.0), (dx, 0.0), (-dx, 0.0), (0.0, dy),
+                       (0.0, -dy), (dx, dy), (dx, -dy), (-dx, dy), (-dx, -dy)):
         if footprint(lon + dlon, lat + dlat) is not None:
             return False
     return True
@@ -63,6 +64,8 @@ def _first_blocked_s(query: Any, profile: Any, route: Route,
     while s <= total:
         pose = route.pose_at(s)
         if not query.passability(profile, pose.lon, pose.lat).value["allowed"]:
+            return s
+        if not _footprint_clear(query, profile, pose.lon, pose.lat):
             return s
         s += step_m
     return None

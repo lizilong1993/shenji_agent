@@ -125,7 +125,10 @@ def evaluate_gates(profile, lon: float, lat: float, env,
             if depth < need:
                 return GateResult(False, ("water_depth",), ("water_depth",))
         else:
-            wading = float(getattr(profile, "wading_depth_m", 0.0))
+            if domain == "amphibious":
+                wading = float(getattr(profile, "swim_depth_m", 0.0))
+            else:
+                wading = float(getattr(profile, "wading_depth_m", 0.0))
             if eff_depth is not None:
                 if eff_depth > wading:
                     return GateResult(False, ("water_depth",), ("water_depth",))

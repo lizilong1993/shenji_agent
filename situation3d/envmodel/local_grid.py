@@ -58,6 +58,9 @@ def _cell_ok(query, profile, lon: float, lat: float) -> bool:
             )
             if depth < need:
                 return False
+        elif _domain(profile) == "amphibious":
+            if depth > float(getattr(profile, "swim_depth_m", 0.0)):
+                return False
         elif depth > float(getattr(profile, "wading_depth_m", 0.0)):
             return False
     slope = float(env.slope_deg(lon, lat))
