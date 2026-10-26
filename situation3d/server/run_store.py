@@ -274,6 +274,9 @@ class RunStore(object):
             "validation": run.get("validation") or {},
             "seed": run.get("seed"),
             "progress": run.get("progress") or {},
+            "scenario_date": (run.get("config") or {}).get("scenario_date"),
+            "resources": run.get("resources") or {},
+            "resource_gaps": run.get("resource_gaps") or [],
         }
 
     def _read_run(self, case_dir, run_id):

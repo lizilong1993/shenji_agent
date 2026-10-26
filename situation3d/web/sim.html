@@ -36,10 +36,21 @@
   .pill.latest { border-color: #b7d3ff; background: #eef5ff; color: #1f6feb; }
   .pill.best { border-color: #b7e1c4; background: #eefaf2; color: #137a3d; }
   .pill.pinned { border-color: #f0d49b; background: #fff8e8; color: #8a5a00; }
-  .ok { color: #137a3d; } .bad { color: #b42318; }
+  .ok { color: #137a3d; } .bad { color: #b42318; } .warn { color: #8a5a00; }
   .actions { display: flex; flex-wrap: wrap; gap: 4px; }
   .actions button { padding: 4px 8px; font-size: 12px; }
   code { font-size: 12px; color: #52606d; }
+  .task-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+              padding: 6px 0; border-bottom: 1px dashed #eef2f5; }
+  .task-row input { padding: 4px 6px; font-size: 12px; }
+  .task-row select { padding: 4px 6px; font-size: 12px; }
+  .task-row .units { width: 150px; }
+  .task-row .obj { width: 150px; }
+  .task-row .coord { width: 105px; }
+  .task-row .when { width: 70px; }
+  .gap { border: 1px solid #e6b8b3; background: #fff7f6; border-radius: 6px;
+         padding: 8px 10px; margin: 6px 0; }
+  #resolver { display: none; }
 </style>
 </head>
 <body>
@@ -54,10 +65,37 @@
       <label>案例 <select id="case"></select></label>
       <label>随机种子 <input id="seed" type="number" value="20261023" step="1"></label>
       <label>推演时长（tick） <input id="ticks" type="number" value="1440" min="10" max="2000" step="10"></label>
+      <label>想定日期 <input id="scenario-date" type="datetime-local"></label>
+      <label>资源模式
+        <select id="resource-mode">
+          <option value="auto" selected>auto（在线优先，失败回退缓存）</option>
+          <option value="offline">offline（只用缓存）</option>
+          <option value="online">online（要求在线刷新）</option>
+        </select>
+      </label>
+      <label>指挥方
+        <select id="side"><option value="0" selected>红方</option><option value="1">蓝方</option></select>
+      </label>
       <button id="launch">发起推演</button>
       <span class="status" id="status"></span>
     </div>
   </section>
+
+  <section class="panel">
+    <div class="row" style="margin-bottom:6px">
+      <strong>开局任务（可选）</strong>
+      <span class="hint">按单位覆盖同侧默认任务；不填则执行案例内置 doctrine。单位 ID 用逗号分隔。</span>
+      <button class="ghost" id="add-task" style="margin-left:auto">添加任务</button>
+      <label>任务模式
+        <select id="task-mode">
+          <option value="user" selected>user（覆盖所涉单位）</option>
+          <option value="mixed">mixed（保留默认，冲突报错）</option>
+        </select>
+      </label>
+    </div>
+    <div id="task-list"><div class="hint" id="task-empty">尚未添加任务。</div></div>
+  </section>
+
   <section class="panel">
     <div class="row" style="margin-bottom:8px">
       <strong>运行结果</strong>
@@ -67,11 +105,26 @@
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>运行</th><th>状态</th><th>seed</th><th>事件</th><th>开火</th><th>毁伤</th>
+          <th>运行</th><th>状态</th><th>seed</th><th>资源</th><th>事件</th><th>开火</th><th>毁伤</th>
           <th>损失</th><th>校验</th><th>角色</th><th>操作</th>
         </tr></thead>
-        <tbody id="runs"><tr><td colspan="10" class="hint">加载中…</td></tr></tbody>
+        <tbody id="runs"><tr><td colspan="11" class="hint">加载中…</td></tr></tbody>
       </table>
+    </div>
+  </section>
+
+  <section class="panel" id="resolver">
+    <div class="row" style="margin-bottom:6px">
+      <strong>处理运行资源缺口</strong>
+      <span class="hint" id="resolver-run"></span>
+      <button class="ghost" id="resolver-close" style="margin-left:auto">关闭</button>
+    </div>
+    <div id="resolver-info"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="ghost" id="resolver-fetch">在线刷新</button>
+      <button class="ghost" id="resolver-provide">提供环境包路径…</button>
+      <button class="danger" id="resolver-cancel">取消运行</button>
+      <span class="status" id="resolver-status"></span>
     </div>
   </section>
 </main>
