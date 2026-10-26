@@ -517,6 +517,38 @@ class NavField(object):
         return mask, speed
 
     # -- point queries -----------------------------------------------------
+    def components(self, prof: PlatformProfile):
+        """Connected components of the passable mask (8-connected).
+
+        Returns ``(labels, sizes)`` where ``labels[i]`` is the component id of
+        cell ``i`` (``-1`` when blocked) and ``sizes[c]`` is its cell count.
+        """
+        mask = self.profile_mask(prof)[0]
+        labels = [-1] * len(mask)
+        sizes: List[int] = []
+        for start in range(len(mask)):
+            if not mask[start] or labels[start] >= 0:
+                continue
+            cid = len(sizes)
+            stack = [start]
+            labels[start] = cid
+            size = 0
+            while stack:
+                i = stack.pop()
+                size += 1
+                row, col = divmod(i, self.cols)
+                for dr in (-1, 0, 1):
+                    for dc in (-1, 0, 1):
+                        rr, cc = row + dr, col + dc
+                        if not (0 <= rr < self.rows and 0 <= cc < self.cols):
+                            continue
+                        j = rr * self.cols + cc
+                        if mask[j] and labels[j] < 0:
+                            labels[j] = cid
+                            stack.append(j)
+            sizes.append(size)
+        return labels, sizes
+
     def passable(self, prof: PlatformProfile, lon: float, lat: float) -> Optional[bool]:
         """True/False inside the pack; ``None`` outside (caller uses env)."""
         i = self._index_of(lon, lat)

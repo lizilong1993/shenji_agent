@@ -104,26 +104,22 @@ def _detour_point(route: Route, idx: int, offset_m: float) -> Optional[Pose]:
     )
 
 
-def repair_route(query: Any, profile: Any, route: Route,
-                 step_m: float = 3.0,
-                 offsets: Sequence[float] = (10.0, 30.0)
-                 ) -> Optional[Route]:
-    """Try shifting the first blocked route vertex sideways.
+def _point_ok(query: Any, profile: Any, lon: float, lat: float) -> bool:
+    if not query.passability(profile, lon, lat).value["allowed"]:
+        return False
+    return _footprint_clear(query, profile, lon, lat)
 
-    Candidate validation uses the same fine step (3 m by default) as the final
-    conformance check, so thin water or footprint strips cannot slip through.
-    """
-    blocked_s = _first_blocked_s(query, profile, route,
-                                 step_m=min(5.0, step_m))
-    if blocked_s is None:
-        return route
+
+def _repair_at(query: Any, profile: Any, route: Route, blocked_s: float,
+               step_m: float, offsets: Sequence[float]) -> Optional[Route]:
+    """Try point shifts, then a local grid splice, around one block."""
     idx = _nearest_index(route, blocked_s)
     for offset in offsets:
         for sign in (-1.0, 1.0):
             p = _detour_point(route, idx, sign * offset)
             if p is None:
                 continue
-            if not query.passability(profile, p.lon, p.lat).value["allowed"]:
+            if not _point_ok(query, profile, p.lon, p.lat):
                 continue
             points: List[Pose] = list(route.points)
             points[idx] = p
@@ -135,29 +131,57 @@ def repair_route(query: Any, profile: Any, route: Route,
             if validate_route(query, profile, candidate, step_m=step_m):
                 return candidate
 
-    # A single point shift is not enough for a block spanning several cells:
-    # plan a short 3 m detour around the blocked window and splice it in.
+    # A point shift is not enough for a block spanning several cells: plan a
+    # short fine detour around the blocked window and splice it in. Try a
+    # wider window when the first one is too tight.
     total = float(route.total_m)
-    s0 = max(0.0, blocked_s - 120.0)
-    s1 = min(total, blocked_s + 120.0)
-    a = route.pose_at(s0)
-    b = route.pose_at(s1)
-    local = plan_local(query, profile, (a.lon, a.lat), (b.lon, b.lat),
-                       res_m=4.0, margin_m=50.0)
-    if local is not None:
+    speed = float(getattr(profile, "max_speed_ms", 5.0) or 5.0)
+    for window, margin in ((120.0, 50.0), (200.0, 60.0)):
+        s0 = max(0.0, blocked_s - window)
+        s1 = min(total, blocked_s + window)
+        a = route.pose_at(s0)
+        b = route.pose_at(s1)
+        local = plan_local(query, profile, (a.lon, a.lat), (b.lon, b.lat),
+                           res_m=4.0, margin_m=margin)
+        if local is None:
+            continue
         i0 = _nearest_index(route, s0)
         i1 = _nearest_index(route, s1)
-        if i0 < i1:
-            points = list(route.points[:i0 + 1]) + list(local.points) + list(route.points[i1:])
-            speed = float(getattr(profile, "max_speed_ms", 5.0) or 5.0)
-            combined = Route(
-                points=points,
-                speed_limits=[speed] * (len(points) - 1),
-                modes=["offroad"] * (len(points) - 1),
-            )
-            if validate_route(query, profile, combined, step_m=step_m):
-                return combined
+        if i0 >= i1:
+            continue
+        points = list(route.points[:i0 + 1]) + list(local.points) + list(route.points[i1:])
+        combined = Route(
+            points=points,
+            speed_limits=[speed] * (len(points) - 1),
+            modes=["offroad"] * (len(points) - 1),
+        )
+        if validate_route(query, profile, combined, step_m=step_m):
+            return combined
     return None
+
+
+def repair_route(query: Any, profile: Any, route: Route,
+                 step_m: float = 3.0,
+                 offsets: Sequence[float] = (10.0, 30.0),
+                 max_rounds: int = 6
+                 ) -> Optional[Route]:
+    """Repair blocked/too-tight spots one round at a time.
+
+    Candidate validation uses the same fine step (3 m by default) as the final
+    conformance check, so thin water or footprint strips cannot slip through.
+    """
+    current = route
+    for _ in range(max_rounds):
+        blocked_s = _first_blocked_s(query, profile, current, step_m=step_m)
+        if blocked_s is None:
+            return current
+        candidate = _repair_at(query, profile, current, blocked_s, step_m,
+                               offsets)
+        if candidate is None:
+            return None
+        current = candidate
+    return current if validate_route(query, profile, current,
+                                     step_m=step_m) else None
 
 
 def plan_valid_route(nav: Any, query: Any, profile: Any, start, goal,

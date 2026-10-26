@@ -65,15 +65,15 @@ NavField(30m) cold build ~8.2 s; cached ~0.013 s; 1k 路径一致性见 §3.1
 
 ### 3.1 路径一致性（300 条探索，统一 1–3 m 权威）
 
-`scripts/check_paths_v3.py --pack envpacks/anping_v3 --routes 300`（道路节点起终点，30 m NavField，`blocked` 排除建筑中心，`safe_fallback=True`；失败时侧移，再做 ±120 m 窗口、4 m 网格、按车宽半宽膨胀建筑的局部 A*，最后用 3 m 精确 Gate 复验）：
+`scripts/check_paths_v3.py --pack envpacks/anping_v3 --routes 300`（道路节点起终点，只取栅格可通行且 Gate 允许的节点，并按导航掩膜的连通分量分组、在同一分量内成对采样；30 m NavField，`blocked` 排除建筑中心，`safe_fallback=True`；失败时逐轮修复：侧移 → ±120 m → ±200 m 窗口、4 m 网格、按车宽半宽膨胀建筑的局部 A*，每轮复验，最后用 3 m 精确 Gate + 建筑净空复验）：
 
 ```text
-planned/accepted 60
-no_path 240
-gate_rejected 164
-accepted route_ok 60 (100%)
-accepted gate_denied 0 / 295 sampled
-mean_length 221.8 m; plan_p95 70.3 ms
+planned/accepted 222
+no_path 78
+gate_rejected 286 (of 586 attempts)
+accepted route_ok 222 (100%)
+accepted gate_denied 0 / 909 sampled
+mean_length 176.5 m; plan_p95 70.8 ms
 ```
 
 本轮的权威统一改动：
@@ -83,7 +83,7 @@ mean_length 221.8 m; plan_p95 70.3 ms
 - 桥面只认车辆等级道路（`VEHICLE_BRIDGE_CLASSES`，含 link/road 类），人行道/自行车道/台阶桥不再豁免水深；建筑检查先于桥面豁免，桥 25 m 内也不能穿建筑。
 - `validate_route`/`repair_route`/`plan_valid_route` 默认复验步长收紧到 3 m，首阻搜索与候选复验同一步长；陆上/两栖平台追加半车宽建筑净空检查（中心 + 8 向偏移，与局部规划器一致）；`sim/motion` 的 footprint 样本在 mask 判阻时同样走精确回退。
 
-结果：accepted 路线的 `route_ok` 从 78.3% 提升到 100%，`gate_denied` 保持 0。代价是接受数从 113 降到 60（约 20%）：半车宽建筑净空与更严格的 landcover/水深规则拒绝了大量贴建筑或跨窄水带的候选路线，`no_path` 增至 240。当前 30 m 全局 A* 并不做足迹级走廊规划，这是后续提高合法路线成功率的首要改造点。
+结果：accepted 路线的 `route_ok` 从 78.3% 提升到 100%，`gate_denied` 保持 0。接受数 222/300（74%）：此前约 20% 的低值来自两个独立原因——起终点跨导航掩膜连通分量（数学上无路），以及修复器只处理第一个阻点；现在按连通分量成对采样，并在 `repair_route` 中逐轮修复（最多 6 轮、窗口 120/200 m），`no_path` 降到 78。剩余 `gate_rejected` 主要来自半车宽净空与贴建筑/窄水带路线，30 m 全局 A* 仍不做足迹级走廊规划，可作为后续优化项。
 
 ## 4. 已知限制
 
@@ -102,7 +102,7 @@ mean_length 221.8 m; plan_p95 70.3 ms
 1. 把 Anping 的 `terrain` 换成 COG（NLSC/Copernicus）、`buildings/roads` 换成 GeoParquet/FlatGeobuf；保留 `source/license/confidence`。
 2. 把 `ObstacleSet` 扩展为建筑体块 + 桥面 + 树冠 + 动态事件；加 BVH/空间桶。
 3. 把 `passability()` 的 `unknown_policy` 接到 `Policy` 对象/审批/场景覆盖；统计合法路线成功率/假阻断率。
-4. 导航权威已统一（3 m 精确回退 + 共用 landcover/水深/桥面规则 + 半车宽净空），`route_ok` 100%；下一步把 300 条扩展到 10k 回归，并把 30 m 全局 A* 升级为足迹级走廊规划，以提升约 20% 的合法路线接受率。
+4. 导航权威已统一（3 m 精确回退 + 共用 landcover/水深/桥面规则 + 半车宽净空），`route_ok` 100%，同分量路线的接受率 74%；下一步把 300 条扩展到 10k 回归，并把 30 m 全局 A* 升级为足迹级走廊规划，继续压低 `gate_rejected`。
 5. 在测试端 8858 做只读查询验证，不改 8848/前端。
 
 > 远程代码位置：`/remote-home/lizilong/shenji_agent_env`（worktree），分支 `feat/env-authority`，提交 `8a1000d` + … + `d12c7a9` + `7d44e41` + 本轮权威修正提交。本地 D 盘副本只含本说明，代码以远程 worktree 为准。

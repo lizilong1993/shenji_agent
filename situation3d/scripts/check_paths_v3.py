@@ -36,7 +36,8 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
         (float(v[0]), float(v[1])) for v in nodes.values()
     ]
     rng.shuffle(node_points)
-    passable_nodes = []
+    labels, _sizes = nav.components(profile)
+    passable_groups = collections.defaultdict(list)
     for point in node_points[:4000]:
         if query._bridges.near(point[0], point[1]):
             # Bridge nodes/approaches are valid route crossings, but their
@@ -44,11 +45,17 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
             # them out of the start/goal sample so the conformance test is not
             # dominated by endpoint-snap artifacts.
             continue
-        if query.passability(profile, *point).value["allowed"]:
-            if nav.motion_point_ok(profile, point[0], point[1]):
-                passable_nodes.append(point)
-        if len(passable_nodes) >= 500:
-            break
+        if not query.passability(profile, *point).value["allowed"]:
+            continue
+        if nav.passable(profile, point[0], point[1]) is not True:
+            # Start/goal must be raster-passable: A* cannot leave a cell the
+            # mask blocks, even when the exact authority allows its edge.
+            continue
+        i = nav._index_of(point[0], point[1])
+        if i is not None and labels[i] >= 0:
+            passable_groups[labels[i]].append(point)
+    groups = [g for g in passable_groups.values() if len(g) >= 2]
+    groups.sort(key=len, reverse=True)
 
     planned = 0
     no_path = 0
@@ -65,8 +72,9 @@ def check(pack: str, routes: int, seed: int, sample_m: float = 50.0) -> dict:
 
     while planned + no_path < routes and attempts < max_attempts:
         attempts += 1
-        if len(passable_nodes) >= 2:
-            start, goal = rng.sample(passable_nodes, 2)
+        if groups:
+            group = rng.choices(groups, weights=[len(g) for g in groups])[0]
+            start, goal = rng.sample(group, 2)
         else:
             start = (rng.uniform(bbox[0], bbox[2]), rng.uniform(bbox[1], bbox[3]))
             goal = (rng.uniform(bbox[0], bbox[2]), rng.uniform(bbox[1], bbox[3]))

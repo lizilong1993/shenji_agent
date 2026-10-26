@@ -242,6 +242,17 @@ class NavFieldTest(unittest.TestCase):
         if route is not None:
             self.assertTrue(nav.route_ok(self.prof, route))
 
+    def test_components_split_by_full_height_water(self):
+        env = FakeFineEnv(water=(120.008, 23.0, 120.012, 23.02))
+        nav = NavField(env, res_m=50.0, use_cache=False)
+        labels, sizes = nav.components(self.prof)
+        self.assertEqual(len(sizes), 2)
+        west = nav._index_of(120.004, 23.01)
+        east = nav._index_of(120.016, 23.01)
+        self.assertGreaterEqual(labels[west], 0)
+        self.assertGreaterEqual(labels[east], 0)
+        self.assertNotEqual(labels[west], labels[east])
+
     def test_bridge_deck_is_passable_over_water(self):
         nodes = {"A": (120.007, 23.010), "B": (120.013, 23.010)}
         edges = [{"a": "A", "b": "B", "class": "residential",
