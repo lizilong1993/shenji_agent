@@ -313,6 +313,11 @@ def _watch_run(case_id, run_id, proc, log_fh):
             pass
     try:
         run = RUN_STORE.get_run(case_id, run_id)
+        pid = run.get("pid")
+        if pid is not None and int(pid) != proc.pid:
+            # A resolve relaunch replaced this process; the newer watchdog owns
+            # the run state.
+            return
         if run.get("status") in ("queued", "running"):
             try:
                 with open(_run_log_path(case_id, run_id), encoding="utf-8",
@@ -325,6 +330,52 @@ def _watch_run(case_id, run_id, proc, log_fh):
     except Exception:  # noqa: BLE001 - watchdog must never kill the server
         import traceback
         traceback.print_exc()
+
+
+def _spawn_run(case_id, run_id, extra_args=None):
+    """(Re)start the runner subprocess for an existing run record."""
+    run = RUN_STORE.get_run(case_id, run_id)
+    config = run.get("config") or {}
+    seed = run.get("seed")
+    if seed is None:
+        seed = config.get("seed") or 20261023
+    ticks = config.get("ticks") or 1440
+    script = os.path.join(_PKG_ROOT, "scripts", "run_situation_case.py")
+    log_path = _run_log_path(case_id, run_id)
+    run_dir = os.path.dirname(log_path)
+    cmd = [sys.executable, script, "--case", case_id, "--seed", str(seed),
+           "--ticks", str(ticks), "--runs-dir", RUNS_DIR,
+           "--run-id", run_id, "--quiet"]
+    scenario_date = config.get("scenario_date")
+    if isinstance(scenario_date, str) and scenario_date:
+        cmd += ["--scenario-date", scenario_date]
+    tasking = config.get("tasking") or {}
+    side = tasking.get("side", 0)
+    if side in (0, 1):
+        cmd += ["--side", str(side)]
+    mode = tasking.get("mode")
+    if mode in ("default", "user", "mixed"):
+        cmd += ["--task-mode", mode]
+    tasks_path = os.path.join(run_dir, "tasks.request.json")
+    if os.path.isfile(tasks_path):
+        cmd += ["--tasks-file", tasks_path]
+    cmd += list(extra_args or [])
+    log_fh = None
+    try:
+        os.makedirs(run_dir, exist_ok=True)
+        log_fh = open(log_path, "a", encoding="utf-8")
+        proc = subprocess.Popen(cmd, cwd=_PKG_ROOT, stdout=log_fh,
+                                stderr=subprocess.STDOUT,
+                                env=dict(os.environ, PYTHONUNBUFFERED="1"))
+        RUN_STORE.update_run(case_id, run_id, pid=proc.pid)
+    except Exception as exc:  # noqa: BLE001
+        if log_fh is not None:
+            log_fh.close()
+        RUN_STORE.fail_run(case_id, run_id, "spawn failed: %s" % exc)
+        raise RunError("spawn failed: %s" % exc)
+    threading.Thread(target=_watch_run,
+                     args=(case_id, run_id, proc, log_fh), daemon=True).start()
+    return proc
 
 
 def _launch_run(body):
@@ -380,39 +431,24 @@ def _launch_run(body):
                                                        "side": side,
                                                        "tasks": task_count}},
                                   reject_active=True)
-    script = os.path.join(_PKG_ROOT, "scripts", "run_situation_case.py")
     log_path = _run_log_path(case_id, run_id)
-    log_fh = None
-    try:
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        log_fh = open(log_path, "a", encoding="utf-8")
-        cmd = [sys.executable, script, "--case", case_id, "--seed", str(seed),
-               "--ticks", str(ticks), "--runs-dir", RUNS_DIR,
-               "--run-id", run_id, "--side", str(side), "--quiet"]
-        if scenario_date:
-            cmd += ["--scenario-date", scenario_date]
-        if task_mode:
-            cmd += ["--task-mode", task_mode]
-        if tasks_doc is not None:
-            payload = json.dumps(tasks_doc, ensure_ascii=False).encode("utf-8")
-            if len(payload) > 1000000:
-                raise RunError("task request too large (max 1 MB)")
-            tasks_path = os.path.join(os.path.dirname(log_path),
-                                      "tasks.request.json")
+    tasks_path = os.path.join(os.path.dirname(log_path),
+                              "tasks.request.json")
+    if tasks_doc is not None:
+        payload = json.dumps(tasks_doc, ensure_ascii=False).encode("utf-8")
+        if len(payload) > 1000000:
+            RUN_STORE.fail_run(case_id, run_id,
+                               "task request too large (max 1 MB)")
+            raise RunError("task request too large (max 1 MB)")
+        try:
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
             with open(tasks_path, "wb") as fh:
                 fh.write(payload)
-            cmd += ["--tasks-file", tasks_path]
-        proc = subprocess.Popen(cmd, cwd=_PKG_ROOT, stdout=log_fh,
-                                stderr=subprocess.STDOUT,
-                                env=dict(os.environ, PYTHONUNBUFFERED="1"))
-        RUN_STORE.update_run(case_id, run_id, pid=proc.pid)
-    except Exception as exc:  # noqa: BLE001
-        if log_fh is not None:
-            log_fh.close()
-        RUN_STORE.fail_run(case_id, run_id, "spawn failed: %s" % exc)
-        raise RunError("spawn failed: %s" % exc)
-    threading.Thread(target=_watch_run,
-                     args=(case_id, run_id, proc, log_fh), daemon=True).start()
+        except OSError as exc:
+            RUN_STORE.fail_run(case_id, run_id,
+                               "task request write failed: %s" % exc)
+            raise RunError("task request write failed: %s" % exc)
+    _spawn_run(case_id, run_id)
     return {"run_id": run_id, "status": "queued", "seed": seed,
             "ticks": ticks, "scenario_date": scenario_date,
             "tasking": {"mode": task_mode or (tasks_doc or {}).get("mode"),
@@ -1602,6 +1638,24 @@ class Handler(SimpleHTTPRequestHandler):
             subchecks["offline_tiles"] = {"status": "error", "ok": False,
                                           "detail": str(exc), "required": False}
 
+        # 资源索引（P2）：只读 index.json 计数，不做全量哈希。
+        try:
+            from resources.store import ResourceStore
+            rows = ResourceStore().entries()
+            counts = {}
+            for entry in rows:
+                counts[entry.kind] = counts.get(entry.kind, 0) + 1
+            subchecks["sim_resources"] = {
+                "status": "ok" if rows else "warn", "ok": bool(rows),
+                "detail": counts, "required": False,
+            }
+        except Exception as exc:  # noqa: BLE001
+            subchecks["sim_resources"] = {
+                "status": "error", "ok": False,
+                "detail": "%s: %s" % (type(exc).__name__, exc),
+                "required": False,
+            }
+
         # 整体级别：任一**必需**子项 error → critical；有任意 error → error；
         # 有 warn → warn；否则 ok。这样级别的来源可解释，不是拍脑袋。
         statuses = [v["status"] for v in subchecks.values()]
@@ -1662,6 +1716,34 @@ class Handler(SimpleHTTPRequestHandler):
                 action = rest[1] if len(rest) > 1 else ""
                 cid = str(body.get("case_id") or "taiwan_dense_transfer_v1")
                 try:
+                    if action == "resolve":
+                        run = RUN_STORE.get_run(cid, run_id)
+                        if run.get("status") != "waiting_resources":
+                            self._send_json({"error": "run is not waiting for "
+                                             "resources", "status": run.get("status")}, 409)
+                            return
+                        decisions = body.get("decisions")
+                        if not isinstance(decisions, list) or len(decisions) > 50:
+                            self._send_json({"error": "decisions must be a list "
+                                             "(max 50)"}, 400)
+                            return
+                        for item in decisions:
+                            if not isinstance(item, dict) or not item.get("action"):
+                                self._send_json({"error": "each decision needs "
+                                                 "an action"}, 400)
+                                return
+                        run_dir = RUN_STORE.run_dir(cid, run_id)
+                        path = os.path.join(run_dir, "decisions.json")
+                        tmp = path + ".tmp"
+                        with open(tmp, "w", encoding="utf-8") as fh:
+                            json.dump({"decisions": decisions}, fh,
+                                      ensure_ascii=False, indent=1)
+                        os.replace(tmp, path)
+                        RUN_STORE.update_run(cid, run_id, status="queued")
+                        _spawn_run(cid, run_id,
+                                   extra_args=["--resolutions", path])
+                        self._send_json({"run_id": run_id, "status": "queued"})
+                        return
                     if action == "select":
                         if not body.get("confirm"):
                             self._send_json({"error": "confirm=true 必填"}, 400)

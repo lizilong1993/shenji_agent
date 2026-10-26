@@ -16,12 +16,11 @@ import subprocess
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
-from .model import ResourceEntry, hash_path
+from .model import ResourceEntry, hash_path, slugify
 
 
 def _slug(text: str) -> str:
-    value = re.sub(r"[^a-z0-9_.-]+", "-", str(text).strip().lower())
-    return value.strip("-.") or "unnamed"
+    return slugify(text)
 
 
 def _iso_date(value) -> str:

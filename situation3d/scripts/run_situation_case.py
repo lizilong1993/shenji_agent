@@ -42,6 +42,9 @@ from sim.scenario import build_world  # noqa: E402
 from sim.collision import obbs_overlap  # noqa: E402
 from sim.motion import entity_profile  # noqa: E402
 from run_store import RunStore  # noqa: E402
+from resources import preflight  # noqa: E402
+from resources.scanners import scan_envpack, scan_repo  # noqa: E402
+from resources.store import ResourceStore  # noqa: E402
 
 CASE_MODULES = {"taiwan_dense_transfer_v1": "taiwan_dense"}
 DEFAULT_ENVPACK = os.path.join(SITUATION3D, "envpacks", "taiwan_tw2_v1")
@@ -98,19 +101,6 @@ def _envpack_hash(path):
             for chunk in iter(lambda: fh.read(1024 * 1024), b""):
                 h.update(chunk)
     return h.hexdigest()
-
-
-def _envpack_bbox(path):
-    manifest = os.path.join(path, "manifest.json")
-    try:
-        with open(manifest, encoding="utf-8") as fh:
-            doc = json.load(fh)
-        bbox = doc.get("bbox")
-        if isinstance(bbox, list) and len(bbox) == 4:
-            return [float(v) for v in bbox]
-    except (OSError, ValueError, TypeError):
-        return None
-    return None
 
 
 def _clear_subcell_buildings(world):
@@ -509,6 +499,67 @@ def _nodes(events, tick_count, phases):
     return {"schema": "sim.nodes.v1", "nodes": nodes}
 
 
+def _atomic_write_json(path, obj):
+    data = json.dumps(obj, ensure_ascii=False, indent=1).encode("utf-8")
+    tmp = path + ".tmp"
+    with open(tmp, "wb") as fh:
+        fh.write(data)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+
+def _load_decisions(path):
+    if not path:
+        return []
+    with open(path, encoding="utf-8") as fh:
+        raw = json.load(fh)
+    return preflight.decisions_from(raw)
+
+
+def _ensure_local_resources(store):
+    """Register repo artifacts and the default envpack when absent.
+
+    This is local-only (no network) and idempotent; it keeps a fresh checkout
+    or a new worktree from blocking on its own tracked data.
+    """
+    try:
+        have = set(entry.kind for entry in store.entries())
+        needed = {"rolecards", "platforms", "weapons", "case_roads"}
+        if not needed.issubset(have):
+            entries, errors = scan_repo(SITUATION3D)
+            for entry in entries:
+                if entry.kind in needed and entry.kind not in have:
+                    try:
+                        store.register(entry)
+                    except Exception:  # noqa: BLE001 - keep the scan going
+                        pass
+            if errors:
+                print("[resource] scan warnings: %s" % errors, file=sys.stderr)
+        if "envpack" not in have and os.path.isdir(DEFAULT_ENVPACK):
+            try:
+                store.register(scan_envpack(DEFAULT_ENVPACK))
+            except Exception as exc:  # noqa: BLE001
+                print("[resource] default envpack not registered: %s" % exc,
+                      file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 - resolution will report the gap
+        print("[resource] registry bootstrap failed: %s" % exc, file=sys.stderr)
+
+
+def _wait_for_resources(store, case_id, run_id, summary, config):
+    path = os.path.join(store.run_dir(case_id, run_id), "resources.json")
+    _atomic_write_json(path, summary)
+    run = store.get_run(case_id, run_id)
+    merged = dict(run.get("config") or {})
+    merged.update(config or {})
+    store.update_run(case_id, run_id, status="waiting_resources",
+                     resources=summary, resource_gaps=summary.get("gaps") or [],
+                     config=merged,
+                     scenario_date=summary.get("scenario_date"))
+    print(json.dumps({"status": "waiting_resources", "summary": summary},
+                     ensure_ascii=False, indent=1))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--case", default="taiwan_dense_transfer_v1")
@@ -517,7 +568,12 @@ def main(argv=None):
     ap.add_argument("--runs-dir", default=None)
     ap.add_argument("--run-id", default=None,
                     help="reserved run id (created by the test console)")
-    ap.add_argument("--envpack", default=DEFAULT_ENVPACK)
+    ap.add_argument("--envpack", default=None,
+                    help="explicit envpack override (skips registry selection)")
+    ap.add_argument("--resource-root", default=None,
+                    help="resource index root (default: situation3d/var/resources)")
+    ap.add_argument("--resolutions", default=None,
+                    help="JSON resource decisions (use_cached_stale/cancel)")
     ap.add_argument("--scenario-date", default=None,
                     help="ISO 8601 start time; default is the current UTC time")
     ap.add_argument("--tasks-file", default=None,
@@ -529,14 +585,59 @@ def main(argv=None):
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args(argv)
 
-    envpack = os.path.abspath(args.envpack)
-    if not os.path.isdir(envpack):
-        raise SystemExit("envpack not found: %s" % envpack)
     scenario_date = args.scenario_date
     if not scenario_date:
         # Resolve "now" once so the scenario snapshot and the replay clock agree.
         scenario_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    runs_dir = args.runs_dir or os.path.join(SITUATION3D, "var", "sim_runs")
+    store = RunStore(runs_dir)
+    rstore = ResourceStore(args.resource_root)
+    _ensure_local_resources(rstore)
+    try:
+        decisions = _load_decisions(args.resolutions)
+    except ValueError as exc:
+        raise SystemExit("invalid resolutions: %s" % exc)
+    if any(d.action == "cancel" for d in decisions):
+        if args.run_id:
+            store.update_run(args.case, args.run_id, status="cancelled")
+        print(json.dumps({"status": "cancelled"}))
+        return 0
+
     plugin = load_plugin(args.case)
+    theatre = getattr(plugin, "THEATRE", None)
+    if args.run_id:
+        run_id = args.run_id
+        store.get_run(args.case, run_id)  # must exist (reserved by the API)
+        run = store.get_run(args.case, run_id)
+        if run.get("status") == "waiting_resources" and args.resolutions:
+            store.update_run(args.case, run_id, status="queued")
+    else:
+        run_id = store.create_run(args.case, seed=args.seed,
+                                  config={"ticks": args.ticks,
+                                          "seed": args.seed})
+
+    early = preflight.check_case_data(rstore, theatre, scenario_date,
+                                      decisions=decisions)
+    if early is not None:
+        _wait_for_resources(store, args.case, run_id,
+                            preflight.plan_summary(early),
+                            {"ticks": args.ticks, "seed": args.seed,
+                             "scenario_date": scenario_date})
+        return 0
+
+    if args.envpack:
+        envpack_override = os.path.abspath(args.envpack)
+        if not os.path.isdir(envpack_override):
+            raise SystemExit("envpack not found: %s" % envpack_override)
+        try:
+            entry = scan_envpack(envpack_override)
+        except Exception as exc:  # noqa: BLE001
+            raise SystemExit("envpack invalid: %s" % exc)
+        entry = type(entry)(**dict(entry.as_dict(), bbox=entry.bbox,
+                                   provider="cli-override",
+                                   notes=dict(entry.notes, manual_override=True)))
+        rstore.register(entry, replace=True)
+
     scenario = plugin.scenario_dict(scenario_date=scenario_date)
     meta = plugin.target_meta()
     cm = plugin.case_meta(scenario_date=scenario_date)
@@ -551,35 +652,39 @@ def main(argv=None):
         request["mode"] = args.task_mode
     try:
         missions, tasking_summary = tasking.merge_missions(
-            plugin.missions(), request, scenario, bbox=_envpack_bbox(envpack))
+            plugin.missions(), request, scenario)
     except tasking.TaskError as exc:
         raise SystemExit("task request rejected: %s" % exc)
     scenario["missions"] = missions
     scenario["tasking"] = tasking_summary
     scenario_bytes = json.dumps(scenario, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     scenario_hash = _sha256_bytes(scenario_bytes)
-    engine_commit = _git_commit()
-    envpack_hash = _envpack_hash(envpack)
 
-    runs_dir = args.runs_dir or os.path.join(SITUATION3D, "var", "sim_runs")
-    store = RunStore(runs_dir)
+    plan = preflight.make_plan(rstore, args.case, scenario_date, scenario,
+                               missions, theatre=theatre,
+                               engine=scenario.get("engine"),
+                               decisions=decisions)
+    summary = preflight.plan_summary(plan)
     config = {"tick_seconds": tick_seconds, "ticks": tick_count,
-              "envpack": os.path.basename(envpack),
               "scenario_date": cm.get("start_time_utc"),
               "tasking": tasking_summary,
+              "resources": {"plan_hash": summary["plan_hash"],
+                            "status": summary["status"]},
               "engine": scenario.get("engine")}
-    if args.run_id:
-        run_id = args.run_id
-        store.get_run(args.case, run_id)  # must exist (reserved by the API/CLI)
-        store.update_run(args.case, run_id, status="running",
-                         config=config, scenario_hash=scenario_hash,
-                         engine_commit=engine_commit, envpack_hash=envpack_hash)
-    else:
-        run_id = store.create_run(
-            args.case, seed=args.seed, config=config,
-            scenario_hash=scenario_hash, engine_commit=engine_commit,
-            envpack_hash=envpack_hash)
-        store.update_run(args.case, run_id, status="running")
+    if plan.status == "blocked":
+        _wait_for_resources(store, args.case, run_id, summary, config)
+        return 0
+    envpack_entry = preflight.entry_for(plan, "envpack")
+    if envpack_entry is None:
+        raise SystemExit("resource plan has no envpack entry")
+    envpack = envpack_entry.path
+    config["envpack"] = os.path.basename(envpack)
+    envpack_hash = _envpack_hash(envpack)
+    engine_commit = _git_commit()
+    store.update_run(args.case, run_id, status="running", config=config,
+                     scenario_hash=scenario_hash,
+                     engine_commit=engine_commit, envpack_hash=envpack_hash,
+                     resources=summary)
     t_start = time.time()
     try:
         world = build_world(scenario, {}, seed=args.seed, dt_s=tick_seconds,
@@ -747,6 +852,8 @@ def main(argv=None):
                 "generator": "sim.world", "runtime": "engine_run",
                 "run_id": run_id, "engine_commit": engine_commit,
                 "scenario_hash": scenario_hash, "envpack_hash": envpack_hash,
+                "resource_plan_hash": summary["plan_hash"],
+                "resources_status": summary["status"],
                 "seed": args.seed, "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ",
                                                                  time.gmtime()),
             },
@@ -766,6 +873,9 @@ def main(argv=None):
             "step_ms_p95": round(sorted(step_ms)[int(len(step_ms) * 0.95)], 1) if step_ms else 0,
             "trajectory_bytes": len(trajectory_bytes),
             "validation": validation,
+            "resources": {"status": summary["status"],
+                          "plan_hash": summary["plan_hash"],
+                          "warnings": summary["warnings"]},
             "engine_commit": engine_commit,
         }
         metrics = {"events": len(events), "fires": counts.get("fire", 0),
@@ -776,6 +886,8 @@ def main(argv=None):
         store.complete_run(
             args.case, run_id,
             {"scenario.json": scenario_bytes,
+             "resources.json": json.dumps(summary, ensure_ascii=False,
+                                          indent=1).encode("utf-8"),
              "trajectory.json": trajectory_bytes,
              "nodes.json": json.dumps(nodes, ensure_ascii=False, indent=1).encode("utf-8"),
              "summary.json": json.dumps(summary, ensure_ascii=False, indent=1).encode("utf-8")},

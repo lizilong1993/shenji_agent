@@ -88,6 +88,11 @@ def hash_path(path: str) -> Tuple[str, int]:
     return h.hexdigest(), total
 
 
+def slugify(text: str) -> str:
+    value = re.sub(r"[^a-z0-9_.-]+", "-", str(text).strip().lower())
+    return value.strip("-.") or "unnamed"
+
+
 def _bbox_list(value) -> Optional[List[float]]:
     if value is None:
         return None
@@ -186,6 +191,28 @@ class ResourceEntry:
             pinned=bool(data.get("pinned") or False),
             notes=dict(data.get("notes") or {}),
         )
+
+
+@dataclass(frozen=True)
+class ResourceRequirement:
+    """What one run needs, before a concrete entry is chosen."""
+
+    kind: str
+    criticality: str
+    reason: str = ""
+    scope: Dict[str, Any] = field(default_factory=dict)
+    allow_stale: bool = False
+    multi: bool = False
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "criticality": self.criticality,
+            "reason": self.reason,
+            "scope": dict(self.scope or {}),
+            "allow_stale": bool(self.allow_stale),
+            "multi": bool(self.multi),
+        }
 
 
 @dataclass(frozen=True)

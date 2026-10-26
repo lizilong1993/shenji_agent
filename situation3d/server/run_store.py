@@ -313,7 +313,8 @@ class RunStore(object):
 
     def _drop_unroled_locked(self, case_dir, state):
         for rid, ent in list(state.get("runs", {}).items()):
-            if ent.get("status") in ("queued", "running", "failed"):
+            if ent.get("status") in ("queued", "running",
+                                     "waiting_resources", "failed"):
                 continue
             if ent.get("roles"):
                 continue
@@ -356,7 +357,8 @@ class RunStore(object):
             state = self._load_state(case_dir)
             if reject_active:
                 for rid, ent in state.get("runs", {}).items():
-                    if ent.get("status") in ("queued", "running"):
+                    if ent.get("status") in ("queued", "running",
+                                             "waiting_resources"):
                         raise RunConflict("another run is already active",
                                           active=rid)
             if run_id is not None:
@@ -401,8 +403,10 @@ class RunStore(object):
             old = run.get("status")
             if status and status != old:
                 allowed = {
-                    "queued": ("running", "failed", "cancelled"),
+                    "queued": ("running", "waiting_resources", "failed",
+                               "cancelled"),
                     "running": ("failed", "cancelled"),
+                    "waiting_resources": ("queued", "failed", "cancelled"),
                 }
                 if status not in allowed.get(old, ()):
                     raise RunConflict("invalid transition %s -> %s" % (old, status))
@@ -512,6 +516,11 @@ class RunStore(object):
             run["roles"] = list((state.get("runs", {}).get(run_id) or {}).get("roles") or [])
             return run
 
+    def run_dir(self, case_id, run_id):
+        """Public path to a run directory (after validating the run exists)."""
+        self.get_run(case_id, run_id)
+        return self._run_dir(case_id, run_id)
+
     def read_artifact(self, case_id, run_id, name):
         if not ARTIFACT_RE.match(name or "") or name in ("run.json", "checksums.sha256"):
             raise RunError("invalid artifact name: %r" % (name,))
@@ -601,7 +610,8 @@ class RunStore(object):
                 raise RunConflict("best run cannot be deleted; select another first")
             if "pinned" in (run.get("roles") or []):
                 raise RunConflict("pinned run must be unpinned first")
-            if run.get("status") in ("queued", "running"):
+            if run.get("status") in ("queued", "running",
+                                     "waiting_resources"):
                 raise RunConflict("active run cannot be deleted",
                                   status=run.get("status"))
             self._delete_run_locked(case_dir, state, run_id, "user delete")
