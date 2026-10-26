@@ -62,6 +62,27 @@ def make_canopy_tif(path):
     ds = None
 
 
+def make_class_tif(path):
+    driver = gdal.GetDriverByName("GTiff")
+    ds = driver.Create(path, 64, 64, 1, gdal.GDT_Byte)
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(4326)
+    ds.SetProjection(srs.ExportToWkt())
+    ds.SetGeoTransform((BBOX[0], (BBOX[2] - BBOX[0]) / 64.0, 0, BBOX[3], 0,
+                        -(BBOX[3] - BBOX[1]) / 64.0))
+    values = []
+    for y in range(64):
+        for x in range(64):
+            if x < 32 and y < 32:
+                values.append(50)   # urban
+            elif x >= 32 and y < 32:
+                values.append(10)   # tree
+            else:
+                values.append(80)   # water
+    ds.GetRasterBand(1).WriteRaster(0, 0, 64, 64, bytes(values))
+    ds = None
+
+
 class CanopyLayerTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="canopy-")
@@ -87,6 +108,32 @@ class CanopyLayerTest(unittest.TestCase):
         self.assertGreater(env.canopy_height(120.015, 22.915), 0.0)
         self.assertEqual(env.canopy_height(122.0, 23.0), 0.0)
         self.assertGreaterEqual(env.cover_height(120.015, 22.915), 6.0)
+
+    @unittest.skipIf(gdal is None, "GDAL python not available")
+    def test_landcover_class_grid(self):
+        tif = os.path.join(self.tmp, "lc.tif")
+        make_class_tif(tif)
+        from resources.envpack_layers import add_landcover_layer
+        croot = os.path.join(self.tmp, "lc_dataset")
+        os.makedirs(croot)
+        shutil.copyfile(tif, os.path.join(croot, "landcover.tif"))
+        write_json(os.path.join(croot, "manifest.json"), {
+            "schema": "s3d.raster.v1", "raster_file": "landcover.tif",
+            "source": {"as_of": "2021-01-01"}, "spec_hash": "x",
+        })
+        lc_entry = self.store.register(
+            type(self.env_entry)(
+                entry_id="landcover:test", kind="landcover",
+                path=croot, content_hash="a" * 64, size=1,
+                schema="s3d.raster.v1", bbox=BBOX, license="CC BY 4.0"))
+        result = add_landcover_layer(
+            self.store, self.env_entry, lc_entry, name="p1-lc",
+            resolution_m=30, cache_root=os.path.join(self.tmp, "out"))
+        entry = result["entry"]
+        env = EnvPackEnvironment(entry.path)
+        self.assertEqual(env.landcover(120.002, 22.918), "urban")
+        self.assertEqual(env.landcover(120.018, 22.918), "forest")
+        self.assertEqual(env.landcover(120.010, 22.902), "water")
 
     @unittest.skipIf(gdal is None, "GDAL python not available")
     def test_raster_to_grid_and_add_layer(self):

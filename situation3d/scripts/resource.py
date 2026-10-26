@@ -27,7 +27,8 @@ from resources.adapters import (acquire_buildings, acquire_canopy,  # noqa: E402
                                 acquire_landcover, DatasetError)
 from resources.vectorproc import DatasetSpec  # noqa: E402
 from resources.enrichment import enrich_envpack  # noqa: E402
-from resources.envpack_layers import add_canopy_layer  # noqa: E402
+from resources.envpack_layers import (add_canopy_layer,  # noqa: E402
+                                      add_landcover_layer)
 from resources.processing import TilesetSpec  # noqa: E402
 from resources.sources import raster_candidate  # noqa: E402
 from resources.catalog import KINDS  # noqa: E402
@@ -387,6 +388,22 @@ def cmd_add_canopy(args):
     return 0
 
 
+def cmd_add_landcover(args):
+    store = _store(args)
+    try:
+        env = store.get(args.envpack)
+        lc = store.get(args.landcover)
+        result = add_landcover_layer(
+            store, env, lc, name=args.name,
+            resolution_m=args.resolution, cache_root=args.cache_root)
+    except Exception as exc:  # noqa: BLE001
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    print(json.dumps({"entry": result["entry"].as_dict(),
+                      "grid": result["grid"]}, ensure_ascii=False, indent=1))
+    return 0
+
+
 def cmd_kinds(args):
     rows = [KINDS[k].as_dict() for k in sorted(KINDS)]
     print(json.dumps(rows, ensure_ascii=False, indent=1))
@@ -555,6 +572,15 @@ def main(argv=None):
     p.add_argument("--resolution", type=float, default=30.0)
     p.add_argument("--cache-root", default=None)
     p.set_defaults(func=cmd_add_canopy)
+
+    p = sub.add_parser("add-landcover",
+                       help="add a WorldCover class grid layer to an envpack")
+    p.add_argument("--envpack", required=True)
+    p.add_argument("--landcover", required=True)
+    p.add_argument("--name", default=None)
+    p.add_argument("--resolution", type=float, default=10.0)
+    p.add_argument("--cache-root", default=None)
+    p.set_defaults(func=cmd_add_landcover)
 
     p = sub.add_parser("kinds", help="list resource kinds")
     p.set_defaults(func=cmd_kinds)

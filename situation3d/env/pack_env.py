@@ -103,6 +103,7 @@ class EnvPackEnvironment(object):
         self._terrain = self._load_json("terrain")
         self._bathymetry = self._load_json("bathymetry")
         self._canopy = self._load_json("canopy")
+        self._landcover_raster = self._load_json("landcover_raster")
         self._landcover = self._load_json("landcover") or []
         self._water = self._load_json("water") or []
         self._buildings = self._load_json("buildings") or []
@@ -306,6 +307,9 @@ class EnvPackEnvironment(object):
             item = self._polygon_at(self._landcover_index, lon, lat)
             if item is not None:
                 value = item.get("class") or LandCover.OPEN
+            elif self._landcover_raster is not None:
+                value = self._grid_value_nearest(
+                    self._landcover_raster, lon, lat) or LandCover.OPEN
             elif self._basic_env is not None:
                 value = self._basic_env.landcover(lon, lat)
             else:
@@ -342,6 +346,22 @@ class EnvPackEnvironment(object):
         if self._basic_env is not None:
             return self._basic_env.building_at(lon, lat)
         return None
+
+    @staticmethod
+    def _grid_value_nearest(grid, lon: float, lat: float):
+        """Nearest-cell sample (for class labels, not continuous heights)."""
+        if not grid:
+            return None
+        fx = (lon - grid["lon0"]) / max(1e-12, grid["lon1"] - grid["lon0"])
+        fy = (lat - grid["lat0"]) / max(1e-12, grid["lat1"] - grid["lat0"])
+        if fx < 0 or fy < 0 or fx > 1 or fy > 1:
+            return None
+        x = int(round(fx * (grid["cols"] - 1)))
+        y = int(round(fy * (grid["rows"] - 1)))
+        try:
+            return grid["values"][y][x]
+        except (IndexError, TypeError):
+            return None
 
     def canopy_height(self, lon: float, lat: float) -> float:
         """Canopy/vegetation height (m) from an optional envpack canopy layer."""

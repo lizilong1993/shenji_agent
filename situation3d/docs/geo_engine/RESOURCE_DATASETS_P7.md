@@ -62,6 +62,9 @@ resource.py enrich-envpack --envpack envpack:taiwan_strait \
 envpack 的 `canopy/grid.json` 图层（30 m 正则网格）：`EnvPackEnvironment.canopy_height()`
 可直接采样，`cover_height()` 取建筑/地类/树冠最大值，因此 LOS 与感知会使用树冠遮蔽。
 这是 VoxCity“城市体素/植被”思路在本引擎中的最小落地，不引入 VoxCity 运行时。
+`resource.py add-landcover` 进一步把 WorldCover 转成 envpack `landcover_raster/grid.json`
+（最近邻类别网格）；`EnvPackEnvironment.landcover()` 在无水体多边形/OSM 地类多边形时回退到
+该栅格，再回退 basic/OPEN。
 
 ## 4. 实测（server155，2026-10-26）
 
@@ -75,13 +78,15 @@ envpack 的 `canopy/grid.json` 图层（30 m 正则网格）：`EnvPackEnvironme
 | 新 envpack 推演 | 20 tick completed，plan ready；selected `envpack:tw2-gba`；validation passed（building_hits=1） |
 | CHMv2 Anping 30 m 树冠层 | 668×408，274 KB；49.6 s；加入 envpack 后 39.8 MB |
 | canopy 图层推演 | `envpack:tw2-gba-canopy` 被选中；20 tick completed/validation passed；`canopy_height`/`cover_height` 可采样 |
+| WorldCover Anping | 2160×1320，2.86 MB，5.0 s（10 m 原始；30 m 转网格）|
+| landcover 图层推演 | `envpack:tw2-gba-canopy-lc`（41.9 MB）被选中；20 tick completed/validation passed；`landcover()` 可采样 water/urban |
 | Overture 实时查询 | 150 s 未返回，记录为可选源；不影响 GBA 默认路径 |
 
 ## 5. 测试
 
 `tests/test_vector_adapters.py`（9 项，含数据集缓存复用）：spec/hash、统计、GeoJSON+注册、GBA 瓦片命名、
 CHMv2 quadkey、建筑源回退（gba 失败→overture）、树冠 raster manifest/注册。
-`tests/test_envpack_canopy.py`（2 项：栅格转网格/图层注册、引擎采样）
+`tests/test_envpack_canopy.py`（3 项：栅格转网格/图层注册、引擎 canopy 采样、landcover 类别网格）
 `tests/test_enrichment.py`（1 项）：default 高度补全、原包不变、新版本注册与校验。
 全量回归见提交时 `pytest tests`。
 
