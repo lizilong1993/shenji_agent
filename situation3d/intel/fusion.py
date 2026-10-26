@@ -2,8 +2,9 @@
 
 Multiple sources report the same earthquake with different ids and slightly
 different coordinates.  This module groups observations by domain/type inside a
-space-time window, picks the highest-confidence member as the anchor, and fuses
-confidence with a noisy-OR.  It does not rewrite the source observations.
+space-time window around a fixed cluster anchor (the highest-confidence
+member), and fuses confidence with a noisy-OR.  It does not rewrite the source
+observations.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import math
 from dataclasses import dataclass
 from typing import Dict, List, Sequence, Tuple
 
-from .model import Observation
+from .model import Observation, parse_time
 
 TYPE_SYNONYMS = {
     "eq": "earthquake",
@@ -40,6 +41,23 @@ SOURCE_PRIORITY = {"usgs": 0, "gdacs": 1, "firms": 2}
 def _canonical_type(value: str) -> str:
     text = str(value or "other").strip().lower().replace(" ", "_")
     return TYPE_SYNONYMS.get(text, text)
+
+
+def _validate(obs: Observation) -> None:
+    try:
+        lat = float(obs.lat)
+        lon = float(obs.lon)
+        conf = float(obs.confidence)
+    except (TypeError, ValueError):
+        raise ValueError("observation %s has non-numeric fields"
+                         % obs.observation_id) from None
+    if not (math.isfinite(lat) and math.isfinite(lon)
+            and math.isfinite(conf)):
+        raise ValueError("observation %s has non-finite fields"
+                         % obs.observation_id)
+    if not -90.0 <= lat <= 90.0 or not -180.0 <= lon <= 180.0:
+        raise ValueError("observation %s has out-of-range coordinates"
+                         % obs.observation_id)
 
 
 def _haversine_m(a: Tuple[float, float], b: Tuple[float, float]) -> float:
@@ -81,16 +99,8 @@ class FusedEvent:
 
 
 def _cluster_id(members: Sequence[Observation]) -> str:
-    payload = "|".join(sorted(m.observation_id for m in members))
+    payload = "|".join(sorted(m.content_hash() for m in members))
     return "cluster:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
-
-
-def _anchor(members: Sequence[Observation]) -> Observation:
-    return min(members, key=lambda o: (
-        -float(o.confidence),
-        SOURCE_PRIORITY.get(o.source_id, 9),
-        o.observation_id,
-    ))
 
 
 def _fused_confidence(members: Sequence[Observation]) -> float:
@@ -100,12 +110,30 @@ def _fused_confidence(members: Sequence[Observation]) -> float:
     return round(min(0.999, 1.0 - remain), 3)
 
 
+def _dedupe(observations: Sequence[Observation]) -> List[Observation]:
+    """Keep one observation per id (higher confidence, then content hash)."""
+    best: Dict[str, Observation] = {}
+    for obs in observations:
+        _validate(obs)
+        current = best.get(obs.observation_id)
+        if current is None or (
+                (float(obs.confidence), obs.content_hash())
+                > (float(current.confidence), current.content_hash())):
+            best[obs.observation_id] = obs
+    return list(best.values())
+
+
 def fuse(observations: Sequence[Observation], radius_m: float = 10000.0,
          window_s: float = 3600.0) -> List[FusedEvent]:
-    """Group observations into deterministic space-time clusters."""
+    """Group observations into deterministic space-time clusters.
+
+    Observations are processed by confidence (highest first); each cluster's
+    anchor is its first member and never drifts, so every member is within the
+    radius/window of the anchor that admitted it.
+    """
     ordered = sorted(
-        observations,
-        key=lambda o: (o.event_ms(), o.lat, o.lon,
+        _dedupe(observations),
+        key=lambda o: (-float(o.confidence),
                        SOURCE_PRIORITY.get(o.source_id, 9),
                        o.observation_id),
     )
@@ -114,7 +142,7 @@ def fuse(observations: Sequence[Observation], radius_m: float = 10000.0,
         best = None
         best_key = None
         for idx, members in enumerate(clusters):
-            anchor = _anchor(members)
+            anchor = members[0]
             if obs.domain != anchor.domain:
                 continue
             if _canonical_type(obs.type) != _canonical_type(anchor.type):
@@ -136,7 +164,7 @@ def fuse(observations: Sequence[Observation], radius_m: float = 10000.0,
 
     events = []
     for members in clusters:
-        anchor = _anchor(members)
+        anchor = members[0]
         events.append(FusedEvent(
             cluster_id=_cluster_id(members),
             domain=anchor.domain,
@@ -149,5 +177,6 @@ def fuse(observations: Sequence[Observation], radius_m: float = 10000.0,
             member_ids=tuple(sorted(m.observation_id for m in members)),
             sources=tuple(sorted({m.source_id for m in members})),
         ))
-    events.sort(key=lambda e: (e.event_time, e.cluster_id))
+    events.sort(key=lambda e: (parse_time(e.event_time).timestamp(),
+                               e.cluster_id))
     return events

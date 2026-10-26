@@ -64,7 +64,7 @@ situation3d/tests/
 
 ## 6. 跨源融合
 
-`fuse(observations, radius_m=10000, window_s=3600)` 先把观测按事件时间排序，再贪心聚类：domain 相同、规范化类型相同（`EQ`/`earthquake` 等走同义词表），且与簇锚点（最高置信度成员）的时空距离都在阈值内则合并，否则新建簇。`FusedEvent` 用锚点坐标/时间代表事件，保留全部 `member_ids` 与 `sources`，`cluster_id` 为成员 id 排序后的 SHA-256 前缀，`confidence` 为 `1-Π(1-ci)`（上限 0.999）。输入顺序不影响结果，簇 id 内容寻址。
+`fuse(observations, radius_m=10000, window_s=3600)` 先按 `observation_id` 去重（保留置信度更高者），再按置信度降序处理：每个簇的首个成员即固定锚点（不随成员变化而漂移），domain 相同、规范化类型相同（`EQ`/`earthquake` 等走同义词表），且与锚点的时空距离都在阈值内则加入最近簇，否则新建簇。因此每个成员都在其锚点的半径/时间窗内，不会通过链式相邻把远端事件并进来。`FusedEvent` 用锚点坐标/时间代表事件，保留全部 `member_ids` 与 `sources`，`cluster_id` 为成员 `content_hash` 排序后的 SHA-256 前缀，`confidence` 为 `1-Π(1-ci)`（上限 0.999）。融合前校验经纬度与置信度必须有限且在合法范围。输入顺序不影响结果。
 
 当前网关尚未消费 `FusedEvent`：同一事件融合后仍需决定是作为单条 cue，还是保留各源 cue 并在消费侧去重，留待网关集成时处理。
 
@@ -89,11 +89,12 @@ cd situation3d
 python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py -v
 ```
 
-11 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址。
+14 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝。
 
 ## 9. 已知限制与下一步
 
 - 仅覆盖三个静态源的离线归一化；GDELT、AIS/ADS-B 等实时连接器未实现（P2）。
 - 融合结果尚未进入网关：`fuse()` 可合并同一事件，但 `IntelGateway` 仍逐条产出 cue；需要决定“融合后单 cue”还是“消费侧去重”，并把融合哈希写入 run-manifest。
+- 固定锚点避免了链式过合并，但可能欠合并（两个彼此接近、锚点相距较远的簇不会二次合并）；复杂度 O(N²)，10k 级以上观测需要空间索引。
 - 未接入调度器：`IntelGateway` 尚未被 `engine`/`sim.world` 调用，需要 run-manifest 记录 bundle 哈希与每批 `log_hash`。
 - 置信度参数为经验值，待用历史数据校准。

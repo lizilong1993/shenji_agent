@@ -102,7 +102,7 @@ def normalize_firms(payload: Iterable[Dict[str, Any]], fetched_at: Any,
             continue
         event = parse_time(item.get("acq_time") or item.get("acq_date")
                            or now)
-        native = str(item.get("id") or "%s_%s" % (lat, lon))
+        native = str(item.get("id") or "%s_%s_%s" % (lat, lon, iso(event)))
         conf = trust.confidence("firms", event, now, "hazard")
         out.append(Observation(
             observation_id="firms:" + native,
