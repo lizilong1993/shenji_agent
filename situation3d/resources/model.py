@@ -247,6 +247,8 @@ class ResourceDecision:
     decided_by: str = ""
     decided_at: str = ""
     accept_stale: bool = False
+    kind: str = ""
+    path: str = ""
 
     def validate(self) -> "ResourceDecision":
         if self.action not in DECISION_ACTIONS:
@@ -262,6 +264,8 @@ class ResourceDecision:
             "decided_by": self.decided_by,
             "decided_at": self.decided_at or utc_now(),
             "accept_stale": bool(self.accept_stale),
+            "kind": self.kind,
+            "path": self.path,
         }
 
 

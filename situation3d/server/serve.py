@@ -356,6 +356,9 @@ def _spawn_run(case_id, run_id, extra_args=None):
     mode = tasking.get("mode")
     if mode in ("default", "user", "mixed"):
         cmd += ["--task-mode", mode]
+    resource_mode = config.get("resource_mode")
+    if resource_mode in ("auto", "offline", "online"):
+        cmd += ["--resource-mode", resource_mode]
     tasks_path = os.path.join(run_dir, "tasks.request.json")
     if os.path.isfile(tasks_path):
         cmd += ["--tasks-file", tasks_path]
@@ -399,6 +402,9 @@ def _launch_run(body):
     task_mode = body.get("task_mode")
     if task_mode not in (None, "default", "user", "mixed"):
         raise RunError("task_mode must be default/user/mixed")
+    resource_mode = body.get("resource_mode") or "auto"
+    if resource_mode not in ("auto", "offline", "online"):
+        raise RunError("resource_mode must be auto/offline/online")
     try:
         side = int(body.get("side", 0))
     except (TypeError, ValueError):
@@ -426,6 +432,7 @@ def _launch_run(body):
     run_id = RUN_STORE.create_run(case_id, seed=seed,
                                   config={"ticks": ticks, "seed": seed,
                                           "scenario_date": scenario_date,
+                                          "resource_mode": resource_mode,
                                           "tasking": {"mode": task_mode
                                                        or (tasks_doc or {}).get("mode"),
                                                        "side": side,
@@ -451,6 +458,7 @@ def _launch_run(body):
     _spawn_run(case_id, run_id)
     return {"run_id": run_id, "status": "queued", "seed": seed,
             "ticks": ticks, "scenario_date": scenario_date,
+            "resource_mode": resource_mode,
             "tasking": {"mode": task_mode or (tasks_doc or {}).get("mode"),
                          "side": side, "tasks": task_count}}
 

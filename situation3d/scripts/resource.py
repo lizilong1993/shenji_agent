@@ -20,6 +20,7 @@ SITUATION3D = os.path.dirname(HERE)
 if SITUATION3D not in sys.path:
     sys.path.insert(0, SITUATION3D)
 
+from resources import providers  # noqa: E402
 from resources.catalog import KINDS  # noqa: E402
 from resources.scanners import scan_repo  # noqa: E402
 from resources.store import ResourceError, ResourceStore  # noqa: E402
@@ -113,6 +114,33 @@ def cmd_remove(args):
     return 0
 
 
+def cmd_fetch(args):
+    store = _store(args)
+    entry = store.get(args.entry_id)
+    cache_root = args.cache_root or os.path.join(str(store.root), "cache")
+    try:
+        new = providers.refresh_envpack(
+            store, entry, cache_root, mode=args.mode,
+            timeout_s=args.timeout, allow_degraded=args.allow_degraded)
+    except providers.ProviderError as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    print(json.dumps(new.as_dict(), ensure_ascii=False, indent=1))
+    return 0
+
+
+def cmd_provide(args):
+    store = _store(args)
+    try:
+        entry = providers.register_provided_envpack(store, args.path,
+                                                    args.entry_id)
+    except providers.ProviderError as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    print(json.dumps(entry.as_dict(), ensure_ascii=False, indent=1))
+    return 0
+
+
 def cmd_kinds(args):
     rows = [KINDS[k].as_dict() for k in sorted(KINDS)]
     print(json.dumps(rows, ensure_ascii=False, indent=1))
@@ -156,6 +184,20 @@ def main(argv=None):
     p.add_argument("entry_id")
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_remove)
+
+    p = sub.add_parser("fetch", help="refresh an envpack from online sources")
+    p.add_argument("entry_id")
+    p.add_argument("--mode", choices=("online", "auto", "offline"),
+                   default="auto")
+    p.add_argument("--cache-root", default=None)
+    p.add_argument("--timeout", type=int, default=20)
+    p.add_argument("--allow-degraded", action="store_true")
+    p.set_defaults(func=cmd_fetch)
+
+    p = sub.add_parser("provide", help="register a user-supplied envpack")
+    p.add_argument("path")
+    p.add_argument("--entry-id", default=None)
+    p.set_defaults(func=cmd_provide)
 
     p = sub.add_parser("kinds", help="list resource kinds")
     p.set_defaults(func=cmd_kinds)

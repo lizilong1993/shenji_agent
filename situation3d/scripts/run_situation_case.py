@@ -42,7 +42,7 @@ from sim.scenario import build_world  # noqa: E402
 from sim.collision import obbs_overlap  # noqa: E402
 from sim.motion import entity_profile  # noqa: E402
 from run_store import RunStore  # noqa: E402
-from resources import preflight  # noqa: E402
+from resources import preflight, providers  # noqa: E402
 from resources.scanners import scan_envpack, scan_repo  # noqa: E402
 from resources.store import ResourceStore  # noqa: E402
 
@@ -573,7 +573,12 @@ def main(argv=None):
     ap.add_argument("--resource-root", default=None,
                     help="resource index root (default: situation3d/var/resources)")
     ap.add_argument("--resolutions", default=None,
-                    help="JSON resource decisions (use_cached_stale/cancel)")
+                    help="JSON resource decisions (use_cached_stale/cancel/"
+                         "fetch_online/provide_file)")
+    ap.add_argument("--resource-mode", choices=("auto", "offline", "online"),
+                    default="auto",
+                    help="auto = refresh missing/stale envpack online; "
+                         "offline = cache only; online = require refresh")
     ap.add_argument("--scenario-date", default=None,
                     help="ISO 8601 start time; default is the current UTC time")
     ap.add_argument("--tasks-file", default=None,
@@ -597,6 +602,25 @@ def main(argv=None):
         decisions = _load_decisions(args.resolutions)
     except ValueError as exc:
         raise SystemExit("invalid resolutions: %s" % exc)
+    allowed_actions = ("use_cached_stale", "cancel", "fetch_online",
+                       "provide_file")
+    for decision in decisions:
+        if decision.action not in allowed_actions:
+            raise SystemExit("unsupported decision action: %s"
+                             % decision.action)
+        if decision.action == "provide_file":
+            kind = decision.kind or (decision.entry_id.split(":", 1)[0]
+                                     if ":" in decision.entry_id else "envpack")
+            if kind != "envpack":
+                raise SystemExit("provide_file 目前只支持 envpack")
+            if not decision.path:
+                raise SystemExit("provide_file 需要 path")
+            try:
+                providers.register_provided_envpack(
+                    rstore, decision.path, decision.entry_id or None)
+            except providers.ProviderError as exc:
+                raise SystemExit("provide_file failed: %s" % exc)
+    force_fetch = any(d.action == "fetch_online" for d in decisions)
     if any(d.action == "cancel" for d in decisions):
         if args.run_id:
             store.update_run(args.case, args.run_id, status="cancelled")
@@ -668,10 +692,44 @@ def main(argv=None):
     config = {"tick_seconds": tick_seconds, "ticks": tick_count,
               "scenario_date": cm.get("start_time_utc"),
               "tasking": tasking_summary,
+              "resource_mode": args.resource_mode,
               "resources": {"plan_hash": summary["plan_hash"],
                             "status": summary["status"]},
               "engine": scenario.get("engine")}
+    fetch_error = None
     if plan.status == "blocked":
+        gap_kinds = set(g.kind for g in plan.gaps
+                        if g.criticality == "critical")
+        online_allowed = (args.resource_mode in ("auto", "online")
+                          or force_fetch)
+        if "envpack" in gap_kinds and online_allowed:
+            candidates = sorted(rstore.entries("envpack"),
+                                key=lambda e: e.as_of or "", reverse=True)
+            template = preflight.entry_for(plan, "envpack") or (
+                candidates[0] if candidates else None)
+            if template is None:
+                fetch_error = "没有可用于在线重建的环境包模板"
+            elif not providers.probe_online():
+                fetch_error = "网络探测失败（Overpass 不可达），已保留现有资源"
+            else:
+                try:
+                    providers.refresh_envpack(
+                        rstore, template,
+                        os.path.join(str(rstore.root), "cache"),
+                        mode=("online" if args.resource_mode == "online"
+                              else "auto"))
+                    plan = preflight.make_plan(
+                        rstore, args.case, scenario_date, scenario, missions,
+                        theatre=theatre, engine=scenario.get("engine"),
+                        decisions=decisions)
+                    summary = preflight.plan_summary(plan)
+                    config["resources"] = {"plan_hash": summary["plan_hash"],
+                                           "status": summary["status"]}
+                except providers.ProviderError as exc:
+                    fetch_error = str(exc)
+    if plan.status == "blocked":
+        if fetch_error:
+            summary["fetch_error"] = fetch_error
         _wait_for_resources(store, args.case, run_id, summary, config)
         return 0
     envpack_entry = preflight.entry_for(plan, "envpack")

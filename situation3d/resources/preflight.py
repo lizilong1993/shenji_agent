@@ -97,6 +97,8 @@ def decisions_from(raw: Any) -> List[ResourceDecision]:
             decided_by=str(item.get("decided_by") or ""),
             decided_at=str(item.get("decided_at") or ""),
             accept_stale=bool(item.get("accept_stale") or False),
+            kind=str(item.get("kind") or ""),
+            path=str(item.get("path") or ""),
         ).validate()
         out.append(decision)
     return out
