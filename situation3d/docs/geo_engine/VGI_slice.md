@@ -1,6 +1,6 @@
 # VGI 情报垂直切片（P1，离线 fixtures）
 
-状态：2026-10-24，分支 `feat/vgi-intel`（基于 `4dc9e1d`）。仅新增 `situation3d/intel/`、测试与 fixtures，未修改主引擎代码，未接入线上 8848。
+状态：2026-10-24 起始；`feat/vgi-intel`（融合）与 `feat/vgi-gateway-fusion`（网关融合）已合并 main；2026-10-26 `feat/intel-scheduler` 增加 `intel/scheduler.py` 与可选 World 接线。未接入线上 8848。
 
 ## 1. 定位
 
@@ -19,9 +19,11 @@ situation3d/intel/
   normalize.py  USGS / GDACS / FIRMS 归一化器
   fusion.py     跨源时空聚类与置信度融合
   gateway.py    IntelBundle、IntelCue、IntelGateway
+  scheduler.py  按 side 的确定性轮询与 run-manifest
 situation3d/tests/
   test_intel_v1.py
   test_fusion.py
+  test_intel_scheduler.py
   fixtures/intel/{usgs,gdacs,firms}.json
 ```
 
@@ -84,18 +86,27 @@ cue 排序键为 `(event_time_ms, source_priority, cue_id)`；批次携带 `log_
 
 `IntelGateway(bundle, fusion=(radius_m, window_s))` 开启融合模式：每次消费先按 side、`watermark ≤ 成员时间 ≤ horizon` 过滤观测并剔除已消费项，再对剩余观测调用 `fuse()`；每个簇产出一条 `cue_kind="fused"` 的 cue，`observation_id` 即 `cluster_id`，`provenance` 保留成员、来源和代表观测。因此 cue 不会包含未来成员，也不会吞掉已过 watermark 的成员；已被消费的成员不会在后续窗口重复融合。`knowledge_time_ms`/`ingest_seq` 取成员最大值，表示整簇信息齐备的时刻。默认 `fusion=None` 保持逐条观测语义。
 
-## 8. 验证
+## 8. 调度器与 World 接入
+
+`IntelScheduler(gateway, sides=(0,1), lookahead_s=300, watermark_lag_s=0)` 每次 `advance(sim_time, lookahead_s=None)` 对每个 side 调一次 `consume`，`horizon = sim_time + lookahead`、`watermark = max(0, sim_time - lag)`，并把 `(side, sim_time, watermark, cue_count, cue_ids, log_hash)` 追加到批次日志。`manifest()` 返回 bundle 哈希/ID、`scenario_start`、调度参数、批次副本、迟到 id 与 cue 总数。
+
+`World.set_intel_gateway(...)` 为可选接线，约定 `world.time_s == 0` 对应 `bundle.scenario_start`（调用方负责对齐，manifest 记录该时间基准）。World 的时间推进统一走 `_advance_clock`：**先**在旧时刻按 `max(lookahead_s, dt)` 预取并缓存 cue，**再**推进时钟，**最后**按 `valid_from` 把到期 cue 发布到 `intel_cues`；`intel_for(side)["cues"]` 只返回 `valid_from <= time_s` 且 `valid_to >= time_s` 的 cue。`step`、`advance_to` 的空闲快进和 `_motion_advance` 都使用同一推进函数，因此步长和推进方式不改变 intel 时序。gateway 的消费集合按 `(side, observation_id)` 记录，side-neutral 观测会对每个侧各送达一次。
+
+`intel_manifest()` 返回 `enabled` 加上述 manifest；未挂载调度器时返回 `{"enabled": False}`，`intel_for` 也不含 `"cues"` 键，保持旧载荷形状。
+
+## 9. 验证
 
 ```
 cd situation3d
-python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py -v
+python3 -m unittest tests/test_intel_v1.py tests/test_fusion.py tests/test_intel_scheduler.py -v
 ```
 
-19 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定。
+28 项测试通过：三源归一化字段、衰减单调性与分项、bundle 哈希与观测顺序无关、future-only 与去重、watermark 迟到策略、日志哈希稳定；同事件跨源合并、异事件不合并、半径/时间窗阈值、融合确定性、簇 id 内容寻址、链式锚点不漂移、重复 id 去重、非有限输入拒绝、融合网关单 cue 去重、关闭融合时逐源保留、融合模式不暴露未来成员、成员级 watermark、融合日志哈希稳定；调度器按 side 轮询、manifest 确定性与隔离、World 只发布到期 cue、多 side 中立观测、窗口内早事件不丢、`advance_to` 同步、未挂载时载荷不变。
 
-## 9. 已知限制与下一步
+## 10. 已知限制与下一步
 
 - 仅覆盖三个静态源的离线归一化；GDELT、AIS/ADS-B 等实时连接器未实现（P2）。
 - 融合需显式开启（`fusion=(radius, window)`），默认仍逐条产出 cue；融合以消费窗口内未消费成员为输入，跨窗口到达的同一事件可能分成多条 cue；固定锚点可能欠合并，O(N²) 复杂度需在 10k 级以上观测前引入空间索引。
-- 未接入调度器：`IntelGateway` 尚未被 `engine`/`sim.world` 调用，需要 run-manifest 记录 bundle 哈希与每批 `log_hash`。
-- 置信度参数为经验值，待用历史数据校准。
+- 时间基准需调用方保证：`world.time_s=0` 必须对应 `bundle.scenario_start`，当前没有自动校验或 offset 参数，只在 manifest 记录。
+- 批次日志每侧每 tick 追加一行，长跑 manifest 无界增长；cue 按 TTL 从 `intel_cues` 淘汰，但 `late_ids` 仍累积。
+- 调度器每 tick 全量扫描 bundle（融合模式 O(N²)），10k 级观测前需要时间索引/增量游标。
