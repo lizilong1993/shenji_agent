@@ -478,6 +478,29 @@ def _launch_run(body):
 # `_api_situations` 的索引缓存：键 = 目录里各 .json 的 (名字, 大小, mtime_ns)，值 = 响应体。
 # 见该方法的注释：不缓存的话，每次进系统都要白白解析 53.6 MB 的案例数据（10.5 s）。
 _SITUATIONS_CACHE = {"key": None, "body": None}
+
+# VGI intel management is shared by the test and demo consoles; the stores are
+# local JSON under var/intel (gitignored).  Lazy so a read-only deployment never
+# pays for it until /api/intel is used.
+_INTEL_MANAGER = None
+_INTEL_LOCK = threading.Lock()
+
+
+def _intel_manager():
+    global _INTEL_MANAGER
+    if _INTEL_MANAGER is None:
+        with _INTEL_LOCK:
+            if _INTEL_MANAGER is None:
+                from intel.management import IntelManager
+                _INTEL_MANAGER = IntelManager(
+                    os.path.join(_PKG_ROOT, "var", "intel"))
+    return _INTEL_MANAGER
+
+
+def _query_bool(value):
+    if value is None or value == "":
+        return None
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
 # 持久化的那一份：让**重启服务后的第一个请求**也是毫秒级（内存缓存随进程消失）。
 # 放 /tmp 而不是 web/data：这是服务端的派生数据，不该被当作项目数据文件。
 _SITUATIONS_INDEX_PATH = "/tmp/situation3d_situations_index.json"
@@ -1296,6 +1319,24 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _api_get(self, path, query=None):
         query = query or {}
+        if path == "/api/intel/overview":
+            try:
+                self._send_json(_intel_manager().overview(
+                    query.get("case_id") or "default"))
+            except Exception as exc:  # noqa: BLE001 - report a useful message
+                self._send_json({"error": "%s: %s"
+                                 % (type(exc).__name__, exc)}, 500)
+            return
+        if path == "/api/intel/sources":
+            try:
+                self._send_json({"sources": _intel_manager().sources.list(
+                    query.get("q"),
+                    query.get("kind") or None,
+                    _query_bool(query.get("enabled")),
+                )})
+            except Exception as exc:  # noqa: BLE001
+                self._send_json({"error": str(exc)}, 500)
+            return
         if path == "/api/ion/status":
             configured = read_ion_token() is not None
             self._send_json({
@@ -1714,7 +1755,66 @@ class Handler(SimpleHTTPRequestHandler):
             "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         })
 
+    def _api_intel_post(self, path):
+        from urllib.parse import unquote
+        body = self._read_json_body()
+        if body is None:
+            body = {}
+        if not isinstance(body, dict):
+            self._send_json({"error": "body must be a JSON object"}, 400)
+            return
+        manager = _intel_manager()
+        try:
+            if path == "/api/intel/manual":
+                item = manager.manual.create(body)
+                self._send_json({"ok": True, "item": item})
+                return
+            if path.startswith("/api/intel/manual/"):
+                rest = [part for part in path[len("/api/intel/manual/"):].split("/")
+                        if part]
+                if not rest:
+                    self._send_json({"error": "intel_id is required"}, 400)
+                    return
+                intel_id = unquote(rest[0])
+                if len(rest) == 2 and rest[1] == "revoke":
+                    item = manager.manual.revoke(intel_id)
+                elif len(rest) == 1:
+                    item = manager.manual.update(intel_id, body)
+                else:
+                    self._send_json({"error": "unknown manual intel action"}, 404)
+                    return
+                self._send_json({"ok": True, "item": item})
+                return
+            if path == "/api/intel/sources":
+                item = manager.sources.add(body)
+                self._send_json({"ok": True, "item": item})
+                return
+            if path.startswith("/api/intel/sources/"):
+                rest = [part for part in path[len("/api/intel/sources/"):].split("/")
+                        if part]
+                if not rest:
+                    self._send_json({"error": "source_id is required"}, 400)
+                    return
+                source_id = unquote(rest[0])
+                if len(rest) == 2 and rest[1] == "delete":
+                    item = manager.sources.delete(source_id)
+                elif len(rest) == 1:
+                    item = manager.sources.update(source_id, body)
+                else:
+                    self._send_json({"error": "unknown source action"}, 404)
+                    return
+                self._send_json({"ok": True, "item": item})
+                return
+            self._send_json({"error": "unknown intel API"}, 404)
+        except KeyError as exc:
+            self._send_json({"error": str(exc)}, 404)
+        except ValueError as exc:
+            self._send_json({"error": str(exc)}, 400)
+
     def _api_post(self, path):
+        if path.startswith("/api/intel/"):
+            self._api_intel_post(path)
+            return
         if path.startswith("/api/sim/"):
             if SERVER_MODE != "test" or RUN_STORE is None:
                 self._send_json({"error": "simulation API is disabled in demo mode"}, 403)

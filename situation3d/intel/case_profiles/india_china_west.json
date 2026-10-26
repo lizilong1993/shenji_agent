@@ -1,13 +1,50 @@
 {
-  "case_id": "india_china_west",
-  "name": "中印西段（虚构演示）",
-  "bbox": [77.0, 31.8, 81.2, 35.7],
-  "domains": ["hazard", "conflict", "aviation", "other"],
-  "sources": ["usgs", "gdacs", "eonet", "adsb", "gdelt"],
-  "keywords": ["ladakh", "aksai chin", "india", "china", "border",
-               "拉达克", "阿克赛钦", "中印"],
-  "countries": ["India", "China"],
+  "bbox": [
+    77.0,
+    31.8,
+    81.2,
+    35.7
+  ],
   "buffer_km": 50.0,
+  "case_id": "india_china_west",
+  "countries": [
+    "India",
+    "China"
+  ],
+  "domains": [
+    "hazard",
+    "conflict",
+    "maritime",
+    "aviation",
+    "infrastructure",
+    "weather",
+    "news",
+    "geography",
+    "society",
+    "social",
+    "selfmedia",
+    "cyber",
+    "health",
+    "other"
+  ],
+  "keywords": [
+    "ladakh",
+    "aksai chin",
+    "india",
+    "china",
+    "border",
+    "拉达克",
+    "阿克赛钦",
+    "中印"
+  ],
   "lookback_hours": 24.0,
-  "max_items": 3000
+  "max_items": 3000,
+  "name": "中印西段（虚构演示）",
+  "sources": [
+    "usgs",
+    "gdacs",
+    "eonet",
+    "adsb",
+    "gdelt"
+  ]
 }

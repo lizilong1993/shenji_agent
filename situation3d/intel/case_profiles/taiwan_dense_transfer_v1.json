@@ -1,13 +1,50 @@
 {
-  "case_id": "taiwan_dense_transfer_v1",
-  "name": "台海密集转运（虚构演示）",
-  "bbox": [119.9, 22.8, 120.5, 23.2],
-  "domains": ["hazard", "conflict", "maritime", "aviation", "other"],
-  "sources": ["usgs", "gdacs", "firms", "eonet", "adsb", "gdelt"],
-  "keywords": ["anping", "tainan", "taiwan strait", "台南", "安平",
-               "台海", "台湾"],
-  "countries": ["Taiwan", "China"],
+  "bbox": [
+    119.9,
+    22.8,
+    120.5,
+    23.2
+  ],
   "buffer_km": 20.0,
+  "case_id": "taiwan_dense_transfer_v1",
+  "countries": [
+    "Taiwan",
+    "China"
+  ],
+  "domains": [
+    "hazard",
+    "conflict",
+    "maritime",
+    "aviation",
+    "infrastructure",
+    "weather",
+    "news",
+    "geography",
+    "society",
+    "social",
+    "selfmedia",
+    "cyber",
+    "health",
+    "other"
+  ],
+  "keywords": [
+    "anping",
+    "tainan",
+    "taiwan strait",
+    "台南",
+    "安平",
+    "台海",
+    "台湾"
+  ],
   "lookback_hours": 24.0,
-  "max_items": 3000
+  "max_items": 3000,
+  "name": "台海密集转运（虚构演示）",
+  "sources": [
+    "usgs",
+    "gdacs",
+    "firms",
+    "eonet",
+    "adsb",
+    "gdelt"
+  ]
 }
