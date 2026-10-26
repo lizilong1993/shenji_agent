@@ -105,36 +105,15 @@ class IntelGateway:
         self.ttl_s = float(ttl_s)
         self.late_policy = late_policy
         self.fusion = fusion
-        self._fused: Dict[int, List[Any]] = {}
         self._start_ms = int(parse_time(bundle.scenario_start).timestamp() * 1000)
         self._consumed = set()
         self.late = []
 
-    def _fused_events(self, side: int):
-        if self.fusion is None:
-            return None
-        if side in self._fused:
-            return self._fused[side]
-        if isinstance(self.fusion, dict):
-            radius = float(self.fusion.get("radius_m", 10000.0))
-            window = float(self.fusion.get("window_s", 3600.0))
-        else:
-            radius, window = (float(v) for v in self.fusion)
-        observations = [
-            obs for obs in self.bundle.observations
-            if obs.properties.get("side") is None
-            or int(obs.properties["side"]) == int(side)
-        ]
-        events = fuse(observations, radius_m=radius, window_s=window)
-        self._fused[side] = events
-        return events
-
     def consume(self, side: int, sim_time: float, watermark: float,
                 lookahead: float) -> CueBatch:
         horizon = float(sim_time) + float(lookahead)
-        events = self._fused_events(side)
-        if events is not None:
-            return self._consume_fused(events, side, horizon, watermark)
+        if self.fusion is not None:
+            return self._consume_fused(side, horizon, watermark)
         cues: List[IntelCue] = []
         for obs in self.bundle.observations:
             if obs.observation_id in self._consumed:
@@ -181,26 +160,49 @@ class IntelGateway:
         ).hexdigest()
         return CueBatch(tuple(cues), float(watermark), self.late_policy, digest)
 
-    def _consume_fused(self, events, side: int, horizon: float,
+    def _consume_fused(self, side: int, horizon: float,
                        watermark: float) -> CueBatch:
-        by_id = {obs.observation_id: obs for obs in self.bundle.observations}
+        if isinstance(self.fusion, dict):
+            radius = float(self.fusion.get("radius_m", 10000.0))
+            window = float(self.fusion.get("window_s", 3600.0))
+        else:
+            radius, window = (float(v) for v in self.fusion)
+
+        # Member-level future-only and watermark gating: only observations
+        # inside [watermark, horizon] are clustered, so a cue never contains
+        # evidence that is not yet knowable or that was already dropped.
+        by_id: Dict[str, Observation] = {}
+        for obs in self.bundle.observations:
+            if obs.observation_id in self._consumed:
+                continue
+            obs_side = obs.properties.get("side")
+            if obs_side is not None and int(obs_side) != int(side):
+                continue
+            sim = (obs.event_ms() - self._start_ms) / 1000.0
+            if sim > horizon:
+                continue
+            if sim < watermark:
+                self.late.append(obs.observation_id)
+                self._consumed.add(obs.observation_id)
+                continue
+            current = by_id.get(obs.observation_id)
+            if current is None or (
+                    (float(obs.confidence), obs.content_hash())
+                    > (float(current.confidence), current.content_hash())):
+                by_id[obs.observation_id] = obs
+
+        events = fuse(list(by_id.values()), radius_m=radius, window_s=window)
         cues: List[IntelCue] = []
         for event in events:
-            if event.cluster_id in self._consumed:
+            members = [by_id[i] for i in event.member_ids if i in by_id]
+            if not members:
                 continue
             event_ms = int(parse_time(event.event_time).timestamp() * 1000)
             sim = (event_ms - self._start_ms) / 1000.0
-            if sim > horizon:
-                break
-            if sim < watermark:
-                self.late.append(event.cluster_id)
-                self._consumed.add(event.cluster_id)
-                continue
-            members = [by_id[i] for i in event.member_ids if i in by_id]
-            knowledge_ms = min(
+            knowledge_ms = max(
                 int(parse_time(m.ingest_time).timestamp() * 1000)
                 for m in members
-            ) if members else event_ms
+            )
             priority = min(
                 (SOURCE_PRIORITY.get(m.source_id, 9) for m in members),
                 default=9,
@@ -208,7 +210,7 @@ class IntelGateway:
             cue = IntelCue(
                 cue_id="cue:" + event.cluster_id,
                 observation_id=event.cluster_id,
-                ingest_seq=min((m.ingest_seq for m in members), default=0),
+                ingest_seq=max(m.ingest_seq for m in members),
                 event_time_ms=event_ms,
                 knowledge_time_ms=knowledge_ms,
                 source_priority=priority,
@@ -232,7 +234,8 @@ class IntelGateway:
                 sensor_model={},
             )
             cues.append(cue)
-            self._consumed.add(event.cluster_id)
+            for member in members:
+                self._consumed.add(member.observation_id)
         cues.sort(key=lambda c: (c.event_time_ms, c.source_priority, c.cue_id))
         payload = [(c.cue_id, c.event_time_ms) for c in cues]
         digest = hashlib.sha256(

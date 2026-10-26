@@ -148,6 +148,34 @@ class FusionTest(unittest.TestCase):
         self.assertEqual(len(batch.cues), 6)
         self.assertTrue(all(c.cue_kind == "observation" for c in batch.cues))
 
+    def test_fused_gateway_never_exposes_future_members(self):
+        bundle = IntelBundle("b1", "s1", all_observations(),
+                             "2026-10-24T00:00:00Z")
+        gateway = IntelGateway(bundle, fusion=(10000.0, 3600.0))
+        early = gateway.consume(1, 0.0, 0.0, 60.0)
+        self.assertEqual(len(early.cues), 1)
+        self.assertEqual(early.cues[0].provenance["member_ids"], ["usgs:us1"])
+        later = gateway.consume(1, 0.0, 0.0, 180.0)
+        ids = {tuple(c.provenance["member_ids"]) for c in later.cues}
+        self.assertIn(("gdacs:gd1",), ids)
+
+    def test_fused_gateway_watermark_is_member_level(self):
+        bundle = IntelBundle("b1", "s1", all_observations(),
+                             "2026-10-24T00:00:00Z")
+        gateway = IntelGateway(bundle, fusion=(10000.0, 3600.0))
+        batch = gateway.consume(1, 0.0, 90.0, 400.0)
+        ids = {tuple(c.provenance["member_ids"]) for c in batch.cues}
+        self.assertIn(("gdacs:gd1",), ids)
+        self.assertIn("usgs:us1", gateway.late)
+
+    def test_fused_log_hash_is_stable(self):
+        def run():
+            bundle = IntelBundle("b1", "s1", all_observations(),
+                                 "2026-10-24T00:00:00Z")
+            return IntelGateway(bundle, fusion=(10000.0, 3600.0)).consume(
+                1, 0.0, -90000.0, 400.0).log_hash
+        self.assertEqual(run(), run())
+
 
 if __name__ == "__main__":
     unittest.main()
