@@ -25,6 +25,7 @@ from sim import sensors as sensor_model
 from sim.rolecards_bridge import (
     card_for_operator,
     domain_from_card,
+    entity_type_for,
     profile_from_card,
     sensors_from_card,
     unit_kind_from_card,
@@ -263,6 +264,9 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
         scan_interval_s = 30.0
     scan_interval_s = min(86400.0, scan_interval_s)
     use_role_cards = _as_bool(engine.get("use_role_cards"), False)
+    catalog_mode = str(engine.get("catalog_mode") or "legacy").lower()
+    if catalog_mode not in ("legacy", "new"):
+        catalog_mode = "legacy"
     nav = None
     if envpack:
         from mobility.nav_field import NavField
@@ -368,16 +372,28 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
         if card:
             domain = domain_from_card(card) or domain
             unit_type = unit_type_from_card(card_id)
-            profile = profile_from_card(card, key=card_id)
+            entity_type = None
+            if catalog_mode == "new":
+                try:
+                    entity_type = entity_type_for(card_id)
+                except KeyError:
+                    entity_type = None
+            profile = profile_from_card(card, key=card_id, entity=entity_type)
         else:
             profile = profile_for(unit_type, domain)
         # Scenario-declared GLB footprint wins over the card defaults, so the
         # collision body and the rendered model agree.
         if op.get("length_m") is not None:
             try:
-                profile = replace(profile,
-                                  length_m=float(op["length_m"]),
-                                  width_m=float(op.get("width_m") or profile.width_m))
+                width_m = float(op.get("width_m") or profile.width_m)
+                changes = {"length_m": float(op["length_m"]),
+                           "width_m": width_m}
+                if entity_type is not None and profile.domain in ("land",
+                                                                  "surface"):
+                    # Typed profiles derive beam from width; keep the road
+                    # width gate consistent with the overridden GLB.
+                    changes["beam_m"] = width_m
+                profile = replace(profile, **changes)
             except (TypeError, ValueError):
                 pass
         armor = op.get("armor")

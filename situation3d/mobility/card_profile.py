@@ -44,7 +44,19 @@ def _f(value: Any, default: float = 0.0) -> float:
         return float(default)
 
 
-def profile_from_card(card: dict, key: Optional[str] = None) -> PlatformProfile:
+def _typed_quantities(entity) -> Dict[str, float]:
+    """Known values from a capability EntityType (empty when not given)."""
+    if entity is None:
+        return {}
+    out: Dict[str, float] = {}
+    for key, quantity in getattr(entity, "quantities", {}).items():
+        if getattr(quantity, "known", False):
+            out[key] = float(quantity.value)
+    return out
+
+
+def profile_from_card(card: dict, key: Optional[str] = None,
+                      entity=None) -> PlatformProfile:
     """Build a ``PlatformProfile`` from an effective role card."""
     identity = card.get("identity") or {}
     motion = card.get("motion") or {}
@@ -57,6 +69,17 @@ def profile_from_card(card: dict, key: Optional[str] = None) -> PlatformProfile:
     size = str(protection.get("size_class") or "medium")
     length_d, width_d, turn_d, pivot_d = FOOTPRINT_DEFAULT.get(
         domain, FOOTPRINT_DEFAULT["land"])
+    typed = _typed_quantities(entity)
+    length_m = typed.get("dim.length_m",
+                         _f(motion.get("length_m"), length_d))
+    width_m = typed.get("dim.width_m",
+                        _f(motion.get("width_m"), width_d))
+    height_m = typed.get("dim.height_m", 0.0)
+    weight_t = typed.get("mass.t", 0.0)
+    if entity is not None and domain in ("land", "surface"):
+        beam_m = typed.get("sea.beam_m", width_m)
+    else:
+        beam_m = _f(sea.get("beam_m"))
     return PlatformProfile(
         key=key or str(identity.get("subclass_id") or "card"),
         domain=domain,
@@ -73,7 +96,7 @@ def profile_from_card(card: dict, key: Optional[str] = None) -> PlatformProfile:
         road_bound=bool(terrain.get("road_bound")),
         draft_m=_f(sea.get("draft_m")),
         ukc_m=_f(sea.get("ukc_m"), 0.5),
-        beam_m=_f(sea.get("beam_m")),
+        beam_m=beam_m,
         max_operating_depth_m=_f(sea.get("max_operating_depth_m")),
         min_clearance_m=_f(air.get("min_clearance_m")),
         service_ceiling_m=_f(air.get("service_ceiling_m")),
@@ -82,8 +105,10 @@ def profile_from_card(card: dict, key: Optional[str] = None) -> PlatformProfile:
         descent_rate_ms=_f(air.get("descent_rate_ms"), 5.0),
         armor_class=int(protection.get("armor_class") or 0),
         size_class=size if size in ("small", "medium", "large") else "medium",
-        length_m=_f(motion.get("length_m"), length_d),
-        width_m=_f(motion.get("width_m"), width_d),
+        weight_t=weight_t,
+        vehicle_height_m=height_m,
+        length_m=length_m,
+        width_m=width_m,
         min_turn_radius_m=_f(motion.get("min_turn_radius_m"), turn_d),
         pivot_turn=bool(motion.get("pivot_turn", pivot_d)),
     )
