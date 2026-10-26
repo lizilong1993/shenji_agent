@@ -1,0 +1,36 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {"synthetic": true},
+  "features": [
+    {
+      "id": "us1",
+      "geometry": {"type": "Point", "coordinates": [120.1, 23.0, 10.0]},
+      "properties": {
+        "mag": 5.2,
+        "place": "fictional A",
+        "time": 1792800060000,
+        "url": "https://example.invalid/us1"
+      }
+    },
+    {
+      "id": "us2",
+      "geometry": {"type": "Point", "coordinates": [120.2, 23.1, 8.0]},
+      "properties": {
+        "mag": 4.1,
+        "place": "fictional B",
+        "time": 1792800120000,
+        "url": "https://example.invalid/us2"
+      }
+    },
+    {
+      "id": "us3",
+      "geometry": {"type": "Point", "coordinates": [120.3, 23.2, 6.0]},
+      "properties": {
+        "mag": 3.5,
+        "place": "fictional C",
+        "time": 1792800300000,
+        "url": "https://example.invalid/us3"
+      }
+    }
+  ]
+}
