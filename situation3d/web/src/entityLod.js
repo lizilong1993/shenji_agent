@@ -264,6 +264,9 @@
     './assets/models/type_eq240.glb': './assets/models/lod1_eq240.glb',
     './assets/models/type_perry.glb': './assets/models/lod1_perry.glb',
     './assets/models/type_j16.glb': './assets/models/lod1_j16.glb',
+    './assets/models/type_kj2000.glb': './assets/models/lod1_kj2000.glb',
+    './assets/models/type_kj500.glb': './assets/models/lod1_kj500.glb',
+    './assets/models/type_e2d.glb': './assets/models/lod1_e2d.glb',
   };
 
   function lod1UrlFor(def) {

@@ -150,8 +150,16 @@ eq(L.lod1UrlFor({ domain: 'sea', model: '成功级护卫舰' }),
   './assets/models/lod1_perry.glb', 'Perry -> lod1');
 eq(L.lod1UrlFor({ domain: 'air', model: '歼-16 多用途战斗机' }),
   './assets/models/lod1_j16.glb', 'J-16 -> lod1');
+eq(L.lod1UrlFor({ domain: 'air', model: 'KJ-2000 预警机' }),
+  './assets/models/lod1_kj2000.glb', 'KJ-2000 -> lod1');
+eq(L.lod1UrlFor({ domain: 'air', model: 'E-2K 预警机' }),
+  './assets/models/lod1_e2d.glb', 'E-2D -> lod1');
+eq(L.lod1UrlFor({ domain: 'air', model: '空警-500 预警机' }),
+  './assets/models/lod1_kj500.glb', 'KJ-500 -> lod1');
 for (const u of ['./assets/models/lod1_ztd05.glb', './assets/models/lod1_eq240.glb',
-                 './assets/models/lod1_perry.glb', './assets/models/lod1_j16.glb']) {
+                 './assets/models/lod1_perry.glb', './assets/models/lod1_j16.glb',
+                 './assets/models/lod1_kj2000.glb', './assets/models/lod1_kj500.glb',
+                 './assets/models/lod1_e2d.glb']) {
   const fp = path.join(__dirname, '..', 'web', u.replace(/^\.\//, ''));
   if (fs.existsSync(fp)) pass++;
   else failures.push('LOD1 文件不存在: ' + fp);
