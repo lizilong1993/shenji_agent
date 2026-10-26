@@ -146,7 +146,12 @@ eq(L.lod1UrlFor({ domain: 'land', model: 'ZTD-05 两栖突击车' }),
 eq(L.lod1UrlFor({ domain: 'land', model: 'EQ240 运输车' }),
   './assets/models/lod1_eq240.glb', 'EQ240 -> lod1');
 eq(L.lod1UrlFor({ domain: 'sea', model: '071 型船坞登陆舰' }), null, '071 无 lod1');
-for (const u of ['./assets/models/lod1_ztd05.glb', './assets/models/lod1_eq240.glb']) {
+eq(L.lod1UrlFor({ domain: 'sea', model: '成功级护卫舰' }),
+  './assets/models/lod1_perry.glb', 'Perry -> lod1');
+eq(L.lod1UrlFor({ domain: 'air', model: '歼-16 多用途战斗机' }),
+  './assets/models/lod1_j16.glb', 'J-16 -> lod1');
+for (const u of ['./assets/models/lod1_ztd05.glb', './assets/models/lod1_eq240.glb',
+                 './assets/models/lod1_perry.glb', './assets/models/lod1_j16.glb']) {
   const fp = path.join(__dirname, '..', 'web', u.replace(/^\.\//, ''));
   if (fs.existsSync(fp)) pass++;
   else failures.push('LOD1 文件不存在: ' + fp);

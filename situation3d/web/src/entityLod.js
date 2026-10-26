@@ -262,6 +262,8 @@
   var LOD1_MAP = {
     './assets/models/type_ztd05.glb': './assets/models/lod1_ztd05.glb',
     './assets/models/type_eq240.glb': './assets/models/lod1_eq240.glb',
+    './assets/models/type_perry.glb': './assets/models/lod1_perry.glb',
+    './assets/models/type_j16.glb': './assets/models/lod1_j16.glb',
   };
 
   function lod1UrlFor(def) {
