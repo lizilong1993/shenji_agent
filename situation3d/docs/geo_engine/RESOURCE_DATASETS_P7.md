@@ -9,7 +9,7 @@
 |---|---|---|---|
 | `building_footprints` | GeoJSON 建筑轮廓 + `height_m`/`height_var_m`/`region` | advisory | GBA（默认）、Overture |
 | `canopy_height` | 树冠高度 GeoTIFF | advisory | Meta/WRI CHMv2 |
-| `landcover` | 地类栅格（ESA WorldCover 2021 v200，10 m） | advisory | ESA WorldCover |
+| `landcover` | 地类栅格（契约已留，适配器待接） | advisory | ESA WorldCover |
 
 统一输出：
 
@@ -20,7 +20,8 @@ cache/datasets/<kind>/<name>/<spec_hash>/
 ```
 
 登记进 `var/resources/index.json`，带 content_hash/bbox/as_of/license/quality/来源；
-resolver 与现有 envpack/瓦片共享在线-离线/时效/门控机制。
+resolver 与现有 envpack/瓦片共享在线-离线/时效/门控机制。同一 `name+spec_hash` 已登记且校验通过时
+直接复用（`--force` 强制刷新），离线模式只读缓存。
 
 ## 2. 适配器
 
@@ -32,8 +33,6 @@ resolver 与现有 envpack/瓦片共享在线-离线/时效/门控机制。
   因此 GBA 为默认，Overture 作为备选适配器保留。
 - **CHMv2（Meta/WRI 1 m 树冠）**：zoom-10 quadkey COG，GDAL `/vsicurl` 窗口裁剪
   （沿用 P6 的 COG 路径），输出 Web Mercator GeoTIFF，CC BY 4.0。
-- **ESA WorldCover 2021 v200（10 m 地类）**：3° COG 瓦片，GDAL 窗口裁剪；2026-10-26
-  厦门 0.02° 实测 7.1 s / 61 KB（240×240），CC BY 4.0。
 
 CLI：
 
@@ -70,14 +69,13 @@ resource.py enrich-envpack --envpack envpack:taiwan_strait \
 | 厦门 AOI 0.1° 建筑 | 6,365 栋，height coverage 100%，均值 13.63 m；适配器+登记 29.5 s |
 | 台湾 Anping AOI 建筑 | 23,260 栋，height coverage 100%，均值 9.75 m；5.6 s |
 | CHMv2 厦门 0.02° | 10.3 s，1864×2047 单波段 GeoTIFF，3.8 MB，CC BY 4.0 |
-| WorldCover 厦门 0.02° | 7.1 s，240×240 单波段 GeoTIFF，61 KB，CC BY 4.0 |
 | envpack 高度补全 | 14,590 栋 default 中填充 13,651 栋（93.6%），新版本 38.6 MB |
 | 新 envpack 推演 | 20 tick completed，plan ready；selected `envpack:tw2-gba`；validation passed（building_hits=1） |
 | Overture 实时查询 | 150 s 未返回，记录为可选源；不影响 GBA 默认路径 |
 
 ## 5. 测试
 
-`tests/test_vector_adapters.py`（6 项）：spec/hash、统计、GeoJSON+注册、GBA 瓦片命名、
+`tests/test_vector_adapters.py`（9 项，含数据集缓存复用）：spec/hash、统计、GeoJSON+注册、GBA 瓦片命名、
 CHMv2 quadkey、建筑源回退（gba 失败→overture）、树冠 raster manifest/注册。
 `tests/test_enrichment.py`（1 项）：default 高度补全、原包不变、新版本注册与校验。
 全量回归见提交时 `pytest tests`。
@@ -89,5 +87,5 @@ CHMv2 quadkey、建筑源回退（gba 失败→overture）、树冠 raster manif
 - GBA 高度为 LOD1 估算值，9.6% 左右的 OSM 非默认高度与 GBA 会有差异；enrichment 只填
   `default`，不覆盖已有 `tag/levels` 高度。
 - Overture 实时查询受网络影响；如需要可预下载 Overture release 到本地再由 pyarrow 读取。
-- canopy/landcover 尚未进入引擎感知/遮蔽；目前作为独立资源登记，供后续城市体素/植被/微气候使用。
+- canopy 尚未进入引擎感知/遮蔽；landcover 适配器（WorldCover）待接。
 - 所有数据许可证逐层记录；GBA/Overture/CHMv2 的具体条款在部署对外使用前需复核。

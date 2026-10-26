@@ -300,7 +300,7 @@ def cmd_buildings(args):
         result = acquire_buildings(
             store, spec, sources,
             args.cache_root or os.path.join(str(store.root), "cache"),
-            mode=args.mode)
+            mode=args.mode, force=args.force)
     except (DatasetError, ValueError) as exc:
         print("error: %s" % exc, file=sys.stderr)
         return 1
@@ -323,7 +323,7 @@ def cmd_canopy(args):
         result = acquire_canopy(
             store, spec,
             args.cache_root or os.path.join(str(store.root), "cache"),
-            mode=args.mode, resolution_m=args.resolution)
+            mode=args.mode, resolution_m=args.resolution, force=args.force)
     except (DatasetError, ValueError) as exc:
         print("error: %s" % exc, file=sys.stderr)
         return 1
@@ -449,6 +449,7 @@ def main(argv=None):
     p.add_argument("--mode", choices=("auto", "offline", "online"),
                    default="auto")
     p.add_argument("--cache-root", default=None)
+    p.add_argument("--force", action="store_true")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_buildings)
 
@@ -459,6 +460,7 @@ def main(argv=None):
     p.add_argument("--mode", choices=("auto", "offline", "online"),
                    default="auto")
     p.add_argument("--cache-root", default=None)
+    p.add_argument("--force", action="store_true")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_canopy)
 
@@ -469,6 +471,7 @@ def main(argv=None):
     p.add_argument("--mode", choices=("auto", "offline", "online"),
                    default="auto")
     p.add_argument("--cache-root", default=None)
+    p.add_argument("--force", action="store_true")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_landcover)
 

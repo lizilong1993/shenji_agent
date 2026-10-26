@@ -126,6 +126,22 @@ class AdapterOrchestrationTest(unittest.TestCase):
         self.assertEqual(result["manifest"]["schema"], "s3d.raster.v1")
         self.assertTrue(self.store.verify(result["entry"].entry_id)["ok"])
 
+    def test_dataset_cache_reuse(self):
+        def ok(*args, **kwargs):
+            return ([feature("o1", 15.0)], {"label": "Overture", "as_of": ""})
+
+        with mock.patch.object(adapters, "fetch_overture", side_effect=ok):
+            first = adapters.acquire_buildings(
+                self.store, SPEC, ["overture"], self.cache)
+        self.assertFalse(first.get("cached"))
+        with mock.patch.object(adapters, "fetch_overture",
+                               side_effect=AssertionError("must not run")):
+            second = adapters.acquire_buildings(
+                self.store, SPEC, ["overture"], self.cache)
+        self.assertTrue(second["cached"])
+        self.assertEqual(second["entry"].content_hash,
+                         first["entry"].content_hash)
+
     def test_canopy_registration(self):
         raster = os.path.join(self.tmp, "canopy.tif")
         with open(raster, "wb") as fh:

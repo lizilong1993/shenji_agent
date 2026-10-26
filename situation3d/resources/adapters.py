@@ -330,9 +330,45 @@ def fetch_worldcover(store: ResourceStore, spec: DatasetSpec,
     return dest, info, source
 
 
+def _cached_dataset(store: ResourceStore, spec: DatasetSpec):
+    """Return a previously acquired dataset for the same spec, if valid."""
+    entry_id = "%s:%s" % (spec.kind, spec.slug)
+    try:
+        entry = store.get(entry_id)
+    except Exception:  # noqa: BLE001
+        return None
+    if not os.path.isdir(entry.path):
+        return None
+    manifest_path = os.path.join(entry.path, "manifest.json")
+    if not os.path.isfile(manifest_path):
+        return None
+    try:
+        with open(manifest_path, encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if manifest.get("spec_hash") != spec.hash():
+        return None
+    if not store.verify(entry_id)["ok"]:
+        return None
+    stats = {"feature_count": manifest.get("feature_count"),
+             "height_coverage": manifest.get("height_coverage"),
+             "height_mean_m": manifest.get("height_mean_m")}
+    return {"entry": entry, "manifest": manifest, "stats": stats,
+            "source": manifest.get("source") or {}, "errors": [],
+            "cached": True}
+
+
 def acquire_landcover(store: ResourceStore, spec: DatasetSpec,
-                      cache_root: str, mode: str = "auto") -> Any:
+                      cache_root: str, mode: str = "auto",
+                      force: bool = False) -> Any:
     spec.validate()
+    if not force:
+        cached = _cached_dataset(store, spec)
+        if cached is not None:
+            return cached
+    if mode == "offline":
+        raise DatasetError("offline and no cached landcover for %s" % spec.name)
     dest, info, source = fetch_worldcover(store, spec, cache_root, mode)
     root = os.path.join(str(store.root), "cache", "datasets",
                         spec.kind, spec.slug, spec.hash()[:12])
@@ -348,13 +384,20 @@ def acquire_landcover(store: ResourceStore, spec: DatasetSpec,
                              as_of=WORLDCOVER_AS_OF,
                              notes={"adapter": "worldcover",
                                     "classes": "ESA WorldCover 2021"})
-    return {"entry": entry, "manifest": manifest, "source": source}
+    return {"entry": entry, "manifest": manifest, "source": source,
+            "stats": {}, "errors": [], "cached": False}
 
 
 def acquire_canopy(store: ResourceStore, spec: DatasetSpec,
                    cache_root: str, mode: str = "auto",
-                   resolution_m: float = 1.2) -> Any:
+                   resolution_m: float = 1.2, force: bool = False) -> Any:
     spec.validate()
+    if not force:
+        cached = _cached_dataset(store, spec)
+        if cached is not None:
+            return cached
+    if mode == "offline":
+        raise DatasetError("offline and no cached canopy for %s" % spec.name)
     dest, info, source = fetch_chmv2(store, spec, cache_root, mode,
                                      resolution_m=resolution_m)
     root = os.path.join(str(store.root), "cache", "datasets",
@@ -371,13 +414,22 @@ def acquire_canopy(store: ResourceStore, spec: DatasetSpec,
                              as_of=CHMV2_AS_OF,
                              notes={"adapter": "chmv2",
                                     "resolution_m": resolution_m})
-    return {"entry": entry, "manifest": manifest, "source": source}
+    return {"entry": entry, "manifest": manifest, "source": source,
+            "stats": {}, "errors": [], "cached": False}
 
 
 def acquire_buildings(store: ResourceStore, spec: DatasetSpec,
                       sources: Sequence[str], cache_root: str,
-                      mode: str = "auto") -> Any:
+                      mode: str = "auto", force: bool = False) -> Any:
     """Try building adapters in order; first non-empty wins."""
+    spec.validate()
+    if not force:
+        cached = _cached_dataset(store, spec)
+        if cached is not None:
+            return cached
+    if mode == "offline":
+        raise DatasetError("offline and no cached building dataset for %s"
+                           % spec.name)
     errors = []
     for name in sources:
         try:
@@ -402,7 +454,7 @@ def acquire_buildings(store: ResourceStore, spec: DatasetSpec,
                                             "feature_count": stats["feature_count"],
                                             "height_coverage": stats["height_coverage"]})
             return {"entry": entry, "manifest": manifest, "stats": stats,
-                    "source": source, "errors": errors}
+                    "source": source, "errors": errors, "cached": False}
         except Exception as exc:  # noqa: BLE001
             errors.append("%s: %s" % (name, exc))
     raise DatasetError("all building sources failed: %s" % "; ".join(errors))
