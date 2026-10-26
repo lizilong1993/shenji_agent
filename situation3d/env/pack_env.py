@@ -102,6 +102,7 @@ class EnvPackEnvironment(object):
         self.grid = LegacyHexGrid.from_grid_meta(self.manifest["grid"])
         self._terrain = self._load_json("terrain")
         self._bathymetry = self._load_json("bathymetry")
+        self._canopy = self._load_json("canopy")
         self._landcover = self._load_json("landcover") or []
         self._water = self._load_json("water") or []
         self._buildings = self._load_json("buildings") or []
@@ -342,12 +343,21 @@ class EnvPackEnvironment(object):
             return self._basic_env.building_at(lon, lat)
         return None
 
+    def canopy_height(self, lon: float, lat: float) -> float:
+        """Canopy/vegetation height (m) from an optional envpack canopy layer."""
+        value = self._grid_value(self._canopy, lon, lat)
+        if value is None:
+            return 0.0
+        return max(0.0, float(value))
+
     def cover_height(self, lon: float, lat: float) -> float:
+        canopy = self.canopy_height(lon, lat)
         item = self._polygon_at(self._building_index, lon, lat)
         if item is not None:
-            return float(item.get("height_m") or 6.0)
+            return max(float(item.get("height_m") or 6.0), canopy)
         cover = self.landcover(lon, lat)
-        return {LandCover.FOREST: 15.0, LandCover.URBAN: 10.0}.get(cover, 0.0)
+        return max({LandCover.FOREST: 15.0, LandCover.URBAN: 10.0}.get(cover, 0.0),
+                   canopy)
 
     def building_intersects(self, a, h0, b, h1) -> bool:
         if not self._buildings or self._building_bbox is None:

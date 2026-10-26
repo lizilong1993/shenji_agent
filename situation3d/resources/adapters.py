@@ -274,7 +274,9 @@ def _worldcover_url(lon0: int, lat0: int) -> str:
         WORLDCOVER_BASE, _tag_upper(lon0, lat0))
 
 
-def _warp_sources(urls, bbox, dest: str, timeout_s: int = 240) -> str:
+def _warp_sources(urls, bbox, dest: str, timeout_s: int = 240,
+                  resolution_m: float = 0.0,
+                  resampling: str = "bilinear") -> str:
     import shutil
     import subprocess
     if shutil.which("gdalwarp") is None:
@@ -284,9 +286,13 @@ def _warp_sources(urls, bbox, dest: str, timeout_s: int = 240) -> str:
     env.setdefault("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
     env.setdefault("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif,.tiff")
     env.setdefault("GDAL_HTTP_MAX_RETRY", "2")
-    cmd = ["gdalwarp", "-q", "-te_srs", "EPSG:4326",
-           "-te", "%.8f" % w, "%.8f" % s, "%.8f" % e, "%.8f" % n,
-           "-of", "GTiff"] + ["/vsicurl/" + u for u in urls] + [dest]
+    cmd = ["gdalwarp", "-q", "-overwrite", "-te_srs", "EPSG:4326",
+           "-te", "%.8f" % w, "%.8f" % s, "%.8f" % e, "%.8f" % n]
+    if resolution_m > 0:
+        deg = float(resolution_m) / 111320.0
+        cmd += ["-t_srs", "EPSG:4326", "-tr", "%.10f" % deg, "%.10f" % deg,
+                "-r", resampling]
+    cmd += ["-of", "GTiff"] + ["/vsicurl/" + u for u in urls] + [dest]
     proc = subprocess.run(cmd, stdout=subprocess.PIPE,
                           stderr=subprocess.PIPE, timeout=timeout_s, env=env)
     if proc.returncode != 0:
@@ -307,7 +313,8 @@ def fetch_chmv2(store: ResourceStore, spec: DatasetSpec, cache_root: str,
     os.makedirs(work, exist_ok=True)
     dest = os.path.join(work, "%s.tif" % spec.slug)
     # GDAL /vsicurl handles the COG windows; pass every covering tile.
-    _warp_sources(urls, spec.bbox, dest, timeout_s=timeout_s)
+    _warp_sources(urls, spec.bbox, dest, timeout_s=timeout_s,
+                  resolution_m=resolution_m, resampling="bilinear")
     info = raster_info(dest)
     source = {"label": "Meta/WRI CHMv2 canopy height", "tiles": urls,
               "license": CHMV2_LICENSE, "as_of": CHMV2_AS_OF}

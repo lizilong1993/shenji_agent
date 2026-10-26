@@ -58,8 +58,10 @@ resource.py enrich-envpack --envpack envpack:taiwan_strait \
   `provenance.building_heights`（来源/匹配数/填充数）；
 - 新版本登记为独立 `envpack:<name>`，resolver 按 `as_of` 选择。
 
-树冠资源目前作为独立 `canopy_height` 资源登记，尚未接入 envpack/感知层；可作为后续
-城市体素/植被遮蔽/微气候约束的输入，不需要引入 VoxCity 运行时。
+树冠资源目前作为独立 `canopy_height` 资源登记；新增 `resource.py add-canopy` 把它转换为
+envpack 的 `canopy/grid.json` 图层（30 m 正则网格）：`EnvPackEnvironment.canopy_height()`
+可直接采样，`cover_height()` 取建筑/地类/树冠最大值，因此 LOS 与感知会使用树冠遮蔽。
+这是 VoxCity“城市体素/植被”思路在本引擎中的最小落地，不引入 VoxCity 运行时。
 
 ## 4. 实测（server155，2026-10-26）
 
@@ -71,12 +73,15 @@ resource.py enrich-envpack --envpack envpack:taiwan_strait \
 | CHMv2 厦门 0.02° | 10.3 s，1864×2047 单波段 GeoTIFF，3.8 MB，CC BY 4.0 |
 | envpack 高度补全 | 14,590 栋 default 中填充 13,651 栋（93.6%），新版本 38.6 MB |
 | 新 envpack 推演 | 20 tick completed，plan ready；selected `envpack:tw2-gba`；validation passed（building_hits=1） |
+| CHMv2 Anping 30 m 树冠层 | 668×408，274 KB；49.6 s；加入 envpack 后 39.8 MB |
+| canopy 图层推演 | `envpack:tw2-gba-canopy` 被选中；20 tick completed/validation passed；`canopy_height`/`cover_height` 可采样 |
 | Overture 实时查询 | 150 s 未返回，记录为可选源；不影响 GBA 默认路径 |
 
 ## 5. 测试
 
 `tests/test_vector_adapters.py`（9 项，含数据集缓存复用）：spec/hash、统计、GeoJSON+注册、GBA 瓦片命名、
 CHMv2 quadkey、建筑源回退（gba 失败→overture）、树冠 raster manifest/注册。
+`tests/test_envpack_canopy.py`（2 项：栅格转网格/图层注册、引擎采样）
 `tests/test_enrichment.py`（1 项）：default 高度补全、原包不变、新版本注册与校验。
 全量回归见提交时 `pytest tests`。
 
