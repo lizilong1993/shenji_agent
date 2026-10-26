@@ -47,6 +47,14 @@ def _footprint_ok(nav, prof, lon: float, lat: float, heading: float,
         if inside:
             continue
         if nav.building_only_block(prof, slon, slat):
+            # Building-only raster blocks are enforced by the centre-cell
+            # exact check (with half-width inflation); this keeps the
+            # blocked-start escape path working.
+            continue
+        exact = getattr(nav, "point_exact_ok", None)
+        if exact is not None and exact(prof, slon, slat):
+            # The coarse cell is blocked, but the exact authority at this
+            # sample is clear (sub-cell detour); match route_ok semantics.
             continue
         return False
     return True

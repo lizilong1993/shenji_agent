@@ -282,6 +282,13 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
                   scan_interval_s=scan_interval_s)
     world.max_ineffective_shots = int(_as_float(engine.get("max_ineffective_shots"), 0))
     world.ineffective_block_s = _as_float(engine.get("ineffective_block_s"), 1800.0)
+    policy = scenario.get("policy")
+    if isinstance(policy, dict) and policy:
+        from envmodel.policy import validate_policy
+        policy = validate_policy(policy, require_approved=True)
+    else:
+        policy = None
+    world.policy = policy
     weather_base = scenario.get("weather_base")
     weather_timeline = scenario.get("weather")
     start_hour = scenario.get("start_hour_utc")

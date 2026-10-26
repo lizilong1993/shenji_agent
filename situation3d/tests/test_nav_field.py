@@ -22,7 +22,7 @@ from geo.geodesy import haversine_m  # noqa: E402
 from mobility.nav_field import NavField  # noqa: E402
 from mobility.planner import GridPlanner  # noqa: E402
 from mobility.profile import PROFILES  # noqa: E402
-from sim.entity import Entity, Pose  # noqa: E402
+from sim.entity import Entity, Pose, Route  # noqa: E402
 from sim.motion import integrate  # noqa: E402
 
 BBOX = (120.0, 23.0, 120.02, 23.02)
@@ -242,6 +242,17 @@ class NavFieldTest(unittest.TestCase):
         if route is not None:
             self.assertTrue(nav.route_ok(self.prof, route))
 
+    def test_components_split_by_full_height_water(self):
+        env = FakeFineEnv(water=(120.008, 23.0, 120.012, 23.02))
+        nav = NavField(env, res_m=50.0, use_cache=False)
+        labels, sizes = nav.components(self.prof)
+        self.assertEqual(len(sizes), 2)
+        west = nav._index_of(120.004, 23.01)
+        east = nav._index_of(120.016, 23.01)
+        self.assertGreaterEqual(labels[west], 0)
+        self.assertGreaterEqual(labels[east], 0)
+        self.assertNotEqual(labels[west], labels[east])
+
     def test_bridge_deck_is_passable_over_water(self):
         nodes = {"A": (120.007, 23.010), "B": (120.013, 23.010)}
         edges = [{"a": "A", "b": "B", "class": "residential",
@@ -252,6 +263,86 @@ class NavFieldTest(unittest.TestCase):
         self.assertTrue(nav.passable(self.prof, 120.010, 23.010))
         # Off the bridge the water still blocks.
         self.assertFalse(nav.passable(self.prof, 120.010, 23.006))
+
+    def test_subcell_detour_passes_exact_authority(self):
+        # A small footprint at the centre blocks the whole 30 m cell, but a
+        # local detour skimming the cell edge stays outside the building.
+        base = NavField(FakeFineEnv(water=None), res_m=30.0, use_cache=False)
+        lon_c, lat_c = base._center(15, 15)
+        d = 0.00005  # ~5 m half-size footprint
+        env = FakeFineEnv(water=None,
+                          buildings=[(lon_c - d, lat_c - d,
+                                      lon_c + d, lat_c + d, 10.0)])
+        nav = NavField(env, res_m=30.0, use_cache=False)
+        prof = self.prof
+        self.assertFalse(nav.passable(prof, lon_c, lat_c))
+
+        north = lat_c + 0.00012  # ~13 m north: same row, outside footprint
+        detour = Route(points=[Pose(lon_c - 0.00025, north),
+                               Pose(lon_c + 0.00025, north)],
+                       speed_limits=[5.0], modes=["offroad"])
+        self.assertFalse(nav._points_ok(prof, detour.points))
+        self.assertTrue(nav.route_ok(prof, detour))
+        self.assertTrue(nav.motion_point_ok(prof, lon_c, north))
+
+        through = Route(points=[Pose(lon_c - 0.00025, lat_c),
+                                Pose(lon_c + 0.00025, lat_c)],
+                        speed_limits=[5.0], modes=["offroad"])
+        self.assertFalse(nav.route_ok(prof, through))
+        self.assertFalse(nav.motion_point_ok(prof, lon_c, lat_c))
+
+    def test_vehicle_half_width_penetration_is_rejected(self):
+        base = NavField(FakeFineEnv(water=None), res_m=30.0, use_cache=False)
+        lon_c, lat_c = base._center(15, 15)
+        dlon, dlat = 10.0 / base.m_lon, 10.0 / base.m_lat  # 20 m x 20 m block
+        env = FakeFineEnv(water=None,
+                          buildings=[(lon_c - dlon, lat_c - dlat,
+                                      lon_c + dlon, lat_c + dlat, 12.0)])
+        nav = NavField(env, res_m=30.0, use_cache=False)
+        north = lat_c + 10.5 / base.m_lat  # centreline 10.5 m from centre
+        route = Route(points=[Pose(lon_c - 0.0002, north),
+                              Pose(lon_c + 0.0002, north)],
+                      speed_limits=[5.0], modes=["offroad"])
+        # The centreline is outside the 10 m half-block, but the tracked
+        # platform's half-width (1.75 m) reaches inside it.
+        self.assertFalse(nav.route_ok(self.prof, route))
+        self.assertFalse(nav.motion_point_ok(self.prof, lon_c, north))
+
+    def test_footway_bridge_does_not_carry_vehicles(self):
+        nodes = {"A": (120.007, 23.010), "B": (120.013, 23.010)}
+        edges = [{"a": "A", "b": "B", "class": "footway",
+                  "bridge": True, "tunnel": False,
+                  "maxweight": None, "maxheight": None, "width": None}]
+        nav = NavField(FakeFineEnv(roads=(nodes, edges)), res_m=30.0,
+                       use_cache=False)
+        self.assertFalse(nav.passable(self.prof, 120.010, 23.010))
+        self.assertFalse(nav.motion_point_ok(self.prof, 120.010, 23.010))
+        route = Route(points=[Pose(120.0095, 23.010), Pose(120.0105, 23.010)],
+                      speed_limits=[5.0], modes=["offroad"])
+        self.assertFalse(nav.route_ok(self.prof, route))
+
+    def test_building_inside_bridge_capsule_still_blocks(self):
+        nodes = {"A": (120.007, 23.010), "B": (120.013, 23.010)}
+        edges = [{"a": "A", "b": "B", "class": "residential",
+                  "bridge": True, "tunnel": False,
+                  "maxweight": None, "maxheight": None, "width": None}]
+        d = 0.00005
+        env = FakeFineEnv(
+            roads=(nodes, edges),
+            buildings=[(120.010 - d, 23.010 - d, 120.010 + d, 23.010 + d, 9.0)])
+        nav = NavField(env, res_m=30.0, use_cache=False)
+        self.assertFalse(nav.motion_point_ok(self.prof, 120.010, 23.010))
+        route = Route(points=[Pose(120.0095, 23.010), Pose(120.0105, 23.010)],
+                      speed_limits=[5.0], modes=["offroad"])
+        self.assertFalse(nav.route_ok(self.prof, route))
+
+    def test_strict_roads_blocks_exact_fallback_offroad(self):
+        nav = NavField(FakeFineEnv(water=None), res_m=30.0, use_cache=False)
+        nav.strict_roads = True
+        route = Route(points=[Pose(120.002, 23.008), Pose(120.018, 23.008)],
+                      speed_limits=[5.0], modes=["offroad"])
+        self.assertFalse(nav.route_ok(self.prof, route))
+        self.assertFalse(nav.motion_point_ok(self.prof, 120.010, 23.008))
 
 
 PACK = os.path.join(SITUATION3D, "envpacks", "anping_v2c")

@@ -16,6 +16,15 @@ from mobility.profile import PlatformProfile
 
 INF = float("inf")
 
+# Road classes whose bridge decks can carry vehicles. Footways, cycleways,
+# paths and steps are bridges too, but not for a tracked/wheeled platform.
+VEHICLE_BRIDGE_CLASSES = frozenset({
+    "motorway", "motorway_link", "trunk", "trunk_link", "primary",
+    "primary_link", "secondary", "secondary_link", "tertiary",
+    "tertiary_link", "living_street", "residential", "unclassified",
+    "service", "track", "road", "legacy",
+})
+
 
 def _measure(value) -> float:
     """Parse ``"20"``, ``"20 t"``, ``"3.5 m"`` into a number."""
