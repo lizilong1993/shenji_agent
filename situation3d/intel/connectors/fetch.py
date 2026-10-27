@@ -14,14 +14,17 @@ import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from urllib.parse import urlparse
 
 from ..case import expand_bbox
 from ..gateway import IntelBundle, SOURCE_PRIORITY
 from ..model import Observation, iso, parse_time
-from . import adsb, eonet, firms, gdacs, gdelt, usgs
+from . import adsb, eonet, firms, gdacs, gdelt, rss, usgs, weather
 from .archive import ArchiveRecord, archive_raw
-from .http import FetchError, MissingCredential, fetch_bytes
+from .http import (FetchError, MissingCredential, ensure_public_host,
+                   fetch_bytes)
 from .registry import get_source
 
 Fetcher = Callable[[str], bytes]
@@ -220,6 +223,52 @@ def _fetch_gdelt(spec, start, end, case_profile, fetcher, fetched_at):
         payload, fetched_at, case_profile.center)
 
 
+def _fetch_weather(spec, bbox, fetcher, fetched_at):
+    west, south, east, north = bbox
+    lat = (south + north) / 2.0
+    lon = (west + east) / 2.0
+    url = weather.build_url(lat, lon)
+    raw = _fetch(url, spec.host, fetcher)
+    payload = _decode_json(raw)
+    return [(spec.source_id, raw, "json")], weather.normalize_payload(
+        payload, fetched_at, lat, lon)
+
+
+def _custom_spec(entry):
+    url = str(entry.get("url") or "")
+    host = (urlparse(url).hostname or "").lower()
+    return SimpleNamespace(
+        source_id=entry.get("source_id"),
+        host=host,
+        license=str(entry.get("license") or "user-registered source"),
+        attribution=str(entry.get("attribution")
+                        or entry.get("name") or entry.get("source_id")),
+        parser_version="rss-v1",
+        optional=True,
+        requires_env=None,
+    )
+
+
+def _fetch_rss(entry, bbox, start, end, fetcher, fetched_at):
+    url = str(entry.get("url") or "").strip()
+    if not url:
+        raise FetchError("RSS source has no URL")
+    host = (urlparse(url).hostname or "").lower()
+    if not host:
+        raise FetchError("RSS source URL has no host")
+    if fetcher is None:
+        ensure_public_host(url)
+    raw = _fetch(url, host, fetcher)
+    west, south, east, north = bbox
+    center = ((west + east) / 2.0, (south + north) / 2.0)
+    try:
+        observations = rss.parse_feed(raw, entry, fetched_at, center,
+                                      start=start, end=end)
+    except Exception as exc:  # parser/entity failures are source failures
+        raise FetchError("invalid RSS/Atom: %s" % exc) from None
+    return [(str(entry.get("source_id")), raw, "xml")], observations
+
+
 def _safe_error(exc: Exception) -> str:
     text = str(exc).strip() or type(exc).__name__
     return text[:300]
@@ -233,7 +282,10 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
                  archive_root: Optional[str] = None,
                  fetcher: Optional[Fetcher] = None,
                  firms_map_key: Optional[str] = None,
-                 case_profile=None) -> FetchResult:
+                 case_profile=None,
+                 custom_sources: Optional[Sequence[dict]] = None,
+                 domain: Optional[str] = None,
+                 filter_observations: bool = True) -> FetchResult:
     """Fetch selected sources, archive raw bytes, and return one bundle.
 
     ``fetcher`` is injected for offline tests; production calls ``http``.
@@ -260,7 +312,15 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
         str(item).strip().lower() for item in source_ids if str(item).strip()))
     if not sources:
         raise ValueError("at least one source is required")
+    custom = {str(entry.get("source_id")): entry
+              for entry in (custom_sources or [])
+              if isinstance(entry, dict) and entry.get("source_id")}
     for source_id in sources:
+        if source_id in custom:
+            kind = str(custom[source_id].get("kind") or "other").lower()
+            if kind not in ("rss", "social", "selfmedia"):
+                raise ValueError("unsupported custom source kind %r" % (kind,))
+            continue
         try:
             get_source(source_id)
         except KeyError:
@@ -281,8 +341,11 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
     warnings: List[dict] = []
 
     for source_id in sources:
-        spec = get_source(source_id)
+        source_entry = custom.get(source_id)
+        spec = None
         try:
+            spec = (_custom_spec(source_entry) if source_entry
+                    else get_source(source_id))
             sensor_errors = []
             if source_id == "usgs":
                 payloads, found = _fetch_usgs(
@@ -303,13 +366,20 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
             elif source_id == "gdelt":
                 payloads, found = _fetch_gdelt(
                     spec, start_dt, end_dt, case_profile, fetcher, fetched_dt)
+            elif source_id == "open-meteo":
+                payloads, found = _fetch_weather(
+                    spec, bbox_tuple, fetcher, fetched_dt)
+            elif source_entry is not None:
+                payloads, found = _fetch_rss(
+                    source_entry, bbox_tuple, start_dt, end_dt,
+                    fetcher, fetched_dt)
             else:  # pragma: no cover - registry already rejects this
                 raise FetchError("unsupported source %s" % (source_id,))
 
             kept = [obs for obs in found
                     if _in_bbox(obs, bbox_tuple)
                     and _in_window(obs, start_dt, end_dt)]
-            if case_profile is not None:
+            if case_profile is not None and filter_observations:
                 kept = [obs for obs in kept if case_profile.matches(obs)]
             kept = [
                 _clamp_live_event(obs, start_dt) if obs.source_id == "gdacs"
@@ -361,7 +431,8 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
             # run; optional feeds (GDELT) degrade the same way.
             entry = {"source_id": source_id, "error": message}
             if isinstance(exc, MissingCredential) or (
-                    spec.optional and isinstance(exc, FetchError)):
+                    spec is not None and spec.optional
+                    and isinstance(exc, FetchError)):
                 warnings.append(entry)
             else:
                 errors.append(entry)
@@ -398,7 +469,7 @@ def build_bundle(source_ids: Optional[Sequence[str]] = None,
         observations=observations,
         scenario_start=iso(start_dt),
         synthetic=False,
-        domain="multi" if case_profile is not None else "hazard",
+        domain=domain or ("multi" if case_profile is not None else "hazard"),
         bbox=bbox_tuple,
         time_window=(iso(start_dt), iso(end_dt)),
         source_allowlist=sources,

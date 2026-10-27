@@ -125,7 +125,7 @@ class SourceStoreTest(unittest.TestCase):
                 "tags": ["新闻", "RSS"],
             })
             self.assertFalse(added["builtin"])
-            found = manager.sources.list(q="本地")
+            found = manager.sources.list(q="RSS")
             self.assertEqual([item["source_id"] for item in found],
                              ["local_news"])
             by_domain = {item["source_id"]

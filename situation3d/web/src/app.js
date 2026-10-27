@@ -8255,6 +8255,11 @@ function applyCaseHooks() {
     }
   }
   if (params.get('autoplay') === '1') setPlaying(true);
+
+  // 选中案例后按案例地理范围自动补充情报（演示模式服务端会拒绝写操作）。
+  if (window.IntelPanel && IntelPanel.onCase) {
+    IntelPanel.onCase(state.caseId, state.data);
+  }
 }
 
 // --------------------------------------------------------------------------

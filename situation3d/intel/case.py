@@ -164,7 +164,7 @@ class CaseIntelProfile:
             _flatten(observation.properties),
         )).lower()
 
-    def matches(self, observation: Observation) -> bool:
+    def matches(self, observation: Observation, use_text: bool = True) -> bool:
         west, south, east, north = self.expanded_bbox
         if not (west <= observation.lon <= east
                 and south <= observation.lat <= north):
@@ -180,11 +180,11 @@ class CaseIntelProfile:
         coarse = (observation.geo_precision not in ("exact", "street")
                   or observation.is_centroid)
         text = None
-        if self.keywords and coarse:
+        if use_text and self.keywords and coarse:
             text = self._haystack(observation)
             if not any(term_hit(keyword, text) for keyword in self.keywords):
                 return False
-        if self.countries and coarse:
+        if use_text and self.countries and coarse:
             if text is None:
                 text = self._haystack(observation)
             if not any(term_hit(country, text) for country in self.countries):

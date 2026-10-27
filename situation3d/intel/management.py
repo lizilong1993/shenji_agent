@@ -156,6 +156,18 @@ class IntelManager:
         except (OSError, ValueError):
             return None
 
+    def _pipeline(self, case_id: str) -> Optional[dict]:
+        safe = _CASE_SAFE.sub("_", case_id or "default") or "default"
+        path = os.path.join(self.root, safe, "pipeline.json")
+        if not os.path.isfile(path):
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            return data if isinstance(data, dict) else None
+        except (OSError, ValueError):
+            return None
+
     def _profile(self, case_id: str):
         try:
             return load_case_profile(case_id, root=self.profile_root)
@@ -169,6 +181,7 @@ class IntelManager:
         source_names = {entry.get("source_id"): entry.get("name")
                         for entry in sources}
         bundle = self._bundle(case_id)
+        pipeline = self._pipeline(case_id)
         warnings = []
         if bundle is None:
             warnings.append("案例 %s 暂无自动情报 bundle（var/intel/%s/bundle.json）"
@@ -272,6 +285,7 @@ class IntelManager:
             "generated_at": _now(),
             "revision": revision,
             "profile": profile.to_dict() if profile else None,
+            "pipeline": pipeline,
             "conflict_rule": {
                 "radius_km": CONFLICT_RADIUS_KM,
                 "window_h": CONFLICT_WINDOW_H,

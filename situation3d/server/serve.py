@@ -490,6 +490,14 @@ _SITUATIONS_CACHE = {"key": None, "body": None}
 # pays for it until /api/intel is used.
 _INTEL_MANAGER = None
 _INTEL_LOCK = threading.Lock()
+_INTEL_JOBS = {}
+_INTEL_JOB_LOCK = threading.Lock()
+_INTEL_ROOT = os.path.join(_PKG_ROOT, "var", "intel")
+
+
+def _intel_job(case_id):
+    with _INTEL_JOB_LOCK:
+        return dict(_INTEL_JOBS.get(case_id) or {})
 
 
 def _intel_manager():
@@ -1348,6 +1356,15 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"error": "%s: %s"
                                  % (type(exc).__name__, exc)}, 500)
             return
+        if path == "/api/intel/job":
+            case_id = str(query.get("case_id") or "").strip()
+            if not re.match(r"^[A-Za-z0-9_.-]{1,80}$", case_id) or ".." in case_id:
+                self._send_json({"error": "invalid case_id"}, 400)
+                return
+            with _INTEL_JOB_LOCK:
+                state = dict(_INTEL_JOBS.get(case_id) or {"state": "idle"})
+            self._send_json(state)
+            return
         if path == "/api/intel/sources":
             try:
                 self._send_json({"sources": _intel_manager().sources.list(
@@ -1776,6 +1793,130 @@ class Handler(SimpleHTTPRequestHandler):
             "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         })
 
+    def _api_intel_collect(self, body):
+        from datetime import datetime, timedelta, timezone
+        from intel.case import CaseIntelProfile, load_case_profile
+        from intel.connectors.registry import SOURCE_IDS
+        from intel.pipeline import custom_rss_sources, run_case
+        from intel.taxonomy import DOMAINS
+
+        case_id = str(body.get("case_id") or "").strip()
+        if not case_id or not re.match(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+                                       case_id) or ".." in case_id:
+            self._send_json({"error": "invalid case_id"}, 400)
+            return
+        try:
+            profile = load_case_profile(case_id)
+        except (OSError, ValueError):
+            bbox = body.get("bbox")
+            if not isinstance(bbox, list) or len(bbox) != 4:
+                self._send_json(
+                    {"error": "case profile not found and bbox is required"},
+                    400)
+                return
+            profile = CaseIntelProfile(
+                case_id=case_id,
+                name=str(body.get("name") or case_id),
+                bbox=bbox,
+                domains=DOMAINS,
+                sources=SOURCE_IDS,
+                lookback_hours=body.get("lookback_hours") or 24.0,
+            )
+        else:
+            # A profile owns its AOI; the browser's case aoi is only a
+            # fallback for cases without a profile.
+            if body.get("name"):
+                profile = profile.with_overrides(name=str(body["name"]))
+
+        sources = list(profile.sources) or list(SOURCE_IDS)
+        if isinstance(body.get("sources"), list) and body["sources"]:
+            sources = [str(item) for item in body["sources"] if str(item).strip()]
+        known = set(SOURCE_IDS)
+        custom = custom_rss_sources(_INTEL_ROOT)
+        custom_ids = {entry.get("source_id") for entry in custom}
+        unknown = [source for source in sources
+                   if source not in known and source not in custom_ids]
+        if unknown:
+            self._send_json({"error": "unsupported source: %s"
+                             % ", ".join(sorted(unknown))}, 400)
+            return
+        enabled_ids = {entry.get("source_id")
+                       for entry in _intel_manager().sources.list(enabled=True)}
+        sources = [source for source in sources if source in enabled_ids]
+        if "open-meteo" in enabled_ids and "open-meteo" not in sources:
+            sources.append("open-meteo")
+        custom = [entry for entry in custom
+                  if entry.get("source_id") in enabled_ids]
+        for entry in custom:
+            if entry.get("source_id") not in sources:
+                sources.append(entry.get("source_id"))
+        if not sources:
+            self._send_json({"error": "no enabled sources"}, 400)
+            return
+        try:
+            end = (datetime.fromisoformat(
+                str(body.get("end")).replace("Z", "+00:00"))
+                if body.get("end") else datetime.now(timezone.utc))
+            if end.tzinfo is None:
+                end = end.replace(tzinfo=timezone.utc)
+            if body.get("start"):
+                start = datetime.fromisoformat(
+                    str(body["start"]).replace("Z", "+00:00"))
+                if start.tzinfo is None:
+                    start = start.replace(tzinfo=timezone.utc)
+            else:
+                hours = float(body.get("lookback_hours")
+                              or profile.lookback_hours or 24.0)
+                start = end - timedelta(hours=max(0.1, min(hours, 168.0)))
+        except (OverflowError, TypeError, ValueError) as exc:
+            self._send_json({"error": "invalid time window: %s" % (exc,)}, 400)
+            return
+        if start > end:
+            self._send_json({"error": "start must not be after end"}, 400)
+            return
+        with _INTEL_JOB_LOCK:
+            current = _INTEL_JOBS.get(case_id)
+            if current and current.get("state") == "running":
+                self._send_json({"case_id": case_id, "state": "running",
+                                 "started_at": current.get("started_at")}, 202)
+                return
+            _INTEL_JOBS[case_id] = {
+                "state": "running",
+                "started_at": datetime.now(timezone.utc).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"),
+            }
+
+        def worker():
+            try:
+                result = run_case(
+                    case_id=case_id,
+                    profile=profile,
+                    start=start,
+                    end=end,
+                    sources=tuple(sources),
+                    root=_INTEL_ROOT,
+                    custom_sources=custom,
+                    archive_root=os.path.join(_INTEL_ROOT, "archive"),
+                )
+                state = {
+                    "state": "done",
+                    "finished_at": datetime.now(timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"),
+                    "report": result.report,
+                }
+            except Exception as exc:  # noqa: BLE001 - store the failure
+                state = {
+                    "state": "error",
+                    "finished_at": datetime.now(timezone.utc).strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"),
+                    "error": "%s: %s" % (type(exc).__name__, exc),
+                }
+            with _INTEL_JOB_LOCK:
+                _INTEL_JOBS[case_id] = state
+
+        threading.Thread(target=worker, daemon=True).start()
+        self._send_json({"case_id": case_id, "state": "running"}, 202)
+
     def _api_intel_post(self, path):
         from urllib.parse import unquote
         # Writes are a test-console capability. Demo mode is a public read-only
@@ -1797,6 +1938,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         manager = _intel_manager()
         try:
+            if path == "/api/intel/collect":
+                self._api_intel_collect(body)
+                return
             if path == "/api/intel/manual":
                 item = manager.manual.create(body)
                 self._send_json({"ok": True, "item": item})

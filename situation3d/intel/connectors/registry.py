@@ -69,6 +69,15 @@ SOURCES = {
         parser_version="vgi-sources-1",
         optional=True,
     ),
+    "open-meteo": SourceSpec(
+        source_id="open-meteo",
+        host="api.open-meteo.com",
+        license="CC BY 4.0",
+        attribution="Weather data by Open-Meteo.com",
+        schedule_s=3600,
+        parser_version="vgi-sources-1",
+        optional=True,
+    ),
 }
 
 SOURCE_IDS = tuple(SOURCES)

@@ -34,7 +34,8 @@
     tab: 'list', overview: null, sources: [], error: null,
     filter: '', priority: 'all', effective: 'all',
     sourceFilter: '', sourceKind: 'all', sourceEnabled: 'all',
-    editing: null, timer: null, loading: false
+    editing: null, timer: null, loading: false, collecting: false,
+    collectStarted: 0, autoTried: {}, lastCase: null, caseRetries: 0
   };
 
   function el(tag, cls, text) {
@@ -122,7 +123,57 @@
     if (!m) return;
     m.classList.remove('hidden');
     refresh();
+    onCase(caseId(), situationData());
     startPoll();
+  }
+
+  function situationData() {
+    try {
+      return (global.SituationHost && global.SituationHost.state
+        && global.SituationHost.state.data) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function pipelineFresh(pipeline) {
+    if (!pipeline || !pipeline.generated_at) return false;
+    var stamp = Date.parse(pipeline.generated_at);
+    return Number.isFinite(stamp) && (Date.now() - stamp) < 6 * 3600 * 1000;
+  }
+
+  function onCase(caseIdValue, data) {
+    var cid = String(caseIdValue || '');
+    if (!cid || cid === 'default') return;
+    if (state.autoTried[cid]) return;
+    // Case profiles on the server own the AOI; the browser bbox is only a
+    // fallback for cases without a profile, so it must not gate collection.
+    var bbox = data && data.aoi;
+    var body = { case_id: cid, name: (data && data.case_name) || cid };
+    if (Array.isArray(bbox) && bbox.length === 4) body.bbox = bbox;
+    state.autoTried[cid] = true;
+    api('/api/intel/overview?case_id=' + encodeURIComponent(cid))
+      .then(function (overview) {
+        if (pipelineFresh(overview.pipeline)) return;
+        state.collecting = true;
+        state.collectStarted = Date.now();
+        api('/api/intel/collect', { method: 'POST', body: body })
+          .then(function () {
+            notify('info', '已启动案例情报采集：' + cid, {});
+            setTimeout(refresh, 1500);
+            setTimeout(refresh, 6000);
+          }).catch(function (err) {
+            // Demo mode is read-only; leave the existing view untouched.
+            state.collecting = false;
+            if (err && /disabled|403/.test(String(err.message))) return;
+            delete state.autoTried[cid];
+            notify('warn', '自动采集未启动：' + (err.message || err), {});
+          });
+      })
+      .catch(function () {
+        state.collecting = false;
+        delete state.autoTried[cid];
+      });
   }
 
   function close() {
@@ -154,6 +205,12 @@
     if (state.loading) return Promise.resolve();
     state.loading = true;
     var requested = caseId();
+    // The panel can be opened before the case finishes loading; poll for the
+    // first real case id so collection is not dependent on startup ordering.
+    if (requested !== 'default' && requested !== state.lastCase) {
+      state.lastCase = requested;
+      onCase(requested, situationData());
+    }
     var url = '/api/intel/overview?case_id=' + encodeURIComponent(requested);
     return api(url).then(function (data) {
       // A deep link can open the panel before the situation finishes loading;
@@ -166,6 +223,14 @@
         return;
       }
       state.caseRetries = 0;
+      if (state.collecting) {
+        var stamp = Date.parse((data.pipeline || {}).generated_at || '');
+        if ((Number.isFinite(stamp) && stamp >= state.collectStarted - 5000) ||
+            (state.collectStarted &&
+             Date.now() - state.collectStarted > 10 * 60 * 1000)) {
+          state.collecting = false;
+        }
+      }
       state.overview = data;
       state.sources = data.sources || [];
       state.error = null;
@@ -245,6 +310,20 @@
     (overview.warnings || []).forEach(function (warning) {
       body.appendChild(el('div', 'intel-warn', warning));
     });
+    var pipeline = overview.pipeline || null;
+    if (pipeline && pipeline.stage1 && pipeline.stage2) {
+      var s1 = pipeline.stage1, s2 = pipeline.stage2, s3 = pipeline.stage3 || {};
+      body.appendChild(el('div', 'intel-pipeline',
+        '三阶段：广泛采集 ' + (s1.observations || 0) +
+        ' → 清洗保留 ' + (s2.kept || 0) +
+        '（无关键词保留 ' + (s2.kept_without_keyword || 0) + '）' +
+        ' → 关联 ' + ((s3.counts && s3.counts.links) || 0) +
+        ' / 关键 ' + ((s3.counts && s3.counts.key_items) || 0) +
+        (state.collecting ? ' · 正在补充采集…' : '')));
+    } else if (state.collecting) {
+      body.appendChild(el('div', 'intel-pipeline',
+        '正在按案例地理范围采集多源情报…'));
+    }
 
     if ((overview.key_items || []).length) {
       var key = el('div', 'intel-key');
@@ -622,7 +701,8 @@
       if (state.sourceEnabled !== 'all' &&
           String(Boolean(source.enabled)) !== state.sourceEnabled) return false;
       var text = [
-        source.source_id, source.name, source.description,
+        source.source_id, source.name, source.description, source.summary,
+        source.coverage, (source.features || []).join(' '),
         (source.tags || []).join(' '), (source.domains || []).join(' ')
       ].join(' ').toLowerCase();
       return !state.sourceFilter ||
@@ -644,8 +724,20 @@
           ? ' · ' + source.domains.map(function (d) {
             return label(DOMAINS, d);
           }).join('/') : '')));
-      if (source.description) {
-        main.appendChild(el('span', 'intel-source-desc', source.description));
+      main.appendChild(el('span', 'intel-source-summary',
+        source.summary || source.description || '未填写简介'));
+      var facts = [];
+      if (source.coverage) facts.push('覆盖：' + source.coverage);
+      if (source.access) facts.push('接入：' + source.access);
+      if (facts.length) {
+        main.appendChild(el('span', 'intel-source-facts', facts.join(' · ')));
+      }
+      if ((source.features || []).length) {
+        var features = el('span', 'intel-source-features');
+        source.features.forEach(function (feature) {
+          features.appendChild(el('span', 'intel-chip', feature));
+        });
+        main.appendChild(features);
       }
       row.appendChild(main);
       var enabled = document.createElement('input');
@@ -701,10 +793,24 @@
       'https://...')));
     grid.appendChild(field('领域', input('text', 'domains', '',
       'news,society（逗号分隔）')));
+    grid.appendChild(field('覆盖范围', input('text', 'coverage', '',
+      '全球 / 全国 / 城市 / 案例区')));
+    grid.appendChild(field('接入方式', input('text', 'access', '',
+      '无需 Key / 免费 Key / 需申请')));
     grid.appendChild(field('标签', input('text', 'tags', '',
       '逗号分隔')));
     form.appendChild(grid);
-    var desc = field('描述', document.createElement('textarea'));
+    var summary = field('简要介绍 *', document.createElement('textarea'));
+    var summaryArea = summary.querySelector('textarea');
+    summaryArea.className = 'intel-input intel-textarea';
+    summaryArea.name = 'summary';
+    summaryArea.rows = 2;
+    summaryArea.placeholder = '说明该源是什么类型、主要提供哪些信息、有什么特点';
+    form.appendChild(summary);
+    var features = field('特点标签', input('text', 'features', '',
+      '逗号分隔，如：实时、全球、无 Key'));
+    form.appendChild(features);
+    var desc = field('补充描述', document.createElement('textarea'));
     var area = desc.querySelector('textarea');
     area.className = 'intel-input intel-textarea';
     area.name = 'description';
@@ -729,10 +835,15 @@
         .map(function (x) { return x.trim(); }).filter(Boolean),
       tags: String(data.get('tags') || '').split(',')
         .map(function (x) { return x.trim(); }).filter(Boolean),
+      summary: String(data.get('summary') || '').trim(),
+      features: String(data.get('features') || '').split(',')
+        .map(function (x) { return x.trim(); }).filter(Boolean),
+      coverage: String(data.get('coverage') || '').trim(),
+      access: String(data.get('access') || '').trim(),
       description: String(data.get('description') || '').trim()
     };
-    if (!payload.source_id || !payload.name) {
-      global.alert('源 ID 和名称不能为空');
+    if (!payload.source_id || !payload.name || !payload.summary) {
+      global.alert('源 ID、名称和简要介绍不能为空');
       return;
     }
     api('/api/intel/sources', { method: 'POST', body: payload }).then(function () {
@@ -771,6 +882,7 @@
 
   global.IntelPanel = {
     bind: bind, open: open, close: close, refresh: refresh,
+    onCase: onCase,
     _state: function () { return state; },
     _caseId: caseId
   };
