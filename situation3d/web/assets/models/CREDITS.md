@@ -4,7 +4,8 @@
 
 | 资产 | 原始模型 | 作者 | 许可 | 用途 |
 |---|---|---|---|---|
-| `type_052c.glb` | Type 052C Destroyer (DCS World) | KojfDiscord | CC Attribution | 052C 驱逐舰（用于 052D / 驱逐舰大类近似） |
+| `type_052c.glb` | Type 052C Destroyer (DCS World) | KojfDiscord | CC Attribution | 052C 驱逐舰（驱逐舰大类回退） |
+| `type_052d.glb` | 自建（tools/modelgen/build_custom.py） | 本项目 | 项目内部 | 052D 型驱逐舰（平板 AESA/64 单元 VLS 近似） |
 | `type_054a.glb` | Type-054A Class Frigate | MirzaArrafiERV_45 | CC Attribution | 054A 护卫舰 |
 | `type_071.glb` | Yuzhao-class landing ship Kunlun Shan | 42manako | CC Attribution | 071 综合登陆舰 |
 | `type_perry.glb` | USS Oliver Hazard Perry FFG-7 | MirzaArrafiERV_45 | CC Attribution | 成功级（Perry 级）护卫舰 |
@@ -46,7 +47,7 @@
 
 ## 说明
 
-- 052D 无公开可下载的精确资产，使用同族 052C 模型；空警-500 使用 KJ-2000 缩比（`type_kj500`）；15 式使用 99A 缩比（`type_ztq15`）；歼-16 使用 Su-30MKK；F-16V 使用 F-16C；CM-11 使用 M60A3 近似。
+- 052D 无可下载精确资产，改为自建近似（`type_052d`，2026-10-27）；空警-500 使用 KJ-2000 缩比（`type_kj500`）；15 式使用 99A 缩比（`type_ztq15`）；歼-16 使用 Su-30MKK；F-16V 使用 F-16C；CM-11 使用 M60A3 近似。
 - 所有 GLB 均按公开全长（舰长/机长/车长含炮管）归一为 1 单位 = 1 米，原点在水线/地面/机体中心，艏/头朝 Blender +Y。
 - Sketchfab 模型已按 CC-BY / Free Standard 许可署名；二次分发时请保留本文件。
 

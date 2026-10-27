@@ -6,10 +6,18 @@
       "source": "Type 052C Destroyer (DCS World)",
       "author": "KojfDiscord",
       "license": "CC Attribution",
-      "use": "052C 驱逐舰（用于 052D / 驱逐舰大类近似）",
+      "use": "052C 驱逐舰（驱逐舰大类回退）",
       "risk": [
         "upstream-game-asset"
       ],
+      "source_url": null
+    },
+    "type_052d.glb": {
+      "source": "自建（tools/modelgen/build_custom.py）",
+      "author": "本项目",
+      "license": "项目内部",
+      "use": "052D 型驱逐舰（平板 AESA/64 单元 VLS 近似）",
+      "risk": [],
       "source_url": null
     },
     "type_054a.glb": {

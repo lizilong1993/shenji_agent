@@ -313,6 +313,37 @@ def paint_below_waterline(ob, draft):
             p.material_index = idx
 
 
+def bulwark(length, beam, freeboard, name="bulwark", bow_frac=0.62,
+            transom=0.72, height=0.55):
+    """舷墙：沿甲板边缘的薄条，双面，跟船体放样同一条宽度曲线。"""
+    n = 20
+    half = beam / 2.0
+    verts, faces = [], []
+    for i in range(n + 1):
+        t = i / n
+        y = -length / 2.0 + length * t
+        if t < 0.12:
+            f = transom + (1.0 - transom) * (t / 0.12)
+        elif t > bow_frac:
+            u = (t - bow_frac) / (1.0 - bow_frac)
+            f = max(0.035, math.sqrt(max(0.0, 1.0 - u ** 1.7)))
+        else:
+            f = 1.0
+        w = half * f
+        fb = freeboard * (0.9 + 0.1 * math.sin(math.pi * min(1.0, t * 1.1)))
+        if t > bow_frac:
+            fb += 0.7 * ((t - bow_frac) / (1 - bow_frac)) ** 2
+        for sx in (-1, 1):
+            verts.append((sx * w, y, fb + 0.04))
+            verts.append((sx * w, y, fb + 0.04 + height))
+    for i in range(n):
+        for side in range(2):
+            k = i * 4 + side * 2
+            faces.append((k, k + 1, k + 5, k + 4))
+            faces.append((k + 4, k + 5, k + 1, k))
+    return obj_from_mesh(name, verts, faces, navy())
+
+
 def gun(prefix, y, z, scale=1.0, caliber=0.13):
     base = cyl(prefix + "_base", (0, y, z + 0.45 * scale), 1.6 * scale, 1.1 * scale, navy(), verts=24)
     tur = frustum(prefix + "_turret", (0, y, z + 1.0 * scale), (3.2 * scale, 4.2 * scale),
@@ -431,58 +462,102 @@ def build_052d():
     L, B, D = 157.0, 17.2, 6.2
     h = hull(L, B, D, 6.2, "052d_hull")
     paint_below_waterline(h, D)
+    bulwark(L, B, 6.2, "052d_bulwark")
     deckz = 6.2
-    # 上层建筑：三层阶梯 + 内倾侧壁
-    wedge("052d_bridge1", (0, 20, deckz), (13.4, 34, 4.2), navy(), 0.9, 1.0)
-    wedge("052d_bridge2", (0, 23, deckz + 4.2), (11.8, 24, 4.0), navy(), 0.85, 0.98)
-    wedge("052d_bridge3", (0, 27, deckz + 8.2), (10.2, 12, 3.6), navy(), 0.72, 0.9)
-    box("052d_windows1", (0, 31.0, deckz + 3.2), (11.0, 5.0, 1.2), glass())
-    box("052d_windows2", (0, 34.0, deckz + 7.2), (9.8, 4.0, 1.1), glass())
-    box("052d_windows3", (0, 32.8, deckz + 10.8), (8.6, 3.2, 1.0), glass())
-    # 346A 相控阵（四块大平板，装在二层舰桥两舷，带边框）
+    # 艏部：防浪板/锚机/锚孔
+    box("052d_breakwater", (0, 66.0, deckz + 0.48), (9.0, 0.4, 1.2), navy())
     for sx in (-1, 1):
-        for yy in (26.0, 15.5):
-            box("052d_aesa_%d_%d" % (sx, int(yy)), (sx * 6.15, yy, deckz + 6.0),
-                (0.35, 5.8, 5.4), mat("aesa", (0.14, 0.17, 0.18), 0.3))
-            box("052d_aesa_frame_%d_%d" % (sx, int(yy)), (sx * 6.28, yy, deckz + 6.0),
-                (0.12, 6.2, 5.8), navy())
-    # 前桅
-    mast("052d_fmast", 10, deckz + 12.0, 12.0, yards=[(10, deckz + 19.0, 6.5)])
-    # 前部 VLS：64 单元（8x8）
-    vls("052d_vls_f", 43.0, deckz, 8, 8)
-    # 130mm 主炮
-    gun("052d_gun", 56.0, deckz, 1.15, 0.16)
-    # 1130 近防炮（舰桥前上方平台）
-    box("052d_ciws_plat", (0, 36.0, deckz + 0.7), (9.0, 5.0, 1.4), navy())
-    ciws("052d_ciws_f", 36.0, deckz + 1.4)
-    # 中部：烟囱 x2（后倾）、后桅、反舰导弹
-    for i, yy in enumerate((-2.0, -13.0)):
-        wedge("052d_funnel%d" % i, (0, yy, deckz + 5.0), (7.4, 11.0, 6.0), navy(), 0.8, 0.92)
-        box("052d_funnel_top%d" % i, (0, yy - 0.8, deckz + 11.0), (5.6, 6.8, 0.5), dark())
-    wedge("052d_mid", (0, 4, deckz), (13.4, 26, 5.0), navy(), 0.95, 1.0)
-    # 反舰导弹发射箱 2x4
+        box("052d_windlass_%d" % sx, (sx * 3.0, 68.5, deckz + 0.45), (1.6, 2.2, 0.9), dark())
+        box("052d_hawse_%d" % sx, (sx * 3.5, 71.5, deckz - 0.8), (0.6, 1.0, 0.9), dark())
+    # 130 mm 主炮
+    gun("052d_gun", 61.0, deckz - 0.15, 1.05, 0.16)
+    # 前部 VLS：32 单元（4 列 x 8 行）
+    vls("052d_vls_f", 48.5, deckz - 0.2, 4, 8)
     for sx in (-1, 1):
+        sphere("052d_esm_%d" % sx, (sx * 2.6, 30.0, deckz + 11.68), 0.28, white(), seg=14, rings=8)
+        box("052d_door_%d_0" % sx, (sx * 6.3, 18.0, deckz + 1.2), (0.3, 1.0, 2.0), dark())
+        box("052d_door_%d_1" % sx, (sx * 6.72, -34.0, deckz + 1.6), (0.3, 1.0, 2.0), dark())
+    for sx in (-1, 1):
+        box("052d_vent_%d" % sx, (sx * 5.6, -6.0, deckz + 4.7), (0.5, 2.0, 0.8), dark())
+    # 舰桥：三层阶梯 + 前窗/侧窗
+    wedge("052d_bridge1", (0, 26, deckz), (13.5, 30, 4.4), navy(), 0.9, 1.0)
+    wedge("052d_bridge2", (0, 27, deckz + 4.4), (11.4, 22, 3.8), navy(), 0.85, 0.98)
+    wedge("052d_bridge3", (0, 29, deckz + 8.2), (9.0, 12, 3.2), navy(), 0.72, 0.9)
+    box("052d_win1_f", (0, 40.0, deckz + 3.0), (10.4, 0.9, 1.2), glass())
+    box("052d_win2_f", (0, 37.4, deckz + 6.8), (8.6, 0.9, 1.1), glass())
+    box("052d_win3_f", (0, 34.4, deckz + 10.0), (7.0, 0.9, 1.0), glass())
+    for sx in (-1, 1):
+        box("052d_win1_s_%d" % sx, (sx * 5.9, 26.0, deckz + 3.0), (0.6, 9.0, 1.0), glass())
+    # 346A 相控阵：前部两块（舰桥两舷）+ 后部两块（机库两舷）
+    for sx in (-1, 1):
+        box("052d_aesa_bp_f_%d" % sx, (sx * 5.12, 30.0, deckz + 6.2), (0.7, 4.7, 3.7), navy())
+        box("052d_aesa_f_%d" % sx, (sx * 5.4, 30.0, deckz + 6.2), (0.3, 4.4, 3.4),
+            mat("aesa", (0.14, 0.17, 0.18), 0.3))
+        box("052d_aesa_bp_a_%d" % sx, (sx * 6.1, -28.0, deckz + 4.8), (0.7, 4.6, 4.0), navy())
+        box("052d_aesa_a_%d" % sx, (sx * 6.4, -28.0, deckz + 4.8), (0.3, 4.3, 3.7),
+            mat("aesa", (0.14, 0.17, 0.18), 0.3))
+    # 前桅/雷达罩/卫通/导航雷达
+    mast("052d_fmast", 29, deckz + 11.4, 7.0, yards=[(29, deckz + 16.4, 5.0)])
+    cyl("052d_radome", (0, 20.5, deckz + 8.65), 0.8, 0.9, white(), verts=18)
+    for sx in (-1, 1):
+        sphere("052d_satcom_%d" % sx, (sx * 3.2, 26.5, deckz + 11.95), 0.55, white())
+    cyl("052d_navradar", (0, 29.0, deckz + 15.4), 0.7, 0.16, dark(), verts=16)
+    # 中部甲板室 + 双烟囱 + 反舰导弹（2x4）
+    wedge("052d_mid", (0, -2, deckz), (13.2, 30, 5.0), navy(), 0.95, 1.0)
+    for i, yy in enumerate((1.0, -11.0)):
+        wedge("052d_funnel%d" % i, (0, yy, deckz + 5.0), (7.2, 10.0, 5.4), navy(), 0.8, 0.92)
+        box("052d_funnel_top%d" % i, (0, yy - 0.8, deckz + 10.4), (5.6, 7.4, 0.5), dark())
+    for sx in (-1, 1):
+        box("052d_assm_base_%d" % sx, (sx * 5.3, 1.5, deckz + 4.9), (1.6, 5.8, 0.5), navy())
         for i in range(4):
-            cyl("052d_assm_%d_%d" % (sx, i), (sx * 5.4, 2.0 + i * 1.35, deckz + 6.4), 0.62, 6.4,
-                mat("assm", (0.24, 0.27, 0.26), 0.5), axis="Y", verts=14)
+            cyl("052d_assm_%d_%d" % (sx, i), (sx * 5.3, 3.5 - i * 1.35, deckz + 5.6),
+                0.55, 6.0, mat("assm", (0.24, 0.27, 0.26), 0.5), axis="Y", verts=14)
+    # 后部 VLS：32 单元（8 列 x 4 行），抬高的甲板室
+    box("052d_avls_house", (0, -21.0, deckz + 1.7), (9.6, 8.0, 3.4), navy())
+    vls("052d_vls_a", -21.0, deckz + 3.4, 8, 4)
+    # 机库/机库门/侧窗
+    wedge("052d_hangar", (0, -36, deckz), (14.0, 20, 7.2), navy(), 0.95, 1.0)
+    box("052d_helo_door", (0, -46.2, deckz + 3.2), (7.0, 0.5, 5.2), dark())
+    for sx in (-1, 1):
+        box("052d_hangar_win_%d" % sx, (sx * 6.05, -36, deckz + 5.3), (0.5, 10.0, 1.0), glass())
     # 后桅
-    mast("052d_rmast", -18, deckz + 10.0, 8.0)
-    # 后部上层建筑 + 机库
-    wedge("052d_hangar", (0, -30, deckz), (14.0, 28, 8.0), navy(), 0.95, 1.0)
-    box("052d_helo_door", (0, -43.5, deckz + 3.6), (7.0, 0.5, 5.4), dark())
-    # 飞行甲板标线
-    box("052d_flightdeck", (0, -57, deckz + 0.10), (14.0, 24.0, 0.12), deck())
-    cyl("052d_helo_circle", (0, -57, deckz + 0.18), 4.0, 0.05, white(), verts=40)
-    # 舰艉 HQ-10
-    ciws("052d_hq10", -47.0, deckz + 8.0)
-    # 救生筏
+    mast("052d_rmast", -30.0, deckz + 7.2, 5.5, yards=[(-30.0, deckz + 11.0, 4.0)])
+    cyl("052d_navradar2", (0, -30.0, deckz + 10.4), 0.6, 0.14, dark(), verts=14)
+    # 1130 近防炮（舰桥前上方平台）与 HQ-10（机库顶）
+    cyl("052d_ciws_base", (0, 36.5, deckz + 8.55), 0.95, 0.7, white(), verts=18)
+    box("052d_ciws_body", (0, 36.5, deckz + 9.35), (1.05, 1.25, 0.9), white())
+    for i in range(6):
+        cyl("052d_ciws_g%d" % i, (-0.28 + i * 0.112, 37.35, deckz + 9.45),
+            0.042, 1.7, dark(), axis="Y", verts=6)
+    sphere("052d_ciws_radome", (0, 36.1, deckz + 9.95), 0.3, white(), seg=14, rings=8)
+    box("052d_hq10_base", (0, -38.0, deckz + 7.5), (3.2, 3.6, 0.6), navy())
+    box("052d_hq10_box", (0, -38.0, deckz + 8.6), (2.8, 3.2, 1.8),
+        mat("launcher", (0.18, 0.20, 0.21), 0.55))
+    for r in range(3):
+        for c in range(8):
+            box("052d_hq10_c%d_%d" % (r, c),
+                (-1.19 + c * 0.34, -39.1 + r * 1.1, deckz + 9.55),
+                (0.24, 0.24, 0.1), dark())
+    # 鱼雷发射管（两舷各 3 管）/ 干扰弹发射器
     for sx in (-1, 1):
+        box("052d_tt_base_%d" % sx, (sx * 7.2, -14.0, deckz + 0.48), (1.2, 3.4, 0.9), navy())
+        for k in range(3):
+            cyl("052d_tt_%d_%d" % (sx, k), (sx * 7.3, -15.2 + k * 1.0, deckz + 1.17),
+                0.24, 2.4, dark(), axis="Y", verts=8)
+        for yy in (12.0, -12.0):
+            box("052d_decoy_%d_%d" % (sx, int(yy)), (sx * 7.0, yy, deckz + 0.65),
+                (0.8, 1.8, 1.2), mat("launcher", (0.18, 0.20, 0.21), 0.55))
+    # 舷侧 RHIB / 救生筏
+    for sx in (-1, 1):
+        box("052d_rhib_%d" % sx, (sx * 7.6, -20.0, deckz + 0.5), (1.4, 4.0, 0.85),
+            mat("rhib", (0.18, 0.20, 0.21), 0.6))
         for i in range(4):
-            cyl("052d_raft_%d_%d" % (sx, i), (sx * 8.2, -20 + i * 3.0, deckz + 1.2), 0.55, 0.9,
-                white(), axis="X", verts=10)
-    # 舷号
+            cyl("052d_raft_%d_%d" % (sx, i), (sx * 7.2, -32.0 - i * 4.0, deckz + 0.45),
+                0.45, 0.9, white(), axis="X", verts=10)
+    # 飞行甲板标线
+    box("052d_flightdeck", (0, -58.5, 5.95), (13.8, 25.0, 0.5), deck())
+    cyl("052d_helo_circle", (0, -58.5, 6.23), 4.0, 0.05, white(), verts=40)
     finish("t_052d", "water")
-
 
 # ---------------------------------------------------------------------------
 # 056A 型轻型护卫舰：L 89 m, B 11.1 m, draft 4.4 m

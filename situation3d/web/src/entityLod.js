@@ -108,8 +108,8 @@
     [/沱江|tuo.?chiang|ta.?chiang/i, 'type_tuochiang'],
     [/基隆|kidd/i, 'type_kidd'],
     [/磐石|panshi/i, 'type_panshi'],
-    // 052D 无公开可下载资产，用同族 052C 近似（文中注释、README 同步说明）
-    [/052d|luyang.?iii/i, 'type_052c'],
+    [/052d|luyang.?iii/i, 'type_052d'],
+    [/052c|luyang\s?ii(?!i)/i, 'type_052c'],
     // 地面
     [/15\s*式|ztq-?15/i, 'type_ztq15'],
     [/99a|ztz-?99/i, 'type_ztz99a'],
