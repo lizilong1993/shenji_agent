@@ -47,6 +47,20 @@ export GDAL_HTTP_PROXY=http://127.0.0.1:27980
 - 无代理直连 `sentinel-cogs` S3 时多次出现 `TIFFFillTile` 部分读取错误（got < expected），
   说明当前 egress 到该 S3 不稳定；生产应配置代理或预取缓存。
 
+## 案例影像缓存（台湾 / 中印边界）
+
+`resources/case_imagery.py` 固化两个演示案例的 Sentinel 配方，`resource.py case-imagery --case <key>`
+幂等确保“场景栅格 + XYZ 瓦片”已缓存，后续案例直接复用，不重复下载：
+
+| case | bbox | 日期/窗口 | 分辨率 | 瓦片 |
+|---|---|---|---|---|
+| `taiwan` | 120.055–120.235, 22.915–23.025 | 2026-10-26 / 180 天 | 20 m | z10-13，46 张 |
+| `india_china` | 78.7–79.5, 33.35–34.15 | 2025-12-31 / 365 天（mosaic） | 30 m | z10-12，172 张 |
+
+实测缓存命中：台湾约 1.0 s、中印约 1.8 s（无网络）；未命中时才走 Sentinel/EOX/Esri 获取。
+缓存条目在 canonical `situation3d/var/resources`（NFS 持久化）：`satellite_imagery:taiwan-anping-s2`、
+`satellite_imagery:india-china-s2`、`tile_layer:taiwan-anping-s2`、`tile_layer:india-china-s2`。
+
 ## 回退与限制
 
 - `sentinel-tiles` 已内置兜底：Sentinel 获取/切片失败时自动改用 EOX Sentinel-2 cloudless 2020

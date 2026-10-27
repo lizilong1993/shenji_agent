@@ -516,11 +516,14 @@ def acquire_sentinel_tiles(store: ResourceStore, tile_spec, cache_root: str,
     errors = []
     sentinel = None
     try:
+        scene_query = {"date": target_date, "window_days": window_days,
+                       "max_cloud": max_cloud}
+        if mosaic:
+            scene_query["mosaic"] = True
         scene_spec = DatasetSpec(
             name=tile_spec.name, bbox=tile_spec.bbox,
             kind="satellite_imagery", resolution_m=resolution_m,
-            query={"date": target_date, "window_days": window_days,
-                   "max_cloud": max_cloud, "mosaic": bool(mosaic)})
+            query=scene_query)
         sentinel = acquire_sentinel(
             store, scene_spec, cache_root, target_date=target_date,
             window_days=window_days, max_cloud=max_cloud,
