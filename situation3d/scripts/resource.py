@@ -27,6 +27,7 @@ from resources.adapters import (acquire_buildings, acquire_canopy,  # noqa: E402
                                 acquire_landcover, acquire_sentinel,
                                 acquire_sentinel_tiles, DatasetError)
 from resources.vectorproc import DatasetSpec  # noqa: E402
+from resources.case_imagery import CASES, ensure_case_imagery  # noqa: E402
 from resources.enrichment import enrich_envpack  # noqa: E402
 from resources.envpack_layers import (add_canopy_layer,  # noqa: E402
                                       add_landcover_layer)
@@ -411,10 +412,10 @@ def cmd_sentinel(args):
         spec = DatasetSpec(name=args.name, bbox=_parse_bbox(args.bbox),
                            kind="satellite_imagery",
                            resolution_m=args.resolution,
-                           query={"date": args.date,
-                                  "window_days": args.window_days,
-                                  "max_cloud": args.max_cloud,
-                                  "mosaic": args.mosaic})
+                           query=dict({"date": args.date,
+                                       "window_days": args.window_days,
+                                       "max_cloud": args.max_cloud},
+                                      **({"mosaic": True} if args.mosaic else {})))
         result = acquire_sentinel(
             store, spec,
             args.cache_root or os.path.join(str(store.root), "cache"),
@@ -457,6 +458,27 @@ def cmd_sentinel_tiles(args):
         if hasattr(result.get("tiles"), "as_dict") else result.get("tiles"),
         "fallback": result.get("fallback"),
         "errors": result.get("errors"),
+    }, ensure_ascii=False, indent=1, default=str))
+    return 0
+
+
+def cmd_case_imagery(args):
+    store = _store(args)
+    try:
+        result = ensure_case_imagery(
+            store, args.case,
+            args.cache_root or os.path.join(str(store.root), "cache"),
+            force=args.force)
+    except Exception as exc:  # noqa: BLE001
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    print(json.dumps({
+        "case": args.case,
+        "sentinel": result["sentinel"]["entry"].as_dict()
+        if result.get("sentinel") else None,
+        "tiles": result["tiles"].as_dict()
+        if hasattr(result.get("tiles"), "as_dict") else result.get("tiles"),
+        "fallback": result.get("fallback"),
     }, ensure_ascii=False, indent=1, default=str))
     return 0
 
@@ -669,6 +691,13 @@ def main(argv=None):
     p.add_argument("--resolution", type=float, default=10.0)
     p.add_argument("--cache-root", default=None)
     p.set_defaults(func=cmd_add_landcover)
+
+    p = sub.add_parser("case-imagery",
+                       help="ensure cached Sentinel imagery+tiles for a case")
+    p.add_argument("--case", required=True, choices=sorted(CASES))
+    p.add_argument("--cache-root", default=None)
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_case_imagery)
 
     p = sub.add_parser("kinds", help="list resource kinds")
     p.set_defaults(func=cmd_kinds)
