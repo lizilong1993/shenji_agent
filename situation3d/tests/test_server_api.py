@@ -182,11 +182,16 @@ class ServerApiTest(unittest.TestCase):
                                "POST", {"pinned": True})
         self.assertEqual(status, 200)
         self.assertTrue(body["entry"]["pinned"])
+        # JSON strings must not be parsed with Python bool(): "false" is false.
+        status, body = request(port, "/api/resources/%s/pin" % entry_id,
+                               "POST", {"pinned": "false"})
+        self.assertEqual(status, 200)
+        self.assertFalse(body["entry"]["pinned"])
+        status, body = request(port, "/api/resources/%s/update" % entry_id,
+                               "POST", {"path": "/etc/hostname"})
+        self.assertEqual(status, 400)
         status, body = request(port, "/api/resources/%s/delete" % entry_id,
                                "POST", {})
-        self.assertEqual(status, 409)
-        status, body = request(port, "/api/resources/%s/delete" % entry_id,
-                               "POST", {"force": True})
         self.assertEqual(status, 200, body)
 
         status, body = request_raw(
@@ -194,11 +199,28 @@ class ServerApiTest(unittest.TestCase):
             "&filename=upload.bin", b"uploaded-bytes",
             {"Content-Type": "application/octet-stream"})
         self.assertEqual(status, 201, body)
-        self.assertTrue(body["entry"]["path"].startswith(
+        first_path = body["entry"]["path"]
+        self.assertTrue(first_path.startswith(
             os.path.join(root, "uploads") + os.sep))
         self.assertEqual(body["entry"]["size"], len(b"uploaded-bytes"))
+        # A second upload with the same name in the same second must not
+        # overwrite the file the first entry points at.
+        status, body = request_raw(
+            port, "/api/resources/upload?kind=tile_layer&name=upload-demo"
+            "&filename=upload.bin", b"other-bytes",
+            {"Content-Type": "application/octet-stream"})
+        self.assertEqual(status, 409, body)
+        self.assertTrue(os.path.isfile(first_path))
 
     def test_demo_mode_blocks_simulation(self):
+        from resources.store import ResourceStore
+        root = os.path.join(self.tmp.name, "resources")
+        os.makedirs(root, exist_ok=True)
+        artifact = os.path.join(root, "demo.bin")
+        with open(artifact, "wb") as fh:
+            fh.write(b"demo")
+        entry = ResourceStore(root).create_entry(
+            "satellite_imagery", "demo", artifact)
         port = self._start("demo")
         status, _body = request(port, "/api/sim/runs?case_id=" + CASE)
         self.assertEqual(status, 404)
@@ -210,6 +232,14 @@ class ServerApiTest(unittest.TestCase):
             "path": os.path.join(self.tmp.name, "x.bin"),
         })
         self.assertEqual(status, 403)
+        status, body = request(port, "/api/resources")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["entries"][0]["path"], "<hidden in demo mode>")
+        status, body = request(port, "/api/resources/"
+                               + entry.entry_id)
+        self.assertEqual(status, 200)
+        self.assertNotIn("verify", body)
+        self.assertEqual(body["entry"]["path"], "<hidden in demo mode>")
 
     def test_resource_path_outside_roots_rejected(self):
         port = self._start("test")

@@ -515,6 +515,21 @@ def _query_bool(value):
     if value is None or value == "":
         return None
     return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _body_bool(value, default=False):
+    """Parse a JSON boolean without Python's bool("false") trap."""
+    if value is None:
+        return bool(default)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in ("1", "true", "yes", "on"):
+            return True
+        if text in ("0", "false", "no", "off", ""):
+            return False
+    raise ValueError("expected a boolean value")
 # 持久化的那一份：让**重启服务后的第一个请求**也是毫秒级（内存缓存随进程消失）。
 # 放 /tmp 而不是 web/data：这是服务端的派生数据，不该被当作项目数据文件。
 _SITUATIONS_INDEX_PATH = "/tmp/situation3d_situations_index.json"
@@ -1372,6 +1387,15 @@ class Handler(SimpleHTTPRequestHandler):
             raise ValueError("path is outside the allowed resource roots")
         return real
 
+    @staticmethod
+    def _resource_public(entry):
+        data = entry.as_dict()
+        if SERVER_MODE != "test":
+            # Demo is publicly reachable through the Funnel; host paths are
+            # operational detail, not product data.
+            data["path"] = "<hidden in demo mode>"
+        return data
+
     def _api_resources_get(self, path, query):
         from resources.store import ResourceError, ResourceNotFound, ResourceStore
         try:
@@ -1390,7 +1414,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({
                     "kinds": store.kinds(),
                     "stats": store.stats(),
-                    "entries": [e.as_dict() for e in rows],
+                    "entries": [self._resource_public(e) for e in rows],
                 })
                 return
             if path.startswith("/api/resources/"):
@@ -1400,8 +1424,13 @@ class Handler(SimpleHTTPRequestHandler):
                     self._send_json({"error": "unknown resource"}, 404)
                     return
                 entry = store.get(entry_id)
-                self._send_json({"entry": entry.as_dict(),
-                                 "verify": store.verify(entry_id)})
+                payload = {"entry": self._resource_public(entry)}
+                # Verification hashes the artifact; never expose that as a
+                # cheap public GET that can be hammered in demo mode.
+                if SERVER_MODE == "test" and _query_bool(
+                        (query or {}).get("verify")):
+                    payload["verify"] = store.verify(entry_id)
+                self._send_json(payload)
                 return
             self._send_json({"error": "unknown resource API"}, 404)
         except ResourceNotFound as exc:
@@ -1440,8 +1469,10 @@ class Handler(SimpleHTTPRequestHandler):
         return length
 
     def _api_resource_upload(self):
+        import uuid
         from resources.model import slugify
-        from resources.store import ResourceError, ResourceStore
+        from resources.store import (ResourceConflict, ResourceError,
+                                     ResourceStore)
         # Uploads are one-shot: if validation fails before the body is read,
         # close the connection instead of trying to keep HTTP/1.1 framing.
         self.close_connection = True
@@ -1450,7 +1481,6 @@ class Handler(SimpleHTTPRequestHandler):
         name = str(query.get("name") or "").strip()
         filename = os.path.basename(str(query.get("filename") or "upload.bin"))
         if not kind or not name:
-            self.close_connection = True
             self._send_json({"error": "kind and name are required"}, 400)
             return
         try:
@@ -1462,8 +1492,12 @@ class Handler(SimpleHTTPRequestHandler):
             stem = slugify(name) or "upload"
             folder = os.path.join(str(store.root), "uploads", kind)
             os.makedirs(folder, exist_ok=True)
-            dest = os.path.join(folder, "%s-%s%s" % (
-                stem, time.strftime("%Y%m%d%H%M%S"), ext))
+            # A per-upload suffix is required: a second upload of the same
+            # name in the same second must not overwrite an artifact that an
+            # existing entry still points at.
+            dest = os.path.join(folder, "%s-%s-%s%s" % (
+                stem, time.strftime("%Y%m%d%H%M%S"), uuid.uuid4().hex[:8], ext))
+            existed = os.path.exists(dest)
             self._read_upload_to(dest)
             try:
                 meta = {}
@@ -1477,15 +1511,18 @@ class Handler(SimpleHTTPRequestHandler):
                     if len(values) != 4:
                         raise ValueError("bbox must be west,south,east,north")
                     meta["bbox"] = values
-                meta["replace"] = _query_bool(query.get("replace"))
+                meta["replace"] = _body_bool(query.get("replace"), False)
                 entry = store.create_entry(kind, name, dest, **meta)
             except Exception:
-                try:
-                    os.unlink(dest)
-                except OSError:
-                    pass
+                if not existed:
+                    try:
+                        os.unlink(dest)
+                    except OSError:
+                        pass
                 raise
             self._send_json({"ok": True, "entry": entry.as_dict()}, 201)
+        except ResourceConflict as exc:
+            self._send_json({"error": str(exc)}, 409)
         except KeyError as exc:
             self._send_json({"error": str(exc)}, 400)
         except (ValueError, ResourceError) as exc:
@@ -1504,7 +1541,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         body = self._read_json_body()
         if body is None:
-            body = {}
+            self.close_connection = True
+            self._send_json({"error": "invalid JSON body"}, 400)
+            return
         if not isinstance(body, dict):
             self._send_json({"error": "body must be a JSON object"}, 400)
             return
@@ -1513,10 +1552,12 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/api/resources":
                 kind = str(body.get("kind") or "").strip()
                 name = str(body.get("name") or "").strip()
+                entry_id = str(body.get("entry_id") or "").strip()
                 target = str(body.get("path") or "").strip()
-                if not kind or not name or not target:
-                    self._send_json({"error": "kind, name and path are required"},
-                                    400)
+                if not kind or not target or (not name and not entry_id):
+                    self._send_json({
+                        "error": "kind, path and (name or entry_id) are required"
+                    }, 400)
                     return
                 target = self._check_manage_path(target)
                 meta = {}
@@ -1525,7 +1566,7 @@ class Handler(SimpleHTTPRequestHandler):
                             "quality", "notes", "bbox"):
                     if key in body:
                         meta[key] = body[key]
-                meta["replace"] = bool(body.get("replace"))
+                meta["replace"] = _body_bool(body.get("replace"), False)
                 entry = store.create_entry(kind, name, target, **meta)
                 self._send_json({"ok": True, "entry": entry.as_dict()}, 201)
                 return
@@ -1541,13 +1582,23 @@ class Handler(SimpleHTTPRequestHandler):
                 if action == "update":
                     changes = dict(body)
                     if "path" in changes:
-                        changes["path"] = self._check_manage_path(changes["path"])
+                        path_value = changes["path"]
+                        if (not isinstance(path_value, str)
+                                or not os.path.isabs(path_value)):
+                            raise ValueError("path must be an absolute path")
+                        current = store.get(entry_id)
+                        if (os.path.realpath(path_value)
+                                != os.path.realpath(current.path)):
+                            changes["path"] = self._check_manage_path(
+                                changes["path"])
+                        else:
+                            changes["path"] = current.path
                     entry = store.update(entry_id, changes)
                     self._send_json({"ok": True, "entry": entry.as_dict()})
                     return
                 if action == "pin":
-                    entry = store.set_pin(entry_id,
-                                          bool(body.get("pinned", True)))
+                    entry = store.set_pin(
+                        entry_id, _body_bool(body.get("pinned"), True))
                     self._send_json({"ok": True, "entry": entry.as_dict()})
                     return
                 if action == "verify":
@@ -1556,7 +1607,8 @@ class Handler(SimpleHTTPRequestHandler):
                                      "verify": result})
                     return
                 if action == "delete":
-                    store.remove(entry_id, force=bool(body.get("force")))
+                    store.remove(entry_id,
+                                 force=_body_bool(body.get("force"), False))
                     self._send_json({"ok": True, "deleted": entry_id})
                     return
                 self._send_json({"error": "unknown resource action"}, 404)

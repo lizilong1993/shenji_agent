@@ -278,9 +278,6 @@ class HashPathTest(unittest.TestCase):
             shutil.rmtree(root, ignore_errors=True)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class SqliteStoreCrudTest(unittest.TestCase):
     def setUp(self):
@@ -330,6 +327,28 @@ class SqliteStoreCrudTest(unittest.TestCase):
         self.assertNotEqual(updated.content_hash, entry.content_hash)
         self.assertEqual(updated.size, len(b"different content"))
 
+    def test_migration_skips_bad_rows(self):
+        pack = make_envpack(os.path.join(self.tmp, "pack"), name="good")
+        entry = scan_envpack(pack)
+        write_json(os.path.join(self.tmp, "index", "index.json"), {
+            "schema": "s3d.resources.index.v1",
+            "entries": {
+                entry.entry_id: entry.as_dict(),
+                "satellite_imagery:bad": {
+                    "entry_id": "satellite_imagery:bad",
+                    "kind": "satellite_imagery",
+                    "path": "/tmp/nope",
+                    "content_hash": "not-a-hash",
+                    "size": 1,
+                },
+            },
+        })
+        store = ResourceStore(os.path.join(self.tmp, "index"))
+        self.assertEqual(store.get(entry.entry_id).content_hash,
+                         entry.content_hash)
+        with self.assertRaises(ResourceNotFound):
+            store.get("satellite_imagery:bad")
+
     def test_index_json_is_migrated_once(self):
         pack = make_envpack(os.path.join(self.tmp, "pack"), name="legacy")
         entry = scan_envpack(pack)
@@ -347,3 +366,6 @@ class SqliteStoreCrudTest(unittest.TestCase):
         again = ResourceStore(os.path.join(self.tmp, "index")).get(
             entry.entry_id)
         self.assertEqual(again.content_hash, entry.content_hash)
+
+if __name__ == "__main__":
+    unittest.main()

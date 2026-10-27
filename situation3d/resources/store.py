@@ -20,6 +20,7 @@ import json
 import os
 import sqlite3
 import uuid
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -47,6 +48,7 @@ class ResourceConflict(ResourceError):
 
 DB_SCHEMA_VERSION = 1
 _DB_NAME = "resources.db"
+_READY_DB_PATHS = set()
 
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS resource_meta (
@@ -193,10 +195,15 @@ class ResourceStore(object):
         return conn
 
     def _ensure_schema(self) -> None:
-        if self._ready:
+        # Initialisation is once per database path per process.  A fresh
+        # ResourceStore object is created for every HTTP request, so an
+        # instance-level flag would take the advisory write lock (and run
+        # DDL) on every read.
+        key = str(self.db_path)
+        if key in _READY_DB_PATHS:
             return
         with self._locked():
-            if self._ready:
+            if key in _READY_DB_PATHS:
                 return
             conn = self._connect()
             try:
@@ -205,18 +212,22 @@ class ResourceStore(object):
                 # reliably provide. Do not re-set the journal mode on every
                 # request - it is persistent and can take a write lock.
                 conn.executescript(_SCHEMA_SQL)
-                count = conn.execute(
-                    "SELECT COUNT(*) FROM resource_kinds").fetchone()[0]
-                if not count:
-                    self._seed_kinds(conn)
+                # Kinds are code-owned; upsert once per process so a newly
+                # added KINDS entry satisfies the foreign key on restart.
+                self._seed_kinds(conn)
                 self._migrate_index(conn)
-                conn.execute(
-                    "INSERT INTO resource_meta(key, value) VALUES('schema_version', ?) "
-                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                    (str(DB_SCHEMA_VERSION),))
+                row = conn.execute(
+                    "SELECT value FROM resource_meta WHERE key='schema_version'"
+                ).fetchone()
+                if row is None or row["value"] != str(DB_SCHEMA_VERSION):
+                    conn.execute(
+                        "INSERT INTO resource_meta(key, value) "
+                        "VALUES('schema_version', ?) "
+                        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                        (str(DB_SCHEMA_VERSION),))
             finally:
                 conn.close()
-            self._ready = True
+            _READY_DB_PATHS.add(key)
 
     @staticmethod
     def _seed_kinds(conn: sqlite3.Connection) -> None:
@@ -241,20 +252,24 @@ class ResourceStore(object):
         row = conn.execute(
             "SELECT value FROM resource_meta WHERE key='migrated_from_index'"
         ).fetchone()
-        if row is not None:
+        if row is not None or not self.index_path.is_file():
             return
-        if self.index_path.is_file():
+        try:
+            with open(self.index_path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError) as exc:
+            warnings.warn("resource index not migrated: %s" % exc)
+            return
+        if not isinstance(data, dict) or data.get("schema") != INDEX_SCHEMA:
+            warnings.warn("resource index not migrated: unsupported schema")
+            return
+        entries = data.get("entries")
+        if not isinstance(entries, dict):
+            warnings.warn("resource index not migrated: entries is not an object")
+            return
+        skipped = 0
+        for raw in entries.values():
             try:
-                with open(self.index_path, encoding="utf-8") as fh:
-                    data = json.load(fh)
-            except (OSError, ValueError) as exc:
-                raise ResourceError("resource index unreadable: %s" % exc)
-            if not isinstance(data, dict) or data.get("schema") != INDEX_SCHEMA:
-                raise ResourceError("resource index has unsupported schema")
-            entries = data.get("entries")
-            if not isinstance(entries, dict):
-                raise ResourceError("resource index entries must be an object")
-            for raw in entries.values():
                 entry = ResourceEntry.from_dict(raw)
                 entry.validate()
                 kind_spec(entry.kind)
@@ -263,9 +278,15 @@ class ResourceStore(object):
                     "INSERT OR IGNORE INTO resources(" + ",".join(_COLUMNS) +
                     ") VALUES(" + ",".join("?" for _ in _COLUMNS) + ")",
                     _entry_values(entry, created))
+            except Exception as exc:  # noqa: BLE001 - one bad row must not brick the store
+                skipped += 1
+                warnings.warn("resource index entry skipped: %s" % exc)
         conn.execute(
             "INSERT OR REPLACE INTO resource_meta(key, value) "
             "VALUES('migrated_from_index', ?)", (utc_now(),))
+        if skipped:
+            warnings.warn("resource index migrated with %d skipped entries"
+                          % skipped)
 
     # -- queries -----------------------------------------------------------
 
@@ -384,7 +405,8 @@ class ResourceStore(object):
                         values)
                 conn.execute("COMMIT")
             except Exception:
-                conn.execute("ROLLBACK")
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
                 raise
             finally:
                 conn.close()
@@ -488,10 +510,25 @@ class ResourceStore(object):
         unknown = sorted(set(changes) - _UPDATABLE - {"entry_id", "kind"})
         if unknown:
             raise ValueError("unsupported fields: %s" % ", ".join(unknown))
-        if "kind" in changes and changes["kind"] != self.get(entry_id).kind:
+        old_pre = self.get(entry_id)
+        if "kind" in changes and changes["kind"] != old_pre.kind:
             raise ValueError("kind cannot be changed")
         if "entry_id" in changes and changes["entry_id"] != entry_id:
             raise ValueError("entry_id cannot be changed")
+        # Hash outside the write lock: an envpack or tileset can take seconds
+        # to walk, and read requests must not wait on that.
+        prepared_hash = None
+        if "path" in changes:
+            new_path = changes["path"]
+            if not isinstance(new_path, str) or not os.path.isabs(new_path):
+                raise ValueError("path must be an absolute path")
+            if os.path.abspath(new_path) != os.path.abspath(old_pre.path):
+                if not os.path.exists(new_path):
+                    raise ValueError("path does not exist: %s" % new_path)
+                try:
+                    prepared_hash = hash_path(new_path)
+                except OSError as exc:
+                    raise ValueError("path unreadable: %s" % exc)
         self._ensure_schema()
         with self._locked():
             conn = self._connect()
@@ -515,13 +552,23 @@ class ResourceStore(object):
                     raise ValueError("path must be an absolute path")
                 if os.path.abspath(new_path) != os.path.abspath(old.path):
                     data["path"] = os.path.abspath(new_path)
-                    data["content_hash"], data["size"] = hash_path(data["path"])
+                    if (prepared_hash is not None
+                            and os.path.abspath(old.path)
+                            == os.path.abspath(old_pre.path)):
+                        data["content_hash"], data["size"] = prepared_hash
+                    else:
+                        try:
+                            data["content_hash"], data["size"] = hash_path(
+                                data["path"])
+                        except OSError as exc:
+                            raise ValueError("path unreadable: %s" % exc)
                 entry = ResourceEntry.from_dict(data)
                 entry.validate()
                 self._update_row(conn, entry)
                 conn.execute("COMMIT")
             except Exception:
-                conn.execute("ROLLBACK")
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
                 raise
             finally:
                 conn.close()
@@ -544,7 +591,8 @@ class ResourceStore(object):
                     (1 if pinned else 0, utc_now(), str(entry_id)))
                 conn.execute("COMMIT")
             except Exception:
-                conn.execute("ROLLBACK")
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
                 raise
             finally:
                 conn.close()
@@ -570,7 +618,8 @@ class ResourceStore(object):
                              (str(entry_id),))
                 conn.execute("COMMIT")
             except Exception:
-                conn.execute("ROLLBACK")
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
                 raise
             finally:
                 conn.close()

@@ -391,8 +391,17 @@
       entry.kind || (state.kinds[0] && state.kinds[0].kind) || '');
     if (edit) kind.disabled = true;
     grid.appendChild(field('资源类型', kind));
-    grid.appendChild(field('名称', textInput('name', edit ? entry.entry_id.split(':').slice(1).join(':') : '', '用于生成 entry_id，可留空用 ID')));
-    grid.appendChild(field('资源 ID', textInput('entry_id', edit ? entry.entry_id : '', 'kind:name；留空自动生成')));
+    var nameInput = textInput('name',
+      edit ? entry.entry_id.split(':').slice(1).join(':') : '',
+      '用于生成 entry_id，可留空用 ID');
+    var idInput = textInput('entry_id', edit ? entry.entry_id : '',
+      'kind:name；留空自动生成');
+    if (edit) {
+      nameInput.readOnly = true;
+      idInput.readOnly = true;
+    }
+    grid.appendChild(field('名称', nameInput));
+    grid.appendChild(field('资源 ID', idInput));
     grid.appendChild(field('服务器绝对路径', textInput('path', entry.path || '', '/remote-home/...')));
 
     grid.appendChild(field('版本', textInput('version', entry.version || '')));
@@ -455,6 +464,13 @@
     grid.appendChild(field('许可', textInput('license', '')));
     grid.appendChild(field('质量', selectInput('quality', QUALITIES, 'measured')));
     grid.appendChild(field('数据时间 as_of', textInput('as_of', '')));
+    var replace = document.createElement('input');
+    replace.type = 'checkbox';
+    replace.dataset.field = 'replace';
+    var replaceWrap = el('label', 'res-check');
+    replaceWrap.appendChild(replace);
+    replaceWrap.appendChild(el('span', null, '同 ID 已存在时覆盖（replace）'));
+    grid.appendChild(replaceWrap);
     form.appendChild(grid);
     form.appendChild(el('div', 'res-hint',
       '上传文件写入资源目录的 uploads/ 下；大目录资源请改用“新增资源”登记服务器路径。'));
@@ -602,6 +618,9 @@
     if (values.license) params.set('license', values.license);
     if (values.quality) params.set('quality', values.quality);
     if (values.as_of) params.set('as_of', values.as_of);
+    if (document.querySelector('#resForm [data-field="replace"]:checked')) {
+      params.set('replace', 'true');
+    }
     state.busy = true;
     fetch('/api/resources/upload?' + params.toString(), {
       method: 'POST',
