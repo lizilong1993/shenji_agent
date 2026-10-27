@@ -475,7 +475,7 @@ def _convert_events(world, uid_to_cid, frames, tick_seconds, tick_count, stages)
     return events
 
 
-def _nodes(events, tick_count, phases):
+def _nodes(events, tick_count, phases, include_terminal=True):
     wanted = [("first_fire", "首次交火", "fire"),
               ("first_destroy", "首次毁伤", "destroy"),
               ("first_objective", "首次夺控", "objective_progress"),
@@ -493,10 +493,79 @@ def _nodes(events, tick_count, phases):
                           "actors": ev.get("actors") or [],
                           "location": ev.get("location"),
                           "description": ev.get("description") or ""})
-    nodes.append({"tick": tick_count, "type": "terminal", "title": "推演结束",
-                  "actors": [], "location": None, "description": "达到想定时长"})
+    if include_terminal:
+        nodes.append({"tick": tick_count, "type": "terminal", "title": "推演结束",
+                      "actors": [], "location": None, "description": "达到想定时长"})
     nodes.sort(key=lambda n: n["tick"])
     return {"schema": "sim.nodes.v1", "nodes": nodes}
+
+
+# ---------------------------------------------------------------------------
+# 实时增量产物（live/）
+# ---------------------------------------------------------------------------
+#
+# 测试端查看器不等推演结束：每一 tick 追加一帧到 live/frames.jsonl，并把该行
+# 的字节偏移同步追加到 live/frames.idx；每 LIVE_EVERY_TICKS 个 tick 重写一次
+# events.json / nodes.json / state.json。查看器用"帧数/事件数"作游标，
+# serve.py 的 /live 接口按偏移直接 seek，不必每次重读 33 MB 的成品 trajectory。
+#
+# 写入顺序固定为 idx 先、行数据后，读取方只要忽略末尾不完整的行，就不会把
+# 写了一半的 JSON 解析进场景。
+
+LIVE_EVERY_TICKS = 10
+
+
+class LiveRunWriter:
+    def __init__(self, store, case_id, run_id):
+        self.dir = os.path.join(store.run_dir(case_id, run_id), "live")
+        os.makedirs(self.dir, exist_ok=True)
+        self._frames = open(os.path.join(self.dir, "frames.jsonl"), "wb")
+        self._index = open(os.path.join(self.dir, "frames.idx"), "wb")
+        self._offset = 0
+        self.frame_count = 0
+        self.last_tick = 0
+
+    def meta(self, doc):
+        _atomic_write_json(os.path.join(self.dir, "meta.json"), doc)
+
+    def append_frame(self, frame):
+        data = (json.dumps(frame, ensure_ascii=False, separators=(",", ":"))
+                + "\n").encode("utf-8")
+        # idx 必须在行落地之前可见：读取方用 idx 定位，定位到尚未写好的行时
+        # 会自然读到 EOF 并丢弃，不会错位。
+        self._index.write(("%d\n" % self._offset).encode("ascii"))
+        self._index.flush()
+        self._frames.write(data)
+        self._frames.flush()
+        self._offset += len(data)
+        self.frame_count += 1
+        self.last_tick = int(frame.get("tick") or 0)
+
+    def publish(self, tick, status, events=None, nodes=None, error=None):
+        if events is not None:
+            _atomic_write_json(os.path.join(self.dir, "events.json"),
+                               {"tick": tick, "events": events})
+        if nodes is not None:
+            _atomic_write_json(os.path.join(self.dir, "nodes.json"),
+                               {"schema": "sim.nodes.v1", "nodes": nodes})
+        state = {
+            "tick": int(tick),
+            "status": status,
+            "frame_count": self.frame_count,
+            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        if events is not None:
+            state["event_count"] = len(events)
+        if error:
+            state["error"] = error
+        _atomic_write_json(os.path.join(self.dir, "state.json"), state)
+
+    def close(self):
+        for fh in (self._frames, self._index):
+            try:
+                fh.close()
+            except OSError:
+                pass
 
 
 def _atomic_write_json(path, obj):
@@ -841,6 +910,8 @@ def main(argv=None):
                      engine_commit=engine_commit, envpack_hash=envpack_hash,
                      resources=summary, resource_gaps=[])
     t_start = time.time()
+    live = LiveRunWriter(store, args.case, run_id)
+    live.publish(0, "running")
     try:
         world = build_world(scenario, {}, seed=args.seed, dt_s=tick_seconds,
                             envpack=envpack)
@@ -850,8 +921,34 @@ def main(argv=None):
             if entity is not None:
                 entity._case_id = cid
                 uid_to_cid[int(m["uid"])] = cid
+        live_meta = dict(cm)
+        live_meta.update({
+            "schema": "situation3d.live.v1",
+            "tick_count": tick_count,
+            "terminal_tick": tick_count,
+            "run_id": run_id,
+            "targets": _target_defs(world, meta),
+            "symbology": symbology.catalog(),
+            "objectives": [
+                {"id": obj["name"], "name": obj["name"], "lon": obj["lon"],
+                 "lat": obj["lat"], "owner": -1,
+                 "value": int(obj.get("value") or 0)}
+                for obj in plugin.objectives()],
+            "inference_model": None,
+            "auto_plots": [],
+            "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        })
+        live.meta(live_meta)
         runner = MissionRunner(world, missions, scenario.get("roe"),
                                interval_s=tick_seconds)
+        # Occupation / objective progress are per-tick quantities: the live
+        # viewer paints frames while the run is still going, so they must be
+        # computed here rather than patched onto the finished array below.
+        areas = {}
+        for obj in plugin.objectives():
+            areas[obj["name"]] = (float(obj["lon"]), float(obj["lat"]))
+        aff = {cid: ("red" if m["affiliation"] == 0 else "blue") for cid, m in meta.items()}
+        objective_defs = plugin.objectives()
         frames = []
         step_ms = []
         travelled = {cid: 0.0 for cid in meta}
@@ -877,35 +974,10 @@ def main(argv=None):
                     travelled[row["id"]] = travelled.get(row["id"], 0.0) + haversine_m(
                         (prev["lon"], prev["lat"]), (row["lon"], row["lat"]))
                 row["travelled_m"] = round(travelled.get(row["id"], 0.0), 1)
-            phase = _phase_at(cm.get("phases") or [], tick)
-            frames.append({
-                "tick": tick,
-                "t_seconds": round(tick * tick_seconds, 0),
-                "phase": phase,
-                "unit_phase": {r["id"]: {"id": phase["id"], "name": phase["name"],
-                                          "index": phase["index"]} for r in rows},
-                "occupation": {},
-                "objectives": {},
-                "targets": rows,
-            })
-            if tick and tick % 120 == 0:
-                store.update_run(args.case, run_id,
-                                 progress={"tick": tick, "ticks": tick_count,
-                                           "events": len(world.events)})
-                if not args.quiet:
-                    print("[run] tick %d/%d events=%d elapsed=%.1fs"
-                          % (tick, tick_count, len(world.events), time.time() - t_start),
-                          flush=True)
-        # Occupation and objective progress from the simulation state.
-        areas = {}
-        for obj in plugin.objectives():
-            areas[obj["name"]] = (float(obj["lon"]), float(obj["lat"]))
-        aff = {cid: ("red" if m["affiliation"] == 0 else "blue") for cid, m in meta.items()}
-        for fr in frames:
             occ = {}
             for name, (lon, lat) in areas.items():
                 red = blue = 0
-                for row in fr["targets"]:
+                for row in rows:
                     if row.get("mode") != "ground":
                         continue
                     d = math.hypot((row["lon"] - lon) * 111320.0 * math.cos(math.radians(lat)),
@@ -918,13 +990,39 @@ def main(argv=None):
                         blue += 1
                 occ[name] = ("red" if red > blue else ("blue" if blue > red else
                                                        ("neutral" if red or blue else "none")))
-            fr["occupation"] = occ
-            fr["objectives"] = {
-                obj["name"]: (1.0 if world.objectives.get(
-                    world.rule_grid.cell_of(float(obj["lon"]), float(obj["lat"])),
-                    {}).get("owner") == 0 else 0.0)
-                for obj in plugin.objectives()
+            phase = _phase_at(cm.get("phases") or [], tick)
+            frame = {
+                "tick": tick,
+                "t_seconds": round(tick * tick_seconds, 0),
+                "phase": phase,
+                "unit_phase": {r["id"]: {"id": phase["id"], "name": phase["name"],
+                                          "index": phase["index"]} for r in rows},
+                "occupation": occ,
+                "objectives": {
+                    obj["name"]: (1.0 if world.objectives.get(
+                        world.rule_grid.cell_of(float(obj["lon"]), float(obj["lat"])),
+                        {}).get("owner") == 0 else 0.0)
+                    for obj in objective_defs
+                },
+                "targets": rows,
             }
+            frames.append(frame)
+            live.append_frame(frame)
+            if tick and tick % LIVE_EVERY_TICKS == 0:
+                events_now = _convert_events(world, uid_to_cid, frames,
+                                             tick_seconds, tick_count,
+                                             cm.get("stages") or [])
+                nodes_now = _nodes(events_now, tick_count,
+                                   cm.get("phases") or [],
+                                   include_terminal=False)["nodes"]
+                live.publish(tick, "running", events=events_now, nodes=nodes_now)
+                store.update_run(args.case, run_id,
+                                 progress={"tick": tick, "ticks": tick_count,
+                                           "events": len(world.events)})
+                if not args.quiet and tick % 120 == 0:
+                    print("[run] tick %d/%d events=%d elapsed=%.1fs"
+                          % (tick, tick_count, len(world.events), time.time() - t_start),
+                          flush=True)
         events = _convert_events(world, uid_to_cid, frames, tick_seconds,
                                  tick_count, cm.get("stages") or [])
         nodes = _nodes(events, tick_count, cm.get("phases") or [])
@@ -1047,10 +1145,16 @@ def main(argv=None):
              "nodes.json": json.dumps(nodes, ensure_ascii=False, indent=1).encode("utf-8"),
              "summary.json": json.dumps(summary, ensure_ascii=False, indent=1).encode("utf-8")},
             metrics=metrics, validation=validation)
+        live.publish(tick_count, "completed", events=events,
+                     nodes=nodes["nodes"])
+        live.close()
         print(json.dumps({"run_id": run_id, "metrics": metrics,
                           "validation": validation}, ensure_ascii=False, indent=1))
         return 0
     except Exception as exc:  # noqa: BLE001
+        live.publish(live.last_tick, "failed",
+                     error="%s: %s" % (type(exc).__name__, exc))
+        live.close()
         store.fail_run(args.case, run_id, "%s: %s" % (type(exc).__name__, exc),
                        traceback.format_exc())
         raise

@@ -1157,6 +1157,55 @@ select {
 
 #timeline { flex: 1 1 auto; }
 
+/* ---------------- 战斗时间轴（仅测试端引擎案例） ---------------- */
+/* 演示端/非引擎案例不带 .tl-live：结构保持旧版一行滑块，样式不受影响。 */
+.tr-timeline { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;
+               justify-content: center; gap: 1px; }
+.tr-timeline.tl-off .tl-meta, .tr-timeline:not(.tl-live) .tl-meta { display: none; }
+.tl-meta { display: flex; justify-content: space-between; gap: 12px;
+           height: 12px; line-height: 12px; font-size: 10px;
+           color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.tl-meta span:empty { display: none; }
+.tl-track { position: relative; flex: 1 1 auto; display: flex; align-items: center; min-width: 0; }
+#timeline { width: 100%; }
+.tr-timeline.tl-live #timeline {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+  margin: 4px 0; border-radius: 3px; outline: none; cursor: pointer;
+  background: linear-gradient(to right,
+    #1f6feb 0, #1f6feb var(--tl-progress, 0%),
+    #d9e0e6 var(--tl-progress, 0%), #d9e0e6 100%);
+}
+.tr-timeline.tl-live #timeline::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+  background: #1f6feb; border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(31, 111, 235, .35);
+}
+.tr-timeline.tl-live #timeline::-moz-range-thumb {
+  width: 10px; height: 10px; border-radius: 50%; background: #1f6feb;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(31, 111, 235, .35);
+}
+.tr-timeline.tl-live #timeline:disabled { opacity: .45; cursor: default; }
+.tl-markers { position: absolute; left: 6px; right: 6px; top: -1px; height: 8px;
+              pointer-events: none; z-index: 2; }
+.tl-marker { position: absolute; top: 0; width: 8px; height: 8px; padding: 0;
+             margin-left: -4px; border-radius: 50%; border: 1px solid #fff;
+             background: #1f6feb; cursor: pointer; pointer-events: auto;
+             box-shadow: 0 0 0 1px rgba(15, 40, 70, .25); }
+.tl-marker:hover, .tl-marker:focus { transform: scale(1.45); outline: none; }
+.tl-marker.node { background: #1f6feb; }
+.tl-marker.destroy { background: #c92a2a; }
+.tl-marker.objective { background: #2b8a3e; }
+.tl-marker.terminal { background: #495057; }
+.tl-tip { position: fixed; z-index: 4000; max-width: 280px;
+          background: #fff; color: #1f2933; border: 1px solid #d9e0e6;
+          border-radius: 8px; box-shadow: 0 6px 20px rgba(15, 40, 70, .16);
+          padding: 8px 10px; font: 12px/1.5 -apple-system, "Segoe UI",
+          "Microsoft YaHei", sans-serif; pointer-events: none; }
+.tl-tip .tl-tip-title { font-weight: 600; margin-bottom: 2px; }
+.tl-tip .tl-tip-meta { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.tl-tip .tl-tip-desc { margin-top: 4px; }
+.tl-tip .tl-tip-actors { margin-top: 4px; color: var(--text-dim); }
+
 #tickLabel, #clockLabel { color: var(--text-dim); font-variant-numeric: tabular-nums; }
 
 /* ---------------- 图层管理分组（可折叠） ---------------- */

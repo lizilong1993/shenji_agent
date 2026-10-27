@@ -286,6 +286,94 @@ def _pid_alive(pid):
         return False
 
 
+# ---------------------------------------------------------------------------
+# live/ 增量产物的读取（测试端查看器轮询用）
+# ---------------------------------------------------------------------------
+#
+# 运行器每 tick 往 live/frames.jsonl 追加一行帧，并把行的字节偏移写进
+# live/frames.idx（先 idx 后数据）。这里按偏移直接 seek，只读客户端游标之后
+# 的部分；events/nodes/state 是"每 N tick 重写一次"的小文件，按 mtime 缓存，
+# 避免每秒把 ~700 KB 的事件表重新解析。
+
+_LIVE_JSON_CACHE = {}
+_LIVE_JSON_LOCK = threading.Lock()
+
+
+def _live_json(path, default=None):
+    try:
+        st = os.stat(path)
+    except OSError:
+        return default
+    key = (st.st_mtime_ns, st.st_size)
+    with _LIVE_JSON_LOCK:
+        ent = _LIVE_JSON_CACHE.get(path)
+        if ent is not None and ent[0] == key:
+            return ent[1]
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            obj = json.load(fh)
+    except (OSError, ValueError):
+        return default
+    with _LIVE_JSON_LOCK:
+        if len(_LIVE_JSON_CACHE) >= 64:
+            _LIVE_JSON_CACHE.clear()
+        _LIVE_JSON_CACHE[path] = (key, obj)
+    return obj
+
+
+def _live_frames(run_dir, cursor):
+    """Return (frames after cursor, frame_count deliverable).
+
+    A trailing idx entry without a complete JSON line means the writer is still
+    in the middle of a tick; the frame is simply not returned yet.
+    """
+    idx_path = os.path.join(run_dir, "frames.idx")
+    data_path = os.path.join(run_dir, "frames.jsonl")
+    try:
+        with open(idx_path, "rb") as fh:
+            raw = fh.read()
+    except OSError:
+        return [], 0
+    offsets = []
+    for line in raw.splitlines():
+        try:
+            offsets.append(int(line))
+        except ValueError:
+            break       # 写了一半的索引行
+    total = len(offsets)
+    try:
+        cursor = int(cursor or 0)
+    except (TypeError, ValueError):
+        cursor = 0
+    if cursor < 0:
+        cursor = 0
+    if cursor >= total:
+        return [], total if cursor <= total else 0
+    try:
+        with open(data_path, "rb") as fh:
+            fh.seek(offsets[cursor])
+            blob = fh.read()
+    except OSError:
+        return [], cursor
+    end = blob.rfind(b"\n")
+    if end < 0:
+        return [], cursor
+    frames = []
+    for line in blob[:end].splitlines():
+        try:
+            frames.append(json.loads(line.decode("utf-8")))
+        except ValueError:
+            break
+    return frames, cursor + len(frames)
+
+
+def _int_param(query, name, default=0):
+    try:
+        return int((query or {}).get(name) or default)
+    except (TypeError, ValueError):
+        return default
+
+
 def _cleanup_stale_runs():
     """At test-server startup, fail runs whose subprocess is gone."""
     for case_id in sorted(ENGINE_CASES):
@@ -1467,6 +1555,62 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, 400)
                 return
             self._send_json({"mode": "test", "case_id": cid, "runs": runs})
+            return
+        if path.startswith("/api/sim/runs/") and path.endswith("/live"):
+            # 增量读取：?case_id=<cid>&frames=<n>&events=<m>
+            # 测试端专用；演示端不暴露。frames 是帧数游标（不是 tick），
+            # events 是事件数组游标，两者都由客户端按已收到的条数递增。
+            if SERVER_MODE != "test" or RUN_STORE is None:
+                self._send_json({"error": "not found"}, 404)
+                return
+            run_id = path[len("/api/sim/runs/"):-len("/live")].strip("/")
+            cid = (query or {}).get("case_id") or ""
+            if not run_id or "/" in run_id:
+                self._send_json({"error": "not found"}, 404)
+                return
+            if not cid:
+                self._send_json({"error": "case_id 必填"}, 400)
+                return
+            try:
+                run = RUN_STORE.get_run(cid, run_id)
+                live_dir = os.path.join(RUN_STORE.run_dir(cid, run_id), "live")
+            except RunNotFound as exc:
+                self._send_json({"error": str(exc)}, 404)
+                return
+            except RunError as exc:
+                self._send_json({"error": str(exc)}, 400)
+                return
+            frames, frame_count = _live_frames(
+                live_dir, _int_param(query, "frames"))
+            events_doc = _live_json(os.path.join(live_dir, "events.json")) or {}
+            all_events = events_doc.get("events") or []
+            event_cursor = max(0, _int_param(query, "events"))
+            if event_cursor > len(all_events):
+                event_cursor = 0
+            nodes_doc = _live_json(os.path.join(live_dir, "nodes.json")) or {}
+            state = _live_json(os.path.join(live_dir, "state.json")) or {}
+            config = run.get("config") or {}
+            # 进程被取消/杀掉时来不及写 live/state.json，运行库的终态优先。
+            live_status = state.get("status") or run.get("status")
+            if run.get("status") in ("failed", "cancelled", "completed"):
+                live_status = run.get("status")
+            self._send_json({
+                "case_id": cid,
+                "run_id": run_id,
+                "status": run.get("status"),
+                "live_status": live_status,
+                "error": state.get("error") or run.get("error"),
+                "progress": run.get("progress") or {},
+                "tick": state.get("tick"),
+                "tick_seconds": config.get("tick_seconds"),
+                "tick_count": config.get("ticks"),
+                "start_time_utc": config.get("scenario_date"),
+                "frames": frames,
+                "frame_count": frame_count,
+                "events": all_events[event_cursor:],
+                "event_count": len(all_events),
+                "nodes": nodes_doc.get("nodes") or [],
+            })
             return
         if path.startswith("/api/sim/runs/"):
             if SERVER_MODE != "test" or RUN_STORE is None:

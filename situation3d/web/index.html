@@ -273,7 +273,18 @@
       <button id="btnStepFwd" type="button">▶</button>
       <span id="tickLabel">0 / 0</span>
     </div>
-    <input id="timeline" type="range" min="0" max="0" value="0" step="1">
+    <div class="tr-timeline">
+      <!-- 测试端引擎案例改走真实时间轴（battleTimeline.js）：两端标出战斗开始/
+           当前时刻，条上标关键节点。其它情况这两个标签保持空，界面与旧版一致。 -->
+      <div class="tl-meta">
+        <span id="tlStartLabel"></span>
+        <span id="tlNowLabel"></span>
+      </div>
+      <div class="tl-track" id="tlTrack">
+        <div class="tl-markers" id="tlMarkers"></div>
+        <input id="timeline" type="range" min="0" max="0" value="0" step="1">
+      </div>
+    </div>
     <div class="transport-right">
       <span id="clockLabel">—</span>
     </div>
@@ -339,6 +350,7 @@
   <script src="./src/situation.js"></script>
 <script src="./src/plotting.js"></script>
   <script src="./src/intelUi.js"></script>
+  <script src="./src/battleTimeline.js"></script>
   <script src="./src/app.js"></script>
 </body>
 </html>

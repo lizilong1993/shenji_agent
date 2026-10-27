@@ -136,6 +136,73 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(self.store.get_run(CASE, queued)["status"], "failed")
 
+    def _write_live(self, rid=None):
+        """Write the incremental artifacts the live viewer polls."""
+        live = os.path.join(self.runs, CASE, rid or self.rid, "live")
+        os.makedirs(live, exist_ok=True)
+        offs, blob = [], b""
+        for tick in range(3):
+            line = (json.dumps({"tick": tick, "t_seconds": tick * 30.0,
+                                "occupation": {}, "objectives": {},
+                                "targets": []}) + "\n").encode("utf-8")
+            offs.append(len(blob))
+            blob += line
+        with open(os.path.join(live, "frames.jsonl"), "wb") as fh:
+            fh.write(blob)
+        with open(os.path.join(live, "frames.idx"), "wb") as fh:
+            fh.write("".join("%d\n" % o for o in offs).encode("ascii"))
+        events = [{"id": "D-1", "tick": 1, "type": "destroy",
+                   "description": "target destroyed"},
+                  {"id": "O-2", "tick": 2, "type": "objective_progress",
+                   "description": "area captured"}]
+        with open(os.path.join(live, "events.json"), "w", encoding="utf-8") as fh:
+            json.dump({"tick": 2, "events": events}, fh, ensure_ascii=False)
+        with open(os.path.join(live, "nodes.json"), "w", encoding="utf-8") as fh:
+            json.dump({"schema": "sim.nodes.v1",
+                       "nodes": [{"tick": 1, "type": "first_destroy",
+                                  "title": "first destroy"}]},
+                      fh, ensure_ascii=False)
+        with open(os.path.join(live, "state.json"), "w", encoding="utf-8") as fh:
+            json.dump({"tick": 2, "status": "running", "frame_count": 3}, fh)
+
+    def test_live_incremental_read(self):
+        self._write_live()
+        port = self._start("test")
+        base = "/api/sim/runs/%s/live?case_id=%s" % (self.rid, CASE)
+        status, body = request(port, base + "&frames=0&events=0")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body["frames"]), 3)
+        self.assertEqual(body["frames"][2]["tick"], 2)
+        self.assertEqual(body["frame_count"], 3)
+        self.assertEqual(len(body["events"]), 2)
+        self.assertEqual(body["event_count"], 2)
+        self.assertEqual(body["nodes"][0]["type"], "first_destroy")
+        # setUp() 已把 run 标记为 completed；live/state.json 里的 running 是
+        # 进程被杀前的旧值，运行库终态优先。
+        self.assertEqual(body["live_status"], "completed")
+        status, body = request(port, base + "&frames=2&events=1")
+        self.assertEqual(status, 200)
+        self.assertEqual([f["tick"] for f in body["frames"]], [2])
+        self.assertEqual([e["id"] for e in body["events"]], ["O-2"])
+
+    def test_live_prefers_terminal_run_status(self):
+        rid = self.store.create_run(CASE, seed=12)
+        self.store.update_run(CASE, rid, status="running")
+        self._write_live(rid)
+        self.store.fail_run(CASE, rid, "killed by test")
+        port = self._start("test")
+        status, body = request(
+            port, "/api/sim/runs/%s/live?case_id=%s&frames=0" % (rid, CASE))
+        self.assertEqual(status, 200)
+        self.assertEqual(body["live_status"], "failed")
+
+    def test_live_is_absent_in_demo(self):
+        self._write_live()
+        port = self._start("demo")
+        status, _body = request(
+            port, "/api/sim/runs/%s/live?case_id=%s&frames=0" % (self.rid, CASE))
+        self.assertEqual(status, 404)
+
     def test_demo_mode_blocks_simulation(self):
         port = self._start("demo")
         status, _body = request(port, "/api/sim/runs?case_id=" + CASE)

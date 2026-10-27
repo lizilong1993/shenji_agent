@@ -973,9 +973,15 @@ function loadCase(caseId) {
     .then(function (data) {
       applySituationData(data, caseId);
       state.inference = null;
-      if (dom.rlNote) dom.rlNote.textContent = '推理结果加载中…';
-      // 不 return：推理帧后台加载，loadCase 在 core 应用完就 resolve（首屏不等它）。
-      loadCaseInference(caseId);
+      // 引擎实时推演案例没有预烘焙推理帧：后台分片不必再取（35 MB），
+      // 右栏明确显示"待推演"，而不是假装正在加载推理结果。
+      if (window.BattleTimeline && BattleTimeline.isLiveCase()) {
+        if (dom.rlNote) dom.rlNote.textContent = '引擎实时推演：点击「TS自动推演」开始';
+      } else {
+        if (dom.rlNote) dom.rlNote.textContent = '推理结果加载中…';
+        // 不 return：推理帧后台加载，loadCase 在 core 应用完就 resolve（首屏不等它）。
+        loadCaseInference(caseId);
+      }
       return data;
     })
     .catch(function (splitErr) {
@@ -1496,6 +1502,9 @@ function applySituationData(data, caseId) {
       clearTargetSelection();
       setTick(0);
       createNodeNav(data);
+      // 案例装载完成后再交给时间轴模块：它要决定是否进入"实时战斗"模式
+      // （测试端引擎案例、且不是 ?run= 成品回放），并把初始帧收敛到 tick 0。
+      if (window.BattleTimeline) BattleTimeline.onCaseLoaded();
       updateInferenceUi();
       applyAutoPlots(data);
 
@@ -1795,6 +1804,8 @@ function clearSituation() {
   state.data = null;
   state.caseId = null;
   state.inference = null;
+  // 时间轴模块同样要退出实时模式，否则空态会残留"战斗开始/未开始"两个标签。
+  if (window.BattleTimeline) BattleTimeline.onCaseLoaded();
   // 鸟瞰图随 TS 一起清空，否则会残留上一场的图标与取景。
   if (window.Overview && Overview.clear) Overview.clear();
   // 整体TS面板也要回到空态；只清 state.data 的话 updateInferenceUi 会因
@@ -6064,6 +6075,20 @@ window.Follow = {
   debug: followDebug,
 };
 
+// 供 battleTimeline.js 使用。它拿不到本文件的闭包；只暴露它真正需要的那几个
+// 入口，避免把整个 state 的写入权散给外部模块。
+window.TransportBridge = {
+  state: state,
+  setTick: setTick,
+  setPlaying: setPlaying,
+  timelineMaxTick: timelineMaxTick,
+  renderTransport: renderTransport,
+  renderTargetCounts: renderTargetCounts,
+  updateInferenceUi: updateInferenceUi,
+  markScene: markScene,
+  setStatus: setStatus,
+};
+
 /** Last usable frame: data may declare a terminal tick before the 12 h array end. */
 function timelineMaxTick() {
   if (!state.data || !state.data.frames) return 0;
@@ -6073,6 +6098,12 @@ function timelineMaxTick() {
 }
 
 function renderTransport() {
+  // 测试端引擎案例由 battleTimeline.js 接管：时间轴按真实时间显示，右端只到
+  // 已推演到的时刻。演示端与非引擎案例走下面的旧逻辑，行为完全不变。
+  if (window.BattleTimeline && BattleTimeline.ownsTransport()) {
+    BattleTimeline.render();
+    return;
+  }
   if (!state.data || !state.data.frames) {
     dom.timeline.max = '0';
     dom.timeline.value = '0';
@@ -7461,7 +7492,14 @@ function bindUI() {
   });
 
   document.getElementById('btnPlay').addEventListener('click', function () { setPlaying(!state.playing); });
-  document.getElementById('btnRun').addEventListener('click', function () { setPlaying(!state.playing); });
+  document.getElementById('btnRun').addEventListener('click', function () {
+    // 测试端引擎案例：这个按钮是"开战"，不是"播放"。
+    if (window.BattleTimeline && BattleTimeline.ownsTransport()) {
+      BattleTimeline.launch();
+      return;
+    }
+    setPlaying(!state.playing);
+  });
   document.getElementById('btnReset').addEventListener('click', function () {
     setPlaying(false);
     setTick(0);
@@ -8283,7 +8321,8 @@ function main() {
       state.ramp = null;
     });
 
-    return Promise.all([loadBase(), loadCaseIndex()]);
+    return Promise.all([loadBase(), loadCaseIndex(),
+      (window.BattleTimeline ? BattleTimeline.ready() : Promise.resolve())]);
   }).then(function (res) {
     applyBase(res[0]);
 
