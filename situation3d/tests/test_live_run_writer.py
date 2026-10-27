@@ -59,6 +59,8 @@ class LiveRunWriterTest(unittest.TestCase):
             self.assertEqual(state["status"], "running")
             self.assertEqual(state["frame_count"], 5)
             self.assertEqual(state["tick"], 4)
+            # 重启同一 run 时查看器靠 epoch 区分新旧两场。
+            self.assertTrue(state.get("epoch"))
             with open(os.path.join(live, "meta.json"), encoding="utf-8") as fh:
                 self.assertEqual(json.load(fh)["tick_count"], 5)
 

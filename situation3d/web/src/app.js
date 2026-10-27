@@ -1454,6 +1454,9 @@ function applySituationData(data, caseId) {
 
       state.data = data;
       state.caseId = caseId || data.case_id || null;
+      // 实时推演案例必须在**建实体 / 编译 CZML 之前**把旧轨迹截到 tick 0；
+      // 否则 TargetMotion 会用案例自带的 1441 帧旧轨迹驱动整场运动。
+      if (window.BattleTimeline) BattleTimeline.prepareCaseData(data);
       state.inference = data.inference_frames || null;
       // 案例数据换了：面板结构与战损缓存都必须重建。"前端生成的TS"的
       // case_id 固定为 custom，只靠 case_id 命中会残留上一份编成。
@@ -2300,6 +2303,32 @@ function createTargetEntities() {
         if (!s) return undefined;
         return Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
       }, false),
+      // 实时推演没有 CZML 采样，模型朝向按当前帧航向直接算；按 tick 缓存，
+      // 同一帧内鸟瞰/面板多次求值不重复构造四元数。成品回放由 CZML 接管，
+      // 这里保持 undefined，绑定逻辑与旧版一致。
+      orientation: (window.BattleTimeline && BattleTimeline.liveCase() &&
+                    window.TargetMotion)
+        ? new Cesium.CallbackProperty((function (d) {
+            let cachedTick = -1;
+            let cachedQ;
+            return function () {
+              const s = positionFor(d.id, state.tick);
+              if (!s) return undefined;
+              if (cachedTick !== state.tick) {
+                cachedTick = state.tick;
+                const cart = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt || 0);
+                const fwd = (window.EntityLod && EntityLod.forwardAxis)
+                  ? EntityLod.forwardAxis() : '+Y';
+                const yaw = (window.EntityLod && EntityLod.modelYawOffset)
+                  ? EntityLod.modelYawOffset(d) : 0;
+                cachedQ = TargetMotion.orientationQuat(
+                  cart, Cesium.Math.toRadians((s.heading || 0) + yaw), 0, 0,
+                  fwd, new Cesium.Quaternion());
+              }
+              return cachedQ;
+            };
+          })(def), false)
+        : undefined,
       billboard: {
         image: Symbology.symbolUri(def.icon, def.affiliation),
         // **固定屏幕尺寸**：34 CSS px，不随相机缩放（去掉 scaleByDistance）。
@@ -2528,7 +2557,11 @@ function attachMotionAndFx(data) {
     try { TargetCollision.init(viewer, data, targetFxApi()); }
     catch (e) { console.warn("[collision] 初始化失败：", e); }
   }
-  if (window.TargetMotion) {
+  // 实时推演案例不走 CZML：它的帧是逐秒追加的，一次性编译的采样会永远停在
+  // 案例旧轨迹上。实体位置/姿态改用 createTargetEntities 里的逐帧 Callback，
+  // 与推演进度同步；成品回放（?run=）与演示端仍走 CZML。
+  if (window.TargetMotion &&
+      !(window.BattleTimeline && BattleTimeline.liveCase())) {
     TargetMotion.load(viewer, data).then(function (st) {
       if (!st || state.data !== data) return;
       markScene('czml-ready');
@@ -3486,12 +3519,25 @@ function updateInferenceUi() {
     Overview.updateSituation(state.data, state.tick);
   }
   if (!inf) {
-    if (dom.rlValue) dom.rlValue.textContent = '—';
-    if (dom.rlNote) dom.rlNote.textContent = '未加载推理结果';
+    if (dom.rlValue) {
+      dom.rlValue.textContent = '—';
+      dom.rlValue.className = 'rl-value';
+    }
+    // 没有推理帧时这三项也没有内容；不清理会把上一案例的意图/阶段徽标留在右栏。
+    if (dom.rlIntent) dom.rlIntent.textContent = '';
+    if (dom.rlPhase) dom.rlPhase.textContent = '';
+    // 实时推演没有推理帧，但说明行归 battleTimeline.js 管（推演状态/已发生时长）；
+    // 这里再写"未加载推理结果"会把它覆盖掉。
+    if (dom.rlNote &&
+        !(window.BattleTimeline && BattleTimeline.ownsTransport())) {
+      dom.rlNote.textContent = '未加载推理结果';
+    }
     // 没有推理帧时整体TS栏仍然渲染，只是战损估计停在"未受高告警"的正常档。
     if (window.StatusPanels && dom.overallBody && state.data) {
       StatusPanels.renderOverall(dom.overallBody, state.data, null, state.tick);
     }
+    // 实时引擎帧自带 unit_phase/strength，选中目标面板必须随 tick 刷新。
+    if (state.selected) renderTargetStatus(state.selected);
     return;
   }
 
@@ -3506,7 +3552,10 @@ function updateInferenceUi() {
     dom.rlValue.textContent = lv + ' 级 · ' + inf.overall.level_label;
     dom.rlValue.className = 'rl-value ' + (LEVEL_CLASS[lv] || '');
   }
-  if (dom.rlNote) dom.rlNote.textContent = noteText;
+  if (dom.rlNote &&
+      !(window.BattleTimeline && BattleTimeline.ownsTransport())) {
+    dom.rlNote.textContent = noteText;
+  }
 
   // 整体TS栏：红蓝双方各类型目标的整体战损状态（图标 + 紧贴底部的血条）。
   // 只更新既有 DOM 的档位/血量，结构在案例切换时才重建——见 statusPanels.js。
@@ -6179,7 +6228,11 @@ function setTick(tick) {
 function setPlaying(on) {
   state.playing = on;
   document.getElementById('btnPlay').textContent = on ? '❚❚ 暂停' : '▶ 播放';
-  document.getElementById('btnRun').textContent = on ? '推演中…' : 'TS自动推演';
+  // 实时模式的「TS自动推演」是开战按钮，文案由 battleTimeline.js 管；
+  // 播放/暂停时不能被改成"推演中…"。
+  if (!(window.BattleTimeline && BattleTimeline.ownsTransport())) {
+    document.getElementById('btnRun').textContent = on ? '推演中…' : 'TS自动推演';
+  }
 }
 
 function loop(nowMs) {

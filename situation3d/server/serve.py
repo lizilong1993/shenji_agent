@@ -322,10 +322,12 @@ def _live_json(path, default=None):
 
 
 def _live_frames(run_dir, cursor):
-    """Return (frames after cursor, frame_count deliverable).
+    """Return (frames after cursor, deliverable count, total idx entries).
 
     A trailing idx entry without a complete JSON line means the writer is still
-    in the middle of a tick; the frame is simply not returned yet.
+    in the middle of a tick; the frame is simply not returned yet. ``frame_total``
+    lets the client tell that apart from "the runner restarted and truncated
+    the file" (count < cursor).
     """
     idx_path = os.path.join(run_dir, "frames.idx")
     data_path = os.path.join(run_dir, "frames.jsonl")
@@ -333,7 +335,7 @@ def _live_frames(run_dir, cursor):
         with open(idx_path, "rb") as fh:
             raw = fh.read()
     except OSError:
-        return [], 0
+        return [], 0, 0
     offsets = []
     for line in raw.splitlines():
         try:
@@ -348,23 +350,23 @@ def _live_frames(run_dir, cursor):
     if cursor < 0:
         cursor = 0
     if cursor >= total:
-        return [], total if cursor <= total else 0
+        return [], total, total
     try:
         with open(data_path, "rb") as fh:
             fh.seek(offsets[cursor])
             blob = fh.read()
     except OSError:
-        return [], cursor
+        return [], cursor, total
     end = blob.rfind(b"\n")
     if end < 0:
-        return [], cursor
+        return [], cursor, total
     frames = []
     for line in blob[:end].splitlines():
         try:
             frames.append(json.loads(line.decode("utf-8")))
         except ValueError:
             break
-    return frames, cursor + len(frames)
+    return frames, cursor + len(frames), total
 
 
 def _int_param(query, name, default=0):
@@ -1580,7 +1582,7 @@ class Handler(SimpleHTTPRequestHandler):
             except RunError as exc:
                 self._send_json({"error": str(exc)}, 400)
                 return
-            frames, frame_count = _live_frames(
+            frames, frame_count, frame_total = _live_frames(
                 live_dir, _int_param(query, "frames"))
             events_doc = _live_json(os.path.join(live_dir, "events.json")) or {}
             all_events = events_doc.get("events") or []
@@ -1602,11 +1604,13 @@ class Handler(SimpleHTTPRequestHandler):
                 "error": state.get("error") or run.get("error"),
                 "progress": run.get("progress") or {},
                 "tick": state.get("tick"),
+                "epoch": state.get("epoch"),
                 "tick_seconds": config.get("tick_seconds"),
                 "tick_count": config.get("ticks"),
                 "start_time_utc": config.get("scenario_date"),
                 "frames": frames,
                 "frame_count": frame_count,
+                "frame_total": frame_total,
                 "events": all_events[event_cursor:],
                 "event_count": len(all_events),
                 "nodes": nodes_doc.get("nodes") or [],

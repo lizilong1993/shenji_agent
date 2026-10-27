@@ -1205,6 +1205,7 @@ select {
 .tl-tip .tl-tip-meta { color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .tl-tip .tl-tip-desc { margin-top: 4px; }
 .tl-tip .tl-tip-actors { margin-top: 4px; color: var(--text-dim); }
+.tl-tip .tl-tip-extra { margin-top: 3px; padding-top: 3px; border-top: 1px dashed #e4e9ee; }
 
 #tickLabel, #clockLabel { color: var(--text-dim); font-variant-numeric: tabular-nums; }
 

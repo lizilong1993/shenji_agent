@@ -19,6 +19,7 @@
   var ENGINE = null;            // {case_id: true}
   var readyPromise = null;
   var live = null;              // 见 onCaseLoaded()
+  var launchSeq = 0;            // 模块级单调 token：跨 live 实例也不会重复
   var els = {};
   var tipEl = null;
   var markerEls = [];
@@ -28,7 +29,7 @@
   function hmsOf(ms) {
     var d = new Date(ms);
     return pad2(d.getUTCHours()) + ':' + pad2(d.getUTCMinutes()) + ':' +
-      pad2(d.getUTCSeconds());
+      pad2(d.getUTCSeconds()) + 'Z';
   }
   function isoOf(ms) {
     var d = new Date(ms);
@@ -77,29 +78,47 @@
   // ------------------------------------------------------------------------
   // 案例装载：测试端引擎案例进入"待开战"状态
   // ------------------------------------------------------------------------
-  function onCaseLoaded() {
-    var B = bridge();
-    if (!B) return;
+  function resetLiveUi() {
     stopPolling();
     live = null;
     clearMarkers();
+    hideTip();
     if (els.wrap) {
       els.wrap.classList.remove('tl-live');
       els.wrap.classList.add('tl-off');
     }
     if (els.start) els.start.textContent = '';
     if (els.now) els.now.textContent = '';
+    // 离开实时模式后按钮要回到旧文案，否则会一直停在"推演中…/重新推演"。
+    if (els.btnRun) {
+      els.btnRun.textContent = 'TS自动推演';
+      els.btnRun.title = '';
+    }
+  }
 
-    var data = B.state.data;
-    if (!data) return;
+  /**
+   * 在**建实体 / 装载 CZML 之前**调用（applySituationData 里）：
+   * 实时模式必须先把案例自带的旧轨迹截成 tick 0，否则 TargetMotion 会拿
+   * 1441 帧旧数据编译 CZML，画面里目标走的仍是旧预烘焙轨迹。
+   */
+  function prepareCaseData(data) {
+    var B = bridge();
+    if (!B) return false;
+    resetLiveUi();
+    if (!data) return false;
     var caseId = data.case_id || B.state.caseId;
     var runParam = null;
+    var caseParam = null;
     try {
-      runParam = new URLSearchParams(window.location.search).get('run');
+      var qp = new URLSearchParams(window.location.search);
+      runParam = qp.get('run');
+      caseParam = qp.get('case');
     } catch (e) { runParam = null; }
-    if (!HEALTH || HEALTH.mode !== 'test' || !ENGINE || !ENGINE[caseId] ||
-        runParam) {
-      return;                       // 演示端 / 非引擎案例 / 成品回放：保持旧界面
+    if (!HEALTH || HEALTH.mode !== 'test' || !ENGINE || !ENGINE[caseId]) {
+      return false;                 // 演示端 / 非引擎案例：保持旧界面
+    }
+    if (runParam && (!caseParam || caseParam === caseId)) {
+      return false;                 // 本案例的成品回放：保持旧界面
     }
 
     // 载入时刻就是战斗开始时刻：向下取整到秒，引擎与时间轴用同一个锚点。
@@ -117,20 +136,41 @@
       markers: [],
       markerSig: '',
       received: false,
-      following: true
+      following: true,
+      launchToken: 0
     };
 
     // 旧案例自带的 12 小时轨迹不属于这场战斗：只保留初始帧，后续帧全部
     // 来自新推演的 live/ 增量接口。terminal_tick 置空，让 timelineMaxTick
     // 以"已收到的最后一帧"为上界（新帧到达即右端生长）。
-    if (data.frames && data.frames.length > 1) data.frames.length = 1;
+    if (data.frames && Array.isArray(data.frames) && data.frames.length > 1) {
+      data.frames.length = 1;
+    }
     data.events = [];
     data.nodes = [];
     data.terminal_tick = null;
     data.start_time_utc = new Date(startMs).toISOString();
+    // 引擎实时帧带 strength/status；TargetStatus 只在 engine_run 下读它们，
+    // 否则整体TS/血条会一直按"100% 完好"画。旧案例的 provenance 可能只是
+    // 一个字符串（如 "simulated"），先包成对象再写 runtime。
+    if (!data.provenance || typeof data.provenance !== 'object') {
+      data.provenance = { source: data.provenance || '' };
+    }
+    data.provenance.runtime = 'engine_run';
+    return true;
+  }
+
+  /** 实体建好后（applySituationData 末尾）完成实时模式的时间轴初始化。 */
+  function onCaseLoaded() {
+    var B = bridge();
+    if (!B) return;
+    var data = B.state.data;
+    if (!live || !data || (data.case_id || B.state.caseId) !== live.caseId) {
+      resetLiveUi();
+      return;
+    }
     var nav = document.getElementById('nodeNav');
     if (nav) nav.style.display = 'none';
-
     if (els.wrap) {
       els.wrap.classList.add('tl-live');
       els.wrap.classList.remove('tl-off');
@@ -142,8 +182,38 @@
     els.timeline.style.setProperty('--tl-progress', '0%');
     render();
     setButton('idle');
-    B.setStatus('已载入「' + (data.case_name || '') +
-      '」：点击「TS自动推演」开始战斗', 'ok');
+    // applySituationData 末尾会 setStatus('', 'ok') 把这条提示盖掉；
+    // 放到下一轮任务里写，保证用户能看到"点按钮开始"的引导。
+    setTimeout(function () {
+      B.setStatus('已载入「' + (data.case_name || '') +
+        '」：点击「TS自动推演」开始战斗', 'ok');
+    }, 0);
+  }
+
+  /** 重新推演前清掉上一场的帧/节点，避免旧战斗在新 run 失败时继续显示。 */
+  function resetBattleView() {
+    var B = bridge();
+    var data = B.state.data;
+    if (!data || !live) return;
+    if (Array.isArray(data.frames) && data.frames.length > 1) {
+      data.frames.length = 1;
+    }
+    data.terminal_tick = null;
+    data.events = [];
+    data.nodes = [];
+    live.events = [];
+    live.nodes = [];
+    live.markers = [];
+    live.markerSig = '';
+    live.received = false;
+    live.following = true;
+    clearMarkers();
+    B.state.tick = 0;
+    B.state.tickFloat = 0;
+    B.setTick(0);
+    B.renderTargetCounts();
+    B.updateInferenceUi();
+    render();
   }
 
   // ------------------------------------------------------------------------
@@ -153,9 +223,12 @@
     if (!live) return;
     if (activeStatus(live.status)) return;
     var B = bridge();
+    var token = ++launchSeq;
+    live.launchToken = token;
     live.status = 'starting';
     setButton('starting');
     B.setStatus('正在启动引擎推演…');
+    render();
     fetch('/api/sim/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -170,22 +243,28 @@
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (body) {
         if (!r.ok) {
-          throw new Error(body && body.error ? body.error : ('HTTP ' + r.status));
+          var err = new Error(body && body.error ? body.error : ('HTTP ' + r.status));
+          err.status = r.status;
+          throw err;
         }
         return body;
       });
     }).then(function (body) {
-      if (!live) return;
+      if (!live || live.launchToken !== token) return;
+      // 只有服务端接受了新推演才清掉上一场，POST 失败时旧战斗仍可回看。
+      resetBattleView();
       live.runId = body.run_id;
       live.status = body.status || 'queued';
       setButton('running');
       B.setStatus('推演已排队：' + live.runId);
+      render();
       startPolling();
     }).catch(function (err) {
-      if (!live) return;
+      if (!live || live.launchToken !== token) return;
       live.status = 'failed';
       setButton('failed');
       B.setStatus('启动推演失败：' + err.message, badStatus());
+      render();
     });
   }
 
@@ -221,7 +300,9 @@
     fetch(url, { cache: 'no-store' }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (body) {
         if (!r.ok) {
-          throw new Error(body && body.error ? body.error : ('HTTP ' + r.status));
+          var err = new Error(body && body.error ? body.error : ('HTTP ' + r.status));
+          err.status = r.status;
+          throw err;
         }
         return body;
       });
@@ -229,9 +310,30 @@
       adopt(body);
     }).catch(function (err) {
       if (!live) return;
+      if (err.status === 404) {
+        // run 被清理/删除：继续重试只会永远停在"推演中"。
+        stopPolling();
+        live.status = 'failed';
+        setButton('failed');
+        B.setStatus('推演记录不存在或已被清理', badStatus());
+        render();
+        return;
+      }
       B.setStatus('读取推演进度失败：' + err.message, badStatus());
       if (activeStatus(live.status)) schedule(3000);
     });
+  }
+
+  /** 运行器重启/同一 run 被重跑：丢掉已收帧与事件，下一轮从 0 重取。 */
+  function dropLiveFrames(data) {
+    live.received = false;
+    live.events = [];
+    live.nodes = [];
+    live.markers = [];
+    live.markerSig = '';
+    data.frames = (data.frames || []).slice(0, 1);
+    data.terminal_tick = null;
+    clearMarkers();
   }
 
   function adopt(d) {
@@ -248,6 +350,25 @@
 
     var frames = d.frames || [];
     var oldFrontier = (data.frames || []).length - 1;
+    // 同一 run_id 重启会从头写文件：epoch 变了就整体重取，避免新旧两场
+    // 在帧数相同/反超时被拼在一起。
+    if (d.epoch) {
+      if (live.epoch && d.epoch !== live.epoch) {
+        dropLiveFrames(data);
+        live.epoch = d.epoch;
+        schedule(0);
+        return;
+      }
+      live.epoch = d.epoch;
+    }
+    // 运行器重启/文件被截短：服务端会返回 frame_count < 已收到的帧数（此时
+    // frames 可能为空）。必须在拼接之前判断并整体重取，否则游标永远卡在旧长度。
+    if (live.received && typeof d.frame_count === 'number' &&
+        d.frame_count < (data.frames || []).length) {
+      dropLiveFrames(data);
+      schedule(0);
+      return;
+    }
     if (!live.received) {
       if (frames.length) {
         // 第一包用运行库的初始帧整体替换（同一批目标 id，场景已按案例建好）。
@@ -259,16 +380,6 @@
         B.setTick(0);
       }
     } else if (frames.length) {
-      if (live.received && typeof d.frame_count === 'number' &&
-          d.frame_count < (data.frames || []).length) {
-        // 运行器重启后文件被截短：丢掉旧帧，下一轮从 0 重新取。
-        live.received = false;
-        live.events = [];
-        live.nodes = [];
-        data.frames = (data.frames || []).slice(0, 1);
-        schedule(0);
-        return;
-      }
       for (var i = 0; i < frames.length; i++) data.frames.push(frames[i]);
     }
     if (d.events && d.events.length) {
@@ -287,13 +398,18 @@
     render();
 
     var frontier = Math.max(0, ((data.frames || []).length - 1));
-    if (s.tick > frontier) B.setTick(frontier);
+    if (s.tick > frontier) {
+      B.setTick(frontier);
+      B.renderTargetCounts();
+      B.updateInferenceUi();
+    }
     if (live.following && !s.playing && frontier > oldFrontier &&
         s.tick >= oldFrontier) {
       // 用户本来就站在"当前时刻"上：随推演推进把视点带到新的右端。
-      // （步进按钮的监听先于 app.js 执行，s.tick 的实时比较比 following
-      //   标志更可靠，避免"刚点后退却被新帧拽回前沿"。）
+      // 与 app.js 的正常推进路径一致，补刷依赖 tick 的面板（鸟瞰/整体TS）。
       B.setTick(frontier);
+      B.renderTargetCounts();
+      B.updateInferenceUi();
       render();
     }
 
@@ -320,7 +436,7 @@
     }
   }
 
-  function badStatus() { return 'bad'; }
+  function badStatus() { return 'err'; }
 
   // ------------------------------------------------------------------------
   // 时间轴渲染
@@ -362,6 +478,8 @@
     if (live.status === 'completed') {
       note.textContent = '引擎推演结束：可回放已发生的 ' +
         elapsedOf(totalMs) + ' 战斗过程';
+    } else if (live.status === 'waiting_resources') {
+      note.textContent = '推演等待资源：请到推演控制台处理资源缺口';
     } else if (activeStatus(live.status)) {
       note.textContent = '引擎实时推演中：已发生 ' + elapsedOf(totalMs) +
         '，只能查看该时刻之前的过程';
@@ -401,9 +519,8 @@
       else if (e.type === 'objective_progress') { kind = 'objective'; title = '占领变化'; }
       if (!kind) return;
       var tick = Number(e.tick) || 0;
-      // 同一 tick 已有精选节点（首次毁伤/首次夺控）时不再重复标事件；
-      // 其余同 tick 的多个毁伤各自保留（用事件 id 作键）。
-      if (seen[tick + '|' + kind]) return;
+      // 精选节点所在 tick 的其它毁伤/占领不丢弃：它们会作为近距事件并入
+      // 该节点的悬停卡片（renderMarkers 的像素合并），不会多画一个点。
       add({
         tick: tick,
         kind: kind,
@@ -457,18 +574,27 @@
     if (!markerEls.length) return;
     var width = els.markers.clientWidth || 0;
     var lastX = -100;
+    var lastIdx = -1;
+    markerEls.forEach(function (btn, i) {
+      btn._extras = [];
+    });
     markerEls.forEach(function (btn, i) {
       var m = live.markers[i];
       if (!m || totalMs <= 0) { btn.style.display = 'none'; return; }
       var atMs = m.tick * live.tickSeconds * 1000;
       if (atMs > totalMs + 1) { btn.style.display = 'none'; return; }
       var pct = Math.max(0, Math.min(100, (atMs / totalMs) * 100));
-      // 按像素而不是百分比判重：时间轴很长时 1% 可能是十几分钟，
-      // 按百分比会把"同一时段的多个毁伤"整片吞掉。8px 内只留一个圆点，
-      // 其余信息仍在事件数据里（悬停卡片只展示最靠左的那个）。
+      // 按像素而不是百分比判重：时间轴很长时 1% 可能是十几分钟。
+      // 8px 内的事件不再各画一个点，而是并入左邻圆点的悬停卡片，
+      // 保证"首次交火 + 首次毁伤"这类同 tick 节点都能看到。
       var x = width ? (pct / 100) * width : pct;
-      if (x - lastX < 8) { btn.style.display = 'none'; return; }
+      if (x - lastX < 8) {
+        if (lastIdx >= 0) markerEls[lastIdx]._extras.push(m);
+        btn.style.display = 'none';
+        return;
+      }
       lastX = x;
+      lastIdx = i;
       btn.style.display = '';
       btn.style.left = pct.toFixed(2) + '%';
     });
@@ -489,6 +615,11 @@
       esc(elapsedOf(m.tick * live.tickSeconds * 1000)) + '</div>';
     if (m.desc) html += '<div class="tl-tip-desc">' + esc(m.desc) + '</div>';
     if (actors) html += '<div class="tl-tip-actors">' + esc(actors) + '</div>';
+    var extras = (markerEls[i] && markerEls[i]._extras) || [];
+    extras.forEach(function (x) {
+      html += '<div class="tl-tip-extra">＋ ' + esc(x.title) +
+        (x.desc ? '：' + esc(x.desc) : '') + '</div>';
+    });
     return html;
   }
 
@@ -575,10 +706,13 @@
     document.body.appendChild(tipEl);
 
     els.timeline.addEventListener('input', onUserSeek);
+    // 步进按钮的 click 监听先于 app.js 注册：现在滑块值还是点击前的，
+    // 放到 setTimeout(0) 里等 app 改完 tick/value 再判断是否还站在右端。
+    function deferredSeek() { setTimeout(onUserSeek, 0); }
     var prev = $('btnStepBack');
     var next = $('btnStepFwd');
-    if (prev) prev.addEventListener('click', onUserSeek);
-    if (next) next.addEventListener('click', onUserSeek);
+    if (prev) prev.addEventListener('click', deferredSeek);
+    if (next) next.addEventListener('click', deferredSeek);
     var play = $('btnPlay');
     if (play) {
       play.addEventListener('click', function () {
@@ -599,9 +733,26 @@
     ready: ready,
     ownsTransport: function () { return !!live; },
     isLiveCase: function () { return !!live; },
+    liveCase: function () { return !!live; },
+    prepareCaseData: prepareCaseData,
     onCaseLoaded: onCaseLoaded,
     launch: launch,
-    render: render
+    render: render,
+    // 只读取证：自检脚本确认轮询/终态时不必再去猜闭包里的状态。
+    debug: function () {
+      if (!live) return null;
+      var B = bridge();
+      return {
+        caseId: live.caseId,
+        runId: live.runId,
+        status: live.status,
+        received: live.received,
+        launchToken: live.launchToken,
+        polling: !!live.timer,
+        frames: ((B.state.data && B.state.data.frames) || []).length,
+        events: live.events.length
+      };
+    }
   };
 
   if (document.readyState === 'loading') {

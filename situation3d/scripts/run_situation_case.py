@@ -313,12 +313,19 @@ def _event_base(ev_id, tick, stage_id, kind, actors, location, desc,
 
 
 def _convert_events(world, uid_to_cid, frames, tick_seconds, tick_count, stages):
+    # 每帧建一次 id→位置索引。原先每个事件都线性扫一遍该帧的 targets，
+    # 推演中每 10 tick 重算一次事件表时是 O(帧 × 目标 × 事件)，长推演里
+    # 会明显拖慢（评审实测 2000 事件约 27 ms/次且随事件数增长）。
+    pos_index = {}
+
     def pos(tick, cid):
         t = max(0, min(int(tick), len(frames) - 1))
-        for row in frames[t]["targets"]:
-            if row["id"] == cid:
-                return (row["lon"], row["lat"])
-        return None
+        table = pos_index.get(t)
+        if table is None:
+            table = {row["id"]: (row["lon"], row["lat"])
+                     for row in frames[t]["targets"]}
+            pos_index[t] = table
+        return table.get(cid)
 
     def uid(cid):
         return uid_to_cid.get(int(cid))
@@ -524,6 +531,9 @@ class LiveRunWriter:
         self._offset = 0
         self.frame_count = 0
         self.last_tick = 0
+        # 同一 run_id 被重启时文件会从头写；epoch 让查看器能区分"新一场"
+        # 与"同一场的增量"，不必依赖帧数是否已反超旧游标。
+        self.epoch = str(time.time_ns())
 
     def meta(self, doc):
         _atomic_write_json(os.path.join(self.dir, "meta.json"), doc)
@@ -552,6 +562,7 @@ class LiveRunWriter:
             "tick": int(tick),
             "status": status,
             "frame_count": self.frame_count,
+            "epoch": self.epoch,
             "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
         if events is not None:
@@ -910,9 +921,12 @@ def main(argv=None):
                      engine_commit=engine_commit, envpack_hash=envpack_hash,
                      resources=summary, resource_gaps=[])
     t_start = time.time()
-    live = LiveRunWriter(store, args.case, run_id)
-    live.publish(0, "running")
+    # writer 放在 try 内：磁盘/权限导致创建失败时也必须走 fail_run，
+    # 不能把 run.json 永远留在 running。
+    live = None
     try:
+        live = LiveRunWriter(store, args.case, run_id)
+        live.publish(0, "running")
         world = build_world(scenario, {}, seed=args.seed, dt_s=tick_seconds,
                             envpack=envpack)
         uid_to_cid = {}
@@ -952,6 +966,7 @@ def main(argv=None):
         frames = []
         step_ms = []
         travelled = {cid: 0.0 for cid in meta}
+        last_raw_events = -1
         for tick in range(tick_count + 1):
             if tick > 0:
                 t0 = time.perf_counter()
@@ -1009,13 +1024,21 @@ def main(argv=None):
             frames.append(frame)
             live.append_frame(frame)
             if tick and tick % LIVE_EVERY_TICKS == 0:
-                events_now = _convert_events(world, uid_to_cid, frames,
-                                             tick_seconds, tick_count,
-                                             cm.get("stages") or [])
-                nodes_now = _nodes(events_now, tick_count,
-                                   cm.get("phases") or [],
-                                   include_terminal=False)["nodes"]
-                live.publish(tick, "running", events=events_now, nodes=nodes_now)
+                # 事件/节点只在原始事件表真的变化时重算与重写；没有新事件时
+                # 只更新 state 的 tick 游标，避免整表 JSON 空转。
+                raw_events = len(world.events)
+                if raw_events != last_raw_events:
+                    events_now = _convert_events(world, uid_to_cid, frames,
+                                                 tick_seconds, tick_count,
+                                                 cm.get("stages") or [])
+                    nodes_now = _nodes(events_now, tick_count,
+                                       cm.get("phases") or [],
+                                       include_terminal=False)["nodes"]
+                    live.publish(tick, "running", events=events_now,
+                                 nodes=nodes_now)
+                    last_raw_events = raw_events
+                else:
+                    live.publish(tick, "running")
                 store.update_run(args.case, run_id,
                                  progress={"tick": tick, "ticks": tick_count,
                                            "events": len(world.events)})
@@ -1136,6 +1159,14 @@ def main(argv=None):
                    "losses": losses, "elapsed_s": summary["elapsed_s"],
                    "step_ms_p95": summary["step_ms_p95"],
                    "trajectory_mb": round(len(trajectory_bytes) / 1048576.0, 1)}
+        # 先发布终态快照，再写 run.json：否则轮询端可能先看到 run.json=completed
+        # 而停止轮询，拿不到 terminal 节点与最后一批事件。快照写失败不影响推演
+        # 完成本身——trajectory.json 才是权威产物。
+        try:
+            live.publish(tick_count, "completed", events=events,
+                         nodes=nodes["nodes"])
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
         store.complete_run(
             args.case, run_id,
             {"scenario.json": scenario_bytes,
@@ -1145,16 +1176,23 @@ def main(argv=None):
              "nodes.json": json.dumps(nodes, ensure_ascii=False, indent=1).encode("utf-8"),
              "summary.json": json.dumps(summary, ensure_ascii=False, indent=1).encode("utf-8")},
             metrics=metrics, validation=validation)
-        live.publish(tick_count, "completed", events=events,
-                     nodes=nodes["nodes"])
         live.close()
         print(json.dumps({"run_id": run_id, "metrics": metrics,
                           "validation": validation}, ensure_ascii=False, indent=1))
         return 0
     except Exception as exc:  # noqa: BLE001
-        live.publish(live.last_tick, "failed",
-                     error="%s: %s" % (type(exc).__name__, exc))
-        live.close()
+        # 失败时的 live 快照是"尽力而为"：写不进去也不能挡住 fail_run，
+        # 否则 run.json 会停在 running，后续发起推演会被 active 槽位拒绝。
+        if live is not None:
+            try:
+                live.publish(live.last_tick, "failed",
+                             error="%s: %s" % (type(exc).__name__, exc))
+            except Exception:  # noqa: BLE001
+                traceback.print_exc()
+            try:
+                live.close()
+            except Exception:  # noqa: BLE001
+                traceback.print_exc()
         store.fail_run(args.case, run_id, "%s: %s" % (type(exc).__name__, exc),
                        traceback.format_exc())
         raise

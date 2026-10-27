@@ -174,6 +174,7 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(len(body["frames"]), 3)
         self.assertEqual(body["frames"][2]["tick"], 2)
         self.assertEqual(body["frame_count"], 3)
+        self.assertEqual(body["frame_total"], 3)
         self.assertEqual(len(body["events"]), 2)
         self.assertEqual(body["event_count"], 2)
         self.assertEqual(body["nodes"][0]["type"], "first_destroy")
@@ -184,6 +185,50 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual([f["tick"] for f in body["frames"]], [2])
         self.assertEqual([e["id"] for e in body["events"]], ["O-2"])
+
+    def test_live_half_written_frame_is_not_returned(self):
+        # idx 先写、行数据后写：读到"指向尚未写完行"的偏移时必须只返回
+        # 已经完整的那几帧，且 frame_total 仍报出真实条数。
+        live = os.path.join(self.runs, CASE, self.rid, "live")
+        os.makedirs(live, exist_ok=True)
+        lines, offs, blob = [], [], b""
+        for tick in range(3):
+            line = (json.dumps({"tick": tick, "targets": []}) + "\n").encode("utf-8")
+            lines.append(line)
+            offs.append(len(blob))
+            blob += line
+        with open(os.path.join(live, "frames.jsonl"), "wb") as fh:
+            fh.write(lines[0] + lines[1])          # 第三帧还没写完
+        with open(os.path.join(live, "frames.idx"), "wb") as fh:
+            fh.write("".join("%d\n" % o for o in offs).encode("ascii"))
+        port = self._start("test")
+        base = "/api/sim/runs/%s/live?case_id=%s" % (self.rid, CASE)
+        status, body = request(port, base + "&frames=0")
+        self.assertEqual(status, 200)
+        self.assertEqual([f["tick"] for f in body["frames"]], [0, 1])
+        self.assertEqual(body["frame_count"], 2)
+        self.assertEqual(body["frame_total"], 3)
+        status, body = request(port, base + "&frames=2")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["frames"], [])
+        self.assertEqual(body["frame_count"], 2)
+        self.assertEqual(body["frame_total"], 3)
+
+    def test_live_cursor_edges(self):
+        self._write_live()
+        port = self._start("test")
+        base = "/api/sim/runs/%s/live?case_id=%s" % (self.rid, CASE)
+        status, body = request(port, base + "&frames=-5")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body["frames"]), 3)      # 负数按 0 处理
+        status, body = request(port, base + "&frames=999")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["frames"], [])
+        self.assertEqual(body["frame_count"], 3)
+        self.assertEqual(body["frame_total"], 3)
+        status, body = request(port, base + "&events=999")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body["events"]), 2)      # 超界事件游标回到 0
 
     def test_live_prefers_terminal_run_status(self):
         rid = self.store.create_run(CASE, seed=12)
