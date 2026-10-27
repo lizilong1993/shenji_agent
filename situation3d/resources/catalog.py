@@ -70,6 +70,10 @@ KINDS: Dict[str, KindSpec] = {
         "commander_service", "远程指挥模型（可选，离线回退 RuleCommander）",
         "advisory", 0.0, "",
         ("http",)),
+    "satellite_imagery": KindSpec(
+        "satellite_imagery", "卫星影像（Sentinel-2 L2A 真彩色等）",
+        "advisory", 30.0, "s3d.raster.v1",
+        ("sentinel2", "eox-s2")),
     "building_footprints": KindSpec(
         "building_footprints", "建筑轮廓/高度（GBA、Overture 等）",
         "advisory", 365.0, "s3d.vector.v1",
