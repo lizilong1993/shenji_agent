@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./src/style.css">
   <link rel="stylesheet" href="./src/theme.css">
   <link rel="stylesheet" href="./src/intel.css">
+  <link rel="stylesheet" href="./src/imagerySources.css">
 </head>
 <body>
   <header class="topbar">
@@ -24,17 +25,39 @@
         <div id="menuCaseList" class="menu-list" role="menu"></div>
       </div>
 
-      <!-- TS三件套直接挂在顶栏，不再套二级下拉：它们各自只有一个动作，
-           多一层展开反而慢。仍复用 [data-situation-cmd] 委托与 SituationPanel.open()。 -->
-      <button type="button" class="menu-btn" data-situation-cmd="input"
-              title="框选或输入经纬度确定ZC范围，添加目标与图层后生成双方TS">TS注册</button>
-      <button type="button" class="menu-btn" data-situation-cmd="manage"
-              title="查看与编辑当前TS：ZC范围、目标编成、图层">TS管理</button>
-      <button type="button" class="menu-btn" data-situation-cmd="download"
-              title="导出当前帧 / 全帧 CSV / TS定义">TS下载</button>
-
-      <button type="button" id="btnIntel" class="menu-btn"
-              title="统一情报管理：自动情报、人工情报与情报源">情报</button>
+      <!-- 数据管理：TS 三件套与情报统一收进二级菜单，顶栏只留一个入口。
+           各条目沿用原命令（[data-situation-cmd]、#btnIntel），SituationPanel /
+           IntelPanel 的打开逻辑不变；新增“影像数据源”只读展示在线源与案例缓存。 -->
+      <div class="menu">
+        <button id="menuData" type="button" class="menu-btn" aria-haspopup="true"
+                aria-expanded="false" title="TS注册、TS管理、TS下载、情报与影像数据源">
+          数据管理 <span class="caret">▾</span>
+        </button>
+        <div id="menuDataList" class="menu-list menu-list-narrow" role="menu"
+             aria-label="数据管理">
+          <button type="button" class="menu-item" data-situation-cmd="input"
+                  title="框选或输入经纬度确定ZC范围，添加目标与图层后生成双方TS">
+            <span class="mi-head">TS注册</span>
+          </button>
+          <button type="button" class="menu-item" data-situation-cmd="manage"
+                  title="查看与编辑当前TS：ZC范围、目标编成、图层">
+            <span class="mi-head">TS管理</span>
+          </button>
+          <button type="button" class="menu-item" data-situation-cmd="download"
+                  title="导出当前帧 / 全帧 CSV / TS定义">
+            <span class="mi-head">TS下载</span>
+          </button>
+          <div class="menu-sep"></div>
+          <button type="button" id="btnIntel" class="menu-item"
+                  title="统一情报管理：自动情报、人工情报与情报源">
+            <span class="mi-head">情报</span>
+          </button>
+          <button type="button" id="btnImagerySources" class="menu-item"
+                  title="查看在线影像源、Sentinel-2 与案例缓存">
+            <span class="mi-head">影像数据源</span>
+          </button>
+        </div>
+      </div>
 
       <!-- 标绘：**创建**标绘的地方，原先在左栏的「标绘工具」里。
            搬到顶栏的理由：它是"动作"，不是"图层开关"；左栏那个位置要滚过图层管理才看得见，
@@ -295,6 +318,19 @@
     </div>
   </div>
 
+  <!-- 影像数据源：只读展示在线源、Sentinel-2 与案例缓存；获取动作仍走 scripts/resource.py -->
+  <div id="imageryModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="影像数据源">
+    <div class="modal-panel imagery-modal-panel">
+      <div class="modal-head">
+        <div class="modal-tabs">
+          <span class="modal-tab active">影像数据源</span>
+        </div>
+        <button id="imageryClose" type="button" class="modal-close" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body" id="imageryBody"></div>
+    </div>
+  </div>
+
   <!-- 情报管理：自动情报与人工情报统一列表、人工结构化录入、情报源管理 -->
   <div id="intelModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="情报管理">
     <div class="modal-panel intel-modal-panel">
@@ -339,6 +375,7 @@
   <script src="./src/situation.js"></script>
 <script src="./src/plotting.js"></script>
   <script src="./src/intelUi.js"></script>
+  <script src="./src/imagerySources.js"></script>
   <script src="./src/app.js"></script>
 </body>
 </html>

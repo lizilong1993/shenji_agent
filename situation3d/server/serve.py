@@ -1897,6 +1897,7 @@ class Handler(SimpleHTTPRequestHandler):
                     root=_INTEL_ROOT,
                     custom_sources=custom,
                     archive_root=os.path.join(_INTEL_ROOT, "archive"),
+                    firms_map_key=env("FIRMS_MAP_KEY"),
                 )
                 state = {
                     "state": "done",

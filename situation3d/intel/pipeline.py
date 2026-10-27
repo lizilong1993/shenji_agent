@@ -220,7 +220,8 @@ def run_case(case_id: str, profile: CaseIntelProfile, start: Any, end: Any,
              sources: Sequence[str], root: str,
              custom_sources: Optional[Sequence[dict]] = None,
              archive_root: Optional[str] = None,
-             fetcher=None) -> PipelineResult:
+             fetcher=None, firms_map_key: Optional[str] = None
+             ) -> PipelineResult:
     """Collect broadly, clean, analyze, and persist all three artifacts."""
     case_id = _case_key(case_id)
     result = build_bundle(
@@ -233,6 +234,7 @@ def run_case(case_id: str, profile: CaseIntelProfile, start: Any, end: Any,
         custom_sources=custom_sources,
         archive_root=archive_root,
         fetcher=fetcher,
+        firms_map_key=firms_map_key,
         domain="multi",
         filter_observations=False,
     )
