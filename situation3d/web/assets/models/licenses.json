@@ -1,0 +1,332 @@
+{
+  "version": 1,
+  "note": "由 tools/model_license_test.py 从 CREDITS.md 生成；risk 仅提示，不阻断入库。",
+  "assets": {
+    "type_052c.glb": {
+      "source": "Type 052C Destroyer (DCS World)",
+      "author": "KojfDiscord",
+      "license": "CC Attribution",
+      "use": "052C 驱逐舰（用于 052D / 驱逐舰大类近似）",
+      "risk": [
+        "upstream-game-asset"
+      ],
+      "source_url": null
+    },
+    "type_054a.glb": {
+      "source": "Type-054A Class Frigate",
+      "author": "MirzaArrafiERV_45",
+      "license": "CC Attribution",
+      "use": "054A 护卫舰",
+      "risk": [],
+      "source_url": null
+    },
+    "type_071.glb": {
+      "source": "Yuzhao-class landing ship Kunlun Shan",
+      "author": "42manako",
+      "license": "CC Attribution",
+      "use": "071 综合登陆舰",
+      "risk": [],
+      "source_url": null
+    },
+    "type_perry.glb": {
+      "source": "USS Oliver Hazard Perry FFG-7",
+      "author": "MirzaArrafiERV_45",
+      "license": "CC Attribution",
+      "use": "成功级（Perry 级）护卫舰",
+      "risk": [],
+      "source_url": null
+    },
+    "type_j16.glb": {
+      "source": "Su-30MKK with Kh-59M",
+      "author": "Jeyhun1985",
+      "license": "CC Attribution",
+      "use": "歼-16（Su-30MKK 同族近似）",
+      "risk": [],
+      "source_url": null
+    },
+    "type_f16c.glb": {
+      "source": "F-16C Block 50 Custom #5",
+      "author": "Jeyhun1985",
+      "license": "CC Attribution",
+      "use": "F-16C（F-16V 近似）",
+      "risk": [],
+      "source_url": null
+    },
+    "type_idf.glb": {
+      "source": "AIDC F-CK-1B \"Ching-Kuo\" IDF",
+      "author": "jmadden64",
+      "license": "CC Attribution",
+      "use": "IDF 经国号",
+      "risk": [],
+      "source_url": null
+    },
+    "type_rafale.glb": {
+      "source": "Dassault Rafale",
+      "author": "mbooo1",
+      "license": "CC Attribution",
+      "use": "阵风 B",
+      "risk": [],
+      "source_url": null
+    },
+    "type_e2d.glb": {
+      "source": "Grumman E-2D Advanced Hawkeye",
+      "author": "MirzaArrafiERV_45",
+      "license": "CC Attribution",
+      "use": "E-2D（E-2K 近似）",
+      "risk": [],
+      "source_url": null
+    },
+    "type_kj2000.glb": {
+      "source": "KJ-2000 (DCS World)",
+      "author": "KojfDiscord",
+      "license": "CC Attribution",
+      "use": "KJ-2000（空警-500 / 预警机大类近似）",
+      "risk": [
+        "upstream-game-asset"
+      ],
+      "source_url": null
+    },
+    "type_z10.glb": {
+      "source": "Changhe Z-10W",
+      "author": "42manako",
+      "license": "CC Attribution",
+      "use": "直-10",
+      "risk": [],
+      "source_url": null
+    },
+    "type_mq9.glb": {
+      "source": "MQ-9 Reaper Drone – Game Ready Military Asset",
+      "author": "racingrevved",
+      "license": "CC Attribution",
+      "use": "MQ-9（无人机大类）",
+      "risk": [],
+      "source_url": null
+    },
+    "type_ztz99a.glb": {
+      "source": "Type 99 MBT",
+      "author": "philano",
+      "license": "CC Attribution",
+      "use": "99A 主战坦克",
+      "risk": [],
+      "source_url": null
+    },
+    "type_m1a2.glb": {
+      "source": "M1a2",
+      "author": "muhammadvscode",
+      "license": "CC Attribution",
+      "use": "M1A2（M1A2T）",
+      "risk": [],
+      "source_url": null
+    },
+    "type_m48a5.glb": {
+      "source": "M48A5 Patton Medium Tank",
+      "author": "MirzaArrafiERV_45",
+      "license": "CC Attribution",
+      "use": "M48A5 本体",
+      "risk": [],
+      "source_url": null
+    },
+    "type_ztd05.glb": {
+      "source": "[OD]ZTD-05AG AAV 05式改型两栖突击车",
+      "author": "EXcalibur117",
+      "license": "Free Standard",
+      "use": "05 式两栖突击车",
+      "risk": [
+        "sketchfab-free-standard-redistribution"
+      ],
+      "source_url": null
+    },
+    "type_plz05.glb": {
+      "source": "Chinese PLZ-05",
+      "author": "42manako",
+      "license": "CC Attribution",
+      "use": "PLZ-05 自行加榴炮",
+      "risk": [],
+      "source_url": null
+    },
+    "type_m109a6.glb": {
+      "source": "M109A6 Paladin Self-Propelled Howitzer",
+      "author": "MirzaArrafiERV_45",
+      "license": "CC Attribution",
+      "use": "M109A6 自行榴弹炮",
+      "risk": [],
+      "source_url": null
+    },
+    "type_hq9.glb": {
+      "source": "Chinese HQ-9",
+      "author": "42manako",
+      "license": "CC Attribution",
+      "use": "红旗-9 防空系统",
+      "risk": [],
+      "source_url": null
+    },
+    "type_pac3.glb": {
+      "source": "MIM-104 Patriot Air Defense System",
+      "author": "MirzaArrafiERV_45",
+      "license": "CC Attribution",
+      "use": "爱国者 PAC-3",
+      "risk": [],
+      "source_url": null
+    },
+    "type_phl03.glb": {
+      "source": "PHL-03 03式远程火箭炮系统",
+      "author": "EXcalibur117",
+      "license": "Free Standard",
+      "use": "PHL-03 远程火箭炮",
+      "risk": [
+        "sketchfab-free-standard-redistribution"
+      ],
+      "source_url": null
+    },
+    "type_eq240.glb": {
+      "source": "Dongfeng EQ240/EQ2081",
+      "author": "42manako",
+      "license": "CC Attribution",
+      "use": "东风 EQ240（运输车队）",
+      "risk": [],
+      "source_url": null
+    },
+    "type_056a.glb": {
+      "source": "自建（tools/modelgen/build_custom.py）",
+      "author": "本项目",
+      "license": "项目内部",
+      "use": "056A 型轻型护卫舰",
+      "risk": [],
+      "source_url": null
+    },
+    "type_903.glb": {
+      "source": "自建（tools/modelgen/build_custom.py）",
+      "author": "本项目",
+      "license": "项目内部",
+      "use": "903 型综合补给舰",
+      "risk": [],
+      "source_url": null
+    },
+    "type_panshi.glb": {
+      "source": "自建（tools/modelgen/build_custom.py）",
+      "author": "本项目",
+      "license": "项目内部",
+      "use": "磐石级补给舰",
+      "risk": [],
+      "source_url": null
+    },
+    "type_tuochiang.glb": {
+      "source": "自建（tools/modelgen/build_custom.py）",
+      "author": "本项目",
+      "license": "项目内部",
+      "use": "沱江级巡逻舰",
+      "risk": [],
+      "source_url": null
+    },
+    "type_kidd.glb": {
+      "source": "自建（tools/modelgen/build_custom.py）",
+      "author": "本项目",
+      "license": "项目内部",
+      "use": "基隆级（Kidd）驱逐舰",
+      "risk": [],
+      "source_url": null
+    },
+    "type_hq16.glb": {
+      "source": "自建（tools/modelgen/build_custom.py）",
+      "author": "本项目",
+      "license": "项目内部",
+      "use": "红旗-16 发射车",
+      "risk": [],
+      "source_url": null
+    },
+    "type_yj62.glb": {
+      "source": "自建（tools/modelgen/build_custom.py）",
+      "author": "本项目",
+      "license": "项目内部",
+      "use": "鹰击-62 岸舰导弹发射车",
+      "risk": [],
+      "source_url": null
+    },
+    "type_m777.glb": {
+      "source": "[M777 howitzer](https://sketchfab.com/models/2a2c381888ef4e4790ed883cddda0aca)",
+      "author": "miloschnack",
+      "license": "CC Attribution",
+      "use": "M777 超轻型榴弹炮（展开射击状态，含 2 发炮弹）",
+      "risk": [],
+      "source_url": "https://sketchfab.com/models/2a2c381888ef4e4790ed883cddda0aca"
+    },
+    "type_075.glb": {
+      "source": "自建（tools/modelgen/build_custom.py `build_075()`）",
+      "author": "本项目",
+      "license": "项目内部",
+      "use": "075 两栖攻击舰（近似）",
+      "risk": [],
+      "source_url": null
+    },
+    "type_kj500.glb": {
+      "source": "KJ-2000 (DCS World) 缩比近似",
+      "author": "KojfDiscord",
+      "license": "CC Attribution",
+      "use": "空警-500（近似）",
+      "risk": [
+        "upstream-game-asset"
+      ],
+      "source_url": null
+    },
+    "type_ztq15.glb": {
+      "source": "Type 99 MBT 缩比近似",
+      "author": "philano",
+      "license": "CC Attribution",
+      "use": "15 式轻型坦克（近似）",
+      "risk": [],
+      "source_url": null
+    },
+    "type_055.glb": {
+      "source": "[Type-055 Destroyer](https://sketchfab.com/models/f0a96b2475da407eb6ea2b430ba9ea85)",
+      "author": "hrd4588",
+      "license": "CC Attribution",
+      "use": "055 型驱逐舰",
+      "risk": [],
+      "source_url": "https://sketchfab.com/models/f0a96b2475da407eb6ea2b430ba9ea85"
+    },
+    "type_p3c.glb": {
+      "source": "[Lockheed P-3C 2 \"Orion\"](https://sketchfab.com/models/be11ab6c970741d78e62c9d8ff2e33e8)（模型 by mandun/3D Warehouse，来源链待核）",
+      "author": "ammardhamiri1",
+      "license": "CC Attribution",
+      "use": "P-3C 反潜巡逻机",
+      "risk": [
+        "provenance-unclear"
+      ],
+      "source_url": "https://sketchfab.com/models/be11ab6c970741d78e62c9d8ff2e33e8"
+    },
+    "type_ah64e.glb": {
+      "source": "[Boeing AH-64D Apache Combat Helicopter](https://sketchfab.com/models/c3b58008c46b45048fdd7dd283a3c8c8)",
+      "author": "MirzaArrafiERV_45",
+      "license": "CC Attribution",
+      "use": "AH-64E 近似",
+      "risk": [],
+      "source_url": "https://sketchfab.com/models/c3b58008c46b45048fdd7dd283a3c8c8"
+    },
+    "type_j20.glb": {
+      "source": "[Chengdu J-20 fighter](https://sketchfab.com/models/735da22f59d04542b5b33e5b8fd699b1)",
+      "author": "miopass",
+      "license": "CC Attribution",
+      "use": "J-20",
+      "risk": [],
+      "source_url": "https://sketchfab.com/models/735da22f59d04542b5b33e5b8fd699b1"
+    },
+    "type_m60a3.glb": {
+      "source": "[M60A3 Patton Medium Tank - Toshueyi](https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803)",
+      "author": "jonathanto99",
+      "license": "CC Attribution",
+      "use": "M60A3 / CM-11 近似",
+      "risk": [],
+      "source_url": "https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803"
+    },
+    "type_himars.glb": {
+      "source": "[Ukrainian M142 HIMARS](https://sketchfab.com/models/95d255cd685e4cc5afc35ba5f58679d4)（作者注明 Not my model）",
+      "author": "42manako",
+      "license": "CC Attribution",
+      "use": "M142 HIMARS",
+      "risk": [
+        "provenance-unclear"
+      ],
+      "source_url": "https://sketchfab.com/models/95d255cd685e4cc5afc35ba5f58679d4"
+    }
+  }
+}

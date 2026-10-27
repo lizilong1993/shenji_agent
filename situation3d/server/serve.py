@@ -97,6 +97,12 @@ COMPRESSIBLE = ("application/json", "application/javascript", "text/html",
 IMMUTABLE_PREFIXES = ("/tiles/", "/vendor/", "/tiles_db/", "/tdt/", "/tiles3d/")
 IMMUTABLE_MAX_AGE = 7 * 24 * 3600
 
+# Target model / FX assets: re-exported in place, so not immutable, but an
+# hour-long cache stops every reload from re-downloading the 30+ GLBs.
+# ETag/Last-Modified still revalidate after the hour.
+ASSET_PREFIXES = ("/assets/models/", "/assets/fx/")
+ASSET_MAX_AGE = 600
+
 # Shared across handler instances. BaseHTTPRequestHandler runs the whole request
 # from inside __init__ (setup -> handle -> finish), so anything assigned after
 # the super().__init__ call does not exist yet when the request is served --
@@ -2187,6 +2193,19 @@ class Handler(SimpleHTTPRequestHandler):
     def _is_immutable(self):
         return self.path.startswith(IMMUTABLE_PREFIXES)
 
+    def _is_asset(self):
+        return self.path.startswith(ASSET_PREFIXES)
+
+    def _response_is_cacheable(self):
+        # send_response() has already put the status line at the head of the
+        # buffer by the time end_headers() runs. Do not attach a long cache to
+        # 404/500 responses (a transient missing GLB would stick for the TTL).
+        try:
+            status = self._headers_buffer[0].decode("latin-1").split(" ")[1]
+            return status in ("200", "304")
+        except Exception:  # noqa: BLE001
+            return False
+
     @staticmethod
     def _etag_for(fs_path, st):
         """Cheap ETag: size + mtime, which is enough for a build-time asset set."""
@@ -2207,6 +2226,8 @@ class Handler(SimpleHTTPRequestHandler):
         if self._is_immutable():
             self.send_header("Cache-Control", "public, max-age=%d, immutable"
                              % IMMUTABLE_MAX_AGE)
+        elif self._is_asset() and self._response_is_cacheable():
+            self.send_header("Cache-Control", "public, max-age=%d" % ASSET_MAX_AGE)
         else:
             self.send_header("Cache-Control", "no-store")
         super().end_headers()

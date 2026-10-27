@@ -76,6 +76,14 @@ eq(L.formClassOf({ domain: 'air', platform_class: '无人机', icon: 'aew' }), '
 const exact = [
   ['052D 型驱逐舰', 'type_052c.glb'],
   ['054A 型护卫舰', 'type_054a.glb'],
+  ['055 型驱逐舰', 'type_055.glb'],
+  ['075 型两栖攻击舰', 'type_075.glb'],
+  ['M60A3 主战坦克', 'type_m60a3.glb'],
+  ['M48H 主战坦克', 'type_m60a3.glb'],
+  ['M142 HIMARS', 'type_himars.glb'],
+  ['歼-20 战斗机', 'type_j20.glb'],
+  ['P-3C 反潜巡逻机', 'type_p3c.glb'],
+  ['AH-64E 阿帕奇', 'type_ah64e.glb'],
   ['903 型综合补给舰', 'type_903.glb'],
   ['071 型综合登陆舰', 'type_071.glb'],
   ['056A 型轻型护卫舰', 'type_056a.glb'],
@@ -85,8 +93,8 @@ const exact = [
   ['磐石级油弹补给舰', 'type_panshi.glb'],
   ['99A 主战坦克', 'type_ztz99a.glb'],
   ['M1A2T 主战坦克', 'type_m1a2.glb'],
-  ['CM-11 主战坦克', 'type_m48a5.glb'],
-  ['15 式轻型坦克', 'type_ztz99a.glb'],
+  ['CM-11 主战坦克', 'type_m60a3.glb'],
+  ['15 式轻型坦克', 'type_ztq15.glb'],
   ['05 式两栖突击车', 'type_ztd05.glb'],
   ['PLZ-05 自行加榴炮', 'type_plz05.glb'],
   ['M109A6 自行榴弹炮', 'type_m109a6.glb'],
@@ -100,7 +108,8 @@ const exact = [
   ['F-16V 战斗机', 'type_f16c.glb'],
   ['IDF 经国号战斗机', 'type_idf.glb'],
   ['阵风战斗机', 'type_rafale.glb'],
-  ['空警-500 预警机', 'type_kj2000.glb'],
+  ['空警-500 预警机', 'type_kj500.glb'],
+  ['KJ-2000 预警机', 'type_kj2000.glb'],
   ['E-2K 预警机', 'type_e2d.glb'],
   ['直-10 武装直升机', 'type_z10.glb'],
   ['中高空长航时无人机', 'type_mq9.glb'],
@@ -129,6 +138,33 @@ for (const url of urls) {
 for (const k of Object.keys(L.MODEL_MAP)) {
   if (L.REAL_LENGTH_M[k] > 0) pass++;
   else failures.push(k + ' 缺少 REAL_LENGTH_M（targetFx 尾流会退化）');
+}
+
+// --- 8c. LOD1 映射 ---
+eq(L.lod1UrlFor({ domain: 'land', model: 'ZTD-05 两栖突击车' }),
+  './assets/models/lod1_ztd05.glb', 'ZTD-05 -> lod1');
+eq(L.lod1UrlFor({ domain: 'land', model: 'EQ240 运输车' }),
+  './assets/models/lod1_eq240.glb', 'EQ240 -> lod1');
+eq(L.lod1UrlFor({ domain: 'sea', model: '071 型船坞登陆舰' }), null, '071 无 lod1');
+eq(L.lod1UrlFor({ domain: 'sea', model: '成功级护卫舰' }),
+  './assets/models/lod1_perry.glb', 'Perry -> lod1');
+eq(L.lod1UrlFor({ domain: 'air', model: '歼-16 多用途战斗机' }),
+  './assets/models/lod1_j16.glb', 'J-16 -> lod1');
+eq(L.lod1UrlFor({ domain: 'air', model: 'KJ-2000 预警机' }),
+  './assets/models/lod1_kj2000.glb', 'KJ-2000 -> lod1');
+eq(L.lod1UrlFor({ domain: 'air', model: 'E-2K 预警机' }),
+  './assets/models/lod1_e2d.glb', 'E-2D -> lod1');
+eq(L.lod1UrlFor({ domain: 'air', model: '空警-500 预警机' }),
+  './assets/models/lod1_kj500.glb', 'KJ-500 -> lod1');
+eq(L.lod1UrlFor({ domain: 'sea', model: '052D 型驱逐舰' }),
+  './assets/models/lod1_052c.glb', '052C/052D -> lod1');
+for (const u of ['./assets/models/lod1_ztd05.glb', './assets/models/lod1_eq240.glb',
+                 './assets/models/lod1_perry.glb', './assets/models/lod1_j16.glb',
+                 './assets/models/lod1_kj2000.glb', './assets/models/lod1_kj500.glb',
+                 './assets/models/lod1_e2d.glb', './assets/models/lod1_052c.glb']) {
+  const fp = path.join(__dirname, '..', 'web', u.replace(/^\.\//, ''));
+  if (fs.existsSync(fp)) pass++;
+  else failures.push('LOD1 文件不存在: ' + fp);
 }
 
 // --- 9. 尺度：资产按米归一，scale 恒为 1 ---

@@ -2161,6 +2161,8 @@ function cameraHeightMeters() {
  * 会让 Cesium 每帧重建这些实体的渲染状态。所以记住上一次的形态，没变就直接返回。
  */
 var lastTargetForm = null;
+// 当前是否使用 LOD1（仅高频模型有）；相机高度 1.2–3 km 时切换。
+var lastTargetModelLod = null;
 // 哪些目标真的挂了 3D 模型。**由 createTargetEntities() 登记**，不去读实体属性猜：
 // 实测 Cesium 的 `entity.model.uri` 读出来是 Property 对象而不是字符串真值，
 // 用它做 `!!` 判断会在首次解算时误判为「没有模型」，表现为「刚进低空时图标和
@@ -2170,7 +2172,7 @@ var targetHasModel = {};
 function applyTargetLod(force) {
   if (!window.EntityLod || !state.data || !state.data.targets) return;
   const d = window.EntityLod.decide(cameraHeightMeters(), lastTargetForm || window.EntityLod.MODE_ICON);
-  if (!force && !d.changed) return;
+  if (!force && !d.changed) { applyTargetModelLod(); return; }
   lastTargetForm = d.mode;
   const useModel = (d.mode === window.EntityLod.MODE_MODEL);
   state.data.targets.forEach(function (def) {
@@ -2190,6 +2192,40 @@ function applyTargetLod(force) {
       applyTargetBillboardAnchor(rec.entity, showModel);
     }
     if (hasModel && rec.entity.model) rec.entity.model.show = showModel && !clustered;
+  });
+  applyTargetModelLod(force);
+}
+
+/** 读取 ModelGraphics.uri 的当前值（它是 Property，不是字符串）。 */
+function targetModelUri(rec) {
+  try {
+    const p = rec && rec.entity && rec.entity.model && rec.entity.model.uri;
+    return p && p.getValue ? p.getValue(viewer.clock.currentTime) : (typeof p === 'string' ? p : null);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * 高频目标的 LOD0/LOD1 切换：相机 1.2–3 km 用 LOD1，低于 1.2 km 用 LOD0。
+ * 只对 EntityLod.lod1UrlFor() 返回非空的资产生效；其他模型始终 LOD0。
+ * 与 2D/3D 形态一起由 camera.changed 的 250 ms 节流调用。
+ */
+function applyTargetModelLod(force) {
+  if (!window.EntityLod || !state.data || !state.data.targets) return;
+  const h = cameraHeightMeters();
+  if (typeof h !== 'number') return;
+  const useLod1 = h > 1200 && h <= 3000;
+  if (!force && useLod1 === lastTargetModelLod) return;
+  lastTargetModelLod = useLod1;
+  state.data.targets.forEach(function (def) {
+    const rec = state.targets[def.id];
+    if (!rec || !rec.entity || !rec.entity.model) return;
+    const url = (useLod1 && window.EntityLod.lod1UrlFor(def)) || window.EntityLod.modelUrlFor(def);
+    if (!url) return;
+    if (targetModelUri(rec) === url) return;
+    // ModelGraphics.uri 是 Property；赋字符串会被 Cesium 包成 ConstantProperty。
+    rec.entity.model.uri = url;
   });
 }
 
@@ -7560,6 +7596,17 @@ function bindUI() {
   applyTargetLod(true);
   setTimeout(function () { applyTargetLod(true); }, 1200);
   setTimeout(function () { applyTargetLod(true); }, 3000);
+  // 程序化 setView（深链/复位/测试）不一定触发 camera.changed；每 500 ms
+  // 兜底比较相机高度，跨阈值时补一次 2D/3D 与 LOD 重算。
+  var lastCameraHeightProbe = cameraHeightMeters();
+  setInterval(function () {
+    if (!state.data) return;
+    var h = cameraHeightMeters();
+    if (typeof h !== 'number') return;
+    if (typeof lastCameraHeightProbe === 'number' && Math.abs(h - lastCameraHeightProbe) < 1) return;
+    lastCameraHeightProbe = h;
+    applyTargetLod(true);
+  }, 500);
 }
 
 // --------------------------------------------------------------------------

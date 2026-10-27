@@ -30,8 +30,8 @@
   'use strict';
 
   var DEFAULTS = {
-    enter3dHeight: 1e9,
-    exit3dHeight: 1e9,
+    enter3dHeight: 3000,
+    exit3dHeight: 3600,
   };
 
   var MODE_ICON = 'icon';
@@ -76,7 +76,7 @@
     boat_speed: './assets/models/type_056a.glb',
     // 地面
     tank: './assets/models/type_ztz99a.glb',
-    light_tank: './assets/models/type_ztz99a.glb',
+    light_tank: './assets/models/type_ztq15.glb',
     amphibious_vehicle: './assets/models/type_ztd05.glb',
     spg: './assets/models/type_plz05.glb',
     howitzer: './assets/models/type_m777.glb',
@@ -100,7 +100,9 @@
     // 水面舰
     [/054a/i, 'type_054a'],
     [/903|综合补给/i, 'type_903'],
+    [/075|两栖攻击|lhd/i, 'type_075'],
     [/071|船坞登陆/i, 'type_071'],
+    [/055|renhai|南昌/i, 'type_055'],
     [/056a|轻型护卫|江岛/i, 'type_056a'],
     [/成功级|perry|佩里/i, 'type_perry'],
     [/沱江|tuo.?chiang|ta.?chiang/i, 'type_tuochiang'],
@@ -109,10 +111,12 @@
     // 052D 无公开可下载资产，用同族 052C 近似（文中注释、README 同步说明）
     [/052d|luyang.?iii/i, 'type_052c'],
     // 地面
+    [/15\s*式|ztq-?15/i, 'type_ztq15'],
     [/99a|ztz-?99/i, 'type_ztz99a'],
     [/m1a2/i, 'type_m1a2'],
-    [/cm-?11|m48/i, 'type_m48a5'],
-    [/15\s*式|type.?15|ztq-?15/i, 'type_ztz99a'],
+    [/m60a?3/i, 'type_m60a3'],
+    [/cm-?11|m48h/i, 'type_m60a3'],
+    [/m48/i, 'type_m48a5'],
     [/05\s*式|ztd-?05|zbd-?05/i, 'type_ztd05'],
     [/plz-?05/i, 'type_plz05'],
     [/m109/i, 'type_m109a6'],
@@ -122,15 +126,19 @@
     [/红旗-?16|hq-?16|ly-?80/i, 'type_hq16'],
     [/爱国者|patriot|pac-?3/i, 'type_pac3'],
     [/鹰击-?62|yj-?62/i, 'type_yj62'],
+    [/himars|m142|海马斯/i, 'type_himars'],
     [/运输|车队|ural|卡车|truck|eq240|东风/i, 'type_eq240'],
     // 空中
+    [/歼-?20|j-?20(?!\d)/i, 'type_j20'],
     [/歼-?16|j-?16|su-?30/i, 'type_j16'],
     [/f-?16/i, 'type_f16c'],
     [/idf|经国|f-?ck-?1/i, 'type_idf'],
     [/阵风|rafale/i, 'type_rafale'],
-    // 空警-500 无公开资产，用 KJ-2000（同为中方预警机）近似
-    [/空警-?500|kj-?500/i, 'type_kj2000'],
+    [/kj-?2000|空警-?2000/i, 'type_kj2000'],
+    [/空警-?500|kj-?500/i, 'type_kj500'],
+    [/p-?3c|p-?3\b|orion|猎户座/i, 'type_p3c'],
     [/e-?2|鹰眼|hawkeye/i, 'type_e2d'],
+    [/ah-?64|apache|阿帕奇/i, 'type_ah64e'],
     [/直-?10|z-?10/i, 'type_z10'],
     [/无人机|uav|drone|mq-?9|翼龙|彩虹/i, 'type_mq9'],
     [/直-?9|z-?9|米-?17|mi-?17|黑鹰|uh-?60/i, 'type_z10'],
@@ -239,11 +247,32 @@
   var MODEL_YAW_FIX_DEG = {
     './assets/models/type_ztd05.glb': 180,
     './assets/models/type_eq240.glb': 180,
+    './assets/models/type_p3c.glb': 180,
   };
 
   function modelYawOffset(def) {
     var url = exactModelUrl(def) || modelUrlFor(def);
     return (url && MODEL_YAW_FIX_DEG[url]) || 0;
+  }
+
+  /**
+   * 高频目标的 LOD1（1.2–3 km 相机高度）。只登记确实做了低模的资产；
+   * 其余返回 null，运行时继续用 LOD0。LOD1 与 LOD0 同朝向、同原点。
+   */
+  var LOD1_MAP = {
+    './assets/models/type_ztd05.glb': './assets/models/lod1_ztd05.glb',
+    './assets/models/type_eq240.glb': './assets/models/lod1_eq240.glb',
+    './assets/models/type_perry.glb': './assets/models/lod1_perry.glb',
+    './assets/models/type_j16.glb': './assets/models/lod1_j16.glb',
+    './assets/models/type_kj2000.glb': './assets/models/lod1_kj2000.glb',
+    './assets/models/type_kj500.glb': './assets/models/lod1_kj500.glb',
+    './assets/models/type_e2d.glb': './assets/models/lod1_e2d.glb',
+    './assets/models/type_052c.glb': './assets/models/lod1_052c.glb',
+  };
+
+  function lod1UrlFor(def) {
+    var url = modelUrlFor(def);
+    return (url && LOD1_MAP[url]) || null;
   }
 
   /** 新资产没有可命名的轮节点（轮子烘焙在车身网格里），返回空表。 */
@@ -276,6 +305,7 @@
     formClassOf: formClassOf,
     forwardAxis: forwardAxis,
     modelYawOffset: modelYawOffset,
+    lod1UrlFor: lod1UrlFor,
     wheelNodes: wheelNodes,
     MODEL_MAP: MODEL_MAP,
     TYPE_RULES: TYPE_RULES,

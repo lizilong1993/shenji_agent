@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "note": "公开尺寸为近似值，用于比例核对；width 对舰为舰宽、对飞机为翼展、对车辆为车宽。approx_of 表示资产是另一型号的近似。",
+  "assets": {
+    "type_052c.glb": {
+      "class": "ship_large",
+      "public_length_m": 155.0,
+      "public_width_m": 17.2,
+      "approx_of": "052D",
+      "notes": "052D 用 052C 近似"
+    },
+    "type_054a.glb": {
+      "class": "ship_large",
+      "public_length_m": 134.0,
+      "public_width_m": 16.0
+    },
+    "type_056a.glb": {
+      "class": "ship_small",
+      "public_length_m": 89.0,
+      "public_width_m": 11.1
+    },
+    "type_071.glb": {
+      "class": "ship_large",
+      "public_length_m": 210.0,
+      "public_width_m": 28.0
+    },
+    "type_903.glb": {
+      "class": "ship_small",
+      "public_length_m": 178.5,
+      "public_width_m": 24.8
+    },
+    "type_kidd.glb": {
+      "class": "ship_small",
+      "public_length_m": 171.6,
+      "public_width_m": 16.8
+    },
+    "type_perry.glb": {
+      "class": "ship_large",
+      "public_length_m": 135.6,
+      "public_width_m": 13.7
+    },
+    "type_tuochiang.glb": {
+      "class": "ship_small",
+      "public_length_m": 60.4,
+      "public_width_m": 14.0
+    },
+    "type_panshi.glb": {
+      "class": "ship_small",
+      "public_length_m": 196.0,
+      "public_width_m": 25.5
+    },
+    "type_e2d.glb": {
+      "class": "aircraft_aew",
+      "public_length_m": 17.6,
+      "public_width_m": 24.56
+    },
+    "type_kj2000.glb": {
+      "class": "aircraft_aew",
+      "public_length_m": 46.59,
+      "public_width_m": 50.5,
+      "notes": "KJ-2000 本体；空警-500 使用 type_kj500"
+    },
+    "type_j16.glb": {
+      "class": "aircraft_fighter",
+      "public_length_m": 21.9,
+      "public_width_m": 14.7,
+      "approx_of": "J-16",
+      "notes": "Su-30MKK 近似"
+    },
+    "type_f16c.glb": {
+      "class": "aircraft_fighter",
+      "public_length_m": 15.06,
+      "public_width_m": 9.96,
+      "approx_of": "F-16V"
+    },
+    "type_idf.glb": {
+      "class": "aircraft_fighter",
+      "public_length_m": 14.21,
+      "public_width_m": 9.0
+    },
+    "type_rafale.glb": {
+      "class": "aircraft_fighter",
+      "public_length_m": 15.27,
+      "public_width_m": 10.9
+    },
+    "type_z10.glb": {
+      "class": "rigged",
+      "public_length_m": 14.15,
+      "public_width_m": 12.0
+    },
+    "type_mq9.glb": {
+      "class": "aircraft_fighter",
+      "public_length_m": 11.0,
+      "public_width_m": 20.1
+    },
+    "type_ztz99a.glb": {
+      "class": "ground_tank",
+      "public_length_m": 11.0,
+      "public_width_m": 3.5,
+      "notes": "99A 本体；15 式使用 type_ztq15"
+    },
+    "type_m1a2.glb": {
+      "class": "rigged",
+      "public_length_m": 9.77,
+      "public_width_m": 3.66
+    },
+    "type_m48a5.glb": {
+      "class": "ground_tank",
+      "public_length_m": 8.69,
+      "public_width_m": 3.63,
+      "notes": "M48A5 本体；CM-11 现用 type_m60a3 近似"
+    },
+    "type_m109a6.glb": {
+      "class": "ground_tank",
+      "public_length_m": 9.7,
+      "public_width_m": 3.9
+    },
+    "type_plz05.glb": {
+      "class": "ground_tank",
+      "public_length_m": 11.6,
+      "public_width_m": 3.4
+    },
+    "type_phl03.glb": {
+      "class": "ground_truck",
+      "public_length_m": 11.5,
+      "public_width_m": 3.4
+    },
+    "type_hq9.glb": {
+      "class": "rigged",
+      "public_length_m": 12.0,
+      "public_width_m": 3.5
+    },
+    "type_hq16.glb": {
+      "class": "rigged",
+      "public_length_m": 11.0,
+      "public_width_m": 3.3
+    },
+    "type_pac3.glb": {
+      "class": "ground_truck",
+      "public_length_m": 12.0,
+      "public_width_m": 2.9,
+      "notes": "模型为展开射击状态"
+    },
+    "type_m777.glb": {
+      "class": "ground_truck",
+      "public_length_m": 10.2,
+      "public_width_m": 2.77,
+      "notes": "M777 展开射击状态；源模型含 2 发炮弹"
+    },
+    "type_ztd05.glb": {
+      "class": "ground_tank",
+      "public_length_m": 9.5,
+      "public_width_m": 3.36
+    },
+    "type_eq240.glb": {
+      "class": "ground_truck",
+      "public_length_m": 6.9,
+      "public_width_m": 2.47
+    },
+    "type_yj62.glb": {
+      "class": "rigged",
+      "public_length_m": 13.0,
+      "public_width_m": 2.5
+    },
+    "type_075.glb": {
+      "class": "ship_large",
+      "public_length_m": 237.0,
+      "public_width_m": 36.0,
+      "notes": "075 两栖攻击舰，自建近似"
+    },
+    "type_kj500.glb": {
+      "class": "aircraft_aew",
+      "public_length_m": 36.0,
+      "public_width_m": 38.0,
+      "approx_of": "KJ-500",
+      "notes": "KJ-2000 缩比近似；机体/发动机仍为 Il-76 风格"
+    },
+    "type_ztq15.glb": {
+      "class": "ground_tank",
+      "public_length_m": 8.5,
+      "public_width_m": 3.3,
+      "approx_of": "15式",
+      "notes": "99A 缩比近似；炮塔/火炮仍为 99A"
+    },
+    "type_055.glb": {
+      "class": "ship_large",
+      "public_length_m": 180.0,
+      "public_width_m": 20.0,
+      "notes": "055 型驱逐舰；模型 bbox 宽 26.3 m，待目视复核"
+    },
+    "type_p3c.glb": {
+      "class": "aircraft_aew",
+      "public_length_m": 35.6,
+      "public_width_m": 30.37,
+      "notes": "P-3C 反潜巡逻机；运行时 180° yaw 修正"
+    },
+    "type_ah64e.glb": {
+      "class": "aircraft_fighter",
+      "public_length_m": 17.73,
+      "public_width_m": 14.63,
+      "approx_of": "AH-64E",
+      "notes": "AH-64D 近似 AH-64E"
+    },
+    "type_j20.glb": {
+      "class": "aircraft_fighter",
+      "public_length_m": 20.3,
+      "public_width_m": 13.0,
+      "notes": "J-20"
+    },
+    "type_m60a3.glb": {
+      "class": "ground_tank",
+      "public_length_m": 9.43,
+      "public_width_m": 3.63,
+      "approx_of": "CM-11",
+      "notes": "M60A3；CM-11 近似（M60A3 炮塔）"
+    },
+    "type_himars.glb": {
+      "class": "ground_truck",
+      "public_length_m": 7.0,
+      "public_width_m": 2.4,
+      "notes": "M142 HIMARS"
+    }
+  }
+}

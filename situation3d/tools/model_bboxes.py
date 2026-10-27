@@ -80,13 +80,16 @@ def world_points(js, binary):
 
 def main(models_dir, out_engine, out_web):
     models = {}
+    skipped = 0
     for fn in sorted(os.listdir(models_dir)):
         if not fn.startswith('type_') or not fn.endswith('.glb') or '_gunfx' in fn:
             continue
         try:
             js, binary = load_glb(os.path.join(models_dir, fn))
-            if any('draco' in str(e).lower() for e in js.get('extensionsUsed', [])):
-                print('SKIP draco', fn)
+            exts = [str(e) for e in js.get('extensionsUsed', [])]
+            if any(('draco' in e.lower() or 'meshopt' in e.lower()) for e in exts):
+                print('SKIP compressed', fn, ','.join(exts))
+                skipped += 1
                 continue
             pts = world_points(js, binary)
             if not len(pts):
@@ -105,6 +108,11 @@ def main(models_dir, out_engine, out_web):
             print(fn, models[fn]['length_m'], models[fn]['width_m'], models[fn]['height_m'])
         except Exception as exc:
             print('SKIP', fn, repr(exc))
+            skipped += 1
+    if skipped:
+        print('ERROR: %d model(s) skipped; refusing to write partial bboxes. '
+              'Use tools/model_bboxes_gltf.py for meshopt/draco assets.' % skipped)
+        return 1
     doc = {'schema': 'situation3d.model_bboxes.v1', 'models': models}
     for path in (out_engine, out_web):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -112,10 +120,11 @@ def main(models_dir, out_engine, out_web):
             json.dump(doc, f, ensure_ascii=False, indent=2, sort_keys=True)
             f.write('\n')
     print('wrote', len(models), 'models')
+    return 0
 
 
 if __name__ == '__main__':
     root = sys.argv[1]
-    main(os.path.join(root, 'web/assets/models'),
-         os.path.join(root, 'engine/data/models/bboxes.json'),
-         os.path.join(root, 'web/assets/models/bboxes.json'))
+    sys.exit(main(os.path.join(root, 'web/assets/models'),
+                  os.path.join(root, 'engine/data/models/bboxes.json'),
+                  os.path.join(root, 'web/assets/models/bboxes.json')))
