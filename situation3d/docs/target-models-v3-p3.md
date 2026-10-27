@@ -49,6 +49,20 @@ LOD1 与 LOD0 同朝向、同原点、同 yaw fix；`lod1_*` 文件不参与 `ty
 ## 5. 下一批
 
 1. 071/054A/055 需更合适的减面参数/网格；
-2. 对 ZTD-05/EQ240 做实例化/共享 Model，进一步压 draw calls；
+2. ZTD-05 已用材质合并把 prims 5→2（2026-10-27，见 §6）；EQ240 需贴图图集或实例化；
 3. 真机 GPU（RTX 3060/4060 级）测 1.5/3/6 km 的 FPS、draw calls、首帧时间；
 4. 轮系/雷达/炮塔关节与 052D 细化/LOD1 继续排期。
+
+## 6. 2026-10-27 ZTD-05 材质合并（draw calls）
+
+密集案例里 36 台 ZTD-05 的 5 个 primitive 共用同一张调色板贴图，仅 roughness/metallic 因子不同。把其中 4 个材质并入第 1 个（保留玻璃 BLEND），并把 TEXCOORD 统一为 float 以便 join，LOD0/LOD1 都从 5 → **2 prims**：
+
+| 资产 | 面数 | prims | 体积 |
+|---|---:|---:|---:|
+| `type_ztd05.glb` | 8,868（不变） | 5 → **2** | 127.5 → 121.3 KB |
+| `lod1_ztd05.glb` | 4,138（不变） | 5 → **2** | 75.9 → 70.3 KB |
+
+- 密集案例（80 目标）draw calls 由 **506 → 398（−21%）**（36 × 3）；1.2–3 km 的 LOD1 带同样减少 108。
+- 工具：`tools/modelgen/merge_materials.py`（默认演练，`--apply` 前写备份）；材质合并后 roughness 统一为材质 0 的值（0.78），Blender 对比渲染与 Cesium headless 加载均无可见差异。
+- EQ240 的 6 个材质各有独立贴图（11 张），不做合并；需要贴图图集（离线烘焙）或实例化才能继续压 draws。
+- 验证：预算 40/40、许可 40 条 7 风险、entity_lod 221/221、全量 pytest（见提交说明）；ZTD-05 LOD0/LOD1 在 Cesium 均 200、无 pageerror。
