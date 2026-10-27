@@ -69,5 +69,19 @@ class AISuggestionStoreTest(unittest.TestCase):
             self.assertEqual(store.counts()["accepted"], 0)
 
 
+class AIOverviewTest(unittest.TestCase):
+    def test_overview_exposes_ai_counts_without_verifying(self):
+        from intel.management import IntelManager
+        with tempfile.TemporaryDirectory() as root:
+            manager = IntelManager(root)
+            item = manager._ai("case1").add(payload())
+            overview = manager.overview("case1")
+            self.assertEqual(overview["ai"]["counts"]["suggested"], 1)
+            self.assertEqual(overview["ai"]["items"][0]["id"], item["id"])
+            self.assertEqual(overview["ai"]["items"][0]["status"],
+                             "suggested")
+            self.assertNotIn("verification", overview["ai"]["items"][0])
+
+
 if __name__ == "__main__":
     unittest.main()

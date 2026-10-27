@@ -309,5 +309,6 @@ class IntelManager:
             "links": links,
             "key_items": key_items,
             "sources": sources,
+            "ai": {"counts": ai_counts, "items": ai_items},
             "warnings": warnings,
         }
