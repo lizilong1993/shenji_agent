@@ -7423,9 +7423,10 @@ function bindUI() {
   // 提示文案由 setBuildingsOnline 的成功/回落分支负责写。
   if (checkboxOn('modelBuildingsOnline')) setBuildingsOnline(true);
 
-  // 顶栏仍有两个下拉（TS案例）；TS注册/管理/下载与图层批量操作已改为直挂按钮，
-  // 不再需要 bindMenu。
+  // 顶栏下拉：TS案例、数据管理、标绘。TS注册/管理/下载与情报都收进
+  // 数据管理这一层菜单，图层批量操作仍在左栏。
   bindMenu('menuCase', 'menuCaseList');
+  bindMenu('menuData', 'menuDataList');
   if (dom.menuCase) dom.menuCase.addEventListener('click', function () { openCaseMenu(); });
   // 标绘面板：与 TS案例 同一套开合，但它是**工具面板**，不因外部点击而收起
   // （keepOpen 恒真）——只有点【标绘】按钮或按 Esc 才关。
@@ -7444,6 +7445,13 @@ function bindUI() {
     });
   if (window.SituationPanel) SituationPanel.bind();
   if (window.IntelPanel) IntelPanel.bind();
+  if (window.ImagerySources) ImagerySources.bind();
+  // 数据管理菜单里的情报/影像源不是 [data-situation-cmd]：它们各自绑好打开
+  // 面板后，再补一条“点击即收起菜单”。放在 bind() 之后，执行顺序稳定。
+  ['btnIntel', 'btnImagerySources'].forEach(function (id) {
+    const btn = document.getElementById(id);
+    if (btn) btn.addEventListener('click', function () { closeAllMenus(); });
+  });
 
   // 图层管理批量操作
   Array.prototype.forEach.call(
