@@ -33,6 +33,7 @@ DEFAULT_BACKUP = "/remote-home/lizilong/model_backups/target-models-v3"
 CFG = {
     # 水面舰：大型 28k，小型/辅助 12k
     "type_052c": ("ship_large", 28000, True, True, True),
+    "type_052d": ("ship_large", 28000, True, True, True),
     "type_054a": ("ship_large", 28000, True, True, True),
     "type_071": ("ship_large", 28000, True, True, True),
     "type_075": ("ship_large", 28000, True, True, True),

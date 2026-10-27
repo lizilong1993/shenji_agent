@@ -60,6 +60,27 @@ class SentinelSearchTest(unittest.TestCase):
             with self.assertRaises(adapters.DatasetError):
                 adapters.search_sentinel2(BBOX, "2025-12-31")
 
+    def test_mosaic_picks_best_scene_per_grid(self):
+        def feat(fid, code, cloud, when="2025-12-20T00:00:00Z"):
+            item = stac_feature(fid, when, cloud)
+            item["properties"]["grid:code"] = code
+            if code == "MGRS-44SLC":
+                item["bbox"] = [78.8, 33.3, 80.0, 34.3]
+            else:
+                item["bbox"] = [77.7, 32.4, 79.0, 33.4]
+            return item
+
+        doc = {"features": [
+            feat("a", "MGRS-44SLC", 20),
+            feat("b", "MGRS-44SLC", 5),
+            feat("c", "MGRS-44SKC", 10),
+        ]}
+        with mock.patch.object(adapters, "_http_json", return_value=doc):
+            scenes, query = adapters.search_sentinel2_mosaic(
+                (78.6, 33.3, 79.6, 34.2), "2025-12-31", max_cloud=30)
+        self.assertEqual([s["id"] for s in scenes], ["b", "c"])
+        self.assertEqual(query["grids"], 2)
+
     def test_query_changes_spec_hash(self):
         a = DatasetSpec(name="s", bbox=BBOX, kind="satellite_imagery",
                         query={"date": "2025-12-01"})

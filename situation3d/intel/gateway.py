@@ -64,7 +64,8 @@ class CueBatch:
 
 
 SOURCE_PRIORITY = {"usgs": 0, "gdacs": 1, "firms": 2,
-                   "eonet": 3, "adsb": 4, "gdelt": 5}
+                   "eonet": 3, "adsb": 4, "gdelt": 5,
+                   "open-meteo": 6, "rss": 7}
 
 
 class IntelBundle:

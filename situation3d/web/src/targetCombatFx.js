@@ -348,6 +348,7 @@
   // ------------------------------------------------------------------
   var PROXY = {
     ship052c: { model: './assets/models/type_052c_gunfx.glb', offset: [-49.2, 0.38, 6.0], muzzle: [-55.6, 0.38, 7.35] },
+    ship052d: { model: './assets/models/type_052c_gunfx.glb', offset: [-61.0, 0, 6.05], muzzle: [-66.15, 0, 7.9] },
     ship054a: { model: './assets/models/type_054a_gunfx.glb', offset: [-46.34, 0, 6.95], muzzle: [-50.4, 0, 8.05] },
     tank99a: { model: './assets/models/type_99a_gunfx.glb', offset: [0.2, 0, 1.3], muzzle: [-6.4, 0, 2.35] },
     ship071: { model: './assets/models/type_071_gunfx.glb', offset: [-80, 0, 14], muzzle: [-84, 0, 15] },
@@ -355,12 +356,13 @@
     hq9: { model: './assets/models/type_hq9_launcherfx.glb', offset: [2.6, 0, 2.5], muzzle: [-3.3, 0, 3.8] },
   };
   var proxyEnts = {};
-  var proxyRecoil = { ship052c: 0, ship054a: 0, tank99a: 0, ship071: 0, tankm1a2: 0 };
+  var proxyRecoil = { ship052c: 0, ship052d: 0, ship054a: 0, tank99a: 0, ship071: 0, tankm1a2: 0 };
   var deaths = {};
 
   function proxyKey(def) {
     var text = ((def && def.model) || '') + ' ' + ((def && def.platform_class) || '');
-    if (/052d|052c|luyang/i.test(text)) return 'ship052c';
+    if (/052d|luyang.?iii/i.test(text)) return 'ship052d';
+    if (/052c|luyang.?ii/i.test(text)) return 'ship052c';
     if (/054a/i.test(text)) return 'ship054a';
     if (/99a|ztz-?99/i.test(text)) return 'tank99a';
     if (/071|yuzhao|昆仑山/i.test(text)) return 'ship071';

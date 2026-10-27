@@ -9,6 +9,10 @@
 }
 .intel-summary b { font-size: 13px; }
 .intel-note { color: var(--text-dim); font-size: 11.5px; line-height: 1.5; }
+.intel-pipeline {
+  margin: 6px 0 10px; padding: 6px 9px; border: 1px solid #cfe0f5;
+  border-radius: 4px; background: #f7fbff; color: #4f6076; font-size: 11.5px;
+}
 
 .intel-toolbar {
   display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
@@ -101,6 +105,13 @@
   border-bottom: 1px solid var(--border); padding: 6px 2px;
 }
 .intel-source-main { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
+.intel-source-summary { color: var(--text); font-size: 11.5px; line-height: 1.5; }
+.intel-source-facts { color: var(--text-dim); font-size: 11px; }
+.intel-source-features { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.intel-chip {
+  display: inline-block; border: 1px solid #d7e2ef; border-radius: 9px;
+  padding: 0 7px; color: #4f6076; background: #f5f9fe; font-size: 10.5px;
+}
 .intel-source-desc { color: var(--text-dim); font-size: 11px; }
 .intel-source-form { margin-top: 12px; }
 

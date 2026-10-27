@@ -156,6 +156,23 @@ class IntelManager:
         except (OSError, ValueError):
             return None
 
+    def _pipeline(self, case_id: str) -> Optional[dict]:
+        safe = _CASE_SAFE.sub("_", case_id or "default") or "default"
+        path = os.path.join(self.root, safe, "pipeline.json")
+        if not os.path.isfile(path):
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            return data if isinstance(data, dict) else None
+        except (OSError, ValueError):
+            return None
+
+    def _ai(self, case_id: str):
+        from .ai import AISuggestionStore
+        safe = _CASE_SAFE.sub("_", case_id or "default") or "default"
+        return AISuggestionStore(os.path.join(self.root, safe, "ai.json"))
+
     def _profile(self, case_id: str):
         try:
             return load_case_profile(case_id, root=self.profile_root)
@@ -169,6 +186,15 @@ class IntelManager:
         source_names = {entry.get("source_id"): entry.get("name")
                         for entry in sources}
         bundle = self._bundle(case_id)
+        pipeline = self._pipeline(case_id)
+        try:
+            ai_store = self._ai(case_id)
+            ai_counts = ai_store.counts()
+            ai_items = ai_store.list()[:20]
+        except (OSError, ValueError):
+            ai_counts = {"total": 0, "suggested": 0, "accepted": 0,
+                         "rejected": 0, "needs_review": 0}
+            ai_items = []
         warnings = []
         if bundle is None:
             warnings.append("案例 %s 暂无自动情报 bundle（var/intel/%s/bundle.json）"
@@ -272,6 +298,7 @@ class IntelManager:
             "generated_at": _now(),
             "revision": revision,
             "profile": profile.to_dict() if profile else None,
+            "pipeline": pipeline,
             "conflict_rule": {
                 "radius_km": CONFLICT_RADIUS_KM,
                 "window_h": CONFLICT_WINDOW_H,
@@ -282,5 +309,6 @@ class IntelManager:
             "links": links,
             "key_items": key_items,
             "sources": sources,
+            "ai": {"counts": ai_counts, "items": ai_items},
             "warnings": warnings,
         }

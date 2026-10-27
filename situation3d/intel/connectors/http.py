@@ -9,6 +9,8 @@ proxy rules.
 from __future__ import annotations
 
 import json
+import ipaddress
+import socket
 import urllib.error
 import urllib.request
 from typing import Any, Iterable
@@ -56,6 +58,38 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         raise urllib.error.HTTPError(
             req.full_url, code, "redirects are not allowed", headers, fp)
+
+
+def ensure_public_host(url: str) -> None:
+    """Reject a URL whose DNS resolution reaches private/reserved space."""
+    parsed = urlparse(str(url or "").strip())
+    if parsed.scheme != "https":
+        raise FetchError("custom feeds must use https")
+    if parsed.username or parsed.password:
+        raise FetchError("credentials in custom feed URL are not allowed")
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if not host:
+        raise FetchError("URL has no host")
+    try:
+        if parsed.port not in (None, 443):
+            raise FetchError("custom feeds only allow the default HTTPS port")
+    except ValueError:
+        raise FetchError("invalid port in custom feed URL") from None
+    try:
+        addresses = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise FetchError("cannot resolve host %s: %s" % (host, exc)) from None
+    for entry in addresses:
+        address = entry[4][0]
+        try:
+            ip = ipaddress.ip_address(address)
+        except ValueError:
+            raise FetchError("invalid resolved address for %s" % (host,)) from None
+        if (not ip.is_global or ip.is_private or ip.is_loopback
+                or ip.is_link_local or ip.is_multicast or ip.is_reserved
+                or ip.is_unspecified
+                or ip in ipaddress.ip_network("64:ff9b::/96")):
+            raise FetchError("host %s resolves to a non-public address" % (host,))
 
 
 def fetch_bytes(url: str, allowed_hosts: Iterable[str],
