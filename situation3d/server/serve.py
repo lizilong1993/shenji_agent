@@ -1356,6 +1356,24 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"error": "%s: %s"
                                  % (type(exc).__name__, exc)}, 500)
             return
+        if path == "/api/intel/ai":
+            case_id = str(query.get("case_id") or "").strip()
+            if not re.match(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+                            case_id) or ".." in case_id:
+                self._send_json({"error": "invalid case_id"}, 400)
+                return
+            try:
+                from intel.ai import AISuggestionStore
+                import os as _os
+                safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", case_id)
+                store = AISuggestionStore(_os.path.join(
+                    _INTEL_ROOT, safe, "ai.json"))
+                self._send_json({"case_id": case_id,
+                                 "counts": store.counts(),
+                                 "items": store.list(query.get("status"))})
+            except Exception as exc:  # noqa: BLE001
+                self._send_json({"error": str(exc)}, 500)
+            return
         if path == "/api/intel/job":
             case_id = str(query.get("case_id") or "").strip()
             if not re.match(r"^[A-Za-z0-9_.-]{1,80}$", case_id) or ".." in case_id:
@@ -1941,6 +1959,35 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             if path == "/api/intel/collect":
                 self._api_intel_collect(body)
+                return
+            if path == "/api/intel/ai":
+                from intel.ai import AISuggestionStore
+                case_id = str(body.get("case_id") or "").strip()
+                if not re.match(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+                                case_id) or ".." in case_id:
+                    self._send_json({"error": "invalid case_id"}, 400)
+                    return
+                safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", case_id)
+                store = AISuggestionStore(os.path.join(
+                    _INTEL_ROOT, safe, "ai.json"))
+                item = store.add(body)
+                self._send_json({"ok": True, "item": item})
+                return
+            if path == "/api/intel/ai/review":
+                from intel.ai import AISuggestionStore
+                case_id = str(body.get("case_id") or "").strip()
+                if not re.match(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$",
+                                case_id) or ".." in case_id:
+                    self._send_json({"error": "invalid case_id"}, 400)
+                    return
+                safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", case_id)
+                store = AISuggestionStore(os.path.join(
+                    _INTEL_ROOT, safe, "ai.json"))
+                item = store.review(str(body.get("id") or ""),
+                                    str(body.get("status") or ""),
+                                    str(body.get("note") or ""),
+                                    str(body.get("reviewer") or ""))
+                self._send_json({"ok": True, "item": item})
                 return
             if path == "/api/intel/manual":
                 item = manager.manual.create(body)

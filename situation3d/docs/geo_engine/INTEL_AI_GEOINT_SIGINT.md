@@ -143,3 +143,15 @@ AI 结果默认 `suggested`，不能写入 `verification=verified`；只有分�
 - 人工可以把 AI 建议标记为接受/修正/驳回，原始 AI 记录不被覆盖。
 - 关键情报同时显示来源、证据、置信度和核验状态。
 - 不出现 AI 自动把未核实线索写成已核实事实。
+
+
+## 9. 当前后端接口（P0 第一片）
+
+- `POST /api/intel/ai`：AI worker 提交建议；必须带 `task`、`model`、
+  `prompt_version`、`confidence`、`evidence`，原始 claims/evidence 只读保存。
+- `GET /api/intel/ai?case_id=...&status=...`：列出建议与状态计数。
+- `POST /api/intel/ai/review`：分析员接受/驳回/要求复核；只改审核字段，
+  不修改 AI 原始 claims/evidence，也不会自动写成 `verification=verified`。
+- `GET /api/intel/overview` 额外返回 `ai.counts` 与最近 20 条建议。
+
+这些接口只在测试模式可写，演示模式保持只读。
