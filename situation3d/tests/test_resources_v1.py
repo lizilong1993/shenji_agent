@@ -280,3 +280,70 @@ class HashPathTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SqliteStoreCrudTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="res-sqlite-")
+        self.store = ResourceStore(os.path.join(self.tmp, "index"))
+        self.artifact = os.path.join(self.tmp, "artifact.bin")
+        with open(self.artifact, "wb") as fh:
+            fh.write(b"first version")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_sqlite_db_and_crud_roundtrip(self):
+        entry = self.store.create_entry(
+            "satellite_imagery", "demo", self.artifact,
+            license="test-license", quality="derived",
+            bbox=[120.0, 22.9, 120.2, 23.0], notes={"role": "test"})
+        self.assertEqual(entry.entry_id, "satellite_imagery:demo")
+        self.assertTrue(os.path.isfile(os.path.join(self.tmp, "index",
+                                                    "resources.db")))
+        self.assertEqual(self.store.stats()["satellite_imagery"]["count"], 1)
+
+        updated = self.store.update(entry.entry_id, {
+            "license": "updated-license",
+            "as_of": "2026-10-27",
+            "notes": {"role": "edited"},
+            "pinned": True,
+        })
+        self.assertEqual(updated.license, "updated-license")
+        self.assertEqual(updated.as_of, "2026-10-27")
+        self.assertTrue(updated.pinned)
+        self.assertEqual(updated.notes, {"role": "edited"})
+
+        with self.assertRaises(ResourceConflict):
+            self.store.remove(entry.entry_id)
+        self.store.remove(entry.entry_id, force=True)
+        with self.assertRaises(ResourceNotFound):
+            self.store.get(entry.entry_id)
+
+    def test_update_path_rehashes(self):
+        entry = self.store.create_entry("landcover", "lc", self.artifact)
+        other = os.path.join(self.tmp, "other.bin")
+        with open(other, "wb") as fh:
+            fh.write(b"different content")
+        updated = self.store.update(entry.entry_id, {"path": other})
+        self.assertEqual(updated.path, os.path.abspath(other))
+        self.assertNotEqual(updated.content_hash, entry.content_hash)
+        self.assertEqual(updated.size, len(b"different content"))
+
+    def test_index_json_is_migrated_once(self):
+        pack = make_envpack(os.path.join(self.tmp, "pack"), name="legacy")
+        entry = scan_envpack(pack)
+        write_json(os.path.join(self.tmp, "index", "index.json"), {
+            "schema": "s3d.resources.index.v1",
+            "entries": {entry.entry_id: entry.as_dict()},
+        })
+        migrated = ResourceStore(os.path.join(self.tmp, "index")).get(
+            entry.entry_id)
+        self.assertEqual(migrated.content_hash, entry.content_hash)
+        # The JSON is now a backup; changing it must not affect the database.
+        with open(os.path.join(self.tmp, "index", "index.json"), "w",
+                  encoding="utf-8") as fh:
+            fh.write("{}")
+        again = ResourceStore(os.path.join(self.tmp, "index")).get(
+            entry.entry_id)
+        self.assertEqual(again.content_hash, entry.content_hash)

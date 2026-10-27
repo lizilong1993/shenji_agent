@@ -1343,6 +1343,234 @@ class Handler(SimpleHTTPRequestHandler):
         # parse_qs returns lists; every parameter here is single-valued.
         return {k: v[0] for k, v in q.items() if v}
 
+    # -- resource registry (SQLite CRUD) --------------------------------
+
+    @staticmethod
+    def _resource_manage_roots():
+        """Directories a management request may register/update in place.
+
+        Uploads are always written under the resource root; this list is only
+        for "register an existing path".  The project root is included so the
+        built-in envpacks/rules/platforms can be managed, while arbitrary
+        filesystem paths need an explicit SITUATION_RESOURCE_ROOTS entry.
+        """
+        from resources.store import ResourceStore
+        roots = _resource_allowed_roots() + [
+            os.path.realpath(_PKG_ROOT),
+            os.path.realpath(str(ResourceStore().root)),
+        ]
+        return list(dict.fromkeys(roots))
+
+    @classmethod
+    def _check_manage_path(cls, path):
+        if not isinstance(path, str) or not os.path.isabs(path):
+            raise ValueError("path must be an absolute path")
+        real = os.path.realpath(path)
+        roots = cls._resource_manage_roots()
+        if not any(real == root or real.startswith(root + os.sep)
+                   for root in roots):
+            raise ValueError("path is outside the allowed resource roots")
+        return real
+
+    def _api_resources_get(self, path, query):
+        from resources.store import ResourceError, ResourceNotFound, ResourceStore
+        try:
+            store = ResourceStore()
+            if path == "/api/resources":
+                kind = (query or {}).get("kind") or None
+                need = ((query or {}).get("q") or "").strip().lower()
+                rows = store.entries(kind)
+                if need:
+                    rows = [e for e in rows
+                            if need in e.entry_id.lower()
+                            or need in (e.path or "").lower()
+                            or need in (e.source or "").lower()
+                            or need in (e.provider or "").lower()
+                            or need in (e.version or "").lower()]
+                self._send_json({
+                    "kinds": store.kinds(),
+                    "stats": store.stats(),
+                    "entries": [e.as_dict() for e in rows],
+                })
+                return
+            if path.startswith("/api/resources/"):
+                from urllib.parse import unquote
+                entry_id = unquote(path[len("/api/resources/"):])
+                if not entry_id or "/" in entry_id:
+                    self._send_json({"error": "unknown resource"}, 404)
+                    return
+                entry = store.get(entry_id)
+                self._send_json({"entry": entry.as_dict(),
+                                 "verify": store.verify(entry_id)})
+                return
+            self._send_json({"error": "unknown resource API"}, 404)
+        except ResourceNotFound as exc:
+            self._send_json({"error": str(exc)}, 404)
+        except (KeyError, ValueError) as exc:
+            self._send_json({"error": str(exc)}, 400)
+        except ResourceError as exc:
+            self._send_json({"error": str(exc)}, 500)
+
+    def _read_upload_to(self, dest, max_bytes=4 * 1024 ** 3):
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        if length <= 0:
+            raise ValueError("Content-Length is required")
+        if length > max_bytes:
+            raise ValueError("upload exceeds %d bytes" % max_bytes)
+        part = dest + ".part"
+        remaining = length
+        try:
+            with open(part, "wb") as fh:
+                while remaining:
+                    chunk = self.rfile.read(min(1 << 20, remaining))
+                    if not chunk:
+                        raise ValueError("unexpected end of upload body")
+                    fh.write(chunk)
+                    remaining -= len(chunk)
+            os.replace(part, dest)
+        finally:
+            if os.path.exists(part):
+                try:
+                    os.unlink(part)
+                except OSError:
+                    pass
+        return length
+
+    def _api_resource_upload(self):
+        from resources.model import slugify
+        from resources.store import ResourceError, ResourceStore
+        # Uploads are one-shot: if validation fails before the body is read,
+        # close the connection instead of trying to keep HTTP/1.1 framing.
+        self.close_connection = True
+        query = self._query(self.path)
+        kind = str(query.get("kind") or "").strip()
+        name = str(query.get("name") or "").strip()
+        filename = os.path.basename(str(query.get("filename") or "upload.bin"))
+        if not kind or not name:
+            self.close_connection = True
+            self._send_json({"error": "kind and name are required"}, 400)
+            return
+        try:
+            from resources.catalog import kind_spec
+            kind_spec(kind)
+            store = ResourceStore()
+            ext = os.path.splitext(filename)[1].lower()
+            ext = re.sub(r"[^a-z0-9.]", "", ext)[:16]
+            stem = slugify(name) or "upload"
+            folder = os.path.join(str(store.root), "uploads", kind)
+            os.makedirs(folder, exist_ok=True)
+            dest = os.path.join(folder, "%s-%s%s" % (
+                stem, time.strftime("%Y%m%d%H%M%S"), ext))
+            self._read_upload_to(dest)
+            try:
+                meta = {}
+                for key in ("entry_id", "version", "schema", "provider",
+                            "source", "fetched_at", "as_of", "license",
+                            "quality"):
+                    if query.get(key):
+                        meta[key] = query[key]
+                if query.get("bbox"):
+                    values = [float(v) for v in query["bbox"].split(",")]
+                    if len(values) != 4:
+                        raise ValueError("bbox must be west,south,east,north")
+                    meta["bbox"] = values
+                meta["replace"] = _query_bool(query.get("replace"))
+                entry = store.create_entry(kind, name, dest, **meta)
+            except Exception:
+                try:
+                    os.unlink(dest)
+                except OSError:
+                    pass
+                raise
+            self._send_json({"ok": True, "entry": entry.as_dict()}, 201)
+        except KeyError as exc:
+            self._send_json({"error": str(exc)}, 400)
+        except (ValueError, ResourceError) as exc:
+            self._send_json({"error": str(exc)}, 400)
+
+    def _api_resources_post(self, path):
+        from resources.store import (ResourceConflict, ResourceError,
+                                     ResourceNotFound, ResourceStore)
+        if SERVER_MODE != "test":
+            self.close_connection = True
+            self._send_json({"error": "resource writes are disabled in demo mode"},
+                            403)
+            return
+        if path == "/api/resources/upload":
+            self._api_resource_upload()
+            return
+        body = self._read_json_body()
+        if body is None:
+            body = {}
+        if not isinstance(body, dict):
+            self._send_json({"error": "body must be a JSON object"}, 400)
+            return
+        try:
+            store = ResourceStore()
+            if path == "/api/resources":
+                kind = str(body.get("kind") or "").strip()
+                name = str(body.get("name") or "").strip()
+                target = str(body.get("path") or "").strip()
+                if not kind or not name or not target:
+                    self._send_json({"error": "kind, name and path are required"},
+                                    400)
+                    return
+                target = self._check_manage_path(target)
+                meta = {}
+                for key in ("entry_id", "version", "schema", "provider",
+                            "source", "fetched_at", "as_of", "license",
+                            "quality", "notes", "bbox"):
+                    if key in body:
+                        meta[key] = body[key]
+                meta["replace"] = bool(body.get("replace"))
+                entry = store.create_entry(kind, name, target, **meta)
+                self._send_json({"ok": True, "entry": entry.as_dict()}, 201)
+                return
+            if path.startswith("/api/resources/"):
+                from urllib.parse import unquote
+                rest = [part for part in path[len("/api/resources/"):].split("/")
+                        if part]
+                if not rest:
+                    self._send_json({"error": "entry_id is required"}, 400)
+                    return
+                entry_id = unquote(rest[0])
+                action = rest[1] if len(rest) > 1 else ""
+                if action == "update":
+                    changes = dict(body)
+                    if "path" in changes:
+                        changes["path"] = self._check_manage_path(changes["path"])
+                    entry = store.update(entry_id, changes)
+                    self._send_json({"ok": True, "entry": entry.as_dict()})
+                    return
+                if action == "pin":
+                    entry = store.set_pin(entry_id,
+                                          bool(body.get("pinned", True)))
+                    self._send_json({"ok": True, "entry": entry.as_dict()})
+                    return
+                if action == "verify":
+                    result = store.verify(entry_id)
+                    self._send_json({"ok": bool(result.get("ok")),
+                                     "verify": result})
+                    return
+                if action == "delete":
+                    store.remove(entry_id, force=bool(body.get("force")))
+                    self._send_json({"ok": True, "deleted": entry_id})
+                    return
+                self._send_json({"error": "unknown resource action"}, 404)
+                return
+            self._send_json({"error": "unknown resource API"}, 404)
+        except ResourceNotFound as exc:
+            self._send_json({"error": str(exc)}, 404)
+        except ResourceConflict as exc:
+            self._send_json({"error": str(exc)}, 409)
+        except KeyError as exc:
+            self._send_json({"error": str(exc)}, 400)
+        except (ValueError, ResourceError) as exc:
+            self._send_json({"error": str(exc)}, 400)
+
     def _api_get(self, path, query=None):
         query = query or {}
         if path == "/api/intel/overview":
@@ -1524,6 +1752,9 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, 400)
                 return
             self._send_json(run)
+            return
+        if path == "/api/resources" or path.startswith("/api/resources/"):
+            self._api_resources_get(path, query)
             return
         if path == "/api/health":
             self._api_health()
@@ -1756,7 +1987,7 @@ class Handler(SimpleHTTPRequestHandler):
             subchecks["offline_tiles"] = {"status": "error", "ok": False,
                                           "detail": str(exc), "required": False}
 
-        # 资源索引（P2）：只读 index.json 计数，不做全量哈希。
+        # 资源库（P2/P8）：只读 SQLite 计数，不做全量哈希。
         try:
             from resources.store import ResourceStore
             rows = ResourceStore().entries()
@@ -2036,6 +2267,9 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"error": str(exc)}, 400)
 
     def _api_post(self, path):
+        if path == "/api/resources" or path.startswith("/api/resources/"):
+            self._api_resources_post(path)
+            return
         if path.startswith("/api/intel/"):
             self._api_intel_post(path)
             return

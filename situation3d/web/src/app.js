@@ -7446,9 +7446,10 @@ function bindUI() {
   if (window.SituationPanel) SituationPanel.bind();
   if (window.IntelPanel) IntelPanel.bind();
   if (window.ImagerySources) ImagerySources.bind();
-  // 数据管理菜单里的情报/影像源不是 [data-situation-cmd]：它们各自绑好打开
-  // 面板后，再补一条“点击即收起菜单”。放在 bind() 之后，执行顺序稳定。
-  ['btnIntel', 'btnImagerySources'].forEach(function (id) {
+  if (window.ResourceManager) ResourceManager.bind();
+  // 数据管理菜单里的情报/资源/影像源不是 [data-situation-cmd]：它们各自绑好
+  // 打开面板后，再补一条“点击即收起菜单”。放在 bind() 之后，执行顺序稳定。
+  ['btnIntel', 'btnResourceManager', 'btnImagerySources'].forEach(function (id) {
     const btn = document.getElementById(id);
     if (btn) btn.addEventListener('click', function () { closeAllMenus(); });
   });

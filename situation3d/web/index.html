@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="./src/theme.css">
   <link rel="stylesheet" href="./src/intel.css">
   <link rel="stylesheet" href="./src/imagerySources.css">
+  <link rel="stylesheet" href="./src/resourceManager.css">
 </head>
 <body>
   <header class="topbar">
@@ -51,6 +52,10 @@
           <button type="button" id="btnIntel" class="menu-item"
                   title="统一情报管理：自动情报、人工情报与情报源">
             <span class="mi-head">情报</span>
+          </button>
+          <button type="button" id="btnResourceManager" class="menu-item"
+                  title="资源库增删改查：路径登记、上传、编辑、固定、校验与删除">
+            <span class="mi-head">资源管理</span>
           </button>
           <button type="button" id="btnImagerySources" class="menu-item"
                   title="查看在线影像源、Sentinel-2 与案例缓存">
@@ -331,7 +336,19 @@
     </div>
   </div>
 
-  <!-- 情报管理：自动情报与人工情报统一列表、人工结构化录入、情报源管理 -->
+  <!-- 资源管理：SQLite 资源库的列表、筛选与增删改查 -->
+  <div id="resourceModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="资源管理">
+    <div class="modal-panel resource-modal-panel">
+      <div class="modal-head">
+        <div class="modal-tabs">
+          <span class="modal-tab active">资源管理</span>
+        </div>
+        <button id="resourceClose" type="button" class="modal-close" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body" id="resourceBody"></div>
+    </div>
+  </div>
+
   <div id="intelModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="情报管理">
     <div class="modal-panel intel-modal-panel">
       <div class="modal-head">
@@ -376,6 +393,7 @@
 <script src="./src/plotting.js"></script>
   <script src="./src/intelUi.js"></script>
   <script src="./src/imagerySources.js"></script>
+  <script src="./src/resourceManager.js"></script>
   <script src="./src/app.js"></script>
 </body>
 </html>

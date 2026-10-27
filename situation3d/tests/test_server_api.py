@@ -33,6 +33,17 @@ def free_port():
     return port
 
 
+def request_raw(port, path, data, headers=None):
+    req = urllib.request.Request("http://127.0.0.1:%d%s" % (port, path),
+                                 data=data, headers=headers or {},
+                                 method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.status, json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        return exc.code, json.loads(exc.read().decode("utf-8") or "{}")
+
+
 def request(port, path, method="GET", body=None):
     data = None
     headers = {}
@@ -74,6 +85,8 @@ class ServerApiTest(unittest.TestCase):
     def _start(self, mode):
         port = free_port()
         env = dict(os.environ, SITUATION_DIR=self.situations,
+                   SITUATION_RESOURCES_DIR=os.path.join(self.tmp.name,
+                                                       "resources"),
                    PYTHONUNBUFFERED="1")
         proc = subprocess.Popen(
             [sys.executable, os.path.join(SERVER, "serve.py"),
@@ -136,6 +149,55 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(self.store.get_run(CASE, queued)["status"], "failed")
 
+    def test_resource_crud_and_upload(self):
+        port = self._start("test")
+        root = os.path.join(self.tmp.name, "resources")
+        os.makedirs(root, exist_ok=True)
+        artifact = os.path.join(root, "sample.bin")
+        with open(artifact, "wb") as fh:
+            fh.write(b"sample")
+        status, body = request(port, "/api/resources", "POST", {
+            "kind": "satellite_imagery", "name": "api-demo",
+            "path": artifact, "license": "test", "quality": "derived",
+            "bbox": [120.0, 22.9, 120.2, 23.0],
+        })
+        self.assertEqual(status, 201, body)
+        entry_id = body["entry"]["entry_id"]
+        self.assertEqual(entry_id, "satellite_imagery:api-demo")
+
+        status, body = request(port, "/api/resources")
+        self.assertEqual(status, 200)
+        self.assertTrue(any(e["entry_id"] == entry_id
+                            for e in body["entries"]))
+        self.assertTrue(any(k["kind"] == "satellite_imagery"
+                            for k in body["kinds"]))
+
+        status, body = request(port, "/api/resources/%s/update" % entry_id,
+                               "POST", {"license": "updated",
+                                        "as_of": "2026-10-27"})
+        self.assertEqual(status, 200, body)
+        self.assertEqual(body["entry"]["license"], "updated")
+
+        status, body = request(port, "/api/resources/%s/pin" % entry_id,
+                               "POST", {"pinned": True})
+        self.assertEqual(status, 200)
+        self.assertTrue(body["entry"]["pinned"])
+        status, body = request(port, "/api/resources/%s/delete" % entry_id,
+                               "POST", {})
+        self.assertEqual(status, 409)
+        status, body = request(port, "/api/resources/%s/delete" % entry_id,
+                               "POST", {"force": True})
+        self.assertEqual(status, 200, body)
+
+        status, body = request_raw(
+            port, "/api/resources/upload?kind=tile_layer&name=upload-demo"
+            "&filename=upload.bin", b"uploaded-bytes",
+            {"Content-Type": "application/octet-stream"})
+        self.assertEqual(status, 201, body)
+        self.assertTrue(body["entry"]["path"].startswith(
+            os.path.join(root, "uploads") + os.sep))
+        self.assertEqual(body["entry"]["size"], len(b"uploaded-bytes"))
+
     def test_demo_mode_blocks_simulation(self):
         port = self._start("demo")
         status, _body = request(port, "/api/sim/runs?case_id=" + CASE)
@@ -143,6 +205,20 @@ class ServerApiTest(unittest.TestCase):
         status, _body = request(port, "/api/sim/runs", "POST",
                                 {"case_id": CASE, "seed": 1, "ticks": 10})
         self.assertEqual(status, 403)
+        status, _body = request(port, "/api/resources", "POST", {
+            "kind": "satellite_imagery", "name": "demo",
+            "path": os.path.join(self.tmp.name, "x.bin"),
+        })
+        self.assertEqual(status, 403)
+
+    def test_resource_path_outside_roots_rejected(self):
+        port = self._start("test")
+        status, body = request(port, "/api/resources", "POST", {
+            "kind": "satellite_imagery", "name": "outside",
+            "path": "/etc/hostname",
+        })
+        self.assertEqual(status, 400, body)
+        self.assertIn("outside", body.get("error", ""))
 
 
 if __name__ == "__main__":
