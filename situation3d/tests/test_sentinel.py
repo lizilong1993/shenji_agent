@@ -68,6 +68,64 @@ class SentinelSearchTest(unittest.TestCase):
         self.assertNotEqual(a.hash(), b.hash())
 
 
+class SentinelTilesTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="st-")
+        self.store = ResourceStore(os.path.join(self.tmp, "index"))
+        self.spec = DatasetSpec(name="x", bbox=BBOX, kind="satellite_imagery",
+                                resolution_m=10)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_sentinel_to_tiles(self):
+        from resources.processing import TilesetSpec
+        raster_dir = os.path.join(self.tmp, "scene")
+        os.makedirs(raster_dir)
+        raster = os.path.join(raster_dir, "sentinel2.tif")
+        with open(raster, "wb") as fh:
+            fh.write(b"II*\x00" + b"\0" * 128)
+        with open(os.path.join(raster_dir, "manifest.json"), "w") as fh:
+            json.dump({"raster_file": "sentinel2.tif"}, fh)
+        from resources.model import ResourceEntry
+        from resources.processing import TilesetSpec
+        scene_entry = ResourceEntry(
+            entry_id="satellite_imagery:x", kind="satellite_imagery",
+            path=raster_dir, content_hash="a" * 64, size=1, bbox=BBOX)
+        sentinel = {"entry": scene_entry, "cached": False}
+        fake_tiles = type("R", (), {"entry": scene_entry,
+                                    "as_dict": lambda self: {"ok": True}})()
+        with mock.patch.object(adapters, "acquire_sentinel",
+                               return_value=sentinel), \
+                mock.patch("resources.acquire.acquire_tiles",
+                           return_value=fake_tiles) as tiles:
+            result = adapters.acquire_sentinel_tiles(
+                self.store, TilesetSpec(name="x", bbox=BBOX, min_zoom=10,
+                                        max_zoom=12),
+                self.tmp)
+        self.assertFalse(result["fallback"])
+        self.assertIs(result["tiles"], fake_tiles)
+        called = tiles.call_args
+        self.assertEqual(called.kwargs["candidates"][0].source_id, "sentinel2")
+        self.assertTrue(called.kwargs["candidates"][0].params["url"].startswith("file://"))
+
+    def test_fallback_to_eox(self):
+        from resources.processing import TilesetSpec
+        fake_tiles = type("R", (), {"entry": None,
+                                    "as_dict": lambda self: {}})()
+        with mock.patch.object(adapters, "acquire_sentinel",
+                               side_effect=adapters.DatasetError("no scene")), \
+                mock.patch("resources.acquire.acquire_tiles",
+                           return_value=fake_tiles) as tiles:
+            result = adapters.acquire_sentinel_tiles(
+                self.store, TilesetSpec(name="x", bbox=BBOX, min_zoom=10,
+                                        max_zoom=12),
+                self.tmp)
+        self.assertTrue(result["fallback"])
+        self.assertEqual(tiles.call_args.kwargs["source_ids"],
+                         ["eox-s2", "esri"])
+
+
 class SentinelRegistrationTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="sentinel-")

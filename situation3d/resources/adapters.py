@@ -414,6 +414,61 @@ def acquire_sentinel(store: ResourceStore, spec: DatasetSpec,
             "chosen": chosen, "cached": False}
 
 
+def acquire_sentinel_tiles(store: ResourceStore, tile_spec, cache_root: str,
+                           target_date=None, window_days: int = 60,
+                           max_cloud: float = 30.0,
+                           resolution_m: float = 10.0,
+                           fallback_sources=("eox-s2", "esri"),
+                           force: bool = False) -> Any:
+    """Acquire a Sentinel scene raster, then render/register XYZ tiles.
+
+    On any Sentinel failure the function falls back to the existing XYZ
+    imagery providers (EOX cloudless / Esri), so map-layer acquisition still
+    succeeds when the scene chain is unavailable.
+    """
+    from .acquire import AcquireError, acquire_tiles
+    from .sources import raster_candidate
+    from .vectorproc import DatasetSpec
+    errors = []
+    sentinel = None
+    try:
+        scene_spec = DatasetSpec(
+            name=tile_spec.name, bbox=tile_spec.bbox,
+            kind="satellite_imagery", resolution_m=resolution_m,
+            query={"date": target_date, "window_days": window_days,
+                   "max_cloud": max_cloud})
+        sentinel = acquire_sentinel(
+            store, scene_spec, cache_root, target_date=target_date,
+            window_days=window_days, max_cloud=max_cloud,
+            resolution_m=resolution_m, force=force)
+        entry = sentinel["entry"]
+        with open(os.path.join(entry.path, "manifest.json"), encoding="utf-8") as fh:
+            manifest = json.load(fh)
+        raster = os.path.join(entry.path,
+                              manifest.get("raster_file") or "sentinel2.tif")
+        if not os.path.isfile(raster):
+            raise DatasetError("Sentinel raster missing: %s" % raster)
+        tiles = acquire_tiles(
+            store, tile_spec,
+            candidates=[raster_candidate("file://" + raster,
+                                         source_id="sentinel2",
+                                         license_text=SENTINEL2_LICENSE)],
+            force=force)
+        return {"sentinel": sentinel, "tiles": tiles, "fallback": False,
+                "errors": errors}
+    except (DatasetError, AcquireError, Exception) as exc:  # noqa: BLE001
+        errors.append("%s: %s" % (type(exc).__name__, exc))
+    try:
+        tiles = acquire_tiles(store, tile_spec,
+                              source_ids=list(fallback_sources), force=force)
+        return {"sentinel": sentinel, "tiles": tiles, "fallback": True,
+                "errors": errors}
+    except Exception as exc:  # noqa: BLE001
+        errors.append("fallback: %s: %s" % (type(exc).__name__, exc))
+        raise DatasetError("Sentinel and fallback tile acquisition failed: %s"
+                           % "; ".join(errors))
+
+
 def _warp_sources(urls, bbox, dest: str, timeout_s: int = 240,
                   resolution_m: float = 0.0,
                   resampling: str = "bilinear") -> str:

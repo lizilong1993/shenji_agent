@@ -19,6 +19,14 @@ python3 scripts/resource.py sentinel --name xiamen-s2 \
   --date 2025-12-31 --window-days 365 --max-cloud 30 --resolution 10
 ```
 
+生成地图瓦片（Sentinel 场景 → XYZ，失败自动回退 EOX cloudless/Esri）：
+
+```bash
+python3 scripts/resource.py sentinel-tiles --name xiamen-s2 \
+  --bbox 118.0,24.4,118.02,24.42 --zooms 10-13 \
+  --date 2025-12-31 --fallback-sources eox-s2,esri
+```
+
 需要代理访问 Sentinel S3 时（server155 当前环境）：
 
 ```bash
@@ -31,13 +39,14 @@ export GDAL_HTTP_PROXY=http://127.0.0.1:27980
 
 - STAC 查询厦门 AOI：返回 `S2B_50QNM_20251208`，云量约 0.0038；日期/云量选择正常。
 - 经本机 Clash 代理：TCI COG 窗口抓取 + 登记 **8.1 s**，223×223、3 波段、约 151 KB。
+- 复用缓存场景生成瓦片：`sentinel-tiles` 0.8 s，z10-12 共 3 张、12.6 KB，tile 源为 `sentinel2`。
 - 无代理直连 `sentinel-cogs` S3 时多次出现 `TIFFFillTile` 部分读取错误（got < expected），
   说明当前 egress 到该 S3 不稳定；生产应配置代理或预取缓存。
 
 ## 回退与限制
 
-- 现有兜底：EOX Sentinel-2 cloudless 2020 XYZ（`resources.sources` 的 `eox-s2`），
-  可走 `resource.py tiles --sources eox-s2` 获取无云年度合成；Sentinel 场景失败时需显式切换。
+- `sentinel-tiles` 已内置兜底：Sentinel 获取/切片失败时自动改用 EOX Sentinel-2 cloudless 2020
+  或 Esri XYZ 源；也可单独走 `resource.py tiles --sources eox-s2`。
 - 单场景：当前不跨景镶嵌；AOI 跨两景时可能只覆盖部分，需要后续加 mosaic。
 - 缓存键包含 `bbox/date/window_days/max_cloud/resolution`（`DatasetSpec.query`），不同日期
   不会误复用；`--force` 可刷新。
