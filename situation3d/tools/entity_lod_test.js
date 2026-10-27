@@ -74,7 +74,8 @@ eq(L.formClassOf({ domain: 'air', platform_class: '无人机', icon: 'aew' }), '
 
 // --- 7. 精确型号优先，缺失型号回退大类 ---
 const exact = [
-  ['052D 型驱逐舰', 'type_052c.glb'],
+  ['052D 型驱逐舰', 'type_052d.glb'],
+  ['052C 型驱逐舰', 'type_052c.glb'],
   ['054A 型护卫舰', 'type_054a.glb'],
   ['055 型驱逐舰', 'type_055.glb'],
   ['075 型两栖攻击舰', 'type_075.glb'],
@@ -157,7 +158,9 @@ eq(L.lod1UrlFor({ domain: 'air', model: 'E-2K 预警机' }),
 eq(L.lod1UrlFor({ domain: 'air', model: '空警-500 预警机' }),
   './assets/models/lod1_kj500.glb', 'KJ-500 -> lod1');
 eq(L.lod1UrlFor({ domain: 'sea', model: '052D 型驱逐舰' }),
-  './assets/models/lod1_052c.glb', '052C/052D -> lod1');
+  null, '052D (no LOD1) -> null');
+eq(L.lod1UrlFor({ domain: 'sea', model: '052C 型驱逐舰' }),
+  './assets/models/lod1_052c.glb', '052C -> lod1');
 for (const u of ['./assets/models/lod1_ztd05.glb', './assets/models/lod1_eq240.glb',
                  './assets/models/lod1_perry.glb', './assets/models/lod1_j16.glb',
                  './assets/models/lod1_kj2000.glb', './assets/models/lod1_kj500.glb',

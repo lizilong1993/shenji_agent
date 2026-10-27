@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": "2026-10-26T17:21:02",
+  "generated_at": "2026-10-27T11:35:00",
   "note": "由 tools/model_budget_test.py 生成；sha256 对应优化后的 GLB。",
   "assets": {
     "type_052c.glb": {
@@ -21,8 +21,7 @@
       "public": {
         "public_length_m": 155.0,
         "public_width_m": 17.2,
-        "approx_of": "052D",
-        "notes": "052D 用 052C 近似"
+        "notes": "052C 本体；无型号名时作驱逐舰大类回退"
       },
       "license": {
         "source": "Type 052C Destroyer (DCS World)",
@@ -34,6 +33,28 @@
         ],
         "source_url": null
       }
+    },
+    "type_052d.glb": {
+      "sha256": "e7d6b4707150dcfb082d0f0e8fbd431473886f560b59c73c09e51f685eb99a2a",
+      "bytes": 363680,
+      "mb": 0.35,
+      "tris": 11552,
+      "prims": 3,
+      "materials": 3,
+      "images": 4,
+      "extensions": [
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization"
+      ],
+      "animations": 0,
+      "class": "ship_large",
+      "public": {
+        "public_length_m": 157.0,
+        "public_width_m": 17.2,
+        "notes": "052D 自建近似：四块平板 346A、前32+后32 VLS、130mm 主炮、1130+HQ-10"
+      },
+      "license": {}
     },
     "type_054a.glb": {
       "sha256": "f9aed2b8b949b5ba8da6718679bc265117b48c528648a07e6a8ec6c96bfcc947",

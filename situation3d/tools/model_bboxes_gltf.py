@@ -51,8 +51,8 @@ def main(root):
             "max_m": [round(x, 2) for x in mx],
         }
         print(fn, models[fn]["length_m"], models[fn]["width_m"], models[fn]["height_m"])
-    if len(models) != 39:
-        print("expected 39 main models, got %d" % len(models), file=sys.stderr)
+    if len(models) != 40:
+        print("expected 40 main models, got %d" % len(models), file=sys.stderr)
         return 1
     doc = {"schema": "situation3d.model_bboxes.v1", "models": models}
     for path in (out_engine, out_web):

@@ -21,7 +21,7 @@ LOD1 与 LOD0 同朝向、同原点、同 yaw fix；`lod1_*` 文件不参与 `ty
 
 ## 2. 运行时切换
 
-- `EntityLod.lod1UrlFor(def)` 登记 ZTD-05/EQ240/Perry/J-16/KJ-2000/KJ-500/E-2D/052C；其他型号返回 null；052D 经 052C 回退同样获得 LOD1。071/054A/055 因 simplify 后仍约 2.2–3.2 万面、收益不足，暂不登记。
+- `EntityLod.lod1UrlFor(def)` 登记 ZTD-05/EQ240/Perry/J-16/KJ-2000/KJ-500/E-2D/052C；其他型号返回 null；052D 自 2026-10-27 起使用自建 `type_052d`，暂无 LOD1。071/054A/055 因 simplify 后仍约 2.2–3.2 万面、收益不足，暂不登记。
 - `app.js` 新增 `applyTargetModelLod()`：
   - 相机高度 **1.2–3 km** 时，对登记型号把 `entity.model.uri` 切到 LOD1；
   - 低于 1.2 km 回 LOD0；高于 3 km 回 LOD0（此时通常已回 2D 图标）；
@@ -51,4 +51,4 @@ LOD1 与 LOD0 同朝向、同原点、同 yaw fix；`lod1_*` 文件不参与 `ty
 1. 071/054A/055 需更合适的减面参数/网格；
 2. 对 ZTD-05/EQ240 做实例化/共享 Model，进一步压 draw calls；
 3. 真机 GPU（RTX 3060/4060 级）测 1.5/3/6 km 的 FPS、draw calls、首帧时间；
-4. 轮系/雷达/炮塔关节与 052D 网格改造继续排期。
+4. 轮系/雷达/炮塔关节与 052D 细化/LOD1 继续排期。

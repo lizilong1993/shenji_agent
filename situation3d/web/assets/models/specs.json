@@ -6,8 +6,7 @@
       "class": "ship_large",
       "public_length_m": 155.0,
       "public_width_m": 17.2,
-      "approx_of": "052D",
-      "notes": "052D 用 052C 近似"
+      "notes": "052C 本体；无型号名时作驱逐舰大类回退"
     },
     "type_054a.glb": {
       "class": "ship_large",
@@ -219,6 +218,12 @@
       "public_length_m": 7.0,
       "public_width_m": 2.4,
       "notes": "M142 HIMARS"
+    },
+    "type_052d.glb": {
+      "class": "ship_large",
+      "public_length_m": 157.0,
+      "public_width_m": 17.2,
+      "notes": "052D 自建近似：四块平板 346A、前32+后32 VLS、130mm 主炮、1130+HQ-10"
     }
   }
 }
