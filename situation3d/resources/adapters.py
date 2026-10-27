@@ -359,25 +359,103 @@ def search_sentinel2(bbox, target_date=None, window_days: int = 60,
                         "%Y-%m-%dT%H:%M:%SZ")}
 
 
+def search_sentinel2_mosaic(bbox, target_date=None, window_days: int = 60,
+                            max_cloud: float = 30.0,
+                            limit: int = 100) -> Any:
+    """Choose the clearest scene per MGRS grid tile covering the AOI."""
+    target = _parse_day(target_date)
+    start = target - __import__("datetime").timedelta(days=int(window_days))
+    payload = {
+        "collections": [SENTINEL2_COLLECTION],
+        "bbox": [float(v) for v in bbox],
+        "datetime": "%s/%s" % (start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                               target.strftime("%Y-%m-%dT%H:%M:%SZ")),
+        "limit": int(limit),
+    }
+    try:
+        doc = _http_json(EARTH_SEARCH_URL, payload)
+    except Exception as exc:  # noqa: BLE001
+        raise DatasetError("Sentinel-2 STAC search failed: %s" % exc)
+    groups = {}
+    for feature in doc.get("features") or []:
+        props = feature.get("properties") or {}
+        assets = feature.get("assets") or {}
+        href = None
+        for key in ("visual", "TCI", "red"):
+            asset = assets.get(key) or {}
+            href = asset.get("href")
+            if href:
+                break
+        if not href:
+            continue
+        try:
+            cloud = float(props.get("eo:cloud_cover"))
+        except (TypeError, ValueError):
+            cloud = 100.0
+        try:
+            when = _parse_day(props.get("datetime"))
+        except DatasetError:
+            continue
+        code = str(props.get("grid:code") or props.get("s2:mgrs_tile")
+                   or feature.get("id"))
+        candidate = {"id": feature.get("id"), "href": href,
+                     "datetime": when, "cloud": cloud,
+                     "bbox": feature.get("bbox"), "grid": code}
+        old = groups.get(code)
+        key = (cloud, abs((target - when).total_seconds()))
+        if old is None or key < old[0]:
+            groups[code] = (key, candidate)
+    scenes = [item[1] for item in groups.values()]
+    if not scenes:
+        raise DatasetError("no Sentinel-2 scene covers %s" % (bbox,))
+    scenes.sort(key=lambda c: (c["cloud"],
+                               abs((target - c["datetime"]).total_seconds()),
+                               c["grid"]))
+    query = {"requested": target.strftime("%Y-%m-%dT%H:%M:%SZ"),
+             "window_days": window_days, "max_cloud": max_cloud,
+             "found": len(doc.get("features") or []),
+             "grids": len(scenes),
+             "scenes": [{"id": c["id"], "grid": c["grid"],
+                         "cloud": c["cloud"],
+                         "datetime": c["datetime"].strftime(
+                             "%Y-%m-%dT%H:%M:%SZ")} for c in scenes]}
+    return scenes, query
+
+
 def fetch_sentinel2(store: ResourceStore, spec: DatasetSpec,
                     cache_root: str, target_date=None,
                     window_days: int = 60, max_cloud: float = 30.0,
                     resolution_m: float = 10.0,
-                    timeout_s: int = 240) -> Any:
+                    timeout_s: int = 240,
+                    mosaic: bool = False) -> Any:
     spec.validate()
-    chosen, query = search_sentinel2(spec.bbox, target_date, window_days,
-                                     max_cloud)
+    if mosaic:
+        scenes, query = search_sentinel2_mosaic(
+            spec.bbox, target_date, window_days, max_cloud)
+        chosen = scenes
+        scene_ids = [c["id"] for c in scenes]
+        scene_datetime = scenes[0]["datetime"].strftime("%Y-%m-%dT%H:%M:%SZ")
+        cloud = max(c["cloud"] for c in scenes)
+    else:
+        chosen, query = search_sentinel2(spec.bbox, target_date, window_days,
+                                         max_cloud)
+        scenes = [chosen]
+        scene_ids = [chosen["id"]]
+        scene_datetime = query["scene_datetime"]
+        cloud = query["cloud_cover"]
     work = os.path.join(cache_root, "raster", "sentinel2")
     os.makedirs(work, exist_ok=True)
     dest = os.path.join(work, "%s.tif" % spec.slug)
-    _warp_sources([chosen["href"]], spec.bbox, dest, timeout_s=timeout_s,
-                  resolution_m=resolution_m, resampling="bilinear")
+    _warp_sources([c["href"] for c in scenes], spec.bbox, dest,
+                  timeout_s=timeout_s, resolution_m=resolution_m,
+                  resampling="bilinear")
     info = raster_info(dest)
     source = {"label": "Sentinel-2 L2A true colour (Earth Search AWS)",
-              "scene_id": chosen["id"], "scene_datetime": query["scene_datetime"],
-              "cloud_cover": query["cloud_cover"], "query": query,
-              "license": SENTINEL2_LICENSE,
-              "as_of": query["scene_datetime"][:10]}
+              "scene_id": scene_ids[0], "scene_ids": scene_ids,
+              "scene_datetime": scene_datetime,
+              "cloud_cover": cloud, "mosaic": bool(mosaic),
+              "query": query, "license": SENTINEL2_LICENSE,
+              "as_of": scene_datetime[:10]}
     return dest, info, source, chosen
 
 
@@ -385,15 +463,17 @@ def acquire_sentinel(store: ResourceStore, spec: DatasetSpec,
                      cache_root: str, target_date=None,
                      window_days: int = 60, max_cloud: float = 30.0,
                      resolution_m: float = 10.0,
-                     force: bool = False) -> Any:
+                     force: bool = False, mosaic: bool = None) -> Any:
     spec.validate()
     if not force:
         cached = _cached_dataset(store, spec)
         if cached is not None:
             return cached
+    if mosaic is None:
+        mosaic = bool((spec.query or {}).get("mosaic"))
     dest, info, source, chosen = fetch_sentinel2(
         store, spec, cache_root, target_date, window_days, max_cloud,
-        resolution_m)
+        resolution_m, mosaic=mosaic)
     root = os.path.join(str(store.root), "cache", "datasets",
                         spec.kind, spec.slug, spec.hash()[:12])
     os.makedirs(root, exist_ok=True)
@@ -408,8 +488,11 @@ def acquire_sentinel(store: ResourceStore, spec: DatasetSpec,
                              quality=quality, provider="adapter:sentinel2",
                              as_of=source["as_of"],
                              notes={"adapter": "sentinel2",
-                                    "scene_id": chosen["id"],
-                                    "cloud_cover": chosen["cloud"]})
+                                    "scene_id": source.get("scene_id"),
+                                    "scene_ids": source.get("scene_ids")
+                                    or [source.get("scene_id")],
+                                    "mosaic": bool(source.get("mosaic")),
+                                    "cloud_cover": source["cloud_cover"]})
     return {"entry": entry, "manifest": manifest, "source": source,
             "chosen": chosen, "cached": False}
 
@@ -419,7 +502,8 @@ def acquire_sentinel_tiles(store: ResourceStore, tile_spec, cache_root: str,
                            max_cloud: float = 30.0,
                            resolution_m: float = 10.0,
                            fallback_sources=("eox-s2", "esri"),
-                           force: bool = False) -> Any:
+                           force: bool = False,
+                           mosaic: bool = False) -> Any:
     """Acquire a Sentinel scene raster, then render/register XYZ tiles.
 
     On any Sentinel failure the function falls back to the existing XYZ
@@ -436,7 +520,7 @@ def acquire_sentinel_tiles(store: ResourceStore, tile_spec, cache_root: str,
             name=tile_spec.name, bbox=tile_spec.bbox,
             kind="satellite_imagery", resolution_m=resolution_m,
             query={"date": target_date, "window_days": window_days,
-                   "max_cloud": max_cloud})
+                   "max_cloud": max_cloud, "mosaic": bool(mosaic)})
         sentinel = acquire_sentinel(
             store, scene_spec, cache_root, target_date=target_date,
             window_days=window_days, max_cloud=max_cloud,

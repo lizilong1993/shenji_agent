@@ -413,7 +413,8 @@ def cmd_sentinel(args):
                            resolution_m=args.resolution,
                            query={"date": args.date,
                                   "window_days": args.window_days,
-                                  "max_cloud": args.max_cloud})
+                                  "max_cloud": args.max_cloud,
+                                  "mosaic": args.mosaic})
         result = acquire_sentinel(
             store, spec,
             args.cache_root or os.path.join(str(store.root), "cache"),
@@ -445,7 +446,7 @@ def cmd_sentinel_tiles(args):
             fallback_sources=[s.strip() for s in
                               (args.fallback_sources or "eox-s2,esri").split(",")
                               if s.strip()],
-            force=args.force)
+            force=args.force, mosaic=args.mosaic)
     except (DatasetError, ValueError) as exc:
         print("error: %s" % exc, file=sys.stderr)
         return 1
@@ -574,6 +575,8 @@ def main(argv=None):
     p.add_argument("--window-days", type=int, default=60)
     p.add_argument("--max-cloud", type=float, default=30.0)
     p.add_argument("--resolution", type=float, default=10.0)
+    p.add_argument("--mosaic", action="store_true",
+                   help="one best scene per MGRS tile, mosaicked")
     p.add_argument("--cache-root", default=None)
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_sentinel)
@@ -588,6 +591,8 @@ def main(argv=None):
     p.add_argument("--max-cloud", type=float, default=30.0)
     p.add_argument("--resolution", type=float, default=10.0)
     p.add_argument("--fallback-sources", default="eox-s2,esri")
+    p.add_argument("--mosaic", action="store_true",
+                   help="one best scene per MGRS tile, mosaicked")
     p.add_argument("--cache-root", default=None)
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_sentinel_tiles)
