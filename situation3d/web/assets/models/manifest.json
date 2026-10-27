@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": "2026-10-27T11:52:51",
+  "generated_at": "2026-10-27T12:00:51",
   "note": "由 tools/model_budget_test.py 生成；sha256 对应优化后的 GLB。",
   "assets": {
     "type_052c.glb": {
@@ -206,8 +206,8 @@
       }
     },
     "type_903.glb": {
-      "sha256": "34a37852053eed56ff4f24bc22cb8b3e2483c18a6a1583ea6b6efdd8f5c00f3d",
-      "bytes": 175240,
+      "sha256": "2d91b2eb7333ad4210a4a8d4db7243cadea608feafec03218e5c91a832d3c8d2",
+      "bytes": 175232,
       "mb": 0.17,
       "tris": 1976,
       "prims": 3,
@@ -525,8 +525,8 @@
       }
     },
     "type_kidd.glb": {
-      "sha256": "f60c1dfda7fd2f55504129326f5766ea0325bc6b4e9758d24da87a015fcae9af",
-      "bytes": 186468,
+      "sha256": "8c5ec8336d2a2f19cf400c077941110523c13d49cf8313495d4d0a6e9375f816",
+      "bytes": 186528,
       "mb": 0.18,
       "tris": 2716,
       "prims": 3,
@@ -848,8 +848,8 @@
       }
     },
     "type_panshi.glb": {
-      "sha256": "e4f50308586c66d0f502a19d24a2f3aad053c05beb80b0f0a2a3dc2eb4791508",
-      "bytes": 174932,
+      "sha256": "c730df23b0e48d01de750fa6b4a12437e24e0f7e2528865baebd26855b5f5058",
+      "bytes": 174916,
       "mb": 0.17,
       "tris": 1936,
       "prims": 3,
@@ -994,8 +994,8 @@
       }
     },
     "type_tuochiang.glb": {
-      "sha256": "315632580b0326457f99d46cf5c45b49df95297a3f5148a78313e2ee18373116",
-      "bytes": 183844,
+      "sha256": "794ae9602de3175f8db1c3d7bb0f02801763595a0e2ca59bb7ba6d0a56444528",
+      "bytes": 183924,
       "mb": 0.18,
       "tris": 2336,
       "prims": 3,
