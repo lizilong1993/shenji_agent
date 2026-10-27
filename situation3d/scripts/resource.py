@@ -24,7 +24,8 @@ from resources import providers  # noqa: E402
 from resources.acquire import (AcquireError, acquire_tiles,  # noqa: E402
                                probe_report)
 from resources.adapters import (acquire_buildings, acquire_canopy,  # noqa: E402
-                                acquire_landcover, DatasetError)
+                                acquire_landcover, acquire_sentinel,
+                                DatasetError)
 from resources.vectorproc import DatasetSpec  # noqa: E402
 from resources.enrichment import enrich_envpack  # noqa: E402
 from resources.envpack_layers import (add_canopy_layer,  # noqa: E402
@@ -404,6 +405,32 @@ def cmd_add_landcover(args):
     return 0
 
 
+def cmd_sentinel(args):
+    store = _store(args)
+    try:
+        spec = DatasetSpec(name=args.name, bbox=_parse_bbox(args.bbox),
+                           kind="satellite_imagery",
+                           resolution_m=args.resolution,
+                           query={"date": args.date,
+                                  "window_days": args.window_days,
+                                  "max_cloud": args.max_cloud})
+        result = acquire_sentinel(
+            store, spec,
+            args.cache_root or os.path.join(str(store.root), "cache"),
+            target_date=args.date, window_days=args.window_days,
+            max_cloud=args.max_cloud, resolution_m=args.resolution,
+            force=args.force)
+    except (DatasetError, ValueError) as exc:
+        print("error: %s" % exc, file=sys.stderr)
+        return 1
+    print(json.dumps({"entry": result["entry"].as_dict(),
+                      "manifest": result["manifest"],
+                      "source": result["source"],
+                      "cached": result.get("cached", False)},
+                     ensure_ascii=False, indent=1))
+    return 0
+
+
 def cmd_kinds(args):
     rows = [KINDS[k].as_dict() for k in sorted(KINDS)]
     print(json.dumps(rows, ensure_ascii=False, indent=1))
@@ -508,6 +535,19 @@ def main(argv=None):
     p.add_argument("--force", action="store_true")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_landcover)
+
+    p = sub.add_parser("sentinel",
+                       help="acquire a Sentinel-2 L2A true-colour raster")
+    p.add_argument("--name", required=True)
+    p.add_argument("--bbox", required=True)
+    p.add_argument("--date", default=None,
+                   help="ISO date/datetime (default: now)")
+    p.add_argument("--window-days", type=int, default=60)
+    p.add_argument("--max-cloud", type=float, default=30.0)
+    p.add_argument("--resolution", type=float, default=10.0)
+    p.add_argument("--cache-root", default=None)
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_sentinel)
 
     p = sub.add_parser("tiles", help="acquire an XYZ tileset from parallel sources")
     p.add_argument("--name", required=True)

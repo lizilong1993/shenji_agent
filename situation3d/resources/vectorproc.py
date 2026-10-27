@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import math
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -39,6 +39,7 @@ class DatasetSpec:
     kind: str = "building_footprints"
     layer: str = ""
     resolution_m: float = 0.0
+    query: Dict[str, Any] = field(default_factory=dict)
 
     def validate(self):
         if not self.name:
@@ -60,6 +61,7 @@ class DatasetSpec:
             "kind": self.kind,
             "layer": self.layer,
             "resolution_m": float(self.resolution_m),
+            "query": dict(self.query or {}),
         }
 
     def hash(self) -> str:

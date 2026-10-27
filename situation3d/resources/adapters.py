@@ -41,6 +41,10 @@ CHMV2_AS_OF = "2024-01-01"
 
 OVERTURE_LICENSE = "Overture Maps data license (per-layer; check CDLA/ODbL terms)"
 
+EARTH_SEARCH_URL = "https://earth-search.aws.element84.com/v1/search"
+SENTINEL2_COLLECTION = "sentinel-2-l2a"
+SENTINEL2_LICENSE = "Copernicus Sentinel data terms (free, open, attribution)"
+
 WORLDCOVER_BASE = ("https://esa-worldcover.s3.eu-central-1.amazonaws.com/"
                    "v200/2021/map")
 WORLDCOVER_LICENSE = "CC BY 4.0 (ESA WorldCover 2021 v200)"
@@ -274,6 +278,142 @@ def _worldcover_url(lon0: int, lat0: int) -> str:
         WORLDCOVER_BASE, _tag_upper(lon0, lat0))
 
 
+def _http_json(url: str, payload=None, timeout_s: float = 30.0) -> Any:
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    req = Request(url, data=data, headers={
+        "Content-Type": "application/json",
+        "User-Agent": "situation3d-geo-engine/1.0"})
+    with urlopen(req, timeout=timeout_s) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _parse_day(value) -> datetime:
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    text = str(value or "").strip()
+    if not text:
+        return datetime.now(timezone.utc)
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        raise DatasetError("date must be ISO 8601: %r" % (value,))
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def search_sentinel2(bbox, target_date=None, window_days: int = 60,
+                     max_cloud: float = 30.0, limit: int = 40) -> Any:
+    target = _parse_day(target_date)
+    start = target - __import__("datetime").timedelta(days=int(window_days))
+    payload = {
+        "collections": [SENTINEL2_COLLECTION],
+        "bbox": [float(v) for v in bbox],
+        "datetime": "%s/%s" % (start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                               target.strftime("%Y-%m-%dT%H:%M:%SZ")),
+        "limit": int(limit),
+    }
+    try:
+        doc = _http_json(EARTH_SEARCH_URL, payload)
+    except Exception as exc:  # noqa: BLE001
+        raise DatasetError("Sentinel-2 STAC search failed: %s" % exc)
+    features = doc.get("features") or []
+    candidates = []
+    for feature in features:
+        props = feature.get("properties") or {}
+        assets = feature.get("assets") or {}
+        href = None
+        for key in ("visual", "TCI", "red"):
+            asset = assets.get(key) or {}
+            href = asset.get("href")
+            if href:
+                break
+        if not href:
+            continue
+        try:
+            cloud = float(props.get("eo:cloud_cover"))
+        except (TypeError, ValueError):
+            cloud = 100.0
+        try:
+            when = _parse_day(props.get("datetime"))
+        except DatasetError:
+            continue
+        candidates.append({"id": feature.get("id"), "href": href,
+                           "datetime": when, "cloud": cloud,
+                           "bbox": feature.get("bbox"),
+                           "assets": sorted(assets)})
+    if not candidates:
+        raise DatasetError("no Sentinel-2 scene covers %s in %s..%s"
+                           % (bbox, start.date(), target.date()))
+    clear = [c for c in candidates if c["cloud"] <= max_cloud]
+    pool = clear or candidates
+    pool.sort(key=lambda c: (c["cloud"],
+                             abs((target - c["datetime"]).total_seconds())))
+    chosen = pool[0]
+    return chosen, {"requested": target.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "window_days": window_days,
+                    "max_cloud": max_cloud, "found": len(candidates),
+                    "clear": len(clear),
+                    "cloud_cover": chosen["cloud"],
+                    "scene_datetime": chosen["datetime"].strftime(
+                        "%Y-%m-%dT%H:%M:%SZ")}
+
+
+def fetch_sentinel2(store: ResourceStore, spec: DatasetSpec,
+                    cache_root: str, target_date=None,
+                    window_days: int = 60, max_cloud: float = 30.0,
+                    resolution_m: float = 10.0,
+                    timeout_s: int = 240) -> Any:
+    spec.validate()
+    chosen, query = search_sentinel2(spec.bbox, target_date, window_days,
+                                     max_cloud)
+    work = os.path.join(cache_root, "raster", "sentinel2")
+    os.makedirs(work, exist_ok=True)
+    dest = os.path.join(work, "%s.tif" % spec.slug)
+    _warp_sources([chosen["href"]], spec.bbox, dest, timeout_s=timeout_s,
+                  resolution_m=resolution_m, resampling="bilinear")
+    info = raster_info(dest)
+    source = {"label": "Sentinel-2 L2A true colour (Earth Search AWS)",
+              "scene_id": chosen["id"], "scene_datetime": query["scene_datetime"],
+              "cloud_cover": query["cloud_cover"], "query": query,
+              "license": SENTINEL2_LICENSE,
+              "as_of": query["scene_datetime"][:10]}
+    return dest, info, source, chosen
+
+
+def acquire_sentinel(store: ResourceStore, spec: DatasetSpec,
+                     cache_root: str, target_date=None,
+                     window_days: int = 60, max_cloud: float = 30.0,
+                     resolution_m: float = 10.0,
+                     force: bool = False) -> Any:
+    spec.validate()
+    if not force:
+        cached = _cached_dataset(store, spec)
+        if cached is not None:
+            return cached
+    dest, info, source, chosen = fetch_sentinel2(
+        store, spec, cache_root, target_date, window_days, max_cloud,
+        resolution_m)
+    root = os.path.join(str(store.root), "cache", "datasets",
+                        spec.kind, spec.slug, spec.hash()[:12])
+    os.makedirs(root, exist_ok=True)
+    import shutil
+    target = os.path.join(root, "sentinel2.tif")
+    if os.path.abspath(dest) != os.path.abspath(target):
+        shutil.copyfile(dest, target)
+    manifest = write_raster_manifest(root, "sentinel2.tif", spec, source,
+                                     info, extra={"adapter": "sentinel2"})
+    quality = "measured" if source["cloud_cover"] <= max_cloud else "derived"
+    entry = register_dataset(store, spec, root, source, SENTINEL2_LICENSE,
+                             quality=quality, provider="adapter:sentinel2",
+                             as_of=source["as_of"],
+                             notes={"adapter": "sentinel2",
+                                    "scene_id": chosen["id"],
+                                    "cloud_cover": chosen["cloud"]})
+    return {"entry": entry, "manifest": manifest, "source": source,
+            "chosen": chosen, "cached": False}
+
+
 def _warp_sources(urls, bbox, dest: str, timeout_s: int = 240,
                   resolution_m: float = 0.0,
                   resampling: str = "bilinear") -> str:
@@ -286,7 +426,9 @@ def _warp_sources(urls, bbox, dest: str, timeout_s: int = 240,
     env.setdefault("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
     env.setdefault("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif,.tiff")
     env.setdefault("GDAL_HTTP_MAX_RETRY", "2")
-    cmd = ["gdalwarp", "-q", "-overwrite", "-te_srs", "EPSG:4326",
+    env.setdefault("GDAL_HTTP_TIMEOUT", "60")
+    env.setdefault("GDAL_HTTP_CONNECTTIMEOUT", "10")
+    cmd = ["gdalwarp", "-q", "-overwrite", "-wm", "256", "-te_srs", "EPSG:4326",
            "-te", "%.8f" % w, "%.8f" % s, "%.8f" % e, "%.8f" % n]
     if resolution_m > 0:
         deg = float(resolution_m) / 111320.0

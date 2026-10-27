@@ -1,0 +1,44 @@
+# Sentinel-2 L2A 影像资源（2026-10-27）
+
+## 数据路径
+
+- STAC：Earth Search AWS（`https://earth-search.aws.element84.com/v1/search`），collection
+  `sentinel-2-l2a`；按 AOI bbox + 想定日期向前 `window_days` 查询，读 `eo:cloud_cover`。
+- 资产：AWS Open Data `sentinel-cogs` 的 `TCI.tif`（真彩色 COG，10 m）；GDAL
+  `/vsicurl` 只读 AOI 窗口，不下载整景。
+- 选择：优先 `cloud <= max_cloud`，再按云量升序、日期距目标最近排序；没有满足云量时
+  选云量最低的场景并标记 `quality=derived`。
+- 登记：`satellite_imagery:<name>`，manifest `s3d.raster.v1`，记录 scene id / datetime /
+  cloud / query；许可为 Copernicus Sentinel data terms。
+
+## 用法
+
+```bash
+python3 scripts/resource.py sentinel --name xiamen-s2 \
+  --bbox 118.0,24.4,118.02,24.42 \
+  --date 2025-12-31 --window-days 365 --max-cloud 30 --resolution 10
+```
+
+需要代理访问 Sentinel S3 时（server155 当前环境）：
+
+```bash
+ssh -f -N -R 27980:172.16.10.254:7897 situ155
+export https_proxy=http://127.0.0.1:27980 HTTPS_PROXY=http://127.0.0.1:27980
+export GDAL_HTTP_PROXY=http://127.0.0.1:27980
+```
+
+## 实测（2026-10-27，server155 新节点）
+
+- STAC 查询厦门 AOI：返回 `S2B_50QNM_20251208`，云量约 0.0038；日期/云量选择正常。
+- 经本机 Clash 代理：TCI COG 窗口抓取 + 登记 **8.1 s**，223×223、3 波段、约 151 KB。
+- 无代理直连 `sentinel-cogs` S3 时多次出现 `TIFFFillTile` 部分读取错误（got < expected），
+  说明当前 egress 到该 S3 不稳定；生产应配置代理或预取缓存。
+
+## 回退与限制
+
+- 现有兜底：EOX Sentinel-2 cloudless 2020 XYZ（`resources.sources` 的 `eox-s2`），
+  可走 `resource.py tiles --sources eox-s2` 获取无云年度合成；Sentinel 场景失败时需显式切换。
+- 单场景：当前不跨景镶嵌；AOI 跨两景时可能只覆盖部分，需要后续加 mosaic。
+- 缓存键包含 `bbox/date/window_days/max_cloud/resolution`（`DatasetSpec.query`），不同日期
+  不会误复用；`--force` 可刷新。
+- Sentinel-1 SAR、Planetary Computer/CDSE OAuth 源尚未接入；可复用同一 STAC/COG 框架。
