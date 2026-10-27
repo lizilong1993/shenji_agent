@@ -23,6 +23,7 @@ P1 遗留的最后一处型号错配：052D 一直用 052C 资产顶替。052D �
 
 - 新资产 `type_052d.glb`：**11,552 面 / 3 prims / 0.35 MB**（1024 WebP + Meshopt），bbox 157.0 × 17.19 × 33.19 m。
 - `entityLod.js`：`052D|Luyang III` → `type_052d`；新增 `052C` → `type_052c`；`destroyer` 大类回退仍是 `type_052c`。
+- `targetCombatFx.js` 新增 `ship052d` 代理炮塔（复用 052C 100 mm 炮塔外观，offset `[-61, 0, 6.05]`、muzzle `[-66.15, 0, 7.9]`），避免原 052C 代理叠在艏部 VLS 上。
 - 052D 暂未配置 LOD1（默认案例只有 2 艘 052D，密集案例不含 052D）。
 - `specs.json`、`CREDITS.md`、`licenses.json`、`manifest.json`、两份 `bboxes.json` 均更新；主模型 39 → **40**。
 
@@ -33,7 +34,7 @@ P1 遗留的最后一处型号错配：052D 一直用 052C 资产顶替。052D �
 - `model_bboxes_gltf.py`：40 型，两份 bboxes 同步。
 - `entity_lod_test.js`：**221/221**（新增 052D/052C 映射与 052D 无 LOD1 断言）。
 - Cesium 1.145 + headless Chromium：052D、052C 同屏加载均 HTTP 200，无 pageerror。
-- 全量 `pytest tests -q`：**558 passed / 14 skipped**（无回归）。
+- 全量 `pytest tests -q`：**563 passed / 14 skipped**（无回归）。
 
 ## 5. 已知限制
 

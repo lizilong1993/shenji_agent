@@ -109,7 +109,7 @@
     [/基隆|kidd/i, 'type_kidd'],
     [/磐石|panshi/i, 'type_panshi'],
     [/052d|luyang.?iii/i, 'type_052d'],
-    [/052c|luyang.?ii/i, 'type_052c'],
+    [/052c|luyang\s?ii(?!i)/i, 'type_052c'],
     // 地面
     [/15\s*式|ztq-?15/i, 'type_ztq15'],
     [/99a|ztz-?99/i, 'type_ztz99a'],

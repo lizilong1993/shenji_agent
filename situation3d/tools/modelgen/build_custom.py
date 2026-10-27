@@ -465,16 +465,16 @@ def build_052d():
     bulwark(L, B, 6.2, "052d_bulwark")
     deckz = 6.2
     # 艏部：防浪板/锚机/锚孔
-    box("052d_breakwater", (0, 66.0, deckz + 0.6), (9.0, 0.4, 1.2), navy())
+    box("052d_breakwater", (0, 66.0, deckz + 0.48), (9.0, 0.4, 1.2), navy())
     for sx in (-1, 1):
         box("052d_windlass_%d" % sx, (sx * 3.0, 68.5, deckz + 0.45), (1.6, 2.2, 0.9), dark())
-        box("052d_hawse_%d" % sx, (sx * 3.2, 71.5, deckz - 0.8), (0.6, 1.0, 0.9), dark())
+        box("052d_hawse_%d" % sx, (sx * 3.5, 71.5, deckz - 0.8), (0.6, 1.0, 0.9), dark())
     # 130 mm 主炮
-    gun("052d_gun", 61.0, deckz, 1.05, 0.16)
+    gun("052d_gun", 61.0, deckz - 0.15, 1.05, 0.16)
     # 前部 VLS：32 单元（4 列 x 8 行）
-    vls("052d_vls_f", 48.5, deckz, 4, 8)
+    vls("052d_vls_f", 48.5, deckz - 0.2, 4, 8)
     for sx in (-1, 1):
-        sphere("052d_esm_%d" % sx, (sx * 3.9, 34.0, deckz + 10.9), 0.28, white(), seg=14, rings=8)
+        sphere("052d_esm_%d" % sx, (sx * 2.6, 30.0, deckz + 11.68), 0.28, white(), seg=14, rings=8)
         box("052d_door_%d_0" % sx, (sx * 6.3, 18.0, deckz + 1.2), (0.3, 1.0, 2.0), dark())
         box("052d_door_%d_1" % sx, (sx * 6.72, -34.0, deckz + 1.6), (0.3, 1.0, 2.0), dark())
     for sx in (-1, 1):
@@ -540,12 +540,12 @@ def build_052d():
                 (0.24, 0.24, 0.1), dark())
     # 鱼雷发射管（两舷各 3 管）/ 干扰弹发射器
     for sx in (-1, 1):
-        box("052d_tt_base_%d" % sx, (sx * 7.2, -14.0, deckz + 1.0), (1.2, 3.4, 0.9), navy())
+        box("052d_tt_base_%d" % sx, (sx * 7.2, -14.0, deckz + 0.48), (1.2, 3.4, 0.9), navy())
         for k in range(3):
-            cyl("052d_tt_%d_%d" % (sx, k), (sx * 7.3, -15.2 + k * 1.0, deckz + 1.6),
+            cyl("052d_tt_%d_%d" % (sx, k), (sx * 7.3, -15.2 + k * 1.0, deckz + 1.17),
                 0.24, 2.4, dark(), axis="Y", verts=8)
         for yy in (12.0, -12.0):
-            box("052d_decoy_%d_%d" % (sx, int(yy)), (sx * 7.0, yy, deckz + 1.4),
+            box("052d_decoy_%d_%d" % (sx, int(yy)), (sx * 7.0, yy, deckz + 0.65),
                 (0.8, 1.8, 1.2), mat("launcher", (0.18, 0.20, 0.21), 0.55))
     # 舷侧 RHIB / 救生筏
     for sx in (-1, 1):
@@ -555,8 +555,8 @@ def build_052d():
             cyl("052d_raft_%d_%d" % (sx, i), (sx * 7.2, -32.0 - i * 4.0, deckz + 0.45),
                 0.45, 0.9, white(), axis="X", verts=10)
     # 飞行甲板标线
-    box("052d_flightdeck", (0, -60, deckz + 0.10), (14.0, 28.0, 0.12), deck())
-    cyl("052d_helo_circle", (0, -60, deckz + 0.18), 4.0, 0.05, white(), verts=40)
+    box("052d_flightdeck", (0, -58.5, 5.95), (13.8, 25.0, 0.5), deck())
+    cyl("052d_helo_circle", (0, -58.5, 6.23), 4.0, 0.05, white(), verts=40)
     finish("t_052d", "water")
 
 # ---------------------------------------------------------------------------

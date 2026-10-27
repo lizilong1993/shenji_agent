@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": "2026-10-27T11:35:00",
+  "generated_at": "2026-10-27T11:52:51",
   "note": "由 tools/model_budget_test.py 生成；sha256 对应优化后的 GLB。",
   "assets": {
     "type_052c.glb": {
@@ -27,7 +27,7 @@
         "source": "Type 052C Destroyer (DCS World)",
         "author": "KojfDiscord",
         "license": "CC Attribution",
-        "use": "052C 驱逐舰（用于 052D / 驱逐舰大类近似）",
+        "use": "052C 驱逐舰（驱逐舰大类回退）",
         "risk": [
           "upstream-game-asset"
         ],
@@ -35,8 +35,8 @@
       }
     },
     "type_052d.glb": {
-      "sha256": "e7d6b4707150dcfb082d0f0e8fbd431473886f560b59c73c09e51f685eb99a2a",
-      "bytes": 363680,
+      "sha256": "4ee4ab1f19aa4499f2a2ed5debcf26215626932fc61d9022518215b3c9d92dda",
+      "bytes": 364076,
       "mb": 0.35,
       "tris": 11552,
       "prims": 3,
@@ -54,7 +54,14 @@
         "public_width_m": 17.2,
         "notes": "052D 自建近似：四块平板 346A、前32+后32 VLS、130mm 主炮、1130+HQ-10"
       },
-      "license": {}
+      "license": {
+        "source": "自建（tools/modelgen/build_custom.py）",
+        "author": "本项目",
+        "license": "项目内部",
+        "use": "052D 型驱逐舰（平板 AESA/64 单元 VLS 近似）",
+        "risk": [],
+        "source_url": null
+      }
     },
     "type_054a.glb": {
       "sha256": "f9aed2b8b949b5ba8da6718679bc265117b48c528648a07e6a8ec6c96bfcc947",
