@@ -183,6 +183,18 @@ class IntelManager:
         case_id = _case_key(case_id)
         profile = self._profile(case_id)
         sources = self.sources.list()
+        cache_stats = None
+        try:
+            from .cache import IntelCache, cache_db_path
+            db_path = cache_db_path(self.root)
+            if os.path.isfile(db_path):
+                cache = IntelCache(db_path)
+                try:
+                    cache_stats = cache.stats()
+                finally:
+                    cache.close()
+        except Exception:  # advisory only; overview must never fail on cache IO
+            cache_stats = None
         source_names = {entry.get("source_id"): entry.get("name")
                         for entry in sources}
         bundle = self._bundle(case_id)
@@ -309,6 +321,7 @@ class IntelManager:
             "links": links,
             "key_items": key_items,
             "sources": sources,
+            "cache": cache_stats,
             "ai": {"counts": ai_counts, "items": ai_items},
             "warnings": warnings,
         }

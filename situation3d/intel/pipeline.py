@@ -21,7 +21,7 @@ from .case import CaseIntelProfile
 from .gateway import IntelBundle
 from .model import Observation, iso, parse_time
 from .sources import SourceStore
-from .connectors.fetch import build_bundle
+from .refresh import refresh_bundle
 
 _CASE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
 
@@ -224,19 +224,17 @@ def run_case(case_id: str, profile: CaseIntelProfile, start: Any, end: Any,
              ) -> PipelineResult:
     """Collect broadly, clean, analyze, and persist all three artifacts."""
     case_id = _case_key(case_id)
-    result = build_bundle(
-        source_ids=tuple(sources),
-        bbox=profile.bbox,
+    result = refresh_bundle(
+        case_id=case_id,
+        profile=profile,
         start=start,
         end=end,
-        scenario_id=case_id,
-        case_profile=profile,
+        sources=tuple(sources),
+        root=root,
         custom_sources=custom_sources,
         archive_root=archive_root,
         fetcher=fetcher,
         firms_map_key=firms_map_key,
-        domain="multi",
-        filter_observations=False,
     )
     candidates = result.bundle
     cleaned, clean_report = clean_candidates(candidates, profile, start, end,
@@ -261,6 +259,7 @@ def run_case(case_id: str, profile: CaseIntelProfile, start: Any, end: Any,
             "errors": list(result.errors),
             "warnings": list(result.warnings),
             "bundle_hash": candidates.hash,
+            "cache": getattr(result, "cache_report", None),
         },
         "stage2": clean_report,
         "stage3": analysis,
