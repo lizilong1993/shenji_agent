@@ -45,8 +45,10 @@
 
 ## 4. 索引与 CLI
 
-索引位置：`situation3d/var/resources/index.json`（gitignored，按 worktree 各自独立）。
-所有写入原子替换并加文件锁。
+索引位置：`situation3d/var/resources/resources.db`（SQLite，gitignored，按 worktree 各自独立）。
+元数据表为 `resources`，资源类型表为 `resource_kinds`；旧 `index.json` 首次打开时自动迁移，
+之后仅作为迁移备份保留、不再写入。写入使用 SQLite 事务，并在资源目录上另加 advisory 文件锁
+（NFS 共享目录下跨进程写串行化）。删除记录默认不删除磁盘文件。
 
 ```bash
 python3 scripts/resource.py scan            # 扫描并登记现有 artifact（可重复执行）

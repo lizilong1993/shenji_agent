@@ -6862,7 +6862,6 @@ function syncPlotLayers() {
 
   usedIds.forEach(ensurePlotLayer);
   extra.forEach(function (id) { LayerRegistry.unregister(id); });
-  refreshPlotLayerSelect();
   applyLayers();
   if (window.LayerPanel) LayerPanel.invalidate();
   return { layers: usedIds };
@@ -7507,16 +7506,11 @@ function bindUI() {
   // 提示文案由 setBuildingsOnline 的成功/回落分支负责写。
   if (checkboxOn('modelBuildingsOnline')) setBuildingsOnline(true);
 
-  // 顶栏下拉：TS案例、数据管理、标绘。TS注册/管理/下载与情报都收进
+  // 顶栏下拉：TS案例、数据管理。TS注册/管理/下载与情报都收进
   // 数据管理这一层菜单，图层批量操作仍在左栏。
   bindMenu('menuCase', 'menuCaseList');
   bindMenu('menuData', 'menuDataList');
   if (dom.menuCase) dom.menuCase.addEventListener('click', function () { openCaseMenu(); });
-  // 标绘面板：与 TS案例 同一套开合，但它是**工具面板**，不因外部点击而收起
-  // （keepOpen 恒真）——只有点【标绘】按钮或按 Esc 才关。
-  // 面板内部控件的 stopPropagation 由 bindMenu 统一加上，所以点类型/红蓝方
-  // 下拉不会再把它关掉。
-  bindMenu('menuPlot', 'menuPlotPanel', { keepOpen: function () { return true; } });
   document.addEventListener('click', function () { closeAllMenus(); });
 
   // TS菜单：输入 / 管理 / 数据下载，三标签页共用一个模态框
@@ -7530,9 +7524,10 @@ function bindUI() {
   if (window.SituationPanel) SituationPanel.bind();
   if (window.IntelPanel) IntelPanel.bind();
   if (window.ImagerySources) ImagerySources.bind();
-  // 数据管理菜单里的情报/影像源不是 [data-situation-cmd]：它们各自绑好打开
-  // 面板后，再补一条“点击即收起菜单”。放在 bind() 之后，执行顺序稳定。
-  ['btnIntel', 'btnImagerySources'].forEach(function (id) {
+  if (window.ResourceManager) ResourceManager.bind();
+  // 数据管理菜单里的情报/资源/影像源不是 [data-situation-cmd]：它们各自绑好
+  // 打开面板后，再补一条“点击即收起菜单”。放在 bind() 之后，执行顺序稳定。
+  ['btnIntel', 'btnResourceManager', 'btnImagerySources'].forEach(function (id) {
     const btn = document.getElementById(id);
     if (btn) btn.addEventListener('click', function () { closeAllMenus(); });
   });
@@ -7549,7 +7544,11 @@ function bindUI() {
     // 浮动目标面板已移除，Esc 改为清除选中态 + 复位目标TS栏。
     // Esc 走**强制**关菜单：它区别于"外部点击"——后者对工具面板（标绘）是豁免的，
     // 而按 Esc 是用户明确要关掉。
-    if (e.key === 'Escape') { closeAllMenus(true); clearTargetSelection(); }
+    if (e.key === 'Escape') {
+      closeAllMenus(true); clearTargetSelection();
+      closePlotCtxMenu();
+      plotDrawReset();
+    }
   });
 
   document.getElementById('btnPlay').addEventListener('click', function () { setPlaying(!state.playing); });
@@ -7604,7 +7603,7 @@ function bindUI() {
 
   bindPicking();
   bindPanelChrome();
-  bindPlotPanel();
+  bindPlotCreation();
   bindFollowInput();
 
   // 跟随相机挂在 preRender：Scene.render 的顺序是 preUpdate → update →
@@ -7709,15 +7708,12 @@ function bindUI() {
 }
 
 // --------------------------------------------------------------------------
-// 标绘面板：地图手动绘制 + 按坐标添加
+// 标绘创建：地图右键选类型，左键落控制点
 // --------------------------------------------------------------------------
 //
-// 为什么需要这一块：`plotting.js` 的引擎与 24 类几何早就完成了，但**没有任何界面入口**
-// —— `Plotting.add()` 只能在控制台里调。人工介入的标绘（分界线、火力扇面、禁飞区…）
-// 一条也落不了图。这里补上两条路径，共用同一套「类型 / 归属 / 图层」选择。
-//
-// 参数录入**没有**放进 TS注册 模态框：绘制按钮必须紧挨图层开关，而两条路径共用同一组
-// 控件，分到两处等于把类型/归属/图层各写一遍。要挪过去是一处 DOM 搬家。
+// 创建入口是画布右键菜单里的「标绘」子菜单（类型直接来自 Plotting.catalogue()），
+// 选中类型后进入与原先「地图绘制」相同的落点流程；绘制期间地图底部显示
+// 完成 / 取消操作条。归属默认红方，落图后可在图层面板里改归属、控制点和标注。
 
 let plotDraw = null;         // {type, layer, side, label, points:[Carto], previewId}
 let plotDraftEntities = [];
@@ -7734,7 +7730,12 @@ function setPlotHint(text, cls) {
   const el = document.getElementById('plotHint');
   if (!el) return;
   el.textContent = text || '';
-  el.className = 'switch-note' + (cls ? ' ' + cls : '');
+  el.className = 'plot-hint' + (cls ? ' ' + cls : '');
+}
+
+function setPlotBarVisible(on) {
+  const bar = document.getElementById('plotDrawBar');
+  if (bar) bar.classList.toggle('hidden', !on);
 }
 
 /** 草稿控制点标记。用普通 point 图元，不走 Plotting —— 它们不是标绘的一部分。 */
@@ -7752,16 +7753,14 @@ function clearPlotDraft() {
 function plotDrawReset() {
   clearPlotDraft();
   plotDraw = null;
-  const btn = document.getElementById('plotDraw');
-  const cancel = document.getElementById('plotCancel');
-  if (btn) btn.textContent = '地图绘制';
-  if (cancel) cancel.style.display = 'none';
   setPlotHint('');
+  setPlotBarVisible(false);
 }
 
 /** 已落点数 → 提示文案。把「还需几个点」说清楚，否则用户不知道什么时候能完成。 */
 function syncPlotHint() {
   if (!plotDraw) return;
+  setPlotBarVisible(true);
   const def = plotDef(plotDraw.type);
   const ctrl = (def && def.ctrl) || { min: 2, max: null };
   const n = plotDraw.points.length;
@@ -7852,145 +7851,143 @@ function finishPlotDraw() {
     try { Plotting.remove(plotDraw.previewId); } catch (err) { /* 已移除 */ }
     plotDraw.previewId = null;
   }
+  let ok = true;
   try {
     Plotting.add(spec);
     setPlotHint('已添加 ' + (def ? def.zh : plotDraw.type) + '（' + pts.length + ' 个控制点）', 'ok');
   } catch (err) {
+    ok = false;
     setPlotHint('添加失败：' + err.message, 'warn');
   }
   plotDraftEntities.forEach(function (e) { try { viewer.entities.remove(e); } catch (err) {} });
   plotDraftEntities = [];
   plotDraw = null;
-  const btn = document.getElementById('plotDraw');
-  const cancel = document.getElementById('plotCancel');
-  if (btn) btn.textContent = '地图绘制';
-  if (cancel) cancel.style.display = 'none';
+  // 失败时保留操作条：否则「添加失败」的提示会随操作条一起立刻消失。
+  if (ok) setPlotBarVisible(false);
 }
 
-/**
- * 解析坐标文本：每行一个点，`lon, lat`（逗号或空白分隔）。
- * 逐条报错而不是只报第一条 —— 粘一份大清单时反复试是最烦的。
- */
-function parsePlotPoints(text) {
-  const lines = String(text || '').split(/\r?\n/);
-  const pts = [];
-  const errs = [];
-  lines.forEach(function (raw, i) {
-    const s = raw.trim();
-    if (!s || s.charAt(0) === '#') return;
-    const parts = s.split(/[,\s]+/).filter(Boolean);
-    if (parts.length !== 2) { errs.push('第 ' + (i + 1) + ' 行：需要两个数（经度, 纬度）'); return; }
-    const lon = Number(parts[0]);
-    const lat = Number(parts[1]);
-    if (!isFinite(lon) || !isFinite(lat)) { errs.push('第 ' + (i + 1) + ' 行：不是有效数字'); return; }
-    if (lon < -180 || lon > 180 || lat < -90 || lat > 90) {
-      errs.push('第 ' + (i + 1) + ' 行：坐标越界（' + lon + ', ' + lat + '）'); return;
-    }
-    pts.push([lon, lat]);
+/** 从右键菜单选中的类型进入绘制：归属先按红方，落图后可在图层面板修改。 */
+function startPlotDraw(type) {
+  const d = plotDef(type);
+  if (!d || d.system) return;
+  if (plotDraw) plotDrawReset();
+  plotDraw = {
+    type: type, layer: d.defaultLayer || 'plot.offense',
+    side: 'friendly', label: null, points: [], previewId: null,
+  };
+  syncPlotHint();
+}
+
+// 画布右键菜单：一级只有「标绘」，子菜单按类别列出全部手动类型。
+// 节点按需创建，避免把二十多个类型的静态 DOM 常驻在 index.html 里。
+let plotCtxMenu = null;
+
+function closePlotCtxMenu() {
+  if (!plotCtxMenu) return;
+  plotCtxMenu.remove();
+  plotCtxMenu = null;
+}
+
+function openPlotCtxMenu(x, y) {
+  closePlotCtxMenu();
+  const wrap = document.querySelector('.globe-wrap');
+  if (!wrap || !window.Plotting) return;
+
+  const menu = document.createElement('div');
+  menu.className = 'plot-ctx-menu';
+  menu.setAttribute('role', 'menu');
+
+  const item = document.createElement('button');
+  item.type = 'button';
+  item.className = 'plot-ctx-item has-sub';
+  item.textContent = '标绘';
+  const caret = document.createElement('span');
+  caret.className = 'caret';
+  caret.textContent = '▸';
+  item.appendChild(caret);
+
+  const sub = document.createElement('div');
+  sub.className = 'plot-ctx-sub';
+  sub.setAttribute('role', 'menu');
+
+  const byCat = {};
+  plotCatalogue().forEach(function (c) {
+    if (c.system) return;
+    (byCat[c.category] = byCat[c.category] || []).push(c);
   });
-  return { points: pts, errors: errs };
-}
-
-
-/**
- * 刷新标绘工具的「归属图层」下拉。
- *
- * 选项来自 `Plotting.categories()`，**不是**注册表里的图层清单：图层面板只列
- * 当前有要素的类别，而创建入口要允许往任意类别里画（包括暂时为空的类别）。
- * 注册动态图层后由 syncPlotLayers 调它，保证下拉随类别扩展自动更新。
- */
-function refreshPlotLayerSelect() {
-  const layerSel = document.getElementById('plotLayer');
-  if (!layerSel || !window.Plotting) return;
-  const cur = layerSel.value;
-  const opts = plotLayerOptions();
-  layerSel.innerHTML = '';
-  opts.forEach(function (o) {
-    const n = document.createElement('option');
-    n.value = o[0];
-    n.textContent = o[1];
-    layerSel.appendChild(n);
+  Plotting.categories().forEach(function (cat) {
+    const list = byCat[cat.id];
+    if (!list || !list.length) return;
+    const head = document.createElement('div');
+    head.className = 'plot-ctx-head';
+    head.textContent = cat.zh;
+    sub.appendChild(head);
+    list.forEach(function (c) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'plot-ctx-item';
+      b.textContent = c.zh;
+      const std = document.createElement('span');
+      std.className = 'plot-ctx-std';
+      std.textContent = c.sourceStandard || '';
+      b.appendChild(std);
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        closePlotCtxMenu();
+        startPlotDraw(c.type);
+      });
+      sub.appendChild(b);
+    });
   });
-  if (cur && opts.some(function (o) { return o[0] === cur; })) {
-    layerSel.value = cur;
-  } else if (opts.length) {
-    layerSel.value = opts[0][0];
-  }
+
+  menu.appendChild(item);
+  menu.appendChild(sub);
+  wrap.appendChild(menu);
+
+  const rect = wrap.getBoundingClientRect();
+  const mx = Math.min(x, rect.width - menu.offsetWidth - 8);
+  const my = Math.min(y, rect.height - menu.offsetHeight - 8);
+  menu.style.left = Math.max(4, mx) + 'px';
+  menu.style.top = Math.max(4, my) + 'px';
+  // 子菜单与一级菜单同顶对齐，高度按剩余可视区收窄，避免底部类型落到视口外。
+  sub.style.maxHeight = Math.max(80, rect.height - Math.max(4, my) - 8) + 'px';
+  // 靠近右缘时子菜单向左展开，避免整列类型溢出画布。
+  if (x + menu.offsetWidth + 228 > rect.width) menu.classList.add('sub-left');
+
+  // 悬停与点击都展开子菜单；触屏没有 hover，点击是必需的。
+  const openSub = function () { menu.classList.add('sub-open'); };
+  item.addEventListener('mouseenter', openSub);
+  item.addEventListener('focus', openSub);
+  item.addEventListener('click', function (e) {
+    e.stopPropagation();
+    menu.classList.add('sub-open');
+  });
+  plotCtxMenu = menu;
 }
 
-function bindPlotPanel() {
-  const typeSel = document.getElementById('plotType');
-  const layerSel = document.getElementById('plotLayer');
-  const sideSel = document.getElementById('plotSide');
-  const labelIn = document.getElementById('plotLabel');
-  const pointsIn = document.getElementById('plotPoints');
+function bindPlotCreation() {
   const drawBtn = document.getElementById('plotDraw');
   const cancelBtn = document.getElementById('plotCancel');
-  const addBtn = document.getElementById('plotAddByText');
-  if (!typeSel || !window.Plotting) return;
-
-  const cat = plotCatalogue();
-  typeSel.innerHTML = '';
-  cat.forEach(function (c) {
-    // 系统生成的类型（目标轨迹）由选中目标自动维护，不进入手动标绘入口
-    if (c.system) return;
-    const o = document.createElement('option');
-    o.value = c.type;
-    // 标准来源直接写在选项里 —— 每个类型是中式还是美式补齐，选的时候就该看见
-    o.textContent = c.zh + '（' + (c.sourceStandard || '?') + '）';
-    typeSel.appendChild(o);
-  });
-  refreshPlotLayerSelect();
-  const syncLayerDefault = function () {
-    const d = plotDef(typeSel.value);
-    if (d && d.defaultLayer) layerSel.value = d.defaultLayer;
-  };
-  typeSel.addEventListener('change', syncLayerDefault);
-  syncLayerDefault();
-
-  drawBtn.addEventListener('click', function () {
-    if (plotDraw) { finishPlotDraw(); return; }
-    const d = plotDef(typeSel.value);
-    if (!d) return;
-    plotDraw = {
-      type: typeSel.value, layer: layerSel.value,
-      side: sideSel.value === 'enemy' ? 'enemy' : 'friendly',
-      label: (labelIn.value || '').trim(), points: [], previewId: null,
-    };
-    if (cancelBtn) cancelBtn.style.display = '';
-    syncPlotHint();
-  });
-
-  if (cancelBtn) {
-    cancelBtn.style.display = 'none';
-    cancelBtn.addEventListener('click', function () {
-      plotDrawReset();
-      setPlotHint('已取消绘制');
+  if (drawBtn) {
+    drawBtn.addEventListener('click', function () {
+      if (plotDraw) finishPlotDraw();
     });
   }
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', function () { plotDrawReset(); });
+  }
 
-  addBtn.addEventListener('click', function () {
-    const res = parsePlotPoints(pointsIn.value);
-    if (res.errors.length) { setPlotHint('坐标有误：' + res.errors.join('；'), 'warn'); return; }
-    const d = plotDef(typeSel.value);
-    const ctrl = (d && d.ctrl) || { min: 2, max: null };
-    if (res.points.length < ctrl.min) {
-      setPlotHint('控制点不足：' + (d ? d.zh : typeSel.value) + ' 至少需要 ' + ctrl.min + ' 个（当前 ' + res.points.length + '）', 'warn');
-      return;
-    }
-    try {
-      Plotting.add({
-        type: typeSel.value, layer: layerSel.value, points: res.points,
-        hostility: sideSel.value === 'enemy' ? 'enemy' : 'friendly',
-        label: (labelIn.value || '').trim() || null,
-      });
-      setPlotHint('已按坐标添加 ' + (d ? d.zh : typeSel.value) + '（' + res.points.length + ' 个控制点）', 'ok');
-    } catch (err) {
-      setPlotHint('添加失败：' + err.message, 'warn');
-    }
+  const canvas = viewer.scene.canvas;
+  canvas.addEventListener('contextmenu', function (e) {
+    e.preventDefault();
+    const rect = document.querySelector('.globe-wrap').getBoundingClientRect();
+    openPlotCtxMenu(e.clientX - rect.left, e.clientY - rect.top);
   });
-
+  document.addEventListener('pointerdown', function (e) {
+    if (plotCtxMenu && !plotCtxMenu.contains(e.target)) closePlotCtxMenu();
+  });
 }
+
 function bindPicking() {
   const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
 

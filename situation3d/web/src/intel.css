@@ -2,17 +2,7 @@
 
 .intel-modal-panel { width: min(1080px, calc(100vw - 48px)); }
 
-.intel-summary {
-  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-  margin-bottom: 10px; padding: 8px 10px;
-  background: #f3f7fd; border: 1px solid var(--border); border-radius: 5px;
-}
-.intel-summary b { font-size: 13px; }
 .intel-note { color: var(--text-dim); font-size: 11.5px; line-height: 1.5; }
-.intel-pipeline {
-  margin: 6px 0 10px; padding: 6px 9px; border: 1px solid #cfe0f5;
-  border-radius: 4px; background: #f7fbff; color: #4f6076; font-size: 11.5px;
-}
 
 .intel-toolbar {
   display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
@@ -27,20 +17,6 @@
 .intel-textarea { height: auto; }
 .intel-input[type="search"] { min-width: 220px; flex: 1 1 220px; }
 .intel-textarea { width: 100%; box-sizing: border-box; resize: vertical; }
-
-.intel-key {
-  border: 1px solid #cfe0f5; border-radius: 5px; background: #f7fbff;
-  padding: 8px 10px; margin-bottom: 12px;
-}
-.intel-key-title { font-size: 12px; font-weight: 600; margin-bottom: 5px; }
-.intel-key-row {
-  display: flex; gap: 8px; align-items: baseline; padding: 3px 0;
-  border-top: 1px dashed #dbe7f5; font-size: 11.5px;
-}
-.intel-key-row:first-of-type { border-top: 0; }
-.intel-key-score { color: var(--accent); font-weight: 600; min-width: 34px; }
-.intel-key-text { flex: 1 1 auto; }
-.intel-key-reason { color: var(--text-dim); flex: 1 1 40%; }
 
 .intel-card {
   border: 1px solid var(--border); border-radius: 5px; background: #fff;
@@ -125,3 +101,69 @@
   .intel-grid { grid-template-columns: 1fr; }
   .intel-input[type="search"] { min-width: 0; }
 }
+
+/* ---- World-Monitor 式情报流（浅色主题） ---- */
+.intel-brief {
+  border: 1px solid #cfe0f5; border-radius: 6px;
+  background: linear-gradient(180deg, #f8fbff, #f2f7fe);
+  padding: 10px 12px; margin-bottom: 10px;
+}
+.intel-brief-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.intel-brief-title { font-size: 13px; font-weight: 700; color: #20344c; }
+.intel-brief-fresh { font-size: 11px; color: #5b7290; }
+.intel-brief-row {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline;
+  padding: 3px 0; font-size: 11.5px;
+}
+.intel-brief-row + .intel-brief-row { border-top: 1px dashed #dbe7f5; }
+.intel-brief-score { color: #c8352c; font-weight: 700; min-width: 34px; }
+.intel-brief-text {
+  flex: 1 1 auto; font-weight: 600; color: #22344a;
+  overflow-wrap: anywhere;
+}
+.intel-brief-reason {
+  flex: 1 1 42%; color: #66788f; overflow-wrap: anywhere;
+}
+.intel-brief-stats {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 7px;
+}
+.intel-brief-time { margin-left: auto; font-size: 11px; color: #66788f; }
+
+.intel-fresh {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  margin: 0 0 8px; font-size: 11px;
+}
+.intel-fresh-label { color: #5b7290; font-weight: 600; }
+.intel-fresh-chip {
+  border: 1px solid #d7e2ef; border-radius: 9px; padding: 0 8px;
+  background: #f6fafd; color: #4f6076;
+}
+.intel-fresh-chip.stale { border-color: #efd49d; background: #fff9ea; color: #8a5a00; }
+.intel-fresh-chip.bad { border-color: #efc3bf; background: #fff4f3; color: #a8332a; }
+
+.intel-toolbar-chips { flex-direction: column; align-items: stretch; gap: 6px; }
+.intel-domains { display: flex; gap: 6px; flex-wrap: wrap; }
+.intel-domain-chip {
+  border: 1px solid #d7e2ef; border-radius: 9px; padding: 1px 10px;
+  background: #f6fafd; color: #4f6076; font: inherit; font-size: 11px;
+  cursor: pointer;
+}
+.intel-domain-chip.active { background: #20344c; border-color: #20344c; color: #fff; }
+.intel-toolbar-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.intel-group {
+  display: flex; align-items: baseline; gap: 8px; margin: 10px 0 6px;
+  padding-bottom: 3px; border-bottom: 1px solid var(--border);
+}
+.intel-group-title { font-size: 12px; font-weight: 700; color: #20344c; }
+.intel-group-count { font-size: 11px; color: var(--text-dim); }
+
+.intel-card-wm { border-left-width: 4px; box-shadow: 0 1px 2px rgba(23, 43, 77, .06); }
+.intel-sev {
+  display: inline-block; border-radius: 3px; padding: 1px 6px;
+  font-size: 10.5px; border: 1px solid transparent;
+}
+.intel-sev-high { color: #a8332a; background: #fff1ef; border-color: #efc3bf; }
+.intel-sev-medium { color: #8a5a00; background: #fff9ea; border-color: #efd49d; }
+.intel-sev-low { color: #35669f; background: #f3f8ff; border-color: #c6d9ef; }
+.intel-conf { color: #35669f; }

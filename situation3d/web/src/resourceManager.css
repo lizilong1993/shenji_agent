@@ -1,0 +1,140 @@
+/* 资源管理面板：宽表 + 表单，沿用 TS/情报模态框的浅色样式。 */
+
+.resource-modal-panel { width: min(1180px, calc(100vw - 40px)); }
+.resource-modal-panel .modal-tab { cursor: default; }
+
+.res-summary {
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #f3f7fd;
+}
+.res-summary b { font-size: 13px; margin-right: 8px; }
+.res-note { color: var(--text-dim); font-size: 11.5px; }
+.res-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.res-chip {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid #cfe0f5;
+  border-radius: 10px;
+  background: #f7fbff;
+  color: #4f6076;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.res-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.res-input {
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 7px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.res-search { min-width: 230px; flex: 1 1 230px; }
+.res-textarea { height: auto; width: 100%; resize: vertical; }
+.res-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.res-primary:hover { background: #2b7ae8; }
+.res-danger { color: #b42318; }
+
+.res-notice {
+  margin-bottom: 9px;
+  padding: 6px 9px;
+  border: 1px solid #b7ddc8;
+  border-radius: 4px;
+  background: #f0fbf5;
+  color: #26734d;
+  font-size: 11.5px;
+}
+.res-notice.error {
+  border-color: #efc3bf;
+  background: #fff4f3;
+  color: #a8332a;
+}
+
+.res-table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 5px; }
+.res-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.res-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 7px 8px;
+  background: #f3f7fd;
+  color: #5b6778;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.res-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eef1f5;
+  font-size: 11.5px;
+  vertical-align: top;
+}
+.res-table tr:hover td { background: #fbfdff; }
+.res-table th:nth-child(1), .res-table td:nth-child(1) { width: 31%; }
+.res-table th:nth-child(2), .res-table td:nth-child(2) { width: 16%; }
+.res-table th:nth-child(3), .res-table td:nth-child(3) { width: 8%; }
+.res-table th:nth-child(4), .res-table td:nth-child(4) { width: 10%; }
+.res-table th:nth-child(5), .res-table td:nth-child(5) { width: 8%; }
+.res-table th:nth-child(6), .res-table td:nth-child(6) { width: 6%; }
+.res-table th:nth-child(7), .res-table td:nth-child(7) { width: 21%; }
+
+.res-id-cell { overflow: hidden; }
+.res-id, .res-kind { display: block; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-sub {
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.res-kind-cell { overflow: hidden; }
+.res-size { white-space: nowrap; }
+.res-actions { white-space: nowrap; }
+.res-action { margin: 0 3px 3px 0; padding: 2px 6px; font-size: 10.5px; }
+
+.res-empty { padding: 18px 4px; color: var(--text-dim); text-align: center; }
+
+.res-form {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+.res-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--border);
+  background: #f3f7fd;
+  font-size: 12.5px;
+}
+.res-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+  gap: 8px 12px;
+  padding: 11px;
+}
+.res-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.res-label { color: #5b6778; font-size: 10.5px; }
+.res-field .res-input { width: 100%; }
+.res-check { display: flex; align-items: center; gap: 6px; font-size: 11.5px; padding-top: 17px; }
+.res-hint { padding: 0 11px 4px; color: var(--text-dim); font-size: 10.5px; line-height: 1.5; }
+.res-form-actions { display: flex; gap: 8px; padding: 9px 11px 11px; }

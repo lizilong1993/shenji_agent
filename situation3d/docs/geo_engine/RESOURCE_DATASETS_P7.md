@@ -19,7 +19,7 @@ cache/datasets/<kind>/<name>/<spec_hash>/
     manifest.json         # s3d.vector.v1 / s3d.raster.v1
 ```
 
-登记进 `var/resources/index.json`，带 content_hash/bbox/as_of/license/quality/来源；
+登记进 `var/resources/resources.db`（SQLite），带 content_hash/bbox/as_of/license/quality/来源；
 resolver 与现有 envpack/瓦片共享在线-离线/时效/门控机制。同一 `name+spec_hash` 已登记且校验通过时
 直接复用（`--force` 强制刷新），离线模式只读缓存。
 
