@@ -156,6 +156,7 @@ def convergence_events(items: Sequence[Dict[str, Any]],
             continue
         # Sliding window over time-sorted members.  Tie handling is irrelevant
         # because members were sorted by (timestamp, id) once, up front.
+        emitted: List[Tuple[int, int]] = []
         start = 0
         while start < len(members):
             end = start
@@ -167,15 +168,20 @@ def convergence_events(items: Sequence[Dict[str, Any]],
                     break
                 types.add(canonical_type(members[end].get("type")))
                 end += 1
-            window_members = members[start:end]
             if len(types) >= needed:
-                events.append(_build(key, size, window_members, types, window))
-                # Advance past this cluster: overlapping duplicates of the
-                # same build-up are noise, and the analyst only needs the
-                # densest reading of one burst.
-                start = end
-            else:
-                start += 1
+                # `start += 1`, not `start = end`: a window beginning inside
+                # this one can still be the only cover for a later member
+                # (A@0h B@23h C@24h D@25h: {A,B,C} and {B,C,D} are both
+                # valid, and jumping to `end` would lose the second).
+                # Sub-windows already covered by an emitted range are dropped
+                # so one long burst still reads as one event.
+                covered = any(begin <= start and finish >= end
+                              for begin, finish in emitted)
+                if not covered:
+                    emitted.append((start, end))
+                    events.append(_build(key, size, members[start:end],
+                                         types, window))
+            start += 1
     events.sort(key=lambda ev: (-ev["score"], ev["t_start"], ev["id"]))
     return events[:max(1, int(max_events))]
 

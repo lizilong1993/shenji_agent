@@ -133,6 +133,32 @@ class ConvergenceTest(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["member_count"], 4)
 
+    def test_sliding_window_keeps_the_second_burst(self):
+        # A@0h B@23h C@24h D@25h: {A,B,C} and {B,C,D} are both valid 24h
+        # windows, and jumping to the end of the first would lose the second.
+        events = convergence_events([
+            item("a", "earthquake", event_time="2026-10-24T00:00:00Z"),
+            item("b", "fire", event_time="2026-10-24T23:00:00Z"),
+            item("c", "conflict", event_time="2026-10-25T00:00:00Z"),
+            item("d", "flood", event_time="2026-10-25T01:00:00Z"),
+        ], bbox=TAIWAN_BBOX, window_h=24.0)
+        self.assertEqual(len(events), 2)
+        # Ranked by score, not time; compare the two member sets.
+        sets = sorted([row["id"] for row in event["members"]]
+                      for event in events)
+        self.assertEqual(sets, [["a", "b", "c"], ["b", "c", "d"]])
+
+    def test_long_burst_is_one_event(self):
+        events = convergence_events([
+            item("a", "earthquake", event_time="2026-10-24T00:00:00Z"),
+            item("b", "fire", event_time="2026-10-24T02:00:00Z"),
+            item("c", "conflict", event_time="2026-10-24T04:00:00Z"),
+            item("d", "flood", event_time="2026-10-24T06:00:00Z"),
+            item("e", "cyclone", event_time="2026-10-24T08:00:00Z"),
+        ], bbox=TAIWAN_BBOX)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["member_count"], 5)
+
     def test_summary_counts_types_and_sources(self):
         events = convergence_events([
             item("a", "earthquake"),
