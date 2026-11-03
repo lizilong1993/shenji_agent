@@ -32,7 +32,7 @@
 
   var state = {
     tab: 'list', overview: null, sources: [], error: null,
-    filter: '', priority: 'all', effective: 'all',
+    filter: '', priority: 'all', effective: 'all', domain: 'all',
     sourceFilter: '', sourceKind: 'all', sourceEnabled: 'all',
     editing: null, timer: null, loading: false, collecting: false,
     collectStarted: 0, autoTried: {}, lastCase: null, caseRetries: 0
@@ -280,9 +280,192 @@
     else renderList(body);
   }
 
+  var SEVERITY = {
+    high: ['高相关度', '#c8352c'],
+    medium: ['中相关度', '#c98a00'],
+    low: ['低相关度', '#4f86c6']
+  };
+
+  function ageLabel(value) {
+    if (!value) return '';
+    var stamp = Date.parse(value);
+    if (!Number.isFinite(stamp)) return '';
+    var minutes = Math.max(0, Math.round((Date.now() - stamp) / 60000));
+    if (minutes < 1) return '刚刚';
+    if (minutes < 60) return minutes + ' 分钟前';
+    var hours = Math.round(minutes / 60);
+    if (hours < 48) return hours + ' 小时前';
+    return Math.round(hours / 24) + ' 天前';
+  }
+
+  function relevanceOf(item) {
+    var props = item.record && item.record.properties;
+    var value = props && props.relevance;
+    return SEVERITY[value] ? value : '';
+  }
+
+  function renderBrief(body, overview) {
+    var counts = overview.counts || {};
+    var cache = overview.cache || null;
+    var brief = el('div', 'intel-brief');
+    var head = el('div', 'intel-brief-head');
+    head.appendChild(el('span', 'intel-brief-title', '态势简报'));
+    if (cache && cache.observations_7d !== undefined) {
+      head.appendChild(el('span', 'intel-brief-fresh',
+        '7 天缓存 ' + cache.observations_7d + ' 条'));
+    }
+    brief.appendChild(head);
+
+    var byId = {};
+    (overview.items || []).forEach(function (item) { byId[item.id] = item; });
+    var keyItems = (overview.key_items || []).slice(0, 3);
+    if (keyItems.length) {
+      keyItems.forEach(function (row) {
+        var item = byId[row.id];
+        if (!item) return;
+        var line = el('div', 'intel-brief-row');
+        line.appendChild(el('span', 'intel-brief-score',
+          Number(row.score || 0).toFixed(2)));
+        line.appendChild(el('span', 'intel-brief-text',
+          (item.priority === 'manual' ? '【人工】' : '') +
+          (item.title || '（无标题）')));
+        var reason = (row.reasons || []).slice(0, 2).join('；');
+        if (reason) line.appendChild(el('span', 'intel-brief-reason', reason));
+        brief.appendChild(line);
+      });
+    } else {
+      brief.appendChild(el('div', 'intel-brief-row intel-note',
+        '暂无关键情报；采集完成后自动抽取。'));
+    }
+
+    var stat = el('div', 'intel-brief-stats');
+    stat.appendChild(el('span', 'intel-chip', '自动 ' + (counts.auto || 0)));
+    stat.appendChild(el('span', 'intel-chip', '人工 ' + (counts.manual_active || 0)));
+    stat.appendChild(el('span', 'intel-chip', '关联 ' + (counts.links || 0)));
+    stat.appendChild(el('span', 'intel-chip', '冲突覆盖 ' +
+      (counts.superseded || 0)));
+    var ai = overview.ai || {};
+    if (ai.counts && ai.counts.total) {
+      stat.appendChild(el('span', 'intel-chip', 'AI 建议 ' + ai.counts.total +
+        '（待审 ' + (ai.counts.suggested || 0) + '）'));
+    }
+    var pipeline = overview.pipeline || null;
+    if (pipeline && pipeline.generated_at) {
+      stat.appendChild(el('span', 'intel-brief-time', '最近采集 ' +
+        ageLabel(pipeline.generated_at) + '（' +
+        timeLabel(pipeline.generated_at) + '）' +
+        (state.collecting ? ' · 正在补充采集…' : '')));
+    } else if (state.collecting) {
+      stat.appendChild(el('span', 'intel-brief-time', '正在采集…'));
+    }
+    brief.appendChild(stat);
+    body.appendChild(brief);
+  }
+
+  function renderFreshness(body, overview) {
+    var cache = overview.cache;
+    if (!cache || !cache.sources) return;
+    var names = {};
+    (overview.sources || []).forEach(function (source) {
+      names[source.source_id] = source.name || source.source_id;
+    });
+    var rows = Object.keys(cache.sources).map(function (sourceId) {
+      return {
+        sourceId: sourceId,
+        name: names[sourceId] || sourceId,
+        entry: cache.sources[sourceId] || {}
+      };
+    }).sort(function (a, b) {
+      return a.sourceId < b.sourceId ? -1 : a.sourceId > b.sourceId ? 1 : 0;
+    });
+    if (!rows.length) return;
+    var strip = el('div', 'intel-fresh');
+    strip.appendChild(el('span', 'intel-fresh-label', '数据源新鲜度'));
+    rows.forEach(function (row) {
+      var stamp = Date.parse(row.entry.last_fetch_at || '');
+      var stale = Number.isFinite(stamp) &&
+        (Date.now() - stamp) > 26 * 3600 * 1000;
+      var failed = Boolean(row.entry.last_error);
+      var chip = el('span', 'intel-fresh-chip' +
+        (failed ? ' bad' : stale ? ' stale' : ''),
+        row.name + ' · ' + (row.entry.observations || 0) + ' 条 · ' +
+        (failed ? '采集失败' : row.entry.last_fetch_at
+          ? ageLabel(row.entry.last_fetch_at) : '未采集'));
+      if (failed) chip.title = row.entry.last_error;
+      strip.appendChild(chip);
+    });
+    body.appendChild(strip);
+  }
+
   function renderList(body) {
     var overview = state.overview;
-    var items = (overview.items || []).filter(function (item) {
+    var all = overview.items || [];
+    var domainCounts = {};
+    all.forEach(function (item) {
+      domainCounts[item.domain] = (domainCounts[item.domain] || 0) + 1;
+    });
+
+    renderBrief(body, overview);
+    renderFreshness(body, overview);
+    (overview.warnings || []).forEach(function (warning) {
+      body.appendChild(el('div', 'intel-warn', warning));
+    });
+
+    var toolbar = el('div', 'intel-toolbar intel-toolbar-chips');
+    var domains = el('div', 'intel-domains');
+    function domainChip(value, text) {
+      var button = el('button', 'intel-domain-chip' +
+        (state.domain === value ? ' active' : ''), text);
+      button.type = 'button';
+      button.addEventListener('click', function () {
+        state.domain = value;
+        render();
+      });
+      return button;
+    }
+    domains.appendChild(domainChip('all', '全部 ' + all.length));
+    DOMAINS.forEach(function (pair) {
+      var count = domainCounts[pair[0]] || 0;
+      if (!count && state.domain !== pair[0]) return;
+      domains.appendChild(domainChip(pair[0], pair[1] + ' ' + count));
+    });
+    toolbar.appendChild(domains);
+
+    var filters = el('div', 'intel-toolbar-filters');
+    var search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'intel-input';
+    search.placeholder = '搜索标题/内容/来源/类型';
+    search.value = state.filter;
+    search.addEventListener('change', function () {
+      state.filter = search.value.trim();
+      render();
+    });
+    filters.appendChild(search);
+    filters.appendChild(selectInput([
+      ['all', '全部来源'], ['manual', '仅人工'], ['auto', '仅自动']
+    ], state.priority, function (value) {
+      state.priority = value; render();
+    }));
+    filters.appendChild(selectInput([
+      ['all', '全部状态'], ['effective', '当前采用'], ['superseded', '已覆盖/撤销']
+    ], state.effective, function (value) {
+      state.effective = value; render();
+    }));
+    var add = el('button', 'mini primary', '+ 人工情报');
+    add.type = 'button';
+    add.addEventListener('click', function () {
+      state.editing = null;
+      state.tab = 'manual';
+      stopPoll();
+      render();
+    });
+    filters.appendChild(add);
+    toolbar.appendChild(filters);
+    body.appendChild(toolbar);
+
+    var items = all.filter(function (item) {
+      if (state.domain !== 'all' && item.domain !== state.domain) return false;
       if (state.priority !== 'all' && item.priority !== state.priority) return false;
       if (state.effective === 'effective' && !item.effective) return false;
       if (state.effective === 'superseded' && item.effective) return false;
@@ -296,98 +479,44 @@
       return true;
     });
 
-    var summary = el('div', 'intel-summary');
-    var counts = overview.counts || {};
-    summary.appendChild(el('b', null,
-      '案例 ' + (overview.case_id || 'default') + ' · 共 ' +
-      (overview.items || []).length + ' 条'));
-    summary.appendChild(el('span', 'intel-note',
-      '人工 ' + (counts.manual_active || 0) +
-      ' · 自动 ' + (counts.auto || 0) +
-      ' · 冲突覆盖 ' + (counts.superseded || 0) +
-      ' · 关联 ' + (counts.links || 0)));
-    body.appendChild(summary);
-    (overview.warnings || []).forEach(function (warning) {
-      body.appendChild(el('div', 'intel-warn', warning));
-    });
-    var pipeline = overview.pipeline || null;
-    if (pipeline && pipeline.stage1 && pipeline.stage2) {
-      var s1 = pipeline.stage1, s2 = pipeline.stage2, s3 = pipeline.stage3 || {};
-      body.appendChild(el('div', 'intel-pipeline',
-        '三阶段：广泛采集 ' + (s1.observations || 0) +
-        ' → 清洗保留 ' + (s2.kept || 0) +
-        '（无关键词保留 ' + (s2.kept_without_keyword || 0) + '）' +
-        ' → 关联 ' + ((s3.counts && s3.counts.links) || 0) +
-        ' / 关键 ' + ((s3.counts && s3.counts.key_items) || 0) +
-        (state.collecting ? ' · 正在补充采集…' : '')));
-    } else if (state.collecting) {
-      body.appendChild(el('div', 'intel-pipeline',
-        '正在按案例地理范围采集多源情报…'));
-    }
-
-    if ((overview.key_items || []).length) {
-      var key = el('div', 'intel-key');
-      key.appendChild(el('div', 'intel-key-title', '关键情报（自动抽取）'));
-      var byId = {};
-      (overview.items || []).forEach(function (item) { byId[item.id] = item; });
-      overview.key_items.slice(0, 5).forEach(function (row) {
-        var item = byId[row.id];
-        if (!item) return;
-        var line = el('div', 'intel-key-row');
-        line.appendChild(el('span', 'intel-key-score', row.score.toFixed(2)));
-        line.appendChild(el('span', 'intel-key-text',
-          (item.priority === 'manual' ? '[人工] ' : '') + item.title));
-        line.appendChild(el('span', 'intel-key-reason',
-          (row.reasons || []).join('；')));
-        key.appendChild(line);
-      });
-      body.appendChild(key);
-    }
-
-    var toolbar = el('div', 'intel-toolbar');
-    var search = document.createElement('input');
-    search.type = 'search';
-    search.className = 'intel-input';
-    search.placeholder = '搜索标题/内容/来源/类型';
-    search.value = state.filter;
-    search.addEventListener('change', function () {
-      state.filter = search.value.trim();
-      render();
-    });
-    toolbar.appendChild(search);
-    toolbar.appendChild(selectInput([
-      ['all', '全部来源'], ['manual', '仅人工'], ['auto', '仅自动']
-    ], state.priority, function (value) {
-      state.priority = value; render();
-    }));
-    toolbar.appendChild(selectInput([
-      ['all', '全部状态'], ['effective', '当前采用'], ['superseded', '已覆盖/撤销']
-    ], state.effective, function (value) {
-      state.effective = value; render();
-    }));
-    var add = el('button', 'mini primary', '+ 人工情报');
-    add.type = 'button';
-    add.addEventListener('click', function () {
-      state.editing = null;
-      state.tab = 'manual';
-      stopPoll();
-      render();
-    });
-    toolbar.appendChild(add);
-    body.appendChild(toolbar);
-
     if (!items.length) {
       body.appendChild(el('div', 'intel-empty', '没有符合条件的情报'));
       return;
     }
-    items.forEach(function (item) { body.appendChild(card(item, overview)); });
+    if (state.domain === 'all') {
+      var groups = {};
+      var order = [];
+      items.forEach(function (item) {
+        var key = item.domain || 'other';
+        if (!groups[key]) { groups[key] = []; order.push(key); }
+        groups[key].push(item);
+      });
+      order.forEach(function (key) {
+        var group = el('div', 'intel-group');
+        group.appendChild(el('span', 'intel-group-title', label(DOMAINS, key)));
+        group.appendChild(el('span', 'intel-group-count',
+          groups[key].length + ' 条'));
+        body.appendChild(group);
+        groups[key].forEach(function (item) {
+          body.appendChild(card(item, overview));
+        });
+      });
+    } else {
+      items.forEach(function (item) { body.appendChild(card(item, overview)); });
+    }
   }
 
   function card(item, overview) {
-    var node = el('div', 'intel-card ' + item.priority +
+    var relevance = relevanceOf(item);
+    var node = el('div', 'intel-card intel-card-wm ' + item.priority +
       (item.effective ? '' : ' superseded') +
       (item.status === 'revoked' ? ' revoked' : ''));
+    if (relevance) node.style.borderLeftColor = SEVERITY[relevance][1];
     var head = el('div', 'intel-card-head');
+    if (relevance) {
+      head.appendChild(el('span', 'intel-sev intel-sev-' + relevance,
+        SEVERITY[relevance][0]));
+    }
     head.appendChild(el('span', 'intel-badge ' + item.priority,
       item.priority === 'manual' ? '人工' : '自动'));
     if (item.priority === 'manual') {
@@ -411,9 +540,14 @@
 
     node.appendChild(el('div', 'intel-title', item.title || '（无标题）'));
     var meta = el('div', 'intel-meta');
+    meta.appendChild(el('span', null, timeLabel(item.event_time) +
+      (ageLabel(item.event_time) ? ' · ' + ageLabel(item.event_time) : '')));
     meta.appendChild(el('span', null,
       label(DOMAINS, item.domain) + ' / ' + label(TYPES, item.type)));
-    meta.appendChild(el('span', null, timeLabel(item.event_time)));
+    if (item.confidence !== null && item.confidence !== undefined) {
+      meta.appendChild(el('span', 'intel-conf',
+        '置信 ' + Number(item.confidence).toFixed(2)));
+    }
     meta.appendChild(el('span', null,
       Number(item.lat).toFixed(6) + ', ' + Number(item.lon).toFixed(6) +
       (item.place ? ' · ' + item.place : '')));
