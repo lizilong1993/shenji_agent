@@ -266,7 +266,8 @@ class TestIndirectFire(unittest.TestCase):
         import json
         import re
         from rules.indirect_fire import tables
-        doc = json.load(open(os.path.join(SITUATION3D, "rules", "data", "crt.json")))
+        doc = json.load(open(os.path.join(SITUATION3D, "rules", "data", "crt.json"),
+                             encoding="utf-8"))
         parsed = tables()
         bands = ((0, 20), (21, 40), (41, 60), (61, 100000))
         for sheet_name, table in (("无校射火力散布裁决", parsed.unobserved),

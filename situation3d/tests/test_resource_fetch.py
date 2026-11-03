@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import sys
 import tempfile
@@ -189,7 +190,7 @@ class RefreshTest(unittest.TestCase):
         with open(src, "wb") as fh:
             fh.write(b"PBF-TEST" * 1024)
         dest = os.path.join(self.tmp, "cache", "osm_pbf", "taiwan.osm.pbf")
-        providers.download_osm_pbf("file://" + src, dest)
+        providers.download_osm_pbf(pathlib.Path(src).as_uri(), dest)
         with open(dest, "rb") as fh:
             self.assertEqual(fh.read(), b"PBF-TEST" * 1024)
         self.assertFalse(os.path.exists(dest + ".part"))
