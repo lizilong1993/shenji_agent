@@ -1262,6 +1262,19 @@ def read_ion_token():
     return token if isinstance(token, str) and token.strip() else None
 
 
+def _demo_public(value):
+    """Hide host filesystem paths from publicly reachable responses."""
+    if isinstance(value, str):
+        if re.match(r"^(/|[A-Za-z]:[\\/])", value):
+            return "<hidden in demo mode>"
+        return value
+    if isinstance(value, list):
+        return [_demo_public(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _demo_public(item) for key, item in value.items()}
+    return value
+
+
 class Handler(SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server_version = "situation3d/1.1"
@@ -1627,8 +1640,11 @@ class Handler(SimpleHTTPRequestHandler):
         query = query or {}
         if path == "/api/intel/overview":
             try:
-                self._send_json(_intel_manager().overview(
-                    query.get("case_id") or "default"))
+                overview = _intel_manager().overview(
+                    query.get("case_id") or "default")
+                if SERVER_MODE != "test":
+                    overview = _demo_public(overview)
+                self._send_json(overview)
             except ValueError as exc:
                 status = 400 if exc.__class__.__name__ == "InvalidCaseId" else 500
                 self._send_json({"error": str(exc)}, status)

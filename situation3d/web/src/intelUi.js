@@ -118,6 +118,7 @@
   function open(tab) {
     state.tab = tab || state.tab || 'list';
     state.editing = null;
+    state.domain = 'all';
     state.caseRetries = 0;
     var m = modal();
     if (!m) return;
@@ -145,6 +146,7 @@
   function onCase(caseIdValue, data) {
     var cid = String(caseIdValue || '');
     if (!cid || cid === 'default') return;
+    state.domain = 'all';
     if (state.autoTried[cid]) return;
     // Case profiles on the server own the AOI; the browser bbox is only a
     // fallback for cases without a profile, so it must not gate collection.
@@ -290,7 +292,8 @@
     if (!value) return '';
     var stamp = Date.parse(value);
     if (!Number.isFinite(stamp)) return '';
-    var minutes = Math.max(0, Math.round((Date.now() - stamp) / 60000));
+    if (stamp > Date.now() + 60000) return '';  // future: keep the absolute time only
+    var minutes = Math.round((Date.now() - stamp) / 60000);
     if (minutes < 1) return '刚刚';
     if (minutes < 60) return minutes + ' 分钟前';
     var hours = Math.round(minutes / 60);
@@ -391,7 +394,7 @@
         row.name + ' · ' + (row.entry.observations || 0) + ' 条 · ' +
         (failed ? '采集失败' : row.entry.last_fetch_at
           ? ageLabel(row.entry.last_fetch_at) : '未采集'));
-      if (failed) chip.title = row.entry.last_error;
+      if (failed) chip.title = '采集失败，详情见服务端日志';
       strip.appendChild(chip);
     });
     body.appendChild(strip);
@@ -545,12 +548,20 @@
     meta.appendChild(el('span', null,
       label(DOMAINS, item.domain) + ' / ' + label(TYPES, item.type)));
     if (item.confidence !== null && item.confidence !== undefined) {
-      meta.appendChild(el('span', 'intel-conf',
-        '置信 ' + Number(item.confidence).toFixed(2)));
+      var conf = Number(item.confidence);
+      if (Number.isFinite(conf)) {
+        meta.appendChild(el('span', 'intel-conf', '置信 ' + conf.toFixed(2)));
+      }
     }
-    meta.appendChild(el('span', null,
-      Number(item.lat).toFixed(6) + ', ' + Number(item.lon).toFixed(6) +
-      (item.place ? ' · ' + item.place : '')));
+    var lat = Number(item.lat);
+    var lon = Number(item.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      meta.appendChild(el('span', null,
+        lat.toFixed(6) + ', ' + lon.toFixed(6) +
+        (item.place ? ' · ' + item.place : '')));
+    } else if (item.place) {
+      meta.appendChild(el('span', null, item.place));
+    }
     meta.appendChild(el('span', null, sourceName(item)));
     node.appendChild(meta);
 

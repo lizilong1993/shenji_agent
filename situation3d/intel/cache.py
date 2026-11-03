@@ -14,23 +14,23 @@ import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Sequence
+from urllib.parse import quote
 
 from .model import Observation, iso, parse_time
 
 RETENTION_DAYS = 7.0
 
-_SCHEMA = (
+_SCHEMA_TABLES = (
     """
     CREATE TABLE IF NOT EXISTS observations (
         observation_id TEXT PRIMARY KEY,
         source_id TEXT NOT NULL,
         event_ms INTEGER NOT NULL,
         fetched_at TEXT,
+        scope TEXT NOT NULL DEFAULT '',
         record TEXT NOT NULL
     )
     """,
-    "CREATE INDEX IF NOT EXISTS idx_obs_event ON observations(event_ms)",
-    "CREATE INDEX IF NOT EXISTS idx_obs_source ON observations(source_id)",
     """
     CREATE TABLE IF NOT EXISTS source_state (
         state_key TEXT PRIMARY KEY,
@@ -41,6 +41,12 @@ _SCHEMA = (
         last_error TEXT
     )
     """,
+)
+
+_SCHEMA_INDEXES = (
+    "CREATE INDEX IF NOT EXISTS idx_obs_event ON observations(event_ms)",
+    "CREATE INDEX IF NOT EXISTS idx_obs_source ON observations(source_id)",
+    "CREATE INDEX IF NOT EXISTS idx_obs_scope ON observations(source_id, scope)",
 )
 
 
@@ -58,7 +64,7 @@ def cache_db_path(root: str) -> str:
 
 
 def bbox_key(bbox: Sequence[float]) -> str:
-    return ",".join("%.3f" % float(value) for value in bbox)
+    return ",".join("%.6f" % float(value) for value in bbox)
 
 
 def _observation_from_record(record: Dict[str, Any]) -> Observation:
@@ -108,19 +114,32 @@ def _observation_from_record(record: Dict[str, Any]) -> Observation:
 
 
 class IntelCache:
-    def __init__(self, path: str):
+    def __init__(self, path: str, readonly: bool = False):
         self.path = os.path.abspath(path)
+        self._lock = threading.Lock()
+        if readonly:
+            uri = "file:%s?mode=ro" % quote(self.path)
+            self._conn = sqlite3.connect(uri, uri=True,
+                                         check_same_thread=False, timeout=10.0)
+            return
         directory = os.path.dirname(self.path)
         if directory:
             os.makedirs(directory, exist_ok=True)
-        self._lock = threading.Lock()
         self._conn = sqlite3.connect(self.path, check_same_thread=False,
                                      timeout=10.0)
         # NFS-hostile by design: no WAL, bounded fsyncs.
         self._conn.execute("PRAGMA journal_mode=DELETE")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         with self._lock, self._conn:
-            for statement in _SCHEMA:
+            for statement in _SCHEMA_TABLES:
+                self._conn.execute(statement)
+            columns = {row[1] for row in self._conn.execute(
+                "PRAGMA table_info(observations)")}
+            if "scope" not in columns:
+                self._conn.execute(
+                    "ALTER TABLE observations ADD COLUMN"
+                    " scope TEXT NOT NULL DEFAULT ''")
+            for statement in _SCHEMA_INDEXES:
                 self._conn.execute(statement)
 
     def close(self) -> None:
@@ -129,9 +148,10 @@ class IntelCache:
 
     # -- observations ---------------------------------------------------
 
-    def upsert(self, observations: Sequence[Observation]) -> int:
+    def upsert(self, observations: Sequence[Observation],
+               scope: str = "") -> int:
         rows = [(obs.observation_id, obs.source_id, obs.event_ms(),
-                 obs.ingest_time,
+                 obs.ingest_time, str(scope or ""),
                  json.dumps(obs.as_dict(), ensure_ascii=False))
                 for obs in observations]
         if not rows:
@@ -139,21 +159,30 @@ class IntelCache:
         with self._lock, self._conn:
             self._conn.executemany(
                 "INSERT OR REPLACE INTO observations"
-                " (observation_id, source_id, event_ms, fetched_at, record)"
-                " VALUES (?, ?, ?, ?, ?)", rows)
+                " (observation_id, source_id, event_ms, fetched_at, scope,"
+                " record)"
+                " VALUES (?, ?, ?, ?, ?, ?)", rows)
         return len(rows)
 
     def query(self, start: Any, end: Any,
-              source_ids: Optional[Sequence[str]] = None) -> List[Observation]:
+              source_ids: Optional[Sequence[str]] = None,
+              scope: Optional[str] = None) -> List[Observation]:
         start_ms = int(parse_time(start).timestamp() * 1000)
         end_ms = int(parse_time(end).timestamp() * 1000)
+        # GDACS keeps multi-day events whose stored event time may precede the
+        # requested window; _in_window() re-checks their from/to span.
         sql = ("SELECT record FROM observations"
-               " WHERE event_ms >= ? AND event_ms <= ?")
-        args = [start_ms, end_ms]
+               " WHERE event_ms <= ?"
+               " AND (event_ms >= ? OR source_id = 'gdacs')")
+        args = [end_ms, start_ms]
         ids = tuple(str(item) for item in (source_ids or ()) if str(item))
         if ids:
             sql += " AND source_id IN (%s)" % ",".join("?" * len(ids))
             args.extend(ids)
+        if scope is not None:
+            # GDELT hits depend on case keywords; never serve another case's.
+            sql += " AND (source_id != 'gdelt' OR scope = ?)"
+            args.append(str(scope))
         with self._lock:
             rows = self._conn.execute(sql, args).fetchall()
         return [_observation_from_record(json.loads(row[0])) for row in rows]
@@ -167,12 +196,14 @@ class IntelCache:
 
     # -- per-source cursor state ---------------------------------------
 
-    def _state_key(self, source_id: str, bbox: Sequence[float]) -> str:
-        return "%s:%s" % (source_id, bbox_key(bbox))
+    def _state_key(self, source_id: str, bbox: Sequence[float],
+                   variant: str = "") -> str:
+        key = "%s:%s" % (source_id, bbox_key(bbox))
+        return key + (":" + str(variant) if variant else "")
 
     def state(self, source_id: str,
-              bbox: Sequence[float]) -> Dict[str, Any]:
-        key = self._state_key(source_id, bbox)
+              bbox: Sequence[float], variant: str = "") -> Dict[str, Any]:
+        key = self._state_key(source_id, bbox, variant)
         with self._lock:
             row = self._conn.execute(
                 "SELECT cursor_until, last_fetch_at, last_error"
@@ -185,9 +216,10 @@ class IntelCache:
     def mark(self, source_id: str, bbox: Sequence[float],
              cursor_until: Optional[str] = None,
              error: Optional[str] = None,
-             fetched_at: Optional[str] = None) -> None:
-        key = self._state_key(source_id, bbox)
-        current = self.state(source_id, bbox)
+             fetched_at: Optional[str] = None,
+             variant: str = "") -> None:
+        key = self._state_key(source_id, bbox, variant)
+        current = self.state(source_id, bbox, variant)
         cursor = (cursor_until if cursor_until is not None
                   else current.get("cursor_until"))
         stamp = fetched_at or iso(datetime.now(timezone.utc))

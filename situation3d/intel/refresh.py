@@ -50,6 +50,11 @@ def _overlap(source_id: str) -> timedelta:
     return timedelta(hours=OVERLAP_H.get(source_id, DEFAULT_OVERLAP_H))
 
 
+def _utc_midnight(value: datetime) -> datetime:
+    return value.astimezone(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+
+
 def fetch_windows(source_id: str, start: datetime, end: datetime,
                   cursor_until: Optional[str], now: datetime,
                   live_allowed: bool) -> List[Tuple[datetime, datetime]]:
@@ -72,10 +77,16 @@ def fetch_windows(source_id: str, start: datetime, end: datetime,
             if window_start >= end:
                 return []
     if source_id == "firms":
+        # FIRMS serves whole UTC calendar days (day_span is a day count from
+        # the URL's date), so chunk boundaries must be UTC midnights. Cutting
+        # at "start + 5 days" instead loses the tail after day 5's midnight.
         chunks: List[Tuple[datetime, datetime]] = []
         current = window_start
         while current < end:
-            nxt = min(end, current + timedelta(days=FIRMS_MAX_DAYS))
+            nxt = min(end, _utc_midnight(current)
+                      + timedelta(days=FIRMS_MAX_DAYS))
+            if nxt <= current:  # defensive: never loop without progress
+                nxt = min(end, current + timedelta(days=1))
             chunks.append((current, nxt))
             current = nxt
         return chunks
@@ -142,7 +153,14 @@ def refresh_bundle(case_id: str, profile: CaseIntelProfile, start: Any,
     fetched_count = 0
     try:
         for source_id in sources:
-            state = cache.state(source_id, bbox)
+            # GDELT queries depend on the case keywords, so its cursor and
+            # cached rows are namespaced per case. The buffer also belongs in
+            # the cursor key: growing it exposes an unfetched ring.
+            scope = case_id if source_id == "gdelt" else ""
+            variant = "buf=%.3f" % float(profile.buffer_km)
+            if scope:
+                variant += ";case=" + scope
+            state = cache.state(source_id, bbox, variant=variant)
             windows = fetch_windows(source_id, start_dt, end_dt,
                                     state.get("cursor_until"), now_dt,
                                     live_allowed)
@@ -150,15 +168,28 @@ def refresh_bundle(case_id: str, profile: CaseIntelProfile, start: Any,
             source_custom = [entry] if entry is not None else None
             source_ok = True
             if not windows:
+                # A cursor past the window normally means "cache is complete".
+                # If pruning already removed that window, fall back to a full
+                # fetch instead of serving an empty bundle forever.
+                probe = [obs for obs in cache.query(
+                    start_dt, end_dt, (source_id,), scope=scope or None)
+                    if _in_bbox(obs, expanded)
+                    and _in_window(obs, start_dt, end_dt)]
+                if probe or (source_id in LIVE_SOURCES and not live_allowed):
+                    windows_log.append({
+                        "source_id": source_id, "mode": "cached",
+                        "cursor_until": state.get("cursor_until"),
+                    })
+                    statuses.append(SourceStatus(
+                        source_id=source_id, state="cached", ok=True,
+                        fetched_at=state.get("last_fetch_at") or "", count=0,
+                        error=state.get("last_error") or ""))
+                    continue
+                windows = [(start_dt, end_dt)]
                 windows_log.append({
-                    "source_id": source_id, "mode": "cached",
+                    "source_id": source_id, "mode": "cache-miss",
                     "cursor_until": state.get("cursor_until"),
                 })
-                statuses.append(SourceStatus(
-                    source_id=source_id, state="cached", ok=True,
-                    fetched_at=state.get("last_fetch_at") or "", count=0,
-                    error=state.get("last_error") or ""))
-                continue
             source_statuses: List[SourceStatus] = []
             for window_start, window_end in windows:
                 try:
@@ -181,7 +212,7 @@ def refresh_bundle(case_id: str, profile: CaseIntelProfile, start: Any,
                     errors.append({"source_id": source_id,
                                    "error": message[:300]})
                     cache.mark(source_id, bbox, error=message,
-                               fetched_at=iso(now_dt))
+                               fetched_at=iso(now_dt), variant=variant)
                     windows_log.append({
                         "source_id": source_id, "mode": "error",
                         "start": iso(window_start), "end": iso(window_end),
@@ -193,11 +224,11 @@ def refresh_bundle(case_id: str, profile: CaseIntelProfile, start: Any,
                 if status is not None and not status.ok:
                     cache.mark(source_id, bbox,
                                error=status.error or "source unavailable",
-                               fetched_at=iso(now_dt))
+                               fetched_at=iso(now_dt), variant=variant)
                     source_ok = False
                 else:
                     fetched_count += cache.upsert(
-                        result.bundle.observations)
+                        result.bundle.observations, scope=scope)
                 if status is not None:
                     source_statuses.append(status)
                 archives.extend(result.archives)
@@ -211,13 +242,22 @@ def refresh_bundle(case_id: str, profile: CaseIntelProfile, start: Any,
                 })
                 if not source_ok:
                     break
-            if source_ok:
+            degraded = any(status.state == "degraded"
+                           for status in source_statuses)
+            if source_ok and not degraded:
                 cache.mark(source_id, bbox, cursor_until=iso(end_dt),
-                           error=None, fetched_at=iso(now_dt))
+                           error=None, fetched_at=iso(now_dt),
+                           variant=variant)
+            elif source_ok:
+                # Partial result (e.g. one FIRMS sensor down): keep the old
+                # cursor so the gap is requested again on the next run.
+                cache.mark(source_id, bbox, error="degraded fetch",
+                           fetched_at=iso(now_dt), variant=variant)
             statuses.extend(_merge_statuses(source_statuses))
 
         # -- assemble the case bundle from the cache --------------------
-        cached = cache.query(start_dt, end_dt, sources)
+        cached = cache.query(start_dt, end_dt, sources,
+                             scope=case_id if "gdelt" in sources else None)
         cached = [obs for obs in cached
                   if _in_bbox(obs, expanded)
                   and _in_window(obs, start_dt, end_dt)]
@@ -253,9 +293,10 @@ def refresh_bundle(case_id: str, profile: CaseIntelProfile, start: Any,
             time_window=(iso(start_dt), iso(end_dt)),
             source_allowlist=tuple(sources),
         )
-        # Retention is relative to the window end so deterministic replays of
-        # historical windows prune the same way they would live.
-        pruned = cache.prune(end_dt - timedelta(days=RETENTION_DAYS))
+        # Retention is anchored at min(window end, now): a future end must not
+        # prune recent data. Historical windows keep their own horizon.
+        prune_anchor = min(end_dt, now_dt)
+        pruned = cache.prune(prune_anchor - timedelta(days=RETENTION_DAYS))
         report = {
             "enabled": True,
             "db": os.path.basename(cache.path),

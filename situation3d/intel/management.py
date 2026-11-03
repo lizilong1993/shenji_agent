@@ -188,7 +188,7 @@ class IntelManager:
             from .cache import IntelCache, cache_db_path
             db_path = cache_db_path(self.root)
             if os.path.isfile(db_path):
-                cache = IntelCache(db_path)
+                cache = IntelCache(db_path, readonly=True)
                 try:
                     cache_stats = cache.stats()
                 finally:
