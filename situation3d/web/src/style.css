@@ -1341,34 +1341,79 @@ select {
 .lp-form-row > input,
 .lp-form-row > select { flex: 1 1 auto; min-width: 0; }
 .lp-elem-box { display: block; }
-.plot-add {  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px dashed var(--border);
-}
-.plot-row { display: flex; gap: 4px; }
-.plot-row > * { flex: 1 1 0; min-width: 0; }
-.plot-sel,
-.plot-input {
-  width: 100%;
-  box-sizing: border-box;
-  font: inherit;
-  font-size: 11px;
-  padding: 2px 4px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: #fff;
-  color: var(--text);
-}
-.plot-input { resize: vertical; }
 
-/* 标绘面板：从菜单栏【标绘】下拉打开（原先在左栏的 details 里）。
-   `.plot-add` 顶部那条虚线是给"标题下方的分节"用的，放进下拉里是多余的；
-   宽度取 268px，与 .menu-list 的 380px 相比更贴合这几个窄控件。 */
-.menu-plot-panel { width: 268px; padding: 8px; }
-.menu-plot-panel .plot-add { margin-top: 0; padding-top: 0; border-top: 0; }
+/* ---------------- 标绘创建：右键菜单与绘制操作条 ---------------- */
+
+.plot-draw-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(560px, calc(100% - 24px));
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgba(16, 26, 40, .18);
+}
+.plot-draw-bar.hidden { display: none; }
+.plot-hint { min-width: 0; font-size: 11px; line-height: 1.5; color: var(--text-dim); }
+.plot-hint.warn { color: #8a4a12; }
+.plot-hint.ok { color: #2f6b45; }
+
+.plot-ctx-menu {
+  position: absolute;
+  z-index: 70;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 12px 30px rgba(16, 26, 40, .18);
+}
+.plot-ctx-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.plot-ctx-item:hover,
+.plot-ctx-item:focus-visible { background: #eef2f8; outline: none; }
+.plot-ctx-item .caret { font-size: 10px; color: var(--text-dim); }
+.plot-ctx-sub {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  display: none;
+  width: 220px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 12px 30px rgba(16, 26, 40, .18);
+}
+.plot-ctx-menu.sub-open .plot-ctx-sub { display: block; }
+.plot-ctx-menu.sub-left .plot-ctx-sub { left: auto; right: 100%; }
+.plot-ctx-head { padding: 6px 9px 3px; font-size: 11px; color: var(--text-dim); }
+.plot-ctx-std { font-size: 10px; color: var(--text-dim); }
 .plot-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
 .plot-item {
   display: flex;
