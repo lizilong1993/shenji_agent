@@ -1342,12 +1342,30 @@ select {
 .lp-form-row > select { flex: 1 1 auto; min-width: 0; }
 .lp-elem-box { display: block; }
 
+/* 图层面板的要素行内编辑表单也在用这三条（见 layerPanel.js 的 editForm），
+   不要当作旧标绘下拉的专属样式删掉。 */
+.plot-row { display: flex; gap: 4px; }
+.plot-row > * { flex: 1 1 0; min-width: 0; }
+.plot-sel,
+.plot-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #fff;
+  color: var(--text);
+}
+.plot-input { resize: vertical; }
+
 /* ---------------- 标绘创建：右键菜单与绘制操作条 ---------------- */
 
 .plot-draw-bar {
   position: absolute;
   left: 50%;
-  bottom: 18px;
+  bottom: 52px;
   transform: translateX(-50%);
   z-index: 45;
   display: flex;

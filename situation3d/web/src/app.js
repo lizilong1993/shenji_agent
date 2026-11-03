@@ -7463,7 +7463,7 @@ function bindUI() {
     if (e.key === 'Escape') {
       closeAllMenus(true); clearTargetSelection();
       closePlotCtxMenu();
-      if (plotDraw) plotDrawReset();
+      plotDrawReset();
     }
   });
 
@@ -7760,16 +7760,19 @@ function finishPlotDraw() {
     try { Plotting.remove(plotDraw.previewId); } catch (err) { /* 已移除 */ }
     plotDraw.previewId = null;
   }
+  let ok = true;
   try {
     Plotting.add(spec);
     setPlotHint('已添加 ' + (def ? def.zh : plotDraw.type) + '（' + pts.length + ' 个控制点）', 'ok');
   } catch (err) {
+    ok = false;
     setPlotHint('添加失败：' + err.message, 'warn');
   }
   plotDraftEntities.forEach(function (e) { try { viewer.entities.remove(e); } catch (err) {} });
   plotDraftEntities = [];
   plotDraw = null;
-  setPlotBarVisible(false);
+  // 失败时保留操作条：否则「添加失败」的提示会随操作条一起立刻消失。
+  if (ok) setPlotBarVisible(false);
 }
 
 /** 从右键菜单选中的类型进入绘制：归属先按红方，落图后可在图层面板修改。 */
@@ -7856,7 +7859,7 @@ function openPlotCtxMenu(x, y) {
   menu.style.left = Math.max(4, mx) + 'px';
   menu.style.top = Math.max(4, my) + 'px';
   // 子菜单与一级菜单同顶对齐，高度按剩余可视区收窄，避免底部类型落到视口外。
-  sub.style.maxHeight = Math.max(180, rect.height - Math.max(4, my) - 8) + 'px';
+  sub.style.maxHeight = Math.max(80, rect.height - Math.max(4, my) - 8) + 'px';
   // 靠近右缘时子菜单向左展开，避免整列类型溢出画布。
   if (x + menu.offsetWidth + 228 > rect.width) menu.classList.add('sub-left');
 
@@ -7866,7 +7869,7 @@ function openPlotCtxMenu(x, y) {
   item.addEventListener('focus', openSub);
   item.addEventListener('click', function (e) {
     e.stopPropagation();
-    menu.classList.toggle('sub-open');
+    menu.classList.add('sub-open');
   });
   plotCtxMenu = menu;
 }
