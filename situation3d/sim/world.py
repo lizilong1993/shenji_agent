@@ -153,6 +153,10 @@ class World(object):
         # 被 ROE 拒掉的交战：(攻击方, 目标) → 理由。用来回答"为什么没打"，
         # 与"刚打完的冷却"分开记，两者在界面上长得一样但原因完全不同。
         self.roe_rejections: Dict[Tuple[int, int], str] = {}
+        # 两栖卸载节拍：运载舰 uid → 下一次可放出的时刻。舱门、艇位与
+        # 登陆艇数量都有限，整船人同一 tick 全冲上岸不真实。
+        self.unload_interval_s = 20.0
+        self._unload_ready: Dict[int, float] = {}
         self._sensor_time_s: Optional[float] = None
         self._env_time_s: Optional[float] = None
         self._stack_cache: Dict[int, bool] = {}
@@ -1688,7 +1692,13 @@ class World(object):
                 continue
             depth = self.env.water_depth(carrier.pose.lon, carrier.pose.lat)
             can_land = depth is None or depth <= 1.2
+            # 卸载按批次进行，不是所有乘客同一 tick 全下：真实的两栖卸载
+            # 受舱门、艇位与登陆艇数量限制，一次只放得下一个波次。
+            # 这里用"每 UNLOAD_INTERVAL_S 放一个"表达，顺序按 uid 固定，
+            # 保证同一 seed 可复现。
             for pid in list(carrier.passengers):
+                if self.time_s < self._unload_ready.get(carrier.uid, 0.0):
+                    break
                 passenger = self.entities.get(pid)
                 if passenger is None or not passenger.alive:
                     carrier.passengers.remove(pid)
@@ -1726,6 +1736,9 @@ class World(object):
                     passenger.moving = False
                     if _is_ground(passenger):
                         self.traffic.insert(passenger)
+                    # 下一个波次要等这么久；没有乘客时这个值自然失效。
+                    self._unload_ready[carrier.uid] = (
+                        self.time_s + self.unload_interval_s)
                     self.emit("disembark", [pid, carrier.uid],
                               "%s 从 %s 下船" % (passenger.name, carrier.name))
 
