@@ -58,7 +58,8 @@
 - [ ] **两栖卸载时机**：`_sync_passengers` 按"水深 ≤1.2 m 或找到最近陆地 + 航速 <0.5"下船，
       未建模卸载耗时与顺序
 - [ ] **空中加油**：无
-- [ ] **交战规则细化**：`sim/mission.py` 的 ROE 只有 halt_on_contact / engage_m / resume_after_s 三项
+- [x] **交战规则细化**（24115d9）：`sim/roe.py` 三种政策（自由/责任区/还击）+ 确认门槛 + NSL；
+      接入 `World._engage`，被拒理由可查；默认值等于旧行为（同 seed 重跑数值不变）
 
 
 
