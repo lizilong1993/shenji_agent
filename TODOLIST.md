@@ -21,7 +21,43 @@
 - [ ] 服务器容器重新挂载 NFS（需宿主机操作，容器内做不到）
 - [ ] `web/tiles` 高层级瓦片与 `tiles_db` / `tiles3d_db` 重建（体积大，按需）
 
-## 1. 收尾队列（交接文档既定）
+## 0.5 三条分支的剩余项（2026-11-07 梳理）
+
+用户指出情报 / 时间轴 / 引擎改造三条分支均未完成。逐条核对后的结论：
+
+### 情报分支
+
+- [x] **汇聚事件界面**（3a4c8a0）：后端早就算好 `overview.convergence`，前端此前零引用。
+      现在列表顶部按评分列出最多 6 处，可定位到网格
+- [ ] **汇聚事件进 event feed**：目前只在情报面板可见，未进统一事件流（`eventFeed.js`）
+- [ ] **情报源目录元数据**：许可 / 采集方式 / tier 三列仍缺，管理界面只有名称与状态
+- [ ] **GDELT 多语言/多地区扩展**：当前只按案例关键词与 bbox 过滤
+- [ ] **情报缓存跨案例去重**：同一事件在不同案例下会分别入库（缓存按 source+bbox 存，未做全局去重）
+
+### 时间轴分支
+
+- [x] **实时推演链路**（cba1d17 + b2d0b77）：开战 / 轮询 / 取消 / 切案例 / 终态全部验证过
+- [x] **成品回放 `?run=`**：simConsole 的「查看」按钮跳转到该路径，链路通
+- [ ] **事件/节点面板**：`nodes.json` 与 `events.json` 后端有，前端只在时间轴打点，没有可点击的事件列表
+- [ ] **多 run 对比**：simConsole 有"设为最优"，但两个 run 的指标无法并排比较
+- [ ] **回放导出**：无法把一次成品回放导出成视频或带标注的轨迹包
+
+### 引擎改造分支
+
+- [x] **中途任务切换**（3a4c8a0）：`MissionRunner.retask()` + `live/retask.json` 文件通道
+- [x] **间瞄校射**：已按"是否被己方探测到"接入 `observed` 标志（`sim/world.py:1142`）
+- [x] **中印案例**：`campaigns/india_china_west.py` 已存在且可被 `run_campaign.py --case` 加载
+- [ ] **战役地图 `map_9001`/`map_9002` 本地缺失**：`web/data/campaign_maps/` 不存在，
+      两个 campaign 案例跑不起来；需 `scripts/build_campaign_map.py` 重新生成
+- [ ] **指挥链 / 通信**：`sim/commander.py` 有 commander 层但默认 `enable_commander: False`，
+      尚无通信中断对指挥的影响
+- [ ] **潜艇浮出转换**：`mobility/profile.py` 有 subsurface 剖面，`sim/world.py` 无浮出/下潜状态机
+- [ ] **两栖卸载时机**：`_sync_passengers` 按"水深 ≤1.2 m 或找到最近陆地 + 航速 <0.5"下船，
+      未建模卸载耗时与顺序
+- [ ] **空中加油**：无
+- [ ] **交战规则细化**：`sim/mission.py` 的 ROE 只有 halt_on_contact / engage_m / resume_after_s 三项
+
+
 
 - [x] **K** 标绘迁到地图右键子菜单（bce01fb / 8e3d6c0）
 - [x] **I** 情报 7 天缓存 + 按源增量（b40a7d0）
