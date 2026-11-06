@@ -206,7 +206,14 @@ def _fetch_eonet(spec, start, end, bbox, fetcher, fetched_at):
 def _fetch_gdelt(spec, start, end, case_profile, fetcher, fetched_at):
     if case_profile is None or not case_profile.keywords:
         raise FetchError("GDELT needs case keywords")
-    url = gdelt.build_url(case_profile.keywords, start, end)
+    # languages 与 extra_terms 是本轮新增的**收窄**条件，profile 里没配就
+    # 等于旧查询。countries 不传：profile 里那个字段存的是 "Taiwan"/"China"
+    # 这样的名称（供文本匹配用），不是 GDELT 要求的两位 ISO 码；混用会让
+    # 查询变成 sourcecountry:Taiwan 而一条也检索不到。
+    url = gdelt.build_url(
+        case_profile.keywords, start, end,
+        languages=getattr(case_profile, "languages", None),
+        extra_terms=getattr(case_profile, "extra_terms", None))
     raw = None
     for attempt in range(2):
         try:

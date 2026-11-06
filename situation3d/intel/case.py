@@ -78,6 +78,10 @@ class CaseIntelProfile:
     sources: Tuple[str, ...] = ()
     keywords: Tuple[str, ...] = ()
     countries: Tuple[str, ...] = ()
+    # 可选的情报检索**收窄**条件：只影响 GDELT 这类按关键词检索的源，
+    # 不改变既有行为（不填就完全等同于旧查询）。
+    languages: Tuple[str, ...] = ()
+    extra_terms: Tuple[str, ...] = ()
     buffer_km: float = 0.0
     lookback_hours: float = 24.0
     max_items: int = 5000
@@ -92,6 +96,9 @@ class CaseIntelProfile:
                            tuple(value.lower() for value in _strings(self.sources)))
         object.__setattr__(self, "keywords", _strings(self.keywords))
         object.__setattr__(self, "countries", _strings(self.countries))
+        object.__setattr__(self, "languages",
+                           tuple(v.lower() for v in _strings(self.languages)))
+        object.__setattr__(self, "extra_terms", _strings(self.extra_terms))
         object.__setattr__(self, "buffer_km", max(0.0, float(self.buffer_km)))
         object.__setattr__(self, "lookback_hours",
                            max(0.0, float(self.lookback_hours)))
@@ -113,6 +120,8 @@ class CaseIntelProfile:
             domains=payload.get("domains") or (),
             sources=payload.get("sources") or (),
             keywords=payload.get("keywords") or (),
+            languages=payload.get("languages") or (),
+            extra_terms=payload.get("extra_terms") or (),
             countries=payload.get("countries") or (),
             buffer_km=value("buffer_km", 0.0),
             lookback_hours=value("lookback_hours", 24.0),
@@ -128,6 +137,8 @@ class CaseIntelProfile:
             "sources": list(self.sources),
             "keywords": list(self.keywords),
             "countries": list(self.countries),
+            "languages": list(self.languages),
+            "extra_terms": list(self.extra_terms),
             "buffer_km": self.buffer_km,
             "lookback_hours": self.lookback_hours,
             "max_items": self.max_items,
@@ -149,7 +160,8 @@ class CaseIntelProfile:
 
     def with_overrides(self, **kwargs) -> "CaseIntelProfile":
         allowed = {"case_id", "name", "bbox", "domains", "sources",
-                   "keywords", "countries", "buffer_km", "lookback_hours",
+                   "keywords", "countries", "languages", "extra_terms",
+                   "buffer_km", "lookback_hours",
                    "max_items"}
         changes = {key: value for key, value in kwargs.items()
                    if key in allowed and value is not None}
