@@ -11,12 +11,15 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .association import (canonical_type, extract_key_items, link_items)
+from .convergence import convergence_events, summarize as convergence_summary
 from .manual import ManualIntelStore
 from .sources import SourceStore
 from .case import load_case_profile
 
 CONFLICT_RADIUS_KM = 25.0
 CONFLICT_WINDOW_H = 6.0
+CONVERGENCE_WINDOW_H = 24.0
+CONVERGENCE_MIN_TYPES = 3
 _CASE_SAFE = re.compile(r"[^A-Za-z0-9_.-]+")
 _CASE_RE = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 
@@ -291,11 +294,17 @@ class IntelManager:
                                radius_km=max(CONFLICT_RADIUS_KM, 50.0),
                                window_h=max(CONFLICT_WINDOW_H, 24.0))
             key_items = extract_key_items(items, links, profile)
+            events = convergence_events(
+                items,
+                bbox=list(profile.expanded_bbox) if profile else None,
+                window_h=CONVERGENCE_WINDOW_H,
+                min_types=CONVERGENCE_MIN_TYPES,
+            )
             if len(self._cache) > 8:
                 self._cache.clear()
-            self._cache[cache_key] = (links, key_items)
+            self._cache[cache_key] = (links, key_items, events)
         else:
-            links, key_items = cached
+            links, key_items, events = cached
         counts = {
             "manual_active": len(active_manual),
             "manual_revoked": len(manual_items) - len(active_manual),
@@ -304,6 +313,7 @@ class IntelManager:
             "superseded": len(superseded),
             "links": len(links),
             "key_items": len(key_items),
+            "convergence": len(events),
         }
         return {
             "case_id": case_id,
@@ -320,6 +330,16 @@ class IntelManager:
             "items": items,
             "links": links,
             "key_items": key_items,
+            "convergence": {
+                "rule": {
+                    "window_h": CONVERGENCE_WINDOW_H,
+                    "min_types": CONVERGENCE_MIN_TYPES,
+                    "cell": "bbox/16 自适应，最小 0.05°",
+                    "rule": "同一网格内 24h 出现 3 类以上不同规范类型即生成汇聚事件",
+                },
+                "events": events,
+                "summary": convergence_summary(events),
+            },
             "sources": sources,
             "cache": cache_stats,
             "ai": {"counts": ai_counts, "items": ai_items},

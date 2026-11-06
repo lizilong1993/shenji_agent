@@ -705,7 +705,7 @@ def _case_parts(path):
                 with open(inf_p, "rb") as fh:
                     inf = fh.read()
             else:
-                with open(path, "r") as fh:
+                with open(path, "r", encoding="utf-8") as fh:
                     doc = json.load(fh)
                 frames = None
                 if isinstance(doc, dict):
@@ -825,7 +825,7 @@ def _build_situations_index(names, listed):
         if not os.path.isfile(full):
             continue
         try:
-            with open(full, "r") as fh:
+            with open(full, "r", encoding="utf-8") as fh:
                 doc = json.load(fh)
         except (OSError, ValueError) as exc:
             errors.append({"file": name, "error": str(exc)})
@@ -891,7 +891,7 @@ def _case_file_for_id(cid):
 def _read_persisted_situations(key):
     """读 /tmp 的持久化索引；键不匹配就返回 None（当作没命中）。"""
     try:
-        with open(_SITUATIONS_INDEX_PATH, "r") as fh:
+        with open(_SITUATIONS_INDEX_PATH, "r", encoding="utf-8") as fh:
             doc = json.load(fh)
         if not isinstance(doc, dict):
             return None
@@ -1355,7 +1355,7 @@ def read_ion_token():
     if from_env:
         return from_env
     try:
-        with open(ION_CONFIG_PATH, "r") as fh:
+        with open(ION_CONFIG_PATH, "r", encoding="utf-8") as fh:
             data = json.load(fh)
     except (OSError, ValueError):
         return None
@@ -1746,6 +1746,23 @@ class Handler(SimpleHTTPRequestHandler):
                 if SERVER_MODE != "test":
                     overview = _demo_public(overview)
                 self._send_json(overview)
+            except ValueError as exc:
+                status = 400 if exc.__class__.__name__ == "InvalidCaseId" else 500
+                self._send_json({"error": str(exc)}, status)
+            except Exception as exc:  # noqa: BLE001 - report a useful message
+                self._send_json({"error": "%s: %s"
+                                 % (type(exc).__name__, exc)}, 500)
+            return
+        if path == "/api/intel/convergence":
+            try:
+                overview = _intel_manager().overview(
+                    query.get("case_id") or query.get("case") or "default")
+                payload = overview.get("convergence") or {}
+                if SERVER_MODE != "test":
+                    payload = _demo_public(payload)
+                self._send_json({"case_id": overview.get("case_id"),
+                                 "revision": overview.get("revision"),
+                                 "convergence": payload})
             except ValueError as exc:
                 status = 400 if exc.__class__.__name__ == "InvalidCaseId" else 500
                 self._send_json({"error": str(exc)}, status)
