@@ -90,6 +90,32 @@
   // `z`，也不写回任何顺序；同一图层内部的多个实例（热点框、高倍段）由
   // `compareImagery()` 按 provider 声明的 maximumLevel 和覆盖矩形排序，
   // 同样与挂载先后无关。
+  // 情报门类：**纯元数据**，只用于面板分组标题与"这一层属于哪类情报"的查询。
+  // 刻意不与 `group` 合并——`group` 参与面板布局与既有顺序约定，而门类是
+  // 情报语义（GMTI/ELINT/IMINT/OSINT/场景/底图/标绘），两者正交。
+  // 没有真实流式情报源时不加这一维；现在加上是为了让以后接进来时不用改结构。
+  var INTEL_CLASSES = ['imagery', 'imint', 'osint', 'scenario', 'plot'];
+  var INTEL_CLASS_LABELS = {
+    imagery: '底图影像',
+    imint: '图像情报',
+    osint: '公开来源情报',
+    scenario: '推演场景',
+    plot: '人工标绘'
+  };
+  // 门类归属：按 id 前缀判定，避免在 28 条定义里逐条手写同一个字段。
+  function intelClassOf(def) {
+    var id = String(def.id || '');
+    if (id.indexOf('layerHotspots') === 0 || id.indexOf('layerRoutes') === 0 ||
+        id.indexOf('layerOverview') === 0 || id.indexOf('layerTargets') === 0 ||
+        id.indexOf('layerLabels') === 0 || id.indexOf('layerTracks') === 0 ||
+        id.indexOf('layerTargetProps') === 0) return 'scenario';
+    if (id.indexOf('situation.') === 0) return 'plot';
+    if (id.indexOf('hotspot.imagery') === 0 || id.indexOf('urban.imagery') === 0 ||
+        id.indexOf('imagery.offline_detail') === 0) return 'imint';
+    if (id.indexOf('places.') === 0 || id.indexOf('weather.') === 0) return 'osint';
+    return 'imagery';
+  }
+
   var LAYERS = [
     // ---- imagery 栈：序号即 imageryLayers 的 index，越大越靠上 ----
     // 【2026-10-16 改】离线 Esri 底图由 z=5 提到 **z=12**，并改名「Esri 影像（离线）」。
@@ -576,6 +602,8 @@
       return {
         id: l.id, kind: l.kind, z: l.z, label: l.label, group: l.group,
         subgroup: l.subgroup || null,
+        intelClass: l.intelClass || intelClassOf(l),
+        intelClassLabel: INTEL_CLASS_LABELS[l.intelClass || intelClassOf(l)],
         panel: l.panel !== false,   // false 的行不在图层面板里显示（内部开关保留）
         checkbox: l.checkbox || null,
         desired: r.desired,
@@ -797,6 +825,9 @@
 
   window.LayerRegistry = {
     LAYERS: LAYERS,
+    INTEL_CLASSES: INTEL_CLASSES,
+    INTEL_CLASS_LABELS: INTEL_CLASS_LABELS,
+    intelClassOf: intelClassOf,
     list: list,
     def: function (id) { return byId[id] || null; },
     orderOf: orderOf,
