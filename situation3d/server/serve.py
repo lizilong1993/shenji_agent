@@ -2000,6 +2000,41 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"error": "not found"}, 404)
                 return
             rest = path[len("/api/sim/runs/"):]
+            # 回放导出：/api/sim/runs/<id>/replay.html?case_id=... 返回单文件包
+            if rest.endswith("/replay.html"):
+                run_id = rest[:-len("/replay.html")].strip("/")
+                cid = (query or {}).get("case_id") or ""
+                if not cid or not run_id:
+                    self._send_json({"error": "case_id 与 run_id 必填"}, 400)
+                    return
+                try:
+                    run_dir = RUN_STORE.run_dir(cid, run_id)
+                    from server.replay_export import build_payload, render
+                    payload = build_payload(run_dir)
+                except RunNotFound as exc:
+                    self._send_json({"error": str(exc)}, 404)
+                    return
+                except RunError as exc:
+                    self._send_json({"error": str(exc)}, 400)
+                    return
+                except Exception as exc:      # noqa: BLE001
+                    self._send_json({"error": "%s: %s"
+                                     % (type(exc).__name__, exc)}, 500)
+                    return
+                body = render(payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type",
+                                 "text/html; charset=utf-8")
+                self.send_header(
+                    "Content-Disposition",
+                    'attachment; filename="replay-%s.html"' % run_id)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+                return
             if "/" in rest:
                 self._send_json({"error": "not found"}, 404)
                 return

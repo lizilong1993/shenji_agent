@@ -115,6 +115,8 @@
         actions += '<button class="danger" data-act="cancel" data-id="' + esc(run.run_id) + '">取消</button>';
       } else {
         actions += '<button class="ghost" data-act="view" data-id="' + esc(run.run_id) + '"' + (done ? '' : ' disabled') + '>查看</button>';
+        // 导出：单文件 HTML，离线可开，带轨迹/事件/指标
+        actions += '<button class="ghost" data-act="export" data-id="' + esc(run.run_id) + '"' + (done ? '' : ' disabled') + '>导出</button>';
         // 对比：勾两条已完成的运行才可用。选中态用按钮的 pressed 表示。
         var picked = (state.compare || []).indexOf(run.run_id) >= 0;
         actions += '<button class="ghost' + (picked ? ' active' : '')
@@ -322,6 +324,12 @@
     if (!btn) return;
     var runId = btn.getAttribute('data-id');
     var act = btn.getAttribute('data-act');
+    if (act === 'export') {
+      // 交给浏览器下载：服务端带 Content-Disposition，不必自己造 Blob。
+      window.open('/api/sim/runs/' + encodeURIComponent(runId)
+        + '/replay.html?case_id=' + encodeURIComponent(state.caseId), '_blank');
+      return;
+    }
     if (act === 'view') {
       window.open('/?case=' + encodeURIComponent(state.caseId) +
                   '&run=' + encodeURIComponent(runId), '_blank');
