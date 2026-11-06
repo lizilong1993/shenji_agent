@@ -778,7 +778,20 @@
     meta.appendChild(el('span', null, sourceName(item)));
     node.appendChild(meta);
 
-    if (item.content) {
+    // 源特有的关键读数（气温/风速/震级…）。直接上卡片：以前只有标题和坐标，
+    // 读者得点开原始记录才知道这条情报说了什么。
+    if ((item.facts || []).length) {
+      var facts = el('div', 'intel-facts');
+      item.facts.forEach(function (fact) {
+        var chip = el('span', 'intel-fact');
+        chip.appendChild(el('span', 'intel-fact-label', fact.label));
+        chip.appendChild(el('span', 'intel-fact-value', fact.value));
+        facts.appendChild(chip);
+      });
+      node.appendChild(facts);
+    }
+
+    if (item.content && item.content !== item.title) {
       node.appendChild(el('div', 'intel-content', item.content));
     }
     if (item.priority === 'manual' && item.verification === 'unverified') {

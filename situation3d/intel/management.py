@@ -113,7 +113,10 @@ def _auto_item(record: Dict[str, Any], source_names: Dict[str, str]) -> Optional
         "is_centroid": bool(record.get("is_centroid")),
         "place": str((record.get("properties") or {}).get("place") or ""),
         "title": str(record.get("title") or record.get("type") or "自动情报"),
-        "content": str(record.get("title") or ""),
+        # 自动情报的 content 以前直接复制 title，卡片上就会出现"标题说一遍、
+        # 正文再说一遍"。真正有内容的是源记录里的 description/正文。
+        "content": str((record.get("properties") or {}).get("description")
+                       or record.get("description") or ""),
         "verification": "automatic",
         "confidence": record.get("confidence"),
         "status": str(record.get("status") or "active"),
@@ -122,10 +125,87 @@ def _auto_item(record: Dict[str, Any], source_names: Dict[str, str]) -> Optional
         "conflicts": [],
         "license": record.get("license") or "",
         "attribution": record.get("attribution") or "",
+        # 把源特有字段整理成 [标签, 值] 对。前端不用知道每个源有什么字段，
+        # 也能把"气温 22°C / 风速 14 km/h"这类关键读数显示出来——否则卡片上
+        # 只剩标题和坐标，读者没法判断这条情报到底说了什么。
+        "facts": _facts(record),
         "quality": quality_of(record),
         "geometry": geometry,
         "record": record,
     }
+
+
+# 各源的关键字段 → 中文标签与格式化。只列**读者要用来判断**的字段，
+# 不把 properties 整个倒出来——那是原始记录，不是情报。
+_FACT_SPECS = {
+    "open-meteo": [
+        ("temperature_c", "气温", "%s°C"),
+        ("wind_speed_kmh", "风速", "%s km/h"),
+        ("precipitation_mm", "降水", "%s mm"),
+        ("relative_humidity_pct", "湿度", "%s%"),
+        ("visibility_m", "能见度", "%s m"),
+        ("weather_code", "天气", "%s"),
+    ],
+    "adsb": [
+        ("aircraft_type", "机型", "%s"),
+        ("altitude_baro_ft", "气压高度", "%s ft"),
+        ("ground_speed_kt", "地速", "%s kt"),
+        ("military", "军用", "%s"),
+    ],
+    "usgs": [
+        ("magnitude", "震级", "M%s"),
+        ("depth_km", "深度", "%s km"),
+        ("place", "位置", "%s"),
+    ],
+    "firms": [
+        ("brightness", "亮度", "%s K"),
+        ("frp", "辐射功率", "%s MW"),
+        ("confidence", "可信度", "%s"),
+    ],
+    "gdacs": [
+        ("alert_level", "警报级别", "%s"),
+        ("event_type", "事件类型", "%s"),
+        ("country", "国家", "%s"),
+    ],
+    "gdelt": [
+        ("source_language", "语种", "%s"),
+        ("mentioned_count", "提及数", "%s"),
+    ],
+}
+
+# weather_code 与 military 要转成人能读的说法，不能直接显示数字/布尔。
+_VALUE_FORMS = {
+    "open-meteo": {"weather_code": lambda v: _weather(v)},
+    "adsb": {"military": lambda v: "是" if v else "否"},
+}
+
+
+def _weather(code):
+    from .weather_text import describe
+    return describe(code) or str(code)
+
+
+def _facts(record: Dict[str, Any]) -> List[dict]:
+    source_id = str(record.get("source_id") or "")
+    props = record.get("properties") or {}
+    forms = _VALUE_FORMS.get(source_id, {})
+    out = []
+    for key, label, pattern in _FACT_SPECS.get(source_id, ()):
+        value = props.get(key)
+        if value is None or value == "":
+            continue
+        if key in forms:
+            try:
+                out.append({"label": label, "value": forms[key](value)})
+            except Exception:      # noqa: BLE001 - 格式化失败就跳过这一项
+                pass
+            continue
+        try:
+            text = pattern % value
+        except (TypeError, ValueError):
+            text = str(value)
+        out.append({"label": label, "value": text})
+    return out
 
 
 def _apply_verdicts(links, verdicts):
@@ -158,6 +238,53 @@ def _apply_verdicts(links, verdicts):
         merged["correlation_id"] = verdict.get("correlation_id")
         merged["reviewed_at"] = verdict.get("updated_at")
         out.append(merged)
+    return out
+
+
+def _latest_per_snapshot_site(items: List[dict]) -> List[dict]:
+    """同一地点的快照型情报（气象、ADS-B 位置）只保留最新一条。
+
+    这些源每次采集都会生成一条新记录（id 带时间戳），所以同一个观测点上
+    十分钟内的三次采集会在列表里并列出现，看起来像"三条一样的天气"。
+    历史价值在缓存里仍然保留（可用于趋势），列表层只展示当前状态。
+
+    只对**快照型**源生效。事件型源（地震、火点、新闻）同一地点多次发生是
+    真实的多起事件，合并掉就是丢情报。
+    """
+    SNAPSHOT = ("open-meteo",)
+    best = {}
+    out = []
+    for item in items:
+        source_id = str(item.get("source_id") or "")
+        if source_id not in SNAPSHOT:
+            out.append(item)
+            continue
+        key = (source_id, round(float(item.get("lat") or 0.0), 4),
+               round(float(item.get("lon") or 0.0), 4), str(item.get("type") or ""))
+        current = best.get(key)
+        if current is None:
+            best[key] = item
+            continue
+        # 时间戳格式统一为 ISO，字符串比较即时间比较
+        if str(item.get("event_time") or "") > str(current.get("event_time") or ""):
+            best[key] = item
+    # 保持原有排序语义：把选中的最新条目放回原位置
+    chosen = {id(row) for row in best.values()}
+    out = []
+    emitted = set()
+    for item in items:
+        source_id = str(item.get("source_id") or "")
+        if source_id not in SNAPSHOT:
+            out.append(item)
+            continue
+        key = (source_id, round(float(item.get("lat") or 0.0), 4),
+               round(float(item.get("lon") or 0.0), 4), str(item.get("type") or ""))
+        winner = best.get(key)
+        if winner is None or key in emitted:
+            continue
+        if id(winner) == id(item):
+            emitted.add(key)
+            out.append(item)
     return out
 
 
@@ -345,6 +472,9 @@ class IntelManager:
                                                          tzinfo=timezone.utc)).timestamp(),
             str(item.get("id")),
         ))
+        # 排序完成后再合并快照型重复项，保证"最新一条"按时间戳选出。
+        # 放在排序之后而不是之前，是因为合并逻辑依赖原顺序把赢家放回原位。
+        items = _latest_per_snapshot_site(items)
         revision = hashlib.sha256("|".join([
             self.manual.revision(),
             self.sources.revision(),

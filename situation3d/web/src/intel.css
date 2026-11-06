@@ -285,3 +285,13 @@
   border: 1px solid #d6e6f5; border-radius: 3px;
   padding: 1px 6px; align-self: flex-start;
 }
+
+/* ---- 情报卡片的关键读数 ---- */
+.intel-facts { display: flex; gap: 6px; flex-wrap: wrap; margin: 5px 0 3px; }
+.intel-fact {
+  display: inline-flex; gap: 4px; align-items: baseline;
+  font-size: 11px; padding: 2px 7px; border-radius: 3px;
+  background: #f2f7fd; border: 1px solid #d9e7f5;
+}
+.intel-fact-label { color: #66788f; }
+.intel-fact-value { color: #20344c; font-weight: 600; font-variant-numeric: tabular-nums; }

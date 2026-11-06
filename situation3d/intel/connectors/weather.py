@@ -24,6 +24,45 @@ def build_url(lat: float, lon: float) -> str:
     return API_URL + "?" + urlencode(params)
 
 
+def _title(current: dict, lat: float, lon: float) -> str:
+    """标题要能一眼读懂：气象情报的价值在数值与现象，不在坐标。
+
+    此前标题是 "Weather at 23.0000, 120.2000"，三条不同时刻的记录看起来完全
+    一样，也没有任何一个可判断的数字。
+    """
+    from ..weather_text import describe, wind_direction
+    parts = []
+    sky = describe(current.get("weather_code"))
+    if sky:
+        parts.append(sky)
+    temp = current.get("temperature_2m")
+    if temp is not None:
+        try:
+            parts.append("%.0f°C" % float(temp))
+        except (TypeError, ValueError):
+            pass
+    wind = current.get("wind_speed_10m")
+    if wind is not None:
+        try:
+            text = "风 %.0f km/h" % float(wind)
+            direction = wind_direction(current.get("wind_direction_10m"))
+            if direction:
+                text = direction + " " + text
+            parts.append(text)
+        except (TypeError, ValueError):
+            pass
+    rain = current.get("precipitation")
+    if rain is not None:
+        try:
+            if float(rain) > 0:
+                parts.append("降水 %.1f mm" % float(rain))
+        except (TypeError, ValueError):
+            pass
+    if not parts:
+        return "气象观测（%.3f, %.3f）" % (lat, lon)
+    return "，".join(parts)
+
+
 def normalize_payload(payload: dict, fetched_at: Any,
                       lat: float, lon: float, start_seq: int = 0):
     now = parse_time(fetched_at)
@@ -50,7 +89,7 @@ def normalize_payload(payload: dict, fetched_at: Any,
         ingest_seq=start_seq,
         confidence=trust.confidence("open-meteo", event, now, "weather"),
         source_url="https://open-meteo.com/",
-        title="Weather at %.4f, %.4f" % (float(lat), float(lon)),
+        title=_title(current, float(lat), float(lon)),
         properties={
             "temperature_c": current.get("temperature_2m"),
             "relative_humidity_pct": current.get("relative_humidity_2m"),
