@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   var state = { caseId: null, runs: [], timer: null, busy: false,
-                resolveRun: null, dateTouched: false };
+                resolveRun: null, dateTouched: false, compare: [] };
   var el = {};
 
   function $(id) { return document.getElementById(id); }
@@ -115,6 +115,12 @@
         actions += '<button class="danger" data-act="cancel" data-id="' + esc(run.run_id) + '">取消</button>';
       } else {
         actions += '<button class="ghost" data-act="view" data-id="' + esc(run.run_id) + '"' + (done ? '' : ' disabled') + '>查看</button>';
+        // 对比：勾两条已完成的运行才可用。选中态用按钮的 pressed 表示。
+        var picked = (state.compare || []).indexOf(run.run_id) >= 0;
+        actions += '<button class="ghost' + (picked ? ' active' : '')
+          + '" data-act="compare" data-id="' + esc(run.run_id) + '"'
+          + (done ? '' : ' disabled') + ' aria-pressed="' + (picked ? 'true' : 'false')
+          + '">' + (picked ? '已选' : '对比') + '</button>';
         actions += '<button class="ghost" data-act="best" data-id="' + esc(run.run_id) + '"' + (done && !best ? '' : ' disabled') + '>设为最优</button>';
         if (!pinned) actions += '<button class="ghost" data-act="pin" data-id="' + esc(run.run_id) + '"' + (done ? '' : ' disabled') + '>指定保留</button>';
         else actions += '<button class="ghost" data-act="unpin" data-id="' + esc(run.run_id) + '">取消保留</button>';
@@ -321,6 +327,21 @@
                   '&run=' + encodeURIComponent(runId), '_blank');
       return;
     }
+    if (act === 'compare') {
+      var picked = state.compare || (state.compare = []);
+      var at = picked.indexOf(runId);
+      if (at >= 0) {
+        picked.splice(at, 1);
+      } else {
+        picked.push(runId);
+        // 只比两条：第三条进来时挤掉最早的那条，避免出现"选了五条不知比谁"。
+        if (picked.length > 2) picked.shift();
+      }
+      render();
+      if (picked.length === 2) showCompare(picked);
+      else if (el.compare) el.compare.classList.add('hidden');
+      return;
+    }
     if (act === 'resolve') {
       var run = (state.runs || []).filter(function (r) { return r.run_id === runId; })[0];
       if (run) openResolver(run);
@@ -372,6 +393,69 @@
     }
   }
 
+  /**
+   * 并排比较两次运行。差异要**标出来**，不能只把两个数并排放着让人自己找。
+   * 数值类按差值着色（多/少都给方向，不说哪个更好——好取决于目标），
+   * 校验与角色是分类值，直接显示。
+   */
+  function showCompare(ids) {
+    var pair = ids.map(function (id) {
+      return (state.runs || []).filter(function (r) { return r.run_id === id; })[0];
+    });
+    if (!pair[0] || !pair[1]) return;
+    el.compare.classList.remove('hidden');
+    el.compareHead.textContent = pair[0].run_id + '  vs  ' + pair[1].run_id;
+
+    var ROWS = [
+      ['事件', function (r) { return num(r.metrics && r.metrics.events); }],
+      ['开火', function (r) { return num(r.metrics && r.metrics.fires); }],
+      ['毁伤', function (r) { return num(r.metrics && r.metrics.destroyed); }],
+      ['红方损失', function (r) { return num((r.metrics || {}).losses, 'red'); }],
+      ['蓝方损失', function (r) { return num((r.metrics || {}).losses, 'blue'); }],
+      ['耗时(秒)', function (r) { return num(r.metrics && r.metrics.elapsed_s); }],
+      ['seed', function (r) { return num(r, 'seed'); }]
+    ];
+    function num(source, key) {
+      var value = key ? (source || {})[key] : source;
+      var n = Number(value);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    var html = '<table class="compare"><thead><tr><th>指标</th><th>'
+      + esc(pair[0].run_id) + '</th><th>' + esc(pair[1].run_id)
+      + '</th><th>差值</th></tr></thead><tbody>';
+    ROWS.forEach(function (row) {
+      var label = row[0];
+      var a = row[1](pair[0]);
+      var b = row[1](pair[1]);
+      var delta = (a == null || b == null) ? null : (b - a);
+      var deltaText = delta == null ? '—'
+        : (delta === 0 ? '相同' : (delta > 0 ? '+' : '') + round1(delta));
+      var cls = delta == null || delta === 0 ? '' :
+        (delta > 0 ? 'up' : 'down');
+      html += '<tr><td>' + esc(label) + '</td><td>' + fmt(a) + '</td><td>'
+        + fmt(b) + '</td><td class="' + cls + '">' + esc(deltaText) + '</td></tr>';
+    });
+    // 分类值：校验与角色
+    var va = ((pair[0].validation || {}).passed) ? '通过' : '未通过';
+    var vb = ((pair[1].validation || {}).passed) ? '通过' : '未通过';
+    html += '<tr><td>校验</td><td>' + esc(va) + '</td><td>' + esc(vb)
+      + '</td><td>' + esc(va === vb ? '相同' : '不同') + '</td></tr>';
+    var ra = (pair[0].roles || []).join('/') || '—';
+    var rb = (pair[1].roles || []).join('/') || '—';
+    html += '<tr><td>角色</td><td>' + esc(ra) + '</td><td>' + esc(rb)
+      + '</td><td>' + esc(ra === rb ? '相同' : '不同') + '</td></tr>';
+    html += '</tbody></table>';
+    el.compareBody.innerHTML = html;
+
+    function fmt(value) {
+      return value == null ? '—' : esc(String(value));
+    }
+    function round1(value) {
+      return Math.round(value * 10) / 10;
+    }
+  }
+
   function initResolver() {
     el.resolverInfo.addEventListener('click', function (evt) {
       var btn = evt.target.closest('button[data-stale]');
@@ -409,8 +493,17 @@
       resolver: $('resolver'), resolverRun: $('resolver-run'),
       resolverInfo: $('resolver-info'), resolverStatus: $('resolver-status'),
       resolverFetch: $('resolver-fetch'), resolverProvide: $('resolver-provide'),
-      resolverCancel: $('resolver-cancel'), resolverClose: $('resolver-close')
+      resolverCancel: $('resolver-cancel'), resolverClose: $('resolver-close'),
+      compare: $('compare'), compareHead: $('compare-head'),
+      compareBody: $('compare-body'), compareClose: $('compare-close')
     };
+    if (el.compareClose) {
+      el.compareClose.addEventListener('click', function () {
+        el.compare.classList.add('hidden');
+        state.compare = [];
+        render();
+      });
+    }
     el.date.value = localNowInput();
     el.date.addEventListener('change', function () { state.dateTouched = true; });
     document.addEventListener('visibilitychange', function () {
