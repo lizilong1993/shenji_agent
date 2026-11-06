@@ -20,6 +20,7 @@
   var readyPromise = null;
   var live = null;              // 见 onCaseLoaded()
   var launchSeq = 0;            // 模块级单调 token：跨 live 实例也不会重复
+  var pendingCancel = null;     // 离开实时的取消请求；下一次启动先等它落地
   var els = {};
   var tipEl = null;
   var markerEls = [];
@@ -79,6 +80,20 @@
   // 案例装载：测试端引擎案例进入"待开战"状态
   // ------------------------------------------------------------------------
   function resetLiveUi() {
+    if (live && live.runId && activeStatus(live.status)) {
+      // Leaving live mode must release the server's active-run slot; otherwise
+      // switching cases leaves an orphan run that blocks the next launch.
+      var canceled = fetch('/api/sim/runs/' + encodeURIComponent(live.runId)
+        + '/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ case_id: live.caseId })
+        }).catch(function () {});
+      pendingCancel = canceled;
+      canceled.then(function () {
+        if (pendingCancel === canceled) pendingCancel = null;
+      });
+    }
     stopPolling();
     live = null;
     clearMarkers();
@@ -229,18 +244,27 @@
     setButton('starting');
     B.setStatus('正在启动引擎推演…');
     render();
-    fetch('/api/sim/runs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        case_id: live.caseId,
-        ticks: live.tickCount,
-        // 推演可能晚于载入几分钟才开始，但战斗开始时刻仍是"载入时刻"。
-        scenario_date: new Date(live.startMs).toISOString(),
-        resource_mode: 'auto',
-        side: 0
-      })
-    }).then(function (r) {
+    // 上一场离开实时模式时发出的取消请求可能还没落地：先等它，再 POST
+    // 新 run，否则服务端仍认为 active 槽位被占，直接回 409。
+    var launchCase = live.caseId;
+    var launchTicks = live.tickCount;
+    var launchStart = live.startMs;
+    var startRequest = function () {
+      return fetch('/api/sim/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          case_id: launchCase,
+          ticks: launchTicks,
+          // 推演可能晚于载入几分钟才开始，但战斗开始时刻仍是"载入时刻"。
+          scenario_date: new Date(launchStart).toISOString(),
+          resource_mode: 'auto',
+          side: 0
+        })
+      });
+    };
+    (pendingCancel ? pendingCancel.then(startRequest, startRequest) : startRequest())
+    .then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (body) {
         if (!r.ok) {
           var err = new Error(body && body.error ? body.error : ('HTTP ' + r.status));

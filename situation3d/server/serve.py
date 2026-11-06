@@ -337,11 +337,19 @@ def _live_frames(run_dir, cursor):
     except OSError:
         return [], 0, 0
     offsets = []
-    for line in raw.splitlines():
+    lines = raw.split(b"\n")
+    # Drop the trailing empty element after the last newline, or an incomplete
+    # trailing write ("123" of "12345\n") that splitlines() would still yield.
+    if lines:
+        lines.pop()
+    for line in lines:
         try:
-            offsets.append(int(line))
+            value = int(line)
         except ValueError:
             break       # 写了一半的索引行
+        if offsets and value <= offsets[-1]:
+            break       # 非递增偏移说明索引已损坏
+        offsets.append(value)
     total = len(offsets)
     try:
         cursor = int(cursor or 0)
@@ -361,7 +369,10 @@ def _live_frames(run_dir, cursor):
     if end < 0:
         return [], cursor, total
     frames = []
+    limit = total - cursor
     for line in blob[:end].splitlines():
+        if len(frames) >= limit:
+            break       # data ahead of the index is not published yet
         try:
             frames.append(json.loads(line.decode("utf-8")))
         except ValueError:

@@ -227,6 +227,30 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(body["frame_count"], 2)
         self.assertEqual(body["frame_total"], 3)
 
+    def test_live_incomplete_idx_line_is_ignored(self):
+        # 索引行也可能写到一半（被杀/磁盘满）：没有结尾换行的数字前缀不能
+        # 当作合法偏移，否则游标会 seek 到某帧中间。
+        live = os.path.join(self.runs, CASE, self.rid, "live")
+        os.makedirs(live, exist_ok=True)
+        lines, offs, blob = [], [], b""
+        for tick in range(3):
+            line = (json.dumps({"tick": tick, "targets": []}) + "\n").encode("utf-8")
+            lines.append(line)
+            offs.append(len(blob))
+            blob += line
+        with open(os.path.join(live, "frames.jsonl"), "wb") as fh:
+            fh.write(blob)
+        with open(os.path.join(live, "frames.idx"), "wb") as fh:
+            fh.write(("%d\n%d\n" % (offs[0], offs[1])).encode("ascii"))
+            fh.write(str(offs[2] + 1).encode("ascii"))   # 第三行写到一半
+        port = self._start("test")
+        base = "/api/sim/runs/%s/live?case_id=%s" % (self.rid, CASE)
+        status, body = request(port, base + "&frames=0")
+        self.assertEqual(status, 200)
+        self.assertEqual([f["tick"] for f in body["frames"]], [0, 1])
+        self.assertEqual(body["frame_count"], 2)
+        self.assertEqual(body["frame_total"], 2)
+
     def test_live_cursor_edges(self):
         self._write_live()
         port = self._start("test")

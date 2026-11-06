@@ -15,6 +15,8 @@ web/vendor/
 # **不在覆盖范围内**，数据集会变成可被误提交。两层都写死，别只靠通配符。
 web/data/*.json
 web/data/situations/
+# 战役案例的地理报告由 scripts/gen_campaign_case.py 生成，不入库
+web/data/geo_reports/
 
 # Offline tile set (~10k files, ~200 MB), rebuilt by tools/fetch_assets.py and
 # tools/fetch_urban_wsf3d.sh. Never commit this.
