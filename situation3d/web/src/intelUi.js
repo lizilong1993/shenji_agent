@@ -603,6 +603,16 @@
     });
 
     if (!items.length) {
+      // 分清两种情况：真的被筛没了，和这个案例压根没有情报。
+      // 都写"没有符合条件的情报"会让人以为过滤条件设错了，其实是没有数据。
+      if (!all.length) {
+        var whether = (state.overview && state.overview.warnings || [])
+          .filter(function (w) { return /bundle|暂无/.test(w); })[0];
+        body.appendChild(el('div', 'intel-empty',
+          '这个案例还没有情报数据。' +
+          (whether ? '（' + whether + '）' : '可在案例载入后等待自动采集，或检查情报源是否启用。')));
+        return;
+      }
       body.appendChild(el('div', 'intel-empty', '没有符合条件的情报'));
       return;
     }
