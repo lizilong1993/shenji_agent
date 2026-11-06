@@ -94,6 +94,14 @@ class AISuggestionStore:
         evidence = _list(payload.get("evidence"))
         if not evidence:
             raise ValueError("evidence is required")
+        reasoning = payload.get("reasoning")
+        if reasoning is None:
+            reasoning = {}
+        if isinstance(reasoning, str):
+            # 只给一段文字也能存：保留原文，不丢信息。
+            reasoning = {"text": reasoning[:20000]}
+        if not isinstance(reasoning, dict):
+            raise ValueError("reasoning must be an object or string")
         item = {
             "id": "ai:" + uuid.uuid4().hex,
             "status": "suggested",
@@ -105,6 +113,14 @@ class AISuggestionStore:
             "confidence": round(confidence, 3),
             "model": model,
             "prompt_version": prompt_version,
+            # 推理记录：AI 给出结论时一并留痕，事后能回答"它凭什么这么说"。
+            # 字段与 Gotham 的 detectionReasoning 对齐（agent/模型/推理文本/时间）。
+            "reasoning": {
+                "text": _text(reasoning.get("text"), 20000),
+                "agent_version": _text(reasoning.get("agent_version"), 80),
+                "algorithm": _text(reasoning.get("algorithm"), 120),
+                "detected_at": _text(reasoning.get("detected_at"), 40),
+            },
             "source_text": _text(payload.get("source_text"), 20000),
             "created_at": _now(),
             "reviewed_at": None,

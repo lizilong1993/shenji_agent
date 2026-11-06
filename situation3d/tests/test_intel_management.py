@@ -71,6 +71,53 @@ def _manual_payload(case_id="case1", **overrides):
     return payload
 
 
+class NoStrikeListTest(unittest.TestCase):
+    def test_flag_and_reason_round_trip(self):
+        with tempfile.TemporaryDirectory() as root:
+            manager = IntelManager(root)
+            item = manager.manual.create(_manual_payload(
+                no_strike=True, no_strike_reason="已确认为民用医院"))
+            self.assertTrue(item["no_strike"])
+            self.assertEqual(item["no_strike_reason"], "已确认为民用医院")
+            row = [r for r in manager.overview("case1")["items"]
+                   if r["id"] == item["intel_id"]][0]
+            self.assertTrue(row["no_strike"])
+            self.assertEqual(row["no_strike_reason"], "已确认为民用医院")
+
+    def test_string_false_is_not_truthy(self):
+        # JSON 里 "false" 被 bool() 读成 True 是这类字段最常见的坑。
+        with tempfile.TemporaryDirectory() as root:
+            manager = IntelManager(root)
+            item = manager.manual.create(_manual_payload(no_strike="false"))
+            self.assertFalse(item["no_strike"])
+
+    def test_default_is_false(self):
+        with tempfile.TemporaryDirectory() as root:
+            manager = IntelManager(root)
+            item = manager.manual.create(_manual_payload())
+            self.assertFalse(item["no_strike"])
+            self.assertEqual(item["no_strike_reason"], "")
+
+    def test_update_can_toggle(self):
+        with tempfile.TemporaryDirectory() as root:
+            manager = IntelManager(root)
+            item = manager.manual.create(_manual_payload())
+            updated = manager.manual.update(item["intel_id"], {
+                "no_strike": True, "no_strike_reason": "学校"})
+            self.assertTrue(updated["no_strike"])
+            cleared = manager.manual.update(item["intel_id"], {"no_strike": False})
+            self.assertFalse(cleared["no_strike"])
+
+    def test_counts_only_active(self):
+        with tempfile.TemporaryDirectory() as root:
+            manager = IntelManager(root)
+            keep = manager.manual.create(_manual_payload(no_strike=True))
+            gone = manager.manual.create(_manual_payload(title="另一个",
+                                                         no_strike=True))
+            manager.manual.revoke(gone["intel_id"])
+            self.assertEqual(manager.overview("case1")["counts"]["no_strike"], 1)
+
+
 class ManualStoreTest(unittest.TestCase):
     def test_create_update_revoke_and_persist(self):
         with tempfile.TemporaryDirectory() as root:

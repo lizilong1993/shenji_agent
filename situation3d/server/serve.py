@@ -1753,6 +1753,14 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"error": "%s: %s"
                                  % (type(exc).__name__, exc)}, 500)
             return
+        if path == "/api/intel/correlations":
+            try:
+                items = _intel_manager().correlations.list(
+                    (query or {}).get("case_id"))
+                self._send_json({"ok": True, "items": items})
+            except Exception as exc:  # noqa: BLE001
+                self._send_json({"error": str(exc)}, 500)
+            return
         if path == "/api/intel/convergence":
             try:
                 overview = _intel_manager().overview(
@@ -2463,6 +2471,25 @@ class Handler(SimpleHTTPRequestHandler):
                                     str(body.get("note") or ""),
                                     str(body.get("reviewer") or ""))
                 self._send_json({"ok": True, "item": item})
+                return
+            if path == "/api/intel/correlations":
+                # 同时承担"列表"和"写结论"两种调用：带 verdict 就是写，
+                # 否则按 case_id 返回该案例已有的人工结论。
+                if str(body.get("verdict") or "").strip():
+                    item = manager.correlations.set(body)
+                    self._send_json({"ok": True, "item": item})
+                else:
+                    self._send_json({"ok": True, "items": manager.correlations.list(
+                        body.get("case_id"))})
+                return
+            if path.startswith("/api/intel/correlations/"):
+                rest = [part for part in
+                        path[len("/api/intel/correlations/"):].split("/") if part]
+                if len(rest) != 1 or not isinstance(body, dict):
+                    self._send_json({"error": "correlation_id is required"}, 400)
+                    return
+                removed = manager.correlations.clear(unquote(rest[0]))
+                self._send_json({"ok": removed})
                 return
             if path == "/api/intel/manual":
                 item = manager.manual.create(body)

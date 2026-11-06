@@ -53,6 +53,15 @@ def _text(value: Any, name: str, maximum: int = 2000,
     return text
 
 
+def _flag(value: Any) -> bool:
+    """JSON 传入的字符串 "false" 不能按 Python 的 bool("false") 解释。"""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
 def _coord(value: Any, name: str, low: float, high: float) -> float:
     try:
         number = float(value)
@@ -158,6 +167,13 @@ class ManualIntelStore:
                 payload.get("verification")),
             "priority": "manual",
             "status": "active",
+            # 禁止打击清单：命中 NSL 的目标不得进入打击提名。
+            # 单独存 reason 而不是只存布尔，是因为"为什么不能打"（医院、
+            # 宗教场所、已确认民用设施）在提名评审时是必须给人看的。
+            "no_strike": _flag(payload.get("no_strike")),
+            "no_strike_reason": _text(payload.get("no_strike_reason"),
+                                      "no_strike_reason", 500,
+                                      required=False),
             "tags": _tags(payload.get("tags")),
             "created_by": _text(payload.get("created_by"), "created_by",
                                 80, required=False),
@@ -207,6 +223,12 @@ class ManualIntelStore:
                         payload["verification"])
                 if payload.get("tags") is not None:
                     item["tags"] = _tags(payload["tags"])
+                if payload.get("no_strike") is not None:
+                    item["no_strike"] = _flag(payload["no_strike"])
+                if payload.get("no_strike_reason") is not None:
+                    item["no_strike_reason"] = _text(
+                        payload["no_strike_reason"], "no_strike_reason",
+                        500, required=False)
                 if payload.get("status") is not None:
                     status = str(payload["status"]).lower()
                     if status not in STATUSES:

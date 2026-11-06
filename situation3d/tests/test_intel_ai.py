@@ -47,6 +47,35 @@ class AISuggestionStoreTest(unittest.TestCase):
             self.assertEqual(store.counts()["accepted"], 1)
             self.assertEqual(store.list("accepted")[0]["id"], item["id"])
 
+    def test_reasoning_record_survives_review(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = AISuggestionStore(os.path.join(root, "ai.json"))
+            item = store.add(payload(reasoning={
+                "text": "热源与车队方向一致，判为集结",
+                "agent_version": "1.2.3",
+                "algorithm": "change-detect-v2",
+                "detected_at": "2026-10-24T12:00:00Z",
+            }))
+            self.assertEqual(item["reasoning"]["agent_version"], "1.2.3")
+            reviewed = store.review(item["id"], "accepted", "确认")
+            # 推理记录是原始主张的一部分，评审只能改状态，不能改它。
+            self.assertEqual(reviewed["reasoning"], item["reasoning"])
+
+    def test_reasoning_accepts_plain_text(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = AISuggestionStore(os.path.join(root, "ai.json"))
+            item = store.add(payload(reasoning="只有一段说明"))
+            self.assertEqual(item["reasoning"]["text"], "只有一段说明")
+
+    def test_missing_reasoning_is_an_empty_record(self):
+        # 老数据没有这个字段：读取方按固定结构取值，不能是 None。
+        with tempfile.TemporaryDirectory() as root:
+            store = AISuggestionStore(os.path.join(root, "ai.json"))
+            item = store.add(payload())
+            self.assertEqual(item["reasoning"],
+                             {"text": "", "agent_version": "",
+                              "algorithm": "", "detected_at": ""})
+
     def test_validation(self):
         with tempfile.TemporaryDirectory() as root:
             store = AISuggestionStore(os.path.join(root, "ai.json"))

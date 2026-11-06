@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from .association import (canonical_type, extract_key_items, link_items)
 from .convergence import convergence_events, summarize as convergence_summary
 from .manual import ManualIntelStore
+from .correlations import CorrelationStore
 from .sources import SourceStore
 from .case import load_case_profile
 
@@ -76,6 +77,16 @@ def _lat_lon(record: Dict[str, Any]) -> Tuple[Optional[float], Optional[float]]:
         return None, None
 
 
+def _uncertainty(record: Dict[str, Any]) -> float:
+    """位置误差半径（米）。缺值按 0 处理，不用 None：前端算 ±X km 时
+    None 会变成 NaN，而"没写"和"精确定位"在展示上是两回事。"""
+    try:
+        value = float(record.get("geo_uncertainty_m") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    return value if value >= 0.0 and value == value else 0.0
+
+
 def _auto_item(record: Dict[str, Any], source_names: Dict[str, str]) -> Optional[dict]:
     lat, lon = _lat_lon(record)
     if lat is None or lon is None:
@@ -90,8 +101,13 @@ def _auto_item(record: Dict[str, Any], source_names: Dict[str, str]) -> Optional
         "domain": str(record.get("domain") or "other"),
         "type": str(record.get("type") or "other"),
         "event_time": str(record.get("event_time") or ""),
+        "ingest_time": str(record.get("ingest_time") or ""),
         "lat": lat,
         "lon": lon,
+        # 定位不确定性与"质心"标记必须一起透出：前端只有拿到半径才能把点
+        # 画成置信区，否则一个 admin0 质心和一个实测点看起来一模一样。
+        "geo_uncertainty_m": _uncertainty(record),
+        "is_centroid": bool(record.get("is_centroid")),
         "place": str((record.get("properties") or {}).get("place") or ""),
         "title": str(record.get("title") or record.get("type") or "自动情报"),
         "content": str(record.get("title") or ""),
@@ -108,6 +124,39 @@ def _auto_item(record: Dict[str, Any], source_names: Dict[str, str]) -> Optional
     }
 
 
+def _apply_verdicts(links, verdicts):
+    """把人工结论盖在算法链接上。
+
+    confirm → 保留链接，但把 kind 标成 ``manual``、分数顶到 0.99，并附上
+              分析员的原话，这样"这条是谁确认的"在界面上可追溯；
+    reject  → 整条链接移除。否决的意义就是"别把它当关联看"，留下来只会
+              让人反复看到一条已知错误的提示。
+    """
+    if not verdicts:
+        return links
+    out = []
+    for link in links:
+        key = "|".join(sorted([str(link.get("from_id")),
+                               str(link.get("to_id"))]))
+        verdict = verdicts.get(key)
+        if verdict is None:
+            out.append(link)
+            continue
+        if verdict.get("verdict") == "reject":
+            continue
+        merged = dict(link)
+        merged["kind"] = "manual"
+        merged["score"] = 0.99
+        reasons = list(link.get("reasons") or [])
+        note = str(verdict.get("note") or "").strip()
+        reasons.append("人工确认" + ("：" + note if note else ""))
+        merged["reasons"] = reasons
+        merged["correlation_id"] = verdict.get("correlation_id")
+        merged["reviewed_at"] = verdict.get("updated_at")
+        out.append(merged)
+    return out
+
+
 def _manual_item(record: Dict[str, Any]) -> dict:
     return {
         "id": str(record.get("intel_id") or ""),
@@ -117,13 +166,22 @@ def _manual_item(record: Dict[str, Any]) -> dict:
         "domain": str(record.get("domain") or "other"),
         "type": str(record.get("intel_type") or record.get("type") or "other"),
         "event_time": str(record.get("event_time") or ""),
+        # 人工录入没有"入库时间"这个概念以外的来源信息，但字段必须齐：
+        # 前端按固定字段渲染，缺一个就是"这条永远显示无时效"。
+        "ingest_time": str(record.get("created_at") or ""),
         "lat": record.get("lat"),
         "lon": record.get("lon"),
+        "geo_uncertainty_m": 0.0,
+        "is_centroid": False,
         "place": str(record.get("place") or ""),
         "title": str(record.get("title") or "人工情报"),
         "content": str(record.get("content") or ""),
         "verification": str(record.get("verification") or "unverified"),
         "confidence": None,
+        # NSL：命中即不得提名打击。字段透传到前端，让每个渲染自定义
+        # 条目的地方都能看到"这条为什么不能打"，而不只是悄悄过滤掉。
+        "no_strike": bool(record.get("no_strike")),
+        "no_strike_reason": str(record.get("no_strike_reason") or ""),
         "status": str(record.get("status") or "active"),
         "effective": str(record.get("status") or "active") == "active",
         "superseded_by": None,
@@ -145,6 +203,8 @@ class IntelManager:
         self.profile_root = profile_root
         self.manual = ManualIntelStore(os.path.join(root, "manual.json"))
         self.sources = SourceStore(os.path.join(root, "sources.json"))
+        self.correlations = CorrelationStore(
+            os.path.join(root, "correlations.json"))
         self._cache = {}
 
     def _bundle(self, case_id: str) -> Optional[dict]:
@@ -283,6 +343,7 @@ class IntelManager:
         revision = hashlib.sha256("|".join([
             self.manual.revision(),
             self.sources.revision(),
+            self.correlations.revision(),
             str((bundle or {}).get("hash") or ""),
             str((profile.to_dict() if profile else "")),
         ]).encode("utf-8")).hexdigest()[:16]
@@ -293,6 +354,7 @@ class IntelManager:
             links = link_items(items, profile,
                                radius_km=max(CONFLICT_RADIUS_KM, 50.0),
                                window_h=max(CONFLICT_WINDOW_H, 24.0))
+            links = _apply_verdicts(links, self.correlations.verdicts(case_id))
             key_items = extract_key_items(items, links, profile)
             events = convergence_events(
                 items,
@@ -308,6 +370,9 @@ class IntelManager:
         counts = {
             "manual_active": len(active_manual),
             "manual_revoked": len(manual_items) - len(active_manual),
+            "no_strike": sum(1 for item in items
+                             if item.get("no_strike")
+                             and item.get("status") == "active"),
             "auto": len(auto_items),
             "effective": sum(1 for item in items if item.get("effective")),
             "superseded": len(superseded),
@@ -329,6 +394,12 @@ class IntelManager:
             "counts": counts,
             "items": items,
             "links": links,
+            # 人工关联结论单列，界面可以只显示"谁确认/否决了哪一对"，
+            # 不必从 links 里反推哪些是算法给的、哪些是人改过的。
+            "correlations": {
+                "rule": "人工确认的关联提升为 manual 并按 0.99 计分；否决的直接移除",
+                "items": self.correlations.list(case_id),
+            },
             "key_items": key_items,
             "convergence": {
                 "rule": {
