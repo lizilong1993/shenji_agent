@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated_at": "2026-10-27T12:29:43",
+  "generated_at": "2026-11-06T15:22:01",
   "note": "由 tools/model_budget_test.py 生成；sha256 对应优化后的 GLB。",
   "assets": {
     "type_052c.glb": {
@@ -262,6 +262,36 @@
         "use": "AH-64E 近似",
         "risk": [],
         "source_url": "https://sketchfab.com/models/c3b58008c46b45048fdd7dd283a3c8c8"
+      }
+    },
+    "type_cm11.glb": {
+      "sha256": "3b4914d37b6fc42ff5120c1397caa655b6a63dbb3a9134762dad0c481e24200c",
+      "bytes": 416716,
+      "mb": 0.4,
+      "tris": 7093,
+      "prims": 2,
+      "materials": 2,
+      "images": 3,
+      "extensions": [
+        "EXT_texture_webp"
+      ],
+      "animations": 0,
+      "class": "ground_tank",
+      "public": {
+        "public_length_m": 8.28,
+        "public_width_m": 3.36,
+        "approx_of": "CM-11",
+        "notes": "M48A5 车体 + M60A3 炮塔拼接（按交接文档记录的组合）。注意：实车 CM-11（M48H）据公开资料是 M60A3 车体 + M48A5 炮塔，与本文档记录的组合相反；此处按任务记录实现，比例取拼接件实测值"
+      },
+      "license": {
+        "source": "派生件：M48A5 Patton Medium Tank（车体）+ M60A3 Patton Medium Tank - Toshueyi（炮塔）",
+        "author": "M48A5 与 M60A3 原作者（见 type_m48a5.glb / type_m60a3.glb 条目）",
+        "license": "CC Attribution",
+        "use": "CM-11 勇虎（M48A5 车体 + M60A3 炮塔拼接）",
+        "risk": [
+          "拼接件：两个 CC-BY 资产衍生，再分发时须同时署名两者"
+        ],
+        "source_url": "https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803"
       }
     },
     "type_e2d.glb": {
@@ -689,7 +719,7 @@
       "public": {
         "public_length_m": 8.69,
         "public_width_m": 3.63,
-        "notes": "M48A5 本体；CM-11 现用 type_m60a3 近似"
+        "notes": "M48A5 本体（CM-11 车体来源）"
       },
       "license": {
         "source": "M48A5 Patton Medium Tank",

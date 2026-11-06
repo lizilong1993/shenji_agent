@@ -318,6 +318,14 @@
       "risk": [],
       "source_url": "https://sketchfab.com/models/735da22f59d04542b5b33e5b8fd699b1"
     },
+    "type_cm11.glb": {
+      "source": "派生件：M48A5 Patton Medium Tank（车体）+ M60A3 Patton Medium Tank - Toshueyi（炮塔）",
+      "author": "M48A5 与 M60A3 原作者（见 type_m48a5.glb / type_m60a3.glb 条目）",
+      "license": "CC Attribution",
+      "use": "CM-11 勇虎（M48A5 车体 + M60A3 炮塔拼接）",
+      "risk": ["拼接件：两个 CC-BY 资产衍生，再分发时须同时署名两者"],
+      "source_url": "https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803"
+    },
     "type_m60a3.glb": {
       "source": "[M60A3 Patton Medium Tank - Toshueyi](https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803)",
       "author": "jonathanto99",

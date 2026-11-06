@@ -42,12 +42,14 @@
 | `type_p3c.glb` | [Lockheed P-3C 2 "Orion"](https://sketchfab.com/models/be11ab6c970741d78e62c9d8ff2e33e8)（模型 by mandun/3D Warehouse，来源链待核） | ammardhamiri1 | CC Attribution | P-3C 反潜巡逻机 |
 | `type_ah64e.glb` | [Boeing AH-64D Apache Combat Helicopter](https://sketchfab.com/models/c3b58008c46b45048fdd7dd283a3c8c8) | MirzaArrafiERV_45 | CC Attribution | AH-64E 近似 |
 | `type_j20.glb` | [Chengdu J-20 fighter](https://sketchfab.com/models/735da22f59d04542b5b33e5b8fd699b1) | miopass | CC Attribution | J-20 |
-| `type_m60a3.glb` | [M60A3 Patton Medium Tank - Toshueyi](https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803) | jonathanto99 | CC Attribution | M60A3 / CM-11 近似 |
+| `type_m60a3.glb` | [M60A3 Patton Medium Tank - Toshueyi](https://sketchfab.com/models/3d298af87c2c4a0691e61ab8ee9ad803) | jonathanto99 | CC Attribution | M60A3 本体（CM-11 车体来源） |
+| `type_cm11.glb` | 派生：M48A5 Patton（炮塔）+ M60A3 Patton（车体） | MirzaArrafiERV_45 + jonathanto99 | CC Attribution | CM-11 勇虎（M48H）：M60A3 车体 + M48A5 炮塔 |
 | `type_himars.glb` | [Ukrainian M142 HIMARS](https://sketchfab.com/models/95d255cd685e4cc5afc35ba5f58679d4)（作者注明 Not my model） | 42manako | CC Attribution | M142 HIMARS |
 
 ## 说明
 
-- 052D 无可下载精确资产，改为自建近似（`type_052d`，2026-10-27）；空警-500 使用 KJ-2000 缩比（`type_kj500`）；15 式使用 99A 缩比（`type_ztq15`）；歼-16 使用 Su-30MKK；F-16V 使用 F-16C；CM-11 使用 M60A3 近似。
+- 052D 无可下载精确资产，改为自建近似（`type_052d`，2026-10-27）；空警-500 使用 KJ-2000 缩比（`type_kj500`）；15 式使用 99A 缩比（`type_ztq15`）；歼-16 使用 Su-30MKK；F-16V 使用 F-16C；**CM-11 自 2026-11-06 起改用拼接件（`type_cm11`，M60A3 车体 + M48A5 炮塔），不再是 M60A3 整车近似**。
+- CM-11 的拼接组合以公开资料为准：维基与多家资料均为 **M60A3 车体 + M48A3 炮塔**（美军编号 M48H，H = Hybrid）。项目 2026-10-27 的交接文档写的是"M48A5 车体 + M60A3 炮塔"，方向相反，已在本次实现中纠正。
 - 所有 GLB 均按公开全长（舰长/机长/车长含炮管）归一为 1 单位 = 1 米，原点在水线/地面/机体中心，艏/头朝 Blender +Y。
 - Sketchfab 模型已按 CC-BY / Free Standard 许可署名；二次分发时请保留本文件。
 

@@ -107,7 +107,14 @@
       "class": "ground_tank",
       "public_length_m": 8.69,
       "public_width_m": 3.63,
-      "notes": "M48A5 本体；CM-11 现用 type_m60a3 近似"
+      "notes": "M48A5 本体（CM-11 车体来源）"
+    },
+    "type_cm11.glb": {
+      "class": "ground_tank",
+      "public_length_m": 8.28,
+      "public_width_m": 3.36,
+      "approx_of": "CM-11",
+      "notes": "M48A5 车体 + M60A3 炮塔拼接（按交接文档记录的组合）。注意：实车 CM-11（M48H）据公开资料是 M60A3 车体 + M48A5 炮塔，与本文档记录的组合相反；此处按任务记录实现，比例取拼接件实测值"
     },
     "type_m109a6.glb": {
       "class": "ground_tank",

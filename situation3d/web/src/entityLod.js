@@ -115,7 +115,7 @@
     [/99a|ztz-?99/i, 'type_ztz99a'],
     [/m1a2/i, 'type_m1a2'],
     [/m60a?3/i, 'type_m60a3'],
-    [/cm-?11|m48h/i, 'type_m60a3'],
+    [/cm-?11|m48h/i, 'type_cm11'],
     [/m48/i, 'type_m48a5'],
     [/05\s*式|ztd-?05|zbd-?05/i, 'type_ztd05'],
     [/plz-?05/i, 'type_plz05'],
