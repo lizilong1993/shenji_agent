@@ -445,6 +445,12 @@
         line.appendChild(el('span', 'intel-brief-text',
           (item.priority === 'manual' ? '【人工】' : '') +
           (item.title || '（无标题）')));
+        // 简报是"一眼看全"的位置：带上关键读数与来源，读者不必展开卡片
+        // 才知道这条说的是什么。
+        var facts = (item.facts || []).slice(0, 3).map(function (fact) {
+          return fact.value;
+        }).join(' · ');
+        if (facts) line.appendChild(el('span', 'intel-brief-facts', facts));
         var reason = (row.reasons || []).slice(0, 2).join('；');
         if (reason) line.appendChild(el('span', 'intel-brief-reason', reason));
         brief.appendChild(line);

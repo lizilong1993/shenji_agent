@@ -26,6 +26,7 @@ from sim.entity import Entity, Pose
 from sim.motion import entity_profile, integrate
 from sim.collision import CollisionIndex, obbs_overlap
 from sim import spotting as spotting_model
+from sim import roe as roe_module
 from sim.tactics import TacticalController
 
 
@@ -143,6 +144,15 @@ class World(object):
         self._phys_scan_due: Dict[int, float] = {}
         self._seen_dirty = False
         self._seen_own: Dict[int, set] = {}
+        # 接触时间：(观察者, 目标) → 首次判定的仿真时刻。ROE 的确认门槛需要它；
+        # 不清空的话一次瞬时接触会被当成"已持续探测"。
+        self.contact_since: Dict[Tuple[int, int], float] = {}
+        # 交战规则手册。默认值等于旧行为（自由开火、无门槛），所以不显式配置
+        # 的案例不受影响。
+        self.roe: Optional[roe_module.Rules] = None
+        # 被 ROE 拒掉的交战：(攻击方, 目标) → 理由。用来回答"为什么没打"，
+        # 与"刚打完的冷却"分开记，两者在界面上长得一样但原因完全不同。
+        self.roe_rejections: Dict[Tuple[int, int], str] = {}
         self._sensor_time_s: Optional[float] = None
         self._env_time_s: Optional[float] = None
         self._stack_cache: Dict[int, bool] = {}
@@ -167,6 +177,65 @@ class World(object):
         self._commander_owned: set = set()
         if commander is not None:
             self.set_commander(commander, commander_interval_s)
+
+    # -- ROE ----------------------------------------------------------------
+    def set_roe(self, payload) -> "roe_module.Rules":
+        """安装交战规则手册。传 dict 或 Rules 都行，None 表示回到默认。"""
+        if payload is None:
+            self.roe = None
+            return roe_module.Rules()
+        rules = (payload if isinstance(payload, roe_module.Rules)
+                 else roe_module.Rules.from_dict(payload))
+        self.roe = rules
+        return rules
+
+    def _roe_allows(self, attacker, target, ctx, manual_fire=False,
+                    distance_m=None):
+        """把交战交给 ROE 手册判定，被拒时记下理由。"""
+        if self.roe is None:
+            return True
+        if distance_m is None:
+            try:
+                distance_m = ctx.distance_m(ctx.view(attacker), ctx.view(target))
+            except Exception:      # noqa: BLE001 - 距离算不出时按 0 处理
+                distance_m = 0.0
+        in_area = True
+        if self.roe.policy == "weapons_tight" and self.roe.area_radius_m > 0:
+            in_area = self._near_friendly_objective(attacker)
+        allowed, reason = roe_module.evaluate(
+            self.roe,
+            distance_m=distance_m,
+            now_s=self.time_s,
+            first_seen_s=self.contact_since.get((attacker.uid, target.uid)),
+            damaged_at_s=float(getattr(attacker, "last_damaged_s", -1.0)),
+            in_area=in_area,
+            no_strike=bool(getattr(target, "no_strike", False)),
+            manual_fire=manual_fire,
+        )
+        if not allowed:
+            self.roe_rejections[(attacker.uid, target.uid)] = reason
+        else:
+            self.roe_rejections.pop((attacker.uid, target.uid), None)
+        return allowed
+
+    def _near_friendly_objective(self, attacker) -> bool:
+        """作战区近似：己方控制的目标点附近即视为责任区内。
+
+        没有独立的"责任区"几何输入，用目标点近似比再引入一套区域数据更贴近
+        现有模型；半径取手册里的 area_radius_m。
+        """
+        from geo.geodesy import haversine_m
+        radius = float(self.roe.area_radius_m) if self.roe else 0.0
+        if radius <= 0:
+            return True
+        for cell, obj in self.objectives.items():
+            if int(obj.get("owner", -1)) != attacker.affiliation:
+                continue
+            lon, lat = self.rule_grid.cell_center_lonlat(*cell)
+            if haversine_m((attacker.pose.lon, attacker.pose.lat),
+                           (lon, lat)) <= radius:
+                return True
+        return False
 
     # -- commander ----------------------------------------------------------
     def set_commander(self, model, interval_s: Optional[float] = None) -> None:
@@ -761,6 +830,8 @@ class World(object):
                                              distance=distance)
                 if visible:
                     seen.add(target.uid)
+                    self.contact_since.setdefault((observer.uid, target.uid),
+                                                  self.time_s)
         return result
 
     def _advance_scan_due(self, uid: int,
@@ -1108,6 +1179,13 @@ class World(object):
                 target = None
             if target is None:
                 target = self._best_target(attacker, ctx)
+            # ROE 判定：自动选出的目标要过一遍交战规则。人工开火命令
+            # （order.type == 'fire'）在 evaluate 里已优先放行。
+            if (target is not None and self.roe is not None
+                    and not self._roe_allows(
+                        attacker, target, ctx,
+                        manual_fire=(order.get("type") == "fire"))):
+                target = None
             if target is None:
                 aim = getattr(attacker, "aim_cell", None)
                 if aim is not None:

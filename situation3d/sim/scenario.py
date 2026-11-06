@@ -293,6 +293,18 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
     else:
         policy = None
     world.policy = policy
+    # 交战规则：scenario["roe"] 里的 policy/confirm_s 等交给 sim/roe.py。
+    # 与上面的 roe（halt_on_contact 等**移动**层面的 ROE）共用同一个键，
+    # 但只取不认识移动语义的字段——两套语义放在一起容易混，所以在手册里
+    # 只认 policy / area_radius_m / return_fire_s / confirm_s / respect_no_strike。
+    roe_config = scenario.get("roe")
+    if isinstance(roe_config, dict) and roe_config.get("policy"):
+        try:
+            world.set_roe(roe_config)
+        except ValueError:
+            # 政策名写错要报出来，但不要因此让整个案例加载失败——
+            # 与"资源不足"同级的降级处理：记一条警告，用默认手册继续。
+            world.roe_warning = "roe policy 无效，已退回默认（自由开火）"
     weather_base = scenario.get("weather_base")
     weather_timeline = scenario.get("weather")
     start_hour = scenario.get("start_hour_utc")

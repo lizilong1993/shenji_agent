@@ -295,3 +295,4 @@
 }
 .intel-fact-label { color: #66788f; }
 .intel-fact-value { color: #20344c; font-weight: 600; font-variant-numeric: tabular-nums; }
+.intel-brief-facts { font-size: 11px; color: #35526f; font-variant-numeric: tabular-nums; }
