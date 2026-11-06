@@ -36,7 +36,7 @@
     sourceFilter: '', sourceKind: 'all', sourceEnabled: 'all',
     editing: null, timer: null, loading: false, collecting: false,
     collectStarted: 0, autoTried: {}, lastCase: null, caseRetries: 0,
-    docked: false
+    docked: false, feedCase: null, feedSeen: {}
   };
 
   function el(tag, cls, text) {
@@ -254,12 +254,47 @@
       state.overview = data;
       state.sources = data.sources || [];
       state.error = null;
+      emitConvergenceToFeed(data);
       render();
     }).catch(function (err) {
       state.error = err.message || String(err);
       renderError();
     }).finally(function () {
       state.loading = false;
+    });
+  }
+
+  /**
+   * 汇聚事件进统一事件流。
+   *
+   * 情报面板 5 秒轮询一次，同一条汇聚会在很多轮里反复出现；事件流按"每轮
+   * 都推一遍"会把真正的新消息冲掉。所以按事件 id 记住推过的，只推新的。
+   * 集合要随案例清空——不同案例的 id 空间不同，混在一起会漏报。
+   */
+  function emitConvergenceToFeed(overview) {
+    var block = overview && overview.convergence;
+    var events = (block && block.events) || [];
+    if (!global.EventFeed || typeof global.EventFeed.push !== 'function') return;
+    if (state.feedCase !== (overview && overview.case_id)) {
+      state.feedCase = overview && overview.case_id;
+      state.feedSeen = {};
+    }
+    var seen = state.feedSeen || (state.feedSeen = {});
+    events.forEach(function (ev) {
+      var id = String(ev.id || '');
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      try {
+        global.EventFeed.push({
+          level: 'warn',
+          source: 'intel',
+          object: 'convergence',
+          content: '区域汇聚：' + (ev.types || []).join(' + ') +
+            '（' + (ev.member_count || 0) + ' 条，' + (ev.source_ids || []).join('/') + '）',
+          raw: { id: id, score: ev.score, cell: ev.cell,
+                 t_start: ev.t_start, t_end: ev.t_end }
+        });
+      } catch (e) { /* 事件流不能反过来打断情报面板 */ }
     });
   }
 
