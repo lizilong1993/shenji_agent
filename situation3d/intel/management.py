@@ -16,6 +16,7 @@ from .manual import ManualIntelStore
 from .correlations import CorrelationStore
 from .lifecycle import LifecycleStore, STAGES as LIFECYCLE_STAGES, \
     STAGE_LABELS as LIFECYCLE_LABELS, TRANSITIONS as LIFECYCLE_TRANSITIONS
+from .quality import quality_of
 from .sources import SourceStore
 from .case import load_case_profile
 
@@ -121,6 +122,7 @@ def _auto_item(record: Dict[str, Any], source_names: Dict[str, str]) -> Optional
         "conflicts": [],
         "license": record.get("license") or "",
         "attribution": record.get("attribution") or "",
+        "quality": quality_of(record),
         "geometry": geometry,
         "record": record,
     }
