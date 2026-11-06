@@ -1480,6 +1480,10 @@ select {
 }
 .plot-ctx-menu.sub-open .plot-ctx-sub { display: block; }
 .plot-ctx-menu.sub-left .plot-ctx-sub { left: auto; right: 100%; }
+/* 第一个子菜单贴着它的触发项；第二个（编辑标绘）要下移一行，否则两个
+   子菜单会完全重叠，鼠标一移就跳。 */
+.plot-ctx-sub + .plot-ctx-item.has-sub { margin-top: 2px; }
+.plot-ctx-item.has-sub + .plot-ctx-sub { top: 100%; }
 .plot-ctx-head { padding: 6px 9px 3px; font-size: 11px; color: var(--text-dim); }
 .plot-ctx-std { font-size: 10px; color: var(--text-dim); }
 .plot-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }

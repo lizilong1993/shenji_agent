@@ -2,6 +2,28 @@
 
 .intel-modal-panel { width: min(1080px, calc(100vw - 48px)); }
 
+/* 停靠模式：情报面板贴到地图右侧，地图仍可见可操作。
+   做法是把遮罩透明化并让内容靠右，而不是重构 DOM ——
+   面板的结构（tabs + body）在两种模式下完全一致，改动只在布局。 */
+#intelModal.docked {
+  background: transparent;
+  pointer-events: none;
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: 56px 12px 96px 0;
+}
+#intelModal.docked .modal-panel {
+  pointer-events: auto;
+  width: min(460px, calc(100vw - 32px));
+  max-height: none;
+  height: 100%;
+  box-shadow: -6px 0 24px rgba(23, 43, 77, .18);
+}
+/* 停靠时地图交互仍然可用，所以关闭按钮要更显眼一点 */
+#intelModal.docked .modal-close { font-size: 20px; }
+.intel-dock-toggle { margin-left: auto; margin-right: 8px; }
+
+
 .intel-note { color: var(--text-dim); font-size: 11.5px; line-height: 1.5; }
 
 .intel-toolbar {
@@ -167,3 +189,73 @@
 .intel-sev-medium { color: #8a5a00; background: #fff9ea; border-color: #efd49d; }
 .intel-sev-low { color: #35669f; background: #f3f8ff; border-color: #c6d9ef; }
 .intel-conf { color: #35669f; }
+
+/* ---- 完整度 / 时效 / 质量（Palantir 借鉴） ---- */
+/* 四条固定槽位：缺项与有值占据同样的版面，只靠底色区分。
+   隐藏缺失会让人误以为这条情报已经齐备。 */
+.intel-complete { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 2px; }
+.intel-complete-chip {
+  font-size: 10.5px; padding: 1px 6px; border-radius: 3px;
+  background: #eef4fb; border: 1px solid #cfe0f5; color: #35526f;
+}
+.intel-complete-chip.missing {
+  background: #f6f7f9; border-color: #e2e5ea; color: #9aa4b2;
+}
+
+.intel-fresh-item {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 2px 0 4px;
+  font-size: 11px; color: #66788f;
+}
+.intel-age.stale { color: #b06a00; font-weight: 600; }
+.intel-geo { color: #4f7a9e; }
+.intel-quality {
+  font-size: 10.5px; padding: 1px 6px; border-radius: 3px;
+  border: 1px solid transparent;
+}
+.intel-quality.ok { color: #1f6f3f; background: #eef8f1; border-color: #badfc8; }
+.intel-quality.warn { color: #8a5a00; background: #fff9ea; border-color: #efd49d; }
+.intel-quality.bad { color: #a8332a; background: #fff1ef; border-color: #efc3bf; }
+
+.intel-locate { margin-left: auto; }
+.intel-card-actions { margin-top: 6px; }
+.intel-badge.nsl {
+  color: #8a1c14; background: #ffe9e6; border: 1px solid #efb3ac;
+  font-size: 10.5px; border-radius: 3px; padding: 1px 6px;
+}
+
+/* ---- 目标看板（五段式生命周期） ---- */
+.kanban {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px; margin-top: 10px; align-items: start;
+}
+.kanban-col {
+  background: #f7f9fc; border: 1px solid #dbe6f2; border-radius: 6px;
+  padding: 6px; min-height: 120px;
+}
+.kanban-head {
+  display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px;
+  padding-bottom: 4px; border-bottom: 1px solid #e3ecf6;
+}
+.kanban-title { font-size: 12px; font-weight: 700; color: #20344c; }
+.kanban-count { font-size: 11px; color: #66788f; margin-left: auto; }
+.kanban-empty { font-size: 11px; color: #9aa4b2; padding: 4px 0; }
+.kanban-card {
+  background: #fff; border: 1px solid #d6e2f0; border-radius: 5px;
+  padding: 6px 7px; margin-bottom: 6px;
+  box-shadow: 0 1px 2px rgba(23, 43, 77, .05);
+}
+.kanban-id { font-size: 11.5px; font-weight: 700; color: #20344c; }
+.kanban-name { font-size: 11px; color: #35526f; overflow-wrap: anywhere; }
+.kanban-bda { font-size: 10.5px; color: #8a1c14; margin-top: 2px; }
+.kanban-actions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+
+.bda-form {
+  border: 1px solid #cfe0f5; border-radius: 6px; padding: 10px 12px;
+  background: #f8fbff; margin-top: 10px;
+}
+.bda-title { font-size: 12.5px; font-weight: 700; color: #20344c; margin-bottom: 8px; }
+.intel-textarea {
+  width: 100%; box-sizing: border-box; margin: 6px 0;
+  border: 1px solid #cfe0f5; border-radius: 4px; padding: 6px 8px;
+  font: inherit; font-size: 12px;
+}

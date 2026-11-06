@@ -1981,6 +1981,37 @@
     setVisible: setVisible,
     update: update,
     focus: focus,
+    // 编辑菜单需要：列出全部手动标绘（含 id）与单条详情。
+    // exportAll 故意不含 id（导出的是可移植的控制点），编辑要用 id 定位，
+    // 所以另给一个只读查询，不去污染导出格式。
+    listItems: function () {
+      return Object.keys(byId).filter(function (id) {
+        var def = CATALOGUE[byId[id].type];
+        return !(def && def.system);
+      }).map(function (id) {
+        var rec = byId[id];
+        return {
+          id: id,
+          type: rec.type,
+          zh: (CATALOGUE[rec.type] && CATALOGUE[rec.type].zh) || rec.type,
+          layer: rec.layer,
+          hostility: rec.hostility,
+          label: rec.label || null,
+          points: rec.points.map(function (c) { return [c[0], c[1]]; }),
+        };
+      });
+    },
+    getItem: function (id) {
+      var rec = byId[id];
+      if (!rec) return null;
+      return {
+        id: id, type: rec.type,
+        zh: (CATALOGUE[rec.type] && CATALOGUE[rec.type].zh) || rec.type,
+        layer: rec.layer, hostility: rec.hostility,
+        label: rec.label || null,
+        points: rec.points.map(function (c) { return [c[0], c[1]]; }),
+      };
+    },
     exportAll: exportAll,
     importAll: importAll,
     // GeoJSON 交换（面状要素的对外统一格式）

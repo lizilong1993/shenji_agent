@@ -107,6 +107,7 @@
       <!-- 标绘绘制中的操作条：创建入口在地图右键菜单，这里只负责进度提示与完成/取消。 -->
       <div id="plotDrawBar" class="plot-draw-bar hidden">
         <span id="plotHint" class="plot-hint"></span>
+        <button type="button" id="plotPick" class="mini" title="从列表选一种标绘类型开始绘制">选类型</button>
         <button type="button" id="plotDraw" class="mini">完成绘制</button>
         <button type="button" id="plotCancel" class="mini">取消</button>
       </div>
@@ -332,7 +333,10 @@
           <button type="button" class="modal-tab active" data-intel-tab="list">情报列表</button>
           <button type="button" class="modal-tab" data-intel-tab="manual">人工录入</button>
           <button type="button" class="modal-tab" data-intel-tab="sources">情报源管理</button>
+          <button type="button" class="modal-tab" data-intel-tab="board">目标看板</button>
         </div>
+        <button id="intelDock" type="button" class="mini intel-dock-toggle"
+                aria-pressed="false" title="停靠到地图右侧，地图仍可查看与操作">停靠</button>
         <button id="intelClose" type="button" class="modal-close" aria-label="关闭">×</button>
       </div>
       <div class="modal-body" id="intelBody"></div>

@@ -4383,6 +4383,46 @@ function setPlottingHidden(hidden) {
   }
 }
 
+// 情报的定位误差圈。只保留一个实体：看情报是"一次看一条"的操作，
+// 堆叠多个圈只会让地图更乱。
+let intelUncertaintyEntity = null;
+
+/**
+ * 画/清一个定位误差圈。
+ *
+ * 半径 0 的观测不画圈 —— 那表示的正是"位置是精确的"，画一个极小圆
+ * 反而会让人以为存在误差。
+ */
+function setIntelUncertainty(spec) {
+  if (intelUncertaintyEntity) {
+    viewer.entities.remove(intelUncertaintyEntity);
+    intelUncertaintyEntity = null;
+  }
+  if (!spec || !(spec.radiusM > 0)) return null;
+  intelUncertaintyEntity = viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(spec.lon, spec.lat, 0),
+    ellipse: {
+      semiMajorAxis: spec.radiusM,
+      semiMinorAxis: spec.radiusM,
+      height: 0,
+      material: Cesium.Color.fromCssColorString('#c8352c').withAlpha(0.14),
+      outline: true,
+      outlineColor: Cesium.Color.fromCssColorString('#c8352c').withAlpha(0.75),
+      outlineWidth: 2
+    },
+    label: spec.label ? {
+      text: spec.label,
+      font: '12px sans-serif',
+      pixelOffset: new Cesium.Cartesian2(0, -14),
+      fillColor: Cesium.Color.fromCssColorString('#c8352c'),
+      showBackground: true,
+      backgroundColor: Cesium.Color.WHITE.withAlpha(0.82),
+      disableDepthTestDistance: Number.POSITIVE_INFINITY
+    } : undefined
+  });
+  return intelUncertaintyEntity;
+}
+
 function selectTarget(id, fly, height) {
   const prev = state.selected;
   state.selected = id;
@@ -6381,6 +6421,19 @@ window.SituationHost = {
   relationsDebug: relationsDebug,
   selectTarget: function (id, fly) { selectTarget(id || null, !!fly); },
   viewer: function () { return viewer; },
+  // 情报面板定位到某个观测：把相机移过去，并按定位误差画一个置信圆。
+  // 单独一个入口而不是复用 flyTo，是因为"看一条情报"和"看一个目标"的
+  // 高度语义不同：前者要能把误差圈整个放进视野。
+  focusIntel: function (lon, lat, radiusM, label) {
+    const r = Math.max(0, Number(radiusM) || 0);
+    // 圆直径占视野 ~1/3 时的高度；无误差时退回 15 km 的城市尺度
+    const height = r > 0 ? Math.max(2000, r * 6) : 15000;
+    flyTo(Number(lon), Number(lat), height, -75);
+    setIntelUncertainty({
+      lon: Number(lon), lat: Number(lat), radiusM: r, label: label || ''
+    });
+  },
+  clearIntelUncertainty: function () { setIntelUncertainty(null); },
   // 运动/特效取证：CZML 采样数、时钟、尾流/尾气/轮角状态。
   motionDebug: function () { return window.TargetMotion ? TargetMotion.stats() : null; },
   fxDebug: function () { return window.TargetFx ? TargetFx.debug() : null; },
@@ -7897,6 +7950,41 @@ function openPlotCtxMenu(x, y) {
   menu.className = 'plot-ctx-menu';
   menu.setAttribute('role', 'menu');
 
+  // 只有已经画过标绘时才出现"编辑已有标绘"——空图上的菜单应该只有创建。
+  const existing = (window.Plotting && Plotting.listItems)
+    ? Plotting.listItems() : [];
+  if (existing.length) {
+    const editItem = document.createElement('button');
+    editItem.type = 'button';
+    editItem.className = 'plot-ctx-item has-sub';
+    editItem.textContent = '编辑标绘';
+    const caret2 = document.createElement('span');
+    caret2.className = 'caret';
+    caret2.textContent = '▸';
+    editItem.appendChild(caret2);
+    const editSub = document.createElement('div');
+    editSub.className = 'plot-ctx-sub';
+    editSub.setAttribute('role', 'menu');
+    existing.slice(0, 40).forEach(function (rec) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'plot-ctx-item';
+      b.textContent = (rec.label || rec.zh) + '（' + rec.points.length + ' 点）';
+      const std = document.createElement('span');
+      std.className = 'plot-ctx-std';
+      std.textContent = rec.zh;
+      b.appendChild(std);
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        closePlotCtxMenu();
+        openPlotEditMenu(rec.id);
+      });
+      editSub.appendChild(b);
+    });
+    menu.appendChild(editItem);
+    menu.appendChild(editSub);
+  }
+
   const item = document.createElement('button');
   item.type = 'button';
   item.className = 'plot-ctx-item has-sub';
@@ -7958,6 +8046,14 @@ function openPlotCtxMenu(x, y) {
   const openSub = function () { menu.classList.add('sub-open'); };
   item.addEventListener('mouseenter', openSub);
   item.addEventListener('focus', openSub);
+  // 「编辑标绘」那一项也要能悬停展开；它的子菜单是同一张 menu 里的第二个
+  // .plot-ctx-sub，所以用同一个 sub-open 开关即可。
+  const editToggle = menu.querySelector('.plot-ctx-item.has-sub + .plot-ctx-sub')
+    ? menu.children[0] : null;
+  if (editToggle && editToggle !== item) {
+    editToggle.addEventListener('mouseenter', openSub);
+    editToggle.addEventListener('focus', openSub);
+  }
   item.addEventListener('click', function (e) {
     e.stopPropagation();
     menu.classList.add('sub-open');
@@ -7965,9 +8061,160 @@ function openPlotCtxMenu(x, y) {
   plotCtxMenu = menu;
 }
 
+/**
+ * 单条标绘的编辑菜单：改名 / 换归属 / 定位 / 删除。
+ *
+ * 只做这四件。改控制点需要重新进入绘制态，那是另一套交互（会与"新建"
+ * 抢画布事件），留作后续；这里的定位是"跳过去看一眼再决定"，不改几何。
+ */
+function openPlotEditMenu(plotId) {
+  const rec = window.Plotting && Plotting.getItem ? Plotting.getItem(plotId) : null;
+  if (!rec) return;
+  const wrap = document.querySelector('.globe-wrap');
+  if (!wrap) return;
+  closePlotCtxMenu();
+  const menu = document.createElement('div');
+  menu.className = 'plot-ctx-menu sub-open';
+  menu.setAttribute('role', 'menu');
+  const head = document.createElement('div');
+  head.className = 'plot-ctx-head';
+  head.textContent = rec.label || rec.zh;
+  menu.appendChild(head);
+
+  const rename = document.createElement('button');
+  rename.type = 'button';
+  rename.className = 'plot-ctx-item';
+  rename.textContent = '改名';
+  rename.addEventListener('click', function (e) {
+    e.stopPropagation();
+    const next = window.prompt('新的名称（留空则清除名称）', rec.label || '');
+    if (next === null) return;
+    try {
+      Plotting.update(plotId, { label: String(next).trim() || null });
+      setSwitchNote('已改名：' + (String(next).trim() || '（无名称）'), 'ok');
+    } catch (err) {
+      setSwitchNote('改名失败：' + err.message, 'warn');
+    }
+    closePlotCtxMenu();
+  });
+  menu.appendChild(rename);
+
+  const side = document.createElement('button');
+  side.type = 'button';
+  side.className = 'plot-ctx-item';
+  const nextSide = rec.hostility === 'friendly' ? 'hostile' : 'friendly';
+  side.textContent = '改为' + (nextSide === 'friendly' ? '友方' : '敌方');
+  side.addEventListener('click', function (e) {
+    e.stopPropagation();
+    try {
+      Plotting.update(plotId, { hostility: nextSide });
+      setSwitchNote('归属已改为' + (nextSide === 'friendly' ? '友方' : '敌方'), 'ok');
+    } catch (err) {
+      setSwitchNote('修改归属失败：' + err.message, 'warn');
+    }
+    closePlotCtxMenu();
+  });
+  menu.appendChild(side);
+
+  const locate = document.createElement('button');
+  locate.type = 'button';
+  locate.className = 'plot-ctx-item';
+  locate.textContent = '定位';
+  locate.addEventListener('click', function (e) {
+    e.stopPropagation();
+    closePlotCtxMenu();
+    Plotting.focus(plotId);
+  });
+  menu.appendChild(locate);
+
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'plot-ctx-item';
+  del.textContent = '删除';
+  del.addEventListener('click', function (e) {
+    e.stopPropagation();
+    closePlotCtxMenu();
+    if (!window.confirm('删除这条标绘？')) return;
+    try {
+      Plotting.remove(plotId);
+      setSwitchNote('已删除标绘', 'ok');
+    } catch (err) {
+      setSwitchNote('删除失败：' + err.message, 'warn');
+    }
+  });
+  menu.appendChild(del);
+
+  const rect = wrap.getBoundingClientRect();
+  wrap.appendChild(menu);
+  const mx = Math.min(rect.width * 0.5, rect.width - menu.offsetWidth - 8);
+  menu.style.left = Math.max(4, mx) + 'px';
+  menu.style.top = Math.max(4, rect.height * 0.4) + 'px';
+  plotCtxMenu = menu;
+}
+
+/**
+ * 工具栏入口的类型菜单：与右键子菜单共用同一份目录与样式，
+ * 只是锚在按钮下方而不是鼠标位置。分组与顺序完全一致，
+ * 避免两处各维护一份列表。
+ */
+function openPlotTypeMenu(anchor) {
+  closePlotCtxMenu();
+  const wrap = document.querySelector('.globe-wrap');
+  if (!wrap || !anchor || !window.Plotting) return;
+  const menu = plotTypeMenuDom(function (type) {
+    closePlotCtxMenu();
+    startPlotDraw(type);
+  });
+  wrap.appendChild(menu);
+  const wrapRect = wrap.getBoundingClientRect();
+  const rect = anchor.getBoundingClientRect();
+  // 操作条在底部，菜单向上展开，避免跑到画布外
+  menu.style.left = Math.max(4, Math.min(
+    rect.left - wrapRect.left, wrapRect.width - menu.offsetWidth - 8)) + 'px';
+  menu.style.top = Math.max(4, rect.top - wrapRect.top - menu.offsetHeight) + 'px';
+  plotCtxMenu = menu;
+}
+
+/** 按目录生成一级即展开（无子菜单）的类型列表。 */
+function plotTypeMenuDom(onPick) {
+  const menu = document.createElement('div');
+  menu.className = 'plot-ctx-menu sub-open';
+  menu.setAttribute('role', 'menu');
+  const byCat = {};
+  plotCatalogue().forEach(function (c) {
+    if (c.system) return;
+    (byCat[c.category] = byCat[c.category] || []).push(c);
+  });
+  Plotting.categories().forEach(function (cat) {
+    const list = byCat[cat.id];
+    if (!list || !list.length) return;
+    const head = document.createElement('div');
+    head.className = 'plot-ctx-head';
+    head.textContent = cat.zh;
+    menu.appendChild(head);
+    list.forEach(function (c) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'plot-ctx-item';
+      b.textContent = c.zh;
+      const std = document.createElement('span');
+      std.className = 'plot-ctx-std';
+      std.textContent = c.sourceStandard || '';
+      b.appendChild(std);
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        onPick(c.type);
+      });
+      menu.appendChild(b);
+    });
+  });
+  return menu;
+}
+
 function bindPlotCreation() {
   const drawBtn = document.getElementById('plotDraw');
   const cancelBtn = document.getElementById('plotCancel');
+  const pickBtn = document.getElementById('plotPick');
   if (drawBtn) {
     drawBtn.addEventListener('click', function () {
       if (plotDraw) finishPlotDraw();
@@ -7975,6 +8222,16 @@ function bindPlotCreation() {
   }
   if (cancelBtn) {
     cancelBtn.addEventListener('click', function () { plotDrawReset(); });
+  }
+  // 第二个入口：右键菜单不是唯一路径。触屏与"不知道能右键"的人都需要它。
+  // 操作条本身在未绘制时是隐藏的，所以这里先显示操作条再弹类型菜单。
+  if (pickBtn) {
+    pickBtn.addEventListener('click', function () {
+      if (plotDraw) { setPlotHint('已有进行中的标绘，先完成或取消', 'warn'); return; }
+      setPlotBarVisible(true);
+      setPlotHint('选择标绘类型…', 'info');
+      openPlotTypeMenu(pickBtn);
+    });
   }
 
   const canvas = viewer.scene.canvas;

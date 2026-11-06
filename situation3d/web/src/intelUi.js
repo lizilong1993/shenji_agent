@@ -35,7 +35,8 @@
     filter: '', priority: 'all', effective: 'all', domain: 'all',
     sourceFilter: '', sourceKind: 'all', sourceEnabled: 'all',
     editing: null, timer: null, loading: false, collecting: false,
-    collectStarted: 0, autoTried: {}, lastCase: null, caseRetries: 0
+    collectStarted: 0, autoTried: {}, lastCase: null, caseRetries: 0,
+    docked: false
   };
 
   function el(tag, cls, text) {
@@ -123,9 +124,26 @@
     var m = modal();
     if (!m) return;
     m.classList.remove('hidden');
+    applyDock();
     refresh();
     onCase(caseId(), situationData());
     startPoll();
+  }
+
+  /**
+   * 停靠模式：面板贴到右侧，遮罩透明且不吃鼠标事件，地图仍可缩放/点选。
+   * 默认仍是居中模态（情报研判需要大版面），停靠是"边看地图边翻情报"时用的。
+   * 状态存在 localStorage，避免每次打开都要重设。
+   */
+  function applyDock() {
+    var m = modal();
+    var btn = document.getElementById('intelDock');
+    if (!m) return;
+    m.classList.toggle('docked', !!state.docked);
+    if (btn) {
+      btn.setAttribute('aria-pressed', state.docked ? 'true' : 'false');
+      btn.textContent = state.docked ? '浮层' : '停靠';
+    }
   }
 
   function situationData() {
@@ -279,6 +297,7 @@
     }
     if (state.tab === 'manual') renderManual(body);
     else if (state.tab === 'sources') renderSources(body);
+    else if (state.tab === 'board') renderBoard(body);
     else renderList(body);
   }
 
@@ -509,7 +528,106 @@
     }
   }
 
+  // ---- Palantir 借鉴：完整度 / 时效 / 定位精度 / 质量 ----
+  //
+  // 这四项的共同点是"缺失本身就是信息"：一条没有来源、定位只到省一级、
+  // 八小时没更新的情报，和一条刚采集到的精确点位，在研判上是两种东西。
+  // 以前这些差别只能靠人把各字段对照一遍才看得出来。
+
+  var QUALITY = {
+    measured: ['实测', 'ok'],
+    interpolated: ['推断', 'warn'],
+    predicted: ['外推', 'warn'],
+    stale: ['陈旧', 'bad']
+  };
+
+  /** 把米换算成可读的 ±X：<1km 用米，更大用公里。 */
+  function uncertaintyLabel(meters) {
+    var value = Number(meters);
+    if (!Number.isFinite(value) || value <= 0) return '';
+    if (value < 1000) return '±' + Math.round(value) + ' m';
+    return '±' + (value / 1000).toFixed(value < 10000 ? 1 : 0) + ' km';
+  }
+
+  /**
+   * 情报完整度：位置 / 来源 / 关联 / 时效 四项固定输出。
+   * 缺项不隐藏，写"无"并置灰——隐藏缺失会让人以为这条情报已经齐备。
+   */
+  function renderCompleteness(item, overview, hasLinks) {
+    var box = el('div', 'intel-complete');
+    var items = [
+      ['位置', !!uncertaintyLabel(item.geo_uncertainty_m) || (
+        Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon))
+      )],
+      ['来源', !!(item.source_name || item.source_id) &&
+        item.source_id !== 'unknown'],
+      ['关联', !!hasLinks],
+      ['时效', !!(item.ingest_time || item.event_time)]
+    ];
+    items.forEach(function (pair) {
+      var chip = el('span', 'intel-complete-chip' + (pair[1] ? '' : ' missing'),
+        pair[0] + (pair[1] ? ' ✓' : ' 无'));
+      chip.title = pair[1] ? '' : '这项信息缺失，研判时需额外确认';
+      box.appendChild(chip);
+    });
+    return box;
+  }
+
+  /** 对象级时效：回答"这条多久没更新"，与"事件发生多久"是两回事。 */
+  function renderFreshness(item) {
+    var box = el('div', 'intel-fresh-item');
+    var quality = item.quality || {};
+    var level = String(quality.level || '');
+    if (QUALITY[level]) {
+      var chip = el('span', 'intel-quality ' + QUALITY[level][1],
+        QUALITY[level][0]);
+      chip.title = (quality.reasons || []).join('\n');
+      box.appendChild(chip);
+    }
+    var age = quality.age_h;
+    if (typeof age === 'number' && Number.isFinite(age)) {
+      var half = Number(quality.half_life_h) || 0;
+      var stale = half > 0 && age > half;
+      var label = age < 1 ? '刚刚' : (age < 48 ? Math.round(age) + ' 小时前'
+        : Math.round(age / 24) + ' 天前');
+      var node = el('span', 'intel-age' + (stale ? ' stale' : ''),
+        '更新于 ' + label);
+      if (stale && half) {
+        node.title = '已超过该领域半衰期（' + Math.round(half) + ' 小时）';
+      }
+      box.appendChild(node);
+    }
+    var radius = uncertaintyLabel(item.geo_uncertainty_m);
+    if (radius) {
+      var geo = el('span', 'intel-geo',
+        '定位 ' + radius + (item.is_centroid ? '（质心）' : ''));
+      geo.title = item.is_centroid
+        ? '该位置是行政区/国家质心，不是实测点位'
+        : '定位误差半径';
+      box.appendChild(geo);
+    }
+    // 定位到地图：把这条观测的误差圈画出来。有坐标才给按钮，
+    // 否则点了什么也不会发生。
+    var lat = Number(item.lat);
+    var lon = Number(item.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon) && global.SituationHost &&
+        typeof global.SituationHost.focusIntel === 'function') {
+      var locate = el('button', 'mini intel-locate', '定位');
+      locate.type = 'button';
+      locate.title = '在地图上查看，并按定位误差画出置信圈';
+      locate.addEventListener('click', function () {
+        global.SituationHost.focusIntel(lon, lat,
+          Number(item.geo_uncertainty_m) || 0, item.title || '');
+      });
+      box.appendChild(locate);
+    }
+    return box;
+  }
+
   function card(item, overview) {
+    var links = (overview.links || []).filter(function (link) {
+      return link.from_id === item.id || link.to_id === item.id;
+    });
     var relevance = relevanceOf(item);
     var node = el('div', 'intel-card intel-card-wm ' + item.priority +
       (item.effective ? '' : ' superseded') +
@@ -589,7 +707,16 @@
         links.slice(0, 2).map(function (link) {
           return link.kind + ' (' + link.score + ')';
         }).join('；')));
+      // 人工确认的链接单独标出来：它的分数是 0.99，但更重要的是"这是人定的"。
+      var manual = links.filter(function (link) { return link.kind === 'manual'; });
+      if (manual.length) {
+        node.appendChild(el('div', 'intel-note',
+          '其中 ' + manual.length + ' 条已由分析员确认'));
+      }
     }
+
+    node.appendChild(renderCompleteness(item, overview, links.length > 0));
+    node.appendChild(renderFreshness(item));
 
     if (item.priority === 'manual') {
       var actions = el('div', 'intel-actions');
@@ -608,7 +735,10 @@
         restore.addEventListener('click', function () { restoreManual(item); });
         actions.appendChild(restore);
       }
+      appendChildren(actions, cardActions(item));
       node.appendChild(actions);
+    } else {
+      node.appendChild(cardActions(item));
     }
     return node;
   }
@@ -626,6 +756,87 @@
     select.value = value;
     select.addEventListener('change', function () { onChange(select.value); });
     return select;
+  }
+
+  /**
+   * 卡片上的快捷动作。Palantir 那套界面的做法是"选了对象就能在对象身上动手"，
+   * 而这里以前要点开"人工录入"标签页才能把一条自动情报转成人工条目。
+   * 动作只做最常用的两件，避免把卡片撑爆：
+   *   - 转人工：带着当前卡片的内容跳进录入表单（原行为保留，但入口前移）
+   *   - 标记禁止打击：直接写 NSL 字段，需要填理由
+   */
+  function appendChildren(target, source) {
+    Array.prototype.slice.call(source.childNodes).forEach(function (child) {
+      target.appendChild(child);
+    });
+    return target;
+  }
+
+  function cardActions(item) {
+    var actions = el('div', 'intel-actions intel-card-actions');
+    var toManual = el('button', 'mini', '转人工');
+    toManual.type = 'button';
+    toManual.title = '以这条自动情报为底稿新建一条人工情报';
+    toManual.addEventListener('click', function () { convertToManual(item); });
+    actions.appendChild(toManual);
+
+    if (item.priority === 'manual') {
+      if (item.no_strike) {
+        var tag = el('span', 'intel-badge nsl', '禁止打击');
+        if (item.no_strike_reason) tag.title = item.no_strike_reason;
+        actions.appendChild(tag);
+      } else {
+        var nsl = el('button', 'mini', '禁止打击');
+        nsl.type = 'button';
+        nsl.title = '标记为禁止打击目标（NSL）';
+        nsl.addEventListener('click', function () { markNoStrike(item); });
+        actions.appendChild(nsl);
+      }
+    } else if (item.no_strike) {
+      var inherited = el('span', 'intel-badge nsl', '禁止打击');
+      actions.appendChild(inherited);
+    }
+    return actions;
+  }
+
+  /** 把自动情报作为底稿转成人工条目：字段能带的都带过去，id 不带。 */
+  function convertToManual(item) {
+    state.editing = {
+      case_id: state.lastCase || 'default',
+      title: item.title || '',
+      domain: item.domain || 'other',
+      intel_type: item.type || 'other',
+      event_time: item.event_time || '',
+      lat: item.lat,
+      lon: item.lon,
+      place: item.place || '',
+      content: item.content || '',
+      verification: 'unverified',
+      tags: [],
+      _converted_from: item.id
+    };
+    state.tab = 'manual';
+    stopPoll();
+    render();
+  }
+
+  function markNoStrike(item) {
+    var reason = global.prompt('禁止打击的理由（例如：已确认为民用医院）', '');
+    if (reason === null) return;
+    var text = String(reason).trim();
+    if (!text) {
+      global.alert('理由不能为空：禁止打击必须有可追溯的依据。');
+      return;
+    }
+    api('/api/intel/manual/' + encodeURIComponent(item.id),
+      { method: 'POST', body: { no_strike: true, no_strike_reason: text } })
+      .then(function () {
+        notify('warn', '已标记禁止打击：' + (item.title || item.id),
+          { id: item.id, reason: text });
+        return refresh();
+      }).catch(function (err) {
+        global.alert('标记失败：' + err.message);
+      });
   }
 
   function editManual(item) {
@@ -1000,15 +1211,176 @@
     });
   }
 
+  // ---- 目标生命周期看板（PAL-FLOW-01/02 前端） ----
+  //
+  // 五列就是后端 lifecycle.STAGES 的那五段；这里不自己发明状态名，
+  // 列的顺序与允许的迁移都从 overview.lifecycle 里读，后端改词表时前端不会走样。
+  var BDA_LABELS = [
+    ['destroyed', '已摧毁'], ['damaged', '受损'],
+    ['functional', '仍可用'], ['unknown', '无法判定']
+  ];
+
+  function renderBoard(body) {
+    var block = (state.overview && state.overview.lifecycle) || null;
+    if (!block) {
+      body.appendChild(el('div', 'intel-empty', '暂无生命周期数据'));
+      return;
+    }
+    var stages = block.stages || [];
+    var transitions = block.transitions || {};
+    var board = block.board || {};
+
+    var intro = el('div', 'intel-note',
+      '目标按五段式推进；只允许表内列出的迁移，跳步会被后端拒绝。' +
+      '历史 append-only，每次迁移都留有操作人与备注。');
+    body.appendChild(intro);
+
+    var wrap = el('div', 'kanban');
+    stages.forEach(function (stage) {
+      var column = el('div', 'kanban-col');
+      var head = el('div', 'kanban-head');
+      head.appendChild(el('span', 'kanban-title', stage.label));
+      var cards = board[stage.key] || [];
+      head.appendChild(el('span', 'kanban-count', String(cards.length)));
+      column.appendChild(head);
+
+      if (!cards.length) {
+        column.appendChild(el('div', 'kanban-empty', '（空）'));
+      }
+      cards.forEach(function (row) {
+        column.appendChild(boardCard(row, stage.key, transitions));
+      });
+      wrap.appendChild(column);
+    });
+    body.appendChild(wrap);
+  }
+
+  function boardCard(row, stageKey, transitions) {
+    var card = el('div', 'kanban-card');
+    card.appendChild(el('div', 'kanban-id', row.target_id));
+    if (row.title) card.appendChild(el('div', 'kanban-name', row.title));
+    if (row.assessment) {
+      var result = row.assessment.result;
+      var label = BDA_LABELS.filter(function (p) { return p[0] === result; });
+      card.appendChild(el('div', 'kanban-bda',
+        'BDA：' + (label.length ? label[0][1] : result)));
+    }
+    var allowed = transitions[stageKey] || [];
+    if (allowed.length) {
+      var actions = el('div', 'kanban-actions');
+      allowed.forEach(function (next) {
+        // complete 一列只给"重新启用"这一条，评估入口在 in_execution 里
+        var button = el('button', 'mini', '→ ' + stageLabelOf(next));
+        button.type = 'button';
+        button.title = '迁移到「' + stageLabelOf(next) + '」';
+        button.addEventListener('click', function () {
+          transitTarget(row.target_id, next);
+        });
+        actions.appendChild(button);
+      });
+      card.appendChild(actions);
+    }
+    if (stageKey === 'in_execution') {
+      var bda = el('button', 'mini primary', '毁伤评估');
+      bda.type = 'button';
+      bda.addEventListener('click', function () { openBdaForm(row); });
+      card.appendChild(bda);
+    }
+    return card;
+  }
+
+  function stageLabelOf(key) {
+    var stages = (state.overview && state.overview.lifecycle
+      && state.overview.lifecycle.stages) || [];
+    for (var i = 0; i < stages.length; i++) {
+      if (stages[i].key === key) return stages[i].label;
+    }
+    return key;
+  }
+
+  function transitTarget(targetId, toStage) {
+    var actor = global.prompt('操作人（可留空）', '') || '';
+    var note = global.prompt('备注（可留空）', '') || '';
+    api('/api/intel/lifecycle', {
+      method: 'POST',
+      body: { target_id: targetId, to_stage: toStage, actor: actor, note: note }
+    }).then(function () {
+      notify('info', '目标 ' + targetId + ' → ' + stageLabelOf(toStage), {});
+      return refresh();
+    }).catch(function (err) {
+      // 非法迁移是最常见的失败：后端会说出允许的去处，原样显示
+      global.alert('迁移失败：' + err.message);
+    });
+  }
+
+  function openBdaForm(row) {
+    var body = document.getElementById('intelBody');
+    if (!body) return;
+    var wrap = el('div', 'bda-form');
+    wrap.appendChild(el('div', 'bda-title', '毁伤评估：' + row.target_id));
+    var result = selectInput(BDA_LABELS, 'destroyed', function () {});
+    wrap.appendChild(result);
+
+    var notes = document.createElement('textarea');
+    notes.className = 'intel-textarea';
+    notes.rows = 3;
+    notes.placeholder = '毁伤程度、剩余威胁、附带损伤等';
+    wrap.appendChild(notes);
+
+    var media = document.createElement('input');
+    media.type = 'text';
+    media.className = 'intel-input';
+    media.placeholder = '证据文件（多个用逗号分隔，可留空）';
+    wrap.appendChild(media);
+
+    var actions = el('div', 'intel-actions');
+    var submit = el('button', 'mini primary', '提交评估');
+    submit.type = 'button';
+    submit.addEventListener('click', function () {
+      var files = media.value.split(',').map(function (s) { return s.trim(); })
+        .filter(Boolean);
+      api('/api/intel/bda', {
+        method: 'POST',
+        body: {
+          target_id: row.target_id, result: result.value,
+          notes: notes.value.trim(), media: files
+        }
+      }).then(function () {
+        notify('info', '已提交毁伤评估：' + row.target_id, {});
+        return refresh();
+      }).catch(function (err) {
+        global.alert('提交失败：' + err.message);
+      });
+    });
+    var cancel = el('button', 'mini', '取消');
+    cancel.type = 'button';
+    cancel.addEventListener('click', function () { render(); });
+    actions.appendChild(submit);
+    actions.appendChild(cancel);
+    wrap.appendChild(actions);
+    body.appendChild(wrap);
+  }
+
   function bind() {
-    var button = document.getElementById('btnIntel');
-    if (button) {
+    var button = document.getElementById('btnIntel');    if (button) {
       button.addEventListener('click', function () { open('list'); });
     }
     var m = modal();
     if (!m) return;
     var closeButton = document.getElementById('intelClose');
     if (closeButton) closeButton.addEventListener('click', close);
+    var dockButton = document.getElementById('intelDock');
+    if (dockButton) {
+      dockButton.addEventListener('click', function () {
+        state.docked = !state.docked;
+        try { global.localStorage.setItem('intel.docked',
+          state.docked ? '1' : '0'); } catch (e) { /* 隐私模式忽略 */ }
+        applyDock();
+      });
+    }
+    try {
+      state.docked = global.localStorage.getItem('intel.docked') === '1';
+    } catch (e) { state.docked = false; }
     m.addEventListener('click', function (event) {
       if (event.target === m) close();
     });
