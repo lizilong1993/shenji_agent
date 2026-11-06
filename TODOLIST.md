@@ -9,7 +9,7 @@
 
 ## 0. 环境
 
-- [x] 本机开发环境（Python 3.11.9 + node 24）；当前全量 **680 passed / 18 skipped**
+- [x] 本机开发环境（Python 3.11.9 + node 24）；当前全量 **680 passed / 18 skipped**，三个 JS 自检全过
 - [x] 本机演示环境：`python situation3d/server/serve.py --port 8848`，demo 模式，3 个案例
 - [x] `.env` 凭据已配置（天地图 key + Cesium ion token），`/tdt/img/...` 代理实测 200，影像与注记正常叠加
 - [x] 公网访问：Tailscale Funnel 8443 → `https://pc-desktop.tailf6b2dc.ts.net:8443/`（443 被其他服务占用）
@@ -42,9 +42,9 @@
 
 - [x] **PAL-DATA-01（后端）** 位置不确定性透传（26dda43）：`_auto_item()` / `_manual_item()`
       输出 `geo_uncertainty_m` / `is_centroid` / `ingest_time`；缺值与非法值一律归零
-- [ ] **PAL-DATA-01（前端）** 卡片显示 ±X km、地图按半径画圆——**需批准**（改 UI）
-- [ ] **PAL-UI-01** 情报卡片固定"完整度"区块（位置/来源/关联/时效），缺项显式写"无"——**需批准**
-- [ ] **PAL-UI-02** 对象级时效标签"更新于 X 前"，超半衰期进 event feed 成为告警条目——**需批准**
+- [x] **PAL-DATA-01（前端）** 卡片显示定位精度与质心标注、"定位"按钮在地图上按误差半径画置信圈（5ddf99b）
+- [x] **PAL-UI-01** 情报卡片固定"完整度"区块（位置/来源/关联/时效），缺项显式写"无"（5ddf99b）
+- [x] **PAL-UI-02** 对象级时效标签"更新于 X 前"，超半衰期标黄并写明半衰期（5ddf99b）
 
 ### P1
 
@@ -55,9 +55,9 @@
 - [x] **PAL-DATA-04** 禁止打击清单（26dda43）：`no_strike` / `no_strike_reason`，counts 里有计数
 - [x] **PAL-UI-05** 图层加 `intelClass` 元数据（7c721d5）：纯元数据，不动 group / z / 互斥；
       `tools/intel_class_test.js` 守边界
-- [ ] **PAL-UI-03** 动作跟着对象走：情报卡片上加确认/否决/转人工——**需批准**
-- [ ] **PAL-UI-04** 情报面板由模态框改为可贴靠右侧停靠栏——**需批准**
-- [ ] **PAL-UI-06** 标绘加工具栏第二入口（`plotDrawBar` 加类型下拉）——**需批准**
+- [x] **PAL-UI-03** 动作跟着对象走：卡片上"转人工"与"标记禁止打击"（须填理由）（5ddf99b）
+- [x] **PAL-UI-04** 情报面板可停靠右侧，遮罩透明不吃事件、地图仍可操作（5ddf99b）
+- [x] **PAL-UI-06** 标绘工具栏第二入口（与右键菜单共用目录与样式）（5ddf99b）
 
 ### P2
 
@@ -65,7 +65,7 @@
       历史 append-only；overview 输出只读看板，`/api/intel/lifecycle` 支持读写
 - [x] **PAL-FLOW-02（后端）** BDA 回写（c525f25）：只接受 in_execution 的目标，
       结果限 destroyed/damaged/functional/unknown，写 assessment 并推进到 complete
-- [ ] **PAL-FLOW-01/02（前端）** 看板与评估表单——**需批准**
+- [x] **PAL-FLOW-01/02（前端）** 目标看板标签页（五列 + 允许迁移按钮）与毁伤评估表单（5ddf99b）
 
 ### 明确不做
 
@@ -79,9 +79,9 @@
 
 - [x] **G（后端）** 数据质量枚举（16ef223）：`intel/quality.py`，四选一
       measured/interpolated/predicted/stale，理由逐条，半衰期复用 trust.py
-- [ ] **G（前端）** 属性面板显示来源/更新时间/质量、stale/predicted 样式区分——**需批准**
-- [ ] **H** 标绘右键编辑菜单——**需批准**（与 PAL-UI-06 共用样式）
-- [ ] 基线异常检测（Welford z-score），待 F 的 UI 落地后评估
+- [x] **G（前端）** 卡片显示质量四选一徽章（悬停看逐条理由）与时效/定位（5ddf99b）
+- [x] **H** 标绘右键编辑菜单（改名/换归属/定位/删除）（5ddf99b）
+- [ ] 基线异常检测（Welford z-score），待 F 的 UI 落地后评估（F 的 UI 已落地，可着手）
 - [ ] 情报源目录元数据（许可/采集方式/tier）
 - [ ] CP-SAT 火力分配（需产品决策）
 - [ ] 屏外方向箭头、AI 两段式管线、2D 视图（均需产品决策）
