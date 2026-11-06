@@ -1925,3 +1925,42 @@ select {
   .topbar { height: auto; min-height: 48px; flex-wrap: wrap; padding: 6px 10px; }
   .topbar-actions { margin-left: 0; flex-wrap: wrap; }
 }
+
+/* ---- 时间轴事件面板（实时推演时才有数据） ---- */
+.tl-events {
+  position: fixed; right: 16px; bottom: 96px; width: 380px;
+  max-height: min(520px, calc(100vh - 180px));
+  display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 12px 30px rgba(16, 26, 40, .18);
+  z-index: 60;
+}
+.tl-events.hidden { display: none; }
+.tl-events-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+}
+.tl-events-title { font-size: 12.5px; font-weight: 700; }
+.tl-events-count { font-size: 11px; color: var(--text-dim); margin-right: auto; }
+.tl-events-filter {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  padding: 6px 10px; border-bottom: 1px solid var(--border);
+}
+.tl-ev-chip {
+  font-size: 11px; padding: 2px 7px; border-radius: 3px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text);
+}
+.tl-ev-chip.active { background: #20344c; border-color: #20344c; color: #fff; }
+.tl-events-body { overflow: auto; padding: 4px 6px 8px; }
+.tl-ev-row {
+  display: flex; gap: 8px; align-items: baseline; width: 100%;
+  padding: 3px 4px; border: 0; border-radius: 3px; background: transparent;
+  color: var(--text); font: inherit; font-size: 11.5px; text-align: left;
+  cursor: pointer;
+}
+.tl-ev-row:hover { background: #eef2f8; }
+.tl-ev-tick { min-width: 46px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.tl-ev-text { flex: 1 1 auto; overflow-wrap: anywhere; }
+.tl-ev-row.destroy .tl-ev-tick { color: #c8352c; font-weight: 700; }
+.tl-ev-row.objective .tl-ev-tick { color: #b06a00; font-weight: 700; }
+.tl-ev-empty { padding: 8px 6px; font-size: 11.5px; color: var(--text-dim); }

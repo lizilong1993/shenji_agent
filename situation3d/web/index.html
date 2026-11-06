@@ -281,8 +281,23 @@
     </div>
     <div class="transport-right">
       <span id="clockLabel">—</span>
+      <button id="btnTimelineEvents" type="button" class="mini" hidden
+              title="查看本场推演的事件列表">事件</button>
     </div>
   </footer>
+
+  <!-- 时间轴事件列表：只在实时推演时出现（数据来自 live 接口的 events/nodes） -->
+  <div id="timelineEventsPanel" class="tl-events hidden" role="region"
+       aria-label="推演事件">
+    <div class="tl-events-head">
+      <span class="tl-events-title">推演事件</span>
+      <span id="tlEventsCount" class="tl-events-count"></span>
+      <button id="tlEventsClose" type="button" class="modal-close"
+              aria-label="关闭">×</button>
+    </div>
+    <div class="tl-events-filter" id="tlEventsFilter"></div>
+    <div class="tl-events-body" id="tlEventsBody"></div>
+  </div>
 
   <!-- TS输入 / 管理 / 数据下载：三标签页模态框 -->
   <div id="situationModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="TS">

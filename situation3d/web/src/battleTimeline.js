@@ -109,6 +109,9 @@
       els.btnRun.textContent = 'TS自动推演';
       els.btnRun.title = '';
     }
+    // 事件面板在离开实时模式后没有数据来源，一并收起。
+    if (els.eventsButton) els.eventsButton.hidden = true;
+    if (els.eventsPanel) els.eventsPanel.classList.add('hidden');
   }
 
   /**
@@ -186,6 +189,7 @@
     }
     var nav = document.getElementById('nodeNav');
     if (nav) nav.style.display = 'none';
+    if (els.eventsButton) els.eventsButton.hidden = false;
     if (els.wrap) {
       els.wrap.classList.add('tl-live');
       els.wrap.classList.remove('tl-off');
@@ -723,6 +727,7 @@
     els.btnRun = $('btnRun');
     els.wrap = els.timeline ? els.timeline.closest('.tr-timeline') : null;
     if (!els.timeline || !els.markers) return;
+    ensureEventPanel();
 
     tipEl = document.createElement('div');
     tipEl.className = 'tl-tip';
@@ -753,6 +758,139 @@
     window.addEventListener('scroll', hideTip, true);
   }
 
+  // ------------------------------------------------------------------------
+  // 事件面板：后端一直在返回 events/nodes，但此前只在时间轴上打点，
+  // 看不到"发生了什么、什么时候、涉及谁"。这里把同一份数据列出来，
+  // 点一条就跳到那个 tick —— 时间轴是主轴，列表是它的索引。
+  // ------------------------------------------------------------------------
+  var eventFilter = 'all';
+
+  function eventKind(e) {
+    // 引擎的事件类型很多；按"指挥员关心的四类"归并，避免下拉框列出几十项。
+    var t = String(e.type || '');
+    if (t === 'destroy') return 'destroy';
+    if (t === 'objective_progress' || t.indexOf('capture') >= 0) return 'objective';
+    if (t === 'disembark' || t === 'embark') return 'move';
+    if (t === 'mission_start' || t === 'mission_complete'
+        || t === 'mission_failed' || t === 'mission_retasked') return 'mission';
+    if (t === 'fire' || t === 'indirect_fire' || t === 'direct_fire') return 'fire';
+    return 'other';
+  }
+
+  var EVENT_KINDS = [
+    ['all', '全部'], ['destroy', '毁伤'], ['fire', '交火'],
+    ['objective', '夺控'], ['mission', '任务'], ['move', '上下船'], ['other', '其它']
+  ];
+
+  function ensureEventPanel() {
+    var panel = document.getElementById('timelineEventsPanel');
+    var button = document.getElementById('btnTimelineEvents');
+    if (!panel || !button || els.eventsBound) return;
+    els.eventsBound = true;
+    els.eventsPanel = panel;
+    els.eventsButton = button;
+    // 事件列表只在实时模式有意义：演示端/非引擎案例没有 live 数据。
+    button.hidden = !live;
+    els.eventsBody = document.getElementById('tlEventsBody');
+    els.eventsCount = document.getElementById('tlEventsCount');
+    var filter = document.getElementById('tlEventsFilter');
+    if (filter) {
+      filter.innerHTML = '';
+      EVENT_KINDS.forEach(function (pair) {
+        var chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'tl-ev-chip' + (eventFilter === pair[0] ? ' active' : '');
+        chip.dataset.kind = pair[0];
+        chip.textContent = pair[1];
+        chip.addEventListener('click', function () {
+          eventFilter = pair[0];
+          Array.prototype.forEach.call(filter.children, function (node) {
+            node.classList.toggle('active', node.dataset.kind === eventFilter);
+          });
+          renderEvents();
+        });
+        filter.appendChild(chip);
+      });
+    }
+    button.addEventListener('click', function () {
+      panel.classList.toggle('hidden');
+      if (!panel.classList.contains('hidden')) renderEvents();
+    });
+    var close = document.getElementById('tlEventsClose');
+    if (close) {
+      close.addEventListener('click', function () {
+        panel.classList.add('hidden');
+      });
+    }
+  }
+
+  function renderEvents() {
+    if (!els.eventsBody) return;
+    var rows = [];
+    (live && live.nodes || []).forEach(function (n) {
+      rows.push({
+        tick: Number(n.tick) || 0,
+        kind: n.type === 'terminal' ? 'objective' : 'mission',
+        title: n.title || '关键节点',
+        desc: n.description || '',
+        actors: n.actors || []
+      });
+    });
+    (live && live.events || []).forEach(function (e) {
+      rows.push({
+        tick: Number(e.tick) || 0,
+        kind: eventKind(e),
+        title: e.type || '事件',
+        desc: e.description || '',
+        actors: e.actors || []
+      });
+    });
+    if (eventFilter !== 'all') {
+      rows = rows.filter(function (r) { return r.kind === eventFilter; });
+    }
+    rows.sort(function (a, b) { return a.tick - b.tick; });
+    if (els.eventsCount) els.eventsCount.textContent = rows.length + ' 条';
+    els.eventsBody.innerHTML = '';
+    if (!rows.length) {
+      var empty = document.createElement('div');
+      empty.className = 'tl-ev-empty';
+      empty.textContent = live && live.received
+        ? '这一筛选条件下没有事件' : '推演开始后事件会出现在这里';
+      els.eventsBody.appendChild(empty);
+      return;
+    }
+    // 上千条事件全部建 DOM 会明显卡顿；只渲染前 400 条并说明截断。
+    var shown = rows.slice(0, 400);
+    var frag = document.createDocumentFragment();
+    shown.forEach(function (r) {
+      var row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'tl-ev-row ' + r.kind;
+      var tick = document.createElement('span');
+      tick.className = 'tl-ev-tick';
+      tick.textContent = 'T' + r.tick;
+      var text = document.createElement('span');
+      text.className = 'tl-ev-text';
+      text.textContent = (r.title ? r.title + '：' : '') + (r.desc || '');
+      row.appendChild(tick);
+      row.appendChild(text);
+      row.addEventListener('click', function () {
+        // 直接跳到该 tick：时间轴与 3D 场景同步由既有渲染链路负责
+        var B = bridge();
+        if (B && B.setTick) B.setTick(r.tick);
+      });
+      frag.appendChild(row);
+    });
+    els.eventsBody.appendChild(frag);
+    if (rows.length > shown.length) {
+      var more = document.createElement('div');
+      more.className = 'tl-ev-empty';
+      more.textContent = '仅显示前 ' + shown.length + ' 条（共 ' + rows.length
+        + ' 条），可用上方筛选缩小范围';
+      els.eventsBody.appendChild(more);
+    }
+  }
+
   window.BattleTimeline = {
     ready: ready,
     ownsTransport: function () { return !!live; },
@@ -762,6 +900,7 @@
     onCaseLoaded: onCaseLoaded,
     launch: launch,
     render: render,
+    renderEvents: renderEvents,
     // 只读取证：自检脚本确认轮询/终态时不必再去猜闭包里的状态。
     debug: function () {
       if (!live) return null;
