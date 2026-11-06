@@ -2739,7 +2739,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return
 
         if not tianditu_key():
-            self.send_error(503, "TIANDITU_KEY 未配置，且离线瓦片库里没有这块")
+            # send_error() 的 message 会原样进 HTTP 状态行，而状态行只允许
+            # latin-1：放中文会在 Windows 上抛 UnicodeEncodeError，把连接打断。
+            self.send_error(503, "TIANDITU_KEY not configured and no offline tile")
             return
         try:
             data, ctype = fetch_tdt_tile(layer, z, x, y)
