@@ -11,8 +11,10 @@
 
 - [x] 本机开发环境（Python 3.11.9 + node 24，`situation3d` 全量 624 passed / 18 skipped）
 - [x] 本机演示环境：`python situation3d/server/serve.py --port 8848`，demo 模式，3 个案例可选，浏览器冒烟通过（TW1 案例 301 帧、31 个目标、无 JS 报错）
+- [x] `.env` 凭据已配置（天地图 key + Cesium ion token），`/api/health` 报 `tianditu_configured: true` / `ion_configured: true`；`/tdt/img/...` 代理实测 200 且天地图影像与注记正常叠加
+- [x] 公网访问：Tailscale Funnel 在 8443 暴露本机 8848 —— `https://pc-desktop.tailf6b2dc.ts.net:8443/`（443 已被其他服务占用，故用 8443）。实测公网 URL 能完整渲染案例
 - [x] 静态资产重建：`web/vendor/cesium`（1.145.0）、`web/tiles`（低层级影像 z0-8 + 地形 z0-6）、`web/data`（3 个案例数据集）
-- [ ] `.env` 凭据补齐（天地图 key、Cesium ion token）——缺省时在线底图与三维实景不可用。**凭据只在用户手中，不能编造**
+- [ ] `.env` 凭据同步到服务器（服务器上那份仍未配置，演示 8848 在服务器上跑不起来在线底图）
 - [~] 服务器 situ155：容器在线，但 `/remote-home` 挂在本地盘而非 NFS，容器内 mount 返回 EPERM 且无 `/dev/fuse`。目前用 libnfs 用户态工具只读访问
 - [ ] 服务器容器重新挂载 NFS（需要宿主机操作，容器内做不到）
 - [ ] `web/tiles` 高层级瓦片与 `tiles_db` / `tiles3d_db` 重建（体积大，按需）
