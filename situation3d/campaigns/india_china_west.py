@@ -163,3 +163,109 @@ def build_spec() -> C.CampaignSpec:
 
 def map_path() -> str:
     return MAP_PATH
+
+
+# ---------------------------------------------------------------------------
+# run_campaign.py 需要的插件接口
+# ---------------------------------------------------------------------------
+# 这些函数与 taiwan_landing 的同名函数形状一致，只是本案例全场都在高原内陆，
+# 没有登陆/两栖/海空部分，所以分类与影响半径的判定简单得多。
+
+UNIT_CLASS_ZH = {
+    "ship": "水面舰艇", "submarine": "潜艇", "aircraft": "作战飞机",
+    "helicopter": "直升机", "uav": "无人机", "infantry": "步兵",
+    "vehicle": "地面车辆", "artillery": "炮兵", "aa": "防空兵力",
+    "recon": "侦察分队", "fort": "工事", "transport": "运输分队",
+}
+
+
+def runner_class():
+    return C.CampaignRunner
+
+
+def map_id() -> int:
+    return MAP_ID
+
+
+def region() -> str:
+    return "中国 中印西段高原（虚构演示）"
+
+
+def start_time_utc() -> str:
+    return "2026-11-05T00:00:00Z"
+
+
+def camera() -> dict:
+    # 400 km 宽的高原战场：机位取山口与谷地之间，200 km 高、-62° 俯视，
+    # 红蓝双方的后方基地都在视野内，单个营级目标仍可辨认。
+    return {"lon": 79.10, "lat": 33.75, "height": 200000.0,
+            "heading": 0.0, "pitch": -62.0}
+
+
+def _icon_for(u) -> str:
+    name = u.name
+    domain = getattr(u, "domain", "")
+    if domain == "air":
+        if "无人" in name:
+            return "uav"
+        if "直升机" in name:
+            return "helicopter"
+        if "预警" in name:
+            return "aew"
+        return "fighter"
+    if "炮兵" in name or "榴弹" in name or "火箭" in name:
+        return "artillery"
+    if "防空" in name or "导弹" in name:
+        return "sam_battalion"
+    if "侦察" in name:
+        return "recon"
+    if "运输" in name:
+        return "transport"
+    if "工兵" in name or "工程" in name:
+        return "engineering"
+    if "步兵" in name or "分队" in name:
+        return "infantry"
+    return "armor"
+
+
+def _class_zh(u) -> str:
+    return UNIT_CLASS_ZH.get(u.unit_type, u.unit_type)
+
+
+def _engage_km(u) -> float:
+    """武器可达距离；上限 60 km，避免前端为每个对偶画一个覆盖全图的圆。"""
+    rng = 0.0
+    for w in getattr(u, "sea_air_weapons", []) or []:
+        rng = max(rng, float(getattr(w, "max_range_km", 0.0)))
+    for w in getattr(u, "weapons", []) or []:
+        rng = max(rng, float(getattr(w, "range_km", 0.0)))
+    return round(min(rng, 60.0), 1)
+
+
+def _influence_km(u) -> float:
+    """传感器可达距离；地面 10 km 上限，空中返回 0（不占地）。"""
+    if getattr(u, "domain", "") == "air":
+        return 0.0
+    rng = 0.0
+    for s in getattr(u, "sensors", []) or []:
+        rng = max(rng, float(getattr(s, "range_km", 0.0)))
+    return round(min(rng, 10.0), 1)
+
+
+def target_defs(state) -> list:
+    out = []
+    for u in state.units.values():
+        out.append({
+            "id": str(u.uid), "name": u.name,
+            "affiliation": "red" if u.color == 0 else "blue",
+            "domain": {"land": "land", "sea": "sea", "sub": "sea",
+                       "air": "air"}.get(u.domain, u.domain),
+            "unit_type": u.unit_type,
+            "platform_class": _class_zh(u),
+            "icon": _icon_for(u),
+            "blood": u.blood, "max_blood": u.max_blood,
+            "speed_kn": round(u.speed_kmh / 1.852, 1),
+            "engage_km": _engage_km(u),
+            "influence_km": _influence_km(u),
+        })
+    return out
