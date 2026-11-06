@@ -109,6 +109,48 @@ class LifecycleStoreTest(unittest.TestCase):
         self.assertFalse(can_transition("identified", "complete"))
 
 
+class BdaTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = LifecycleStore(os.path.join(self.tmp.name, "lc.json"))
+        for stage in ("identified", "prioritized", "in_coordination",
+                      "in_execution"):
+            self.store.transit({"target_id": "T1", "to_stage": stage})
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_assess_closes_the_target(self):
+        event = self.store.assess({"target_id": "T1", "result": "destroyed",
+                                   "notes": "炮塔已掀翻", "media": ["a.jpg"]})
+        self.assertEqual(event["from"], "in_execution")
+        self.assertEqual(event["to"], "complete")
+        row = self.store.get("T1")
+        self.assertEqual(row["stage"], "complete")
+        self.assertEqual(row["assessment"]["result"], "destroyed")
+        self.assertEqual(row["assessment"]["media"], ["a.jpg"])
+
+    def test_bda_requires_in_execution(self):
+        self.store.transit({"target_id": "T1", "to_stage": "complete"})
+        with self.assertRaises(ValueError):
+            self.store.assess({"target_id": "T1", "result": "destroyed"})
+
+    def test_bda_result_must_be_known(self):
+        with self.assertRaises(ValueError):
+            self.store.assess({"target_id": "T1", "result": "vaporized"})
+
+    def test_unknown_target_rejected(self):
+        with self.assertRaises(ValueError):
+            self.store.assess({"target_id": "nope", "result": "destroyed"})
+
+    def test_bda_is_in_the_audit_trail(self):
+        self.store.assess({"target_id": "T1", "result": "damaged",
+                           "actor": "analyst-a"})
+        last = self.store.history("T1")[-1]
+        self.assertIn("BDA: damaged", last["note"])
+        self.assertEqual(last["actor"], "analyst-a")
+
+
 class LifecycleOverviewTest(unittest.TestCase):
     def test_overview_exposes_board_and_vocabulary(self):
         with tempfile.TemporaryDirectory() as root:

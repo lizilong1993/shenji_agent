@@ -2488,6 +2488,10 @@ class Handler(SimpleHTTPRequestHandler):
                 item = manager.lifecycle.transit(body)
                 self._send_json({"ok": True, "event": item})
                 return
+            if path == "/api/intel/bda":
+                event = manager.lifecycle.assess(body)
+                self._send_json({"ok": True, "event": event})
+                return
             if path == "/api/intel/correlations":
                 # 同时承担"列表"和"写结论"两种调用：带 verdict 就是写，
                 # 否则按 case_id 返回该案例已有的人工结论。

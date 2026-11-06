@@ -51,6 +51,9 @@ TRANSITIONS = {
 }
 
 
+BDA_RESULTS = ("destroyed", "damaged", "functional", "unknown")
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -181,6 +184,63 @@ class LifecycleStore:
                 "at": stamp,
                 "actor": actor,
                 "note": note,
+            }
+            data["history"].append(event)
+            self._save_unlocked(data)
+            return copy.deepcopy(event)
+
+    def assess(self, payload: Dict[str, Any]) -> dict:
+        """毁伤评估：写一条 BDA 记录，并把目标推进到 complete。
+
+        与 ``transit`` 分开是因为它有额外约束：只有执行中的目标能评估，
+        结果必须是枚举里的值，且评估本身就是"闭环"这一步——分开之后
+        ``transit`` 保持纯粹的阶段迁移，审计记录里也能一眼分出人工拖拽
+        和毁伤评估两种推进来源。
+        """
+        if not isinstance(payload, dict):
+            raise ValueError("payload must be an object")
+        target_id = _text(payload.get("target_id"), "target_id")
+        result = _text(payload.get("result"), "result", 32).lower()
+        if result not in BDA_RESULTS:
+            raise ValueError("result must be one of " + ", ".join(BDA_RESULTS))
+        notes = _text(payload.get("notes"), "notes", 4000, required=False)
+        actor = _text(payload.get("actor"), "actor", 120, required=False)
+        media = payload.get("media")
+        if media is None:
+            media = []
+        if not isinstance(media, list):
+            raise ValueError("media must be a list")
+        media = [_text(entry, "media", 500) for entry in media if str(entry).strip()]
+        with self._lock:
+            data = self._load_unlocked()
+            row = data["targets"].get(target_id)
+            if row is None:
+                raise ValueError("unknown target: " + target_id)
+            if row.get("stage") != "in_execution":
+                raise ValueError(
+                    "BDA requires the target to be in_execution, currently %s"
+                    % row.get("stage"))
+            stamp = _now()
+            assessment = {
+                "result": result,
+                "notes": notes,
+                "media": media,
+                "actor": actor,
+                "at": stamp,
+            }
+            row["stage"] = "complete"
+            row["updated_at"] = stamp
+            row["assessment"] = assessment
+            data["targets"][target_id] = row
+            event = {
+                "seq": len(data["history"]) + 1,
+                "target_id": target_id,
+                "from": "in_execution",
+                "to": "complete",
+                "at": stamp,
+                "actor": actor,
+                "note": "BDA: " + result + ("；" + notes if notes else ""),
+                "assessment": assessment,
             }
             data["history"].append(event)
             self._save_unlocked(data)
