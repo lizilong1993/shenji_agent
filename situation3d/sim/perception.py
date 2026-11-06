@@ -361,9 +361,19 @@ def detection_probability(spec: SensorSpec, observer, target,
     target_domain = getattr(target, "domain", "land")
     if spec.kind == "sonar" and target_domain not in ("surface", "subsurface"):
         return 0.0
+    # 潜艇的浮出状态决定常规传感器能否看到它：潜航时不可见，浮出后可见，
+    # 潜望镜只露桅杆（有效距离打折）。此前 depth 字段从未被读取，所有潜艇
+    # 一律按潜航处理，等于永远隐身。
     if (spec.kind in ("radar", "optics", "ir")
             and target_domain == "subsurface"):
-        return 0.0
+        from sim import submarine as submarine_model
+        if not submarine_model.is_detectable_by(target, spec.kind):
+            return 0.0
+        # 先折算有效距离再判射程：桅杆目标在远处一律看不到。
+        distance_m = distance_m / max(
+            1e-6, submarine_model.detection_factor(target))
+        if distance_m > spec.range_m:
+            return 0.0
     if not _fov_ok(spec, observer, target, distance_m):
         return 0.0
     a = (observer.pose.lon, observer.pose.lat)
