@@ -10,9 +10,11 @@
 ## 0. 环境
 
 - [x] 本机开发环境（Python 3.11.9 + node 24）；当前全量 **680 passed / 18 skipped**，三个 JS 自检全过
-- [x] 本机演示环境：`python situation3d/server/serve.py --port 8848`，demo 模式，3 个案例
+- [x] 演示环境 **8848**（demo 模式，只读）：`python situation3d/server/serve.py --port 8848 --mode demo`
+- [x] 测试环境 **8858**（test 模式，可推演可写运行库）：`python situation3d/server/serve.py --port 8858 --mode test --runs-dir <本地盘>`
+      端口分工沿用 `交接_情报WM化与后续_20261103.md:73`「8848=demo，8858=main」。
 - [x] `.env` 凭据已配置（天地图 key + Cesium ion token），`/tdt/img/...` 代理实测 200，影像与注记正常叠加
-- [x] 公网访问：Tailscale Funnel 8443 → `https://pc-desktop.tailf6b2dc.ts.net:8443/`（443 被其他服务占用）
+- [x] 演示公网入口：Tailscale Funnel 8443 → `https://pc-desktop.tailf6b2dc.ts.net:8443/`（443 已被其他服务占用）。**测试环境不开放公网**
 - [x] 静态资产重建：`web/vendor/cesium`、`web/tiles`（低层级）、`web/data`（3 个案例）、`envpacks`
 - [ ] `.env` 凭据同步到服务器（服务器容器挂不上 NFS，无法写入）
 - [~] 服务器 situ155：容器在线，`/remote-home` 落在本地盘，容器内 mount 返回 EPERM 且无 `/dev/fuse`；用 libnfs 用户态工具只读访问
