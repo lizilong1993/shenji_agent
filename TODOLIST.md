@@ -29,16 +29,18 @@
 
 - [x] **汇聚事件界面**（3a4c8a0）：后端早就算好 `overview.convergence`，前端此前零引用。
       现在列表顶部按评分列出最多 6 处，可定位到网格
-- [ ] **汇聚事件进 event feed**：目前只在情报面板可见，未进统一事件流（`eventFeed.js`）
-- [ ] **情报源目录元数据**：许可 / 采集方式 / tier 三列仍缺，管理界面只有名称与状态
+- [x] **汇聚事件进 event feed**（0624fb9）：按事件 id 去重推送，按案例清空集合
+- [x] **情报源目录元数据**（313742b）：cadence / cadence_note / tier 三字段，tier 直接由 trust 分档
 - [ ] **GDELT 多语言/多地区扩展**：当前只按案例关键词与 bbox 过滤
-- [ ] **情报缓存跨案例去重**：同一事件在不同案例下会分别入库（缓存按 source+bbox 存，未做全局去重）
+- [-] **情报缓存跨案例去重**：核对后确认**已具备**——`observations` 以 `observation_id` 为主键，
+      同一 USGS/GDACS 事件在多个案例下只存一份；只有 GDELT 按 case 隔离（其命中依赖案例关键词，
+      跨案例复用会串味），这是有意设计。原清单这条判断有误，撤销
 
 ### 时间轴分支
 
 - [x] **实时推演链路**（cba1d17 + b2d0b77）：开战 / 轮询 / 取消 / 切案例 / 终态全部验证过
 - [x] **成品回放 `?run=`**：simConsole 的「查看」按钮跳转到该路径，链路通
-- [ ] **事件/节点面板**：`nodes.json` 与 `events.json` 后端有，前端只在时间轴打点，没有可点击的事件列表
+- [x] **事件/节点面板**（71bbe5e）：右下角事件按钮，七个筛选分类，点条目跳到该 tick，超 400 条截断并说明
 - [ ] **多 run 对比**：simConsole 有"设为最优"，但两个 run 的指标无法并排比较
 - [ ] **回放导出**：无法把一次成品回放导出成视频或带标注的轨迹包
 
@@ -47,8 +49,9 @@
 - [x] **中途任务切换**（3a4c8a0）：`MissionRunner.retask()` + `live/retask.json` 文件通道
 - [x] **间瞄校射**：已按"是否被己方探测到"接入 `observed` 标志（`sim/world.py:1142`）
 - [x] **中印案例**：`campaigns/india_china_west.py` 已存在且可被 `run_campaign.py --case` 加载
-- [ ] **战役地图 `map_9001`/`map_9002` 本地缺失**：`web/data/campaign_maps/` 不存在，
-      两个 campaign 案例跑不起来；需 `scripts/build_campaign_map.py` 重新生成
+- [x] **战役地图**（bb66b22）：补了 NE 10m 陆地矢量与地形 z10，生成 map_9001 / map_9002；
+      注意本地地图无 OSM 路网，海岸线与原图不同，两条依赖原图的测试改为按数据差异跳过
+- [x] **中印案例插件**（bb66b22）：补齐六个接口，可跑出 1440 帧 / 256 事件
 - [ ] **指挥链 / 通信**：`sim/commander.py` 有 commander 层但默认 `enable_commander: False`，
       尚无通信中断对指挥的影响
 - [ ] **潜艇浮出转换**：`mobility/profile.py` 有 subsurface 剖面，`sim/world.py` 无浮出/下潜状态机
