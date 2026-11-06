@@ -337,6 +337,9 @@ class IntelManager:
         self.correlations = CorrelationStore(
             os.path.join(root, "correlations.json"))
         self.lifecycle = LifecycleStore(os.path.join(root, "lifecycle.json"))
+        # 基线是进程内状态（不落盘）：它描述的是"运行期间见过的分布"，
+        # 重启后从零开始累积，避免把上一轮任务的历史混进来。
+        self._baseline_tracker = None
         self._cache = {}
 
     def _bundle(self, case_id: str) -> Optional[dict]:
@@ -373,6 +376,45 @@ class IntelManager:
             return load_case_profile(case_id, root=self.profile_root)
         except (OSError, ValueError):
             return None
+
+    def _baseline_block(self, items, profile):
+        """按网格统计情报条数，和历史基线比，列出偏离的网格。
+
+        为什么按网格而不按"总量"：总量受案例大小与采集节奏影响，涨落几乎是
+        采集行为的镜像；网格级才反映"某片区域忽然热起来了"。
+        """
+        from .baseline import BaselineTracker
+        from .convergence import cell_of, cell_size_for
+        size = cell_size_for(list(profile.expanded_bbox) if profile
+                             else (119.0, 22.0, 123.0, 26.0))
+        counts = {}
+        for item in items:
+            try:
+                lat = float(item.get("lat"))
+                lon = float(item.get("lon"))
+            except (TypeError, ValueError):
+                continue
+            key = "%d,%d" % cell_of(lat, lon, size)
+            counts[key] = counts.get(key, 0) + 1
+        if not counts:
+            return {"cells": 0, "anomalies": [], "note": "没有可用坐标"}
+        tracker = self._baseline_tracker
+        if tracker is None:
+            tracker = self._baseline_tracker = BaselineTracker()
+        found = []
+        # 顺序固定：同一次观察必须可复现（dict 顺序在 Py3.7+ 是插入序，
+        # 但插入序取决于 items 顺序，这里再显式排序一次）。
+        for key in sorted(counts):
+            anomaly = tracker.observe(key, counts[key])
+            if anomaly is not None:
+                found.append(anomaly.as_dict())
+        return {
+            "cells": len(counts),
+            "sample_size": tracker.min_samples,
+            "threshold": tracker.threshold,
+            "anomalies": found,
+            "baseline": tracker.snapshot(),
+        }
 
     def overview(self, case_id: str) -> dict:
         case_id = _case_key(case_id)
@@ -546,6 +588,9 @@ class IntelManager:
                 "events": events,
                 "summary": convergence_summary(events),
             },
+            # 基线异常：只输出"哪个网格的情报量偏离了平时"，不判定是否告警。
+            # 判定交给调用方——同一组数字在不同任务下的含义完全不同。
+            "baseline": self._baseline_block(items, profile),
             "sources": sources,
             # 目标生命周期（五段式）。只读输出：写操作走 /api/intel/lifecycle。
             "lifecycle": {
