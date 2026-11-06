@@ -14,6 +14,8 @@ from .association import (canonical_type, extract_key_items, link_items)
 from .convergence import convergence_events, summarize as convergence_summary
 from .manual import ManualIntelStore
 from .correlations import CorrelationStore
+from .lifecycle import LifecycleStore, STAGES as LIFECYCLE_STAGES, \
+    STAGE_LABELS as LIFECYCLE_LABELS, TRANSITIONS as LIFECYCLE_TRANSITIONS
 from .sources import SourceStore
 from .case import load_case_profile
 
@@ -205,6 +207,7 @@ class IntelManager:
         self.sources = SourceStore(os.path.join(root, "sources.json"))
         self.correlations = CorrelationStore(
             os.path.join(root, "correlations.json"))
+        self.lifecycle = LifecycleStore(os.path.join(root, "lifecycle.json"))
         self._cache = {}
 
     def _bundle(self, case_id: str) -> Optional[dict]:
@@ -412,6 +415,14 @@ class IntelManager:
                 "summary": convergence_summary(events),
             },
             "sources": sources,
+            # 目标生命周期（五段式）。只读输出：写操作走 /api/intel/lifecycle。
+            "lifecycle": {
+                "stages": [{"key": stage, "label": LIFECYCLE_LABELS[stage]}
+                           for stage in LIFECYCLE_STAGES],
+                "transitions": {stage: list(LIFECYCLE_TRANSITIONS[stage])
+                                for stage in LIFECYCLE_STAGES},
+                "board": self.lifecycle.board(),
+            },
             "cache": cache_stats,
             "ai": {"counts": ai_counts, "items": ai_items},
             "warnings": warnings,

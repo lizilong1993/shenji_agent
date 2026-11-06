@@ -1753,6 +1753,18 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"error": "%s: %s"
                                  % (type(exc).__name__, exc)}, 500)
             return
+        if path == "/api/intel/lifecycle":
+            try:
+                manager = _intel_manager()
+                self._send_json({
+                    "ok": True,
+                    "board": manager.lifecycle.board(),
+                    "history": manager.lifecycle.history(
+                        (query or {}).get("target_id")),
+                })
+            except Exception as exc:  # noqa: BLE001
+                self._send_json({"error": str(exc)}, 500)
+            return
         if path == "/api/intel/correlations":
             try:
                 items = _intel_manager().correlations.list(
@@ -2471,6 +2483,10 @@ class Handler(SimpleHTTPRequestHandler):
                                     str(body.get("note") or ""),
                                     str(body.get("reviewer") or ""))
                 self._send_json({"ok": True, "item": item})
+                return
+            if path == "/api/intel/lifecycle":
+                item = manager.lifecycle.transit(body)
+                self._send_json({"ok": True, "event": item})
                 return
             if path == "/api/intel/correlations":
                 # 同时承担"列表"和"写结论"两种调用：带 verdict 就是写，
