@@ -326,6 +326,65 @@
     return SEVERITY[value] ? value : '';
   }
 
+  /**
+   * 汇聚事件区块：同一网格 24h 内出现三类以上不同情报时，指挥员要一眼看到
+   * "哪里在聚集"，而不是自己在几百张卡片里比对。
+   *
+   * 后端早就算好了（overview.convergence），这里只负责呈现：
+   * 每张卡给位置、时段、类型组合、评分与成员；点卡片定位到格中心。
+   */
+  function renderConvergence(body, overview) {
+    var block = overview.convergence || null;
+    var events = (block && block.events) || [];
+    if (!events.length) return;   // 没有汇聚时不占版面
+    var wrap = el('div', 'intel-convergence');
+    var head = el('div', 'intel-conv-head');
+    head.appendChild(el('span', 'intel-conv-title', '区域汇聚'));
+    head.appendChild(el('span', 'intel-conv-count', events.length + ' 处'));
+    var rule = (block.rule || {});
+    if (rule.window_h) {
+      head.appendChild(el('span', 'intel-conv-rule',
+        rule.window_h + 'h 内 ' + (rule.min_types || 3) + ' 类以上'));
+    }
+    wrap.appendChild(head);
+
+    events.slice(0, 6).forEach(function (ev) {
+      var card = el('div', 'intel-conv-card');
+      var top = el('div', 'intel-conv-top');
+      top.appendChild(el('span', 'intel-conv-score',
+        Number(ev.score || 0).toFixed(2)));
+      top.appendChild(el('span', 'intel-conv-types',
+        (ev.types || []).join(' + ')));
+      card.appendChild(top);
+      card.appendChild(el('div', 'intel-conv-meta',
+        (ev.t_start || '').slice(5, 16) + ' → ' + (ev.t_end || '').slice(5, 16) +
+        ' · ' + (ev.member_count || 0) + ' 条 · ' +
+        (ev.source_ids || []).join('/')));
+      // 理由只放第一行："同格 N 类信号"这句话本身说明了一切
+      var reason = (ev.reasons || [])[0];
+      if (reason) card.appendChild(el('div', 'intel-conv-reason', reason));
+
+      var cell = ev.cell || {};
+      if (Number.isFinite(Number(cell.center_lat)) &&
+          Number.isFinite(Number(cell.center_lon)) && global.SituationHost &&
+          typeof global.SituationHost.focusIntel === 'function') {
+        var locate = el('button', 'mini intel-conv-locate', '定位');
+        locate.type = 'button';
+        locate.title = '定位到这处汇聚所在网格';
+        locate.addEventListener('click', function () {
+          // 用格边长的一半当半径，圈出整格
+          var half = Number(cell.cell_deg || 0) * 111000 / 2;
+          global.SituationHost.focusIntel(Number(cell.center_lon),
+            Number(cell.center_lat), half, '汇聚 ' + (ev.types || []).length + ' 类');
+        });
+        card.appendChild(locate);
+      }
+      card.title = (ev.reasons || []).join('\n');
+      wrap.appendChild(card);
+    });
+    body.appendChild(wrap);
+  }
+
   function renderBrief(body, overview) {
     var counts = overview.counts || {};
     var cache = overview.cache || null;
@@ -428,6 +487,7 @@
     });
 
     renderBrief(body, overview);
+    renderConvergence(body, overview);
     renderFreshness(body, overview);
     (overview.warnings || []).forEach(function (warning) {
       body.appendChild(el('div', 'intel-warn', warning));

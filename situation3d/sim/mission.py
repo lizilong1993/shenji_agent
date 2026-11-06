@@ -280,6 +280,102 @@ class MissionRunner(object):
 
     # -- maintenance / completion ------------------------------------------
 
+    def retask(self, missions, now=None):
+        """推演中途追加/改写任务。
+
+        与启动时下发的区别只有一个：此时单位可能已经在路上、正在交战、
+        或已经到达旧目标。因此这里**不做** ``validate_tasks`` 那套
+        "单位是否属于默认任务"的冲突检查 —— 中途换任务是战场常态，
+        拒绝它只会逼人整场重来。
+
+        返回 ``(applied, rejected)``：``applied`` 是真正接管了的 mission id，
+        ``rejected`` 是 ``[(mission_id, reason)]``。调用方要把两者都写进
+        运行记录，否则"下发了但没生效"就查不出来。
+        """
+        applied = []
+        rejected = []
+        moment = float(self.world.time_s if now is None else now)
+        for raw in missions or []:
+            mid = str(raw.get("id") or "")
+            if not mid:
+                rejected.append((mid, "缺少 id"))
+                continue
+            units = []
+            for value in raw.get("units") or []:
+                try:
+                    units.append(int(value))
+                except (TypeError, ValueError):
+                    rejected.append((mid, "单位 id 不是整数：%r" % (value,)))
+                    break
+            else:
+                if not units:
+                    rejected.append((mid, "没有可用单位"))
+                    continue
+                missing = [uid for uid in units
+                           if uid not in self.world.entities
+                           or not self.world.entities[uid].alive]
+                if missing:
+                    rejected.append((mid, "单位不存在或已损失：%s"
+                                     % ",".join(str(u) for u in missing)))
+                    continue
+                lon = raw.get("lon")
+                lat = raw.get("lat")
+                objective = str(raw.get("objective") or "")
+                cell = None
+                if lon is not None and lat is not None:
+                    try:
+                        lon, lat = float(lon), float(lat)
+                    except (TypeError, ValueError):
+                        rejected.append((mid, "坐标不是数字"))
+                        continue
+                elif objective:
+                    cell = self._cell_for_name(objective)
+                    if cell is None:
+                        rejected.append((mid, "找不到目标点：%s" % objective))
+                        continue
+                else:
+                    rejected.append((mid, "缺少目标点或坐标"))
+                    continue
+
+                mission = {
+                    "id": mid,
+                    "side": int(raw.get("side", 0)),
+                    "units": units,
+                    "task": str(raw.get("task") or "move_to"),
+                    "objective": objective,
+                    "lon": lon,
+                    "lat": lat,
+                    "cell": cell,
+                    "pace": str(raw.get("pace") or "normal"),
+                    "risk": str(raw.get("risk") or "normal"),
+                    "arrive_m": float(raw.get("arrive_m") or 250.0),
+                    "after": [],
+                    "start_s": moment,
+                    "status": "active",
+                }
+                # 换任务时先解除旧任务的占位，否则同一单位会被两条 mission
+                # 同时 _assign，路线互相覆盖。
+                self.missions[mid] = mission
+                for uid in units:
+                    self.engaged.pop(uid, None)
+                    entity = self.world.entities.get(uid)
+                    if entity is not None:
+                        entity.route = None
+                        entity.goal = None
+                        entity.route_s = 0.0
+                        entity.moving = False
+                    self._assign(mission, uid)
+                self.world.emit("mission_retasked", units,
+                                "%s 任务变更：%s" % (mid, objective or mission["task"]))
+                applied.append(mid)
+        return applied, rejected
+
+    def _cell_for_name(self, name):
+        for cell, obj in sorted(self.world.objectives.items()):
+            if str(obj.get("name") or "") == str(name):
+                return cell
+        return None
+
     def _maintain(self, now):
         for mid in sorted(self.missions):
             mission = self.missions[mid]

@@ -522,6 +522,52 @@ def _nodes(events, tick_count, phases, include_terminal=True):
 LIVE_EVERY_TICKS = 10
 
 
+def _poll_retask(runner, live, state, tick):
+    """读 live/retask.json，有变化就下发给 runner。
+
+    为什么走文件而不是 HTTP：推演进程是独立的子进程，运行器没有端口可连；
+    文件是唯一不需要新开服务、又能在两个进程之间传数据的通道。UI 侧只需
+    往运行目录写这个文件即可中途改任务。
+
+    失败不打断推演：把 ``applied`` / ``rejected`` 写进结果文件，调用方看得到
+    "下发了但没生效"的原因，而不是静默丢掉。
+    """
+    path = os.path.join(live.dir, "retask.json")
+    try:
+        st = os.stat(path)
+    except OSError:
+        return
+    if state["mtime"] == st.st_mtime_ns:
+        return
+    state["mtime"] = st.st_mtime_ns
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            doc = json.load(fh)
+    except (OSError, ValueError) as exc:
+        _atomic_write_json(os.path.join(live.dir, "retask-result.json"),
+                           {"tick": tick, "applied": [],
+                            "rejected": [["", "读取失败：%s" % exc]]})
+        return
+    missions = doc.get("missions") if isinstance(doc, dict) else doc
+    if not isinstance(missions, list):
+        _atomic_write_json(os.path.join(live.dir, "retask-result.json"),
+                           {"tick": tick, "applied": [],
+                            "rejected": [["", "missions 必须是列表"]]})
+        return
+    applied, rejected = runner.retask(missions)
+    _atomic_write_json(os.path.join(live.dir, "retask-result.json"),
+                       {"tick": tick, "applied": applied,
+                        "rejected": [[mid, reason] for mid, reason in rejected]})
+
+
+def _atomic_write_json(path, payload):
+    temporary = path + ".tmp"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=1)
+        handle.write("\n")
+    os.replace(temporary, path)
+
+
 class LiveRunWriter:
     def __init__(self, store, case_id, run_id):
         self.dir = os.path.join(store.run_dir(case_id, run_id), "live")
@@ -955,6 +1001,7 @@ def main(argv=None):
         live.meta(live_meta)
         runner = MissionRunner(world, missions, scenario.get("roe"),
                                interval_s=tick_seconds)
+        retask_state = {"mtime": None}
         # Occupation / objective progress are per-tick quantities: the live
         # viewer paints frames while the run is still going, so they must be
         # computed here rather than patched onto the finished array below.
@@ -972,6 +1019,9 @@ def main(argv=None):
                 t0 = time.perf_counter()
                 world.step(tick_seconds)
                 runner.update()
+                # 中途任务注入：查看运行目录下的 tasks-inject.json，有变化就生效。
+                # 放在 runner.update() 之后，保证新任务立刻接管本 tick 的移动。
+                _poll_retask(runner, live, retask_state, tick)
                 _clear_subcell_buildings(world)
                 step_ms.append((time.perf_counter() - t0) * 1000.0)
             rows = []
