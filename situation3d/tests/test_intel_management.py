@@ -154,6 +154,44 @@ class ManualStoreTest(unittest.TestCase):
                 manager.manual.create(_manual_payload(domain="military"))
 
 
+class SourceCadenceTierTest(unittest.TestCase):
+    def test_builtins_carry_cadence_and_tier(self):
+        with tempfile.TemporaryDirectory() as root:
+            sources = {item["source_id"]: item
+                       for item in IntelManager(root).sources.list()}
+            usgs = sources["usgs"]
+            self.assertEqual(usgs["cadence"], "准实时")
+            self.assertEqual(usgs["tier"], "A（权威机构）")
+            self.assertTrue(usgs["cadence_note"])
+
+    def test_tier_follows_trust_reliability(self):
+        from intel.trust import SOURCE_RELIABILITY
+        with tempfile.TemporaryDirectory() as root:
+            sources = {item["source_id"]: item
+                       for item in IntelManager(root).sources.list()}
+            for source_id, row in sources.items():
+                if source_id == "manual":
+                    continue
+                value = SOURCE_RELIABILITY.get(source_id)
+                if value is None:
+                    self.assertEqual(row["tier"], "未登记")
+                elif value >= 0.9:
+                    self.assertTrue(row["tier"].startswith("A"), source_id)
+                elif value >= 0.8:
+                    self.assertTrue(row["tier"].startswith("B"), source_id)
+                elif value >= 0.65:
+                    self.assertTrue(row["tier"].startswith("C"), source_id)
+                else:
+                    self.assertTrue(row["tier"].startswith("D"), source_id)
+
+    def test_manual_source_is_labelled(self):
+        with tempfile.TemporaryDirectory() as root:
+            manual = [item for item in IntelManager(root).sources.list()
+                      if item["source_id"] == "manual"][0]
+            self.assertEqual(manual["cadence"], "人工")
+            self.assertIn("线索", manual["tier"])
+
+
 class SourceStoreTest(unittest.TestCase):
     def test_builtins_add_search_delete(self):
         with tempfile.TemporaryDirectory() as root:

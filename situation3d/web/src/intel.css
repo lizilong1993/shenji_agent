@@ -279,3 +279,9 @@
 .intel-conv-meta { font-size: 10.5px; color: #7c8a99; margin-top: 1px; }
 .intel-conv-reason { font-size: 10.5px; color: #66788f; overflow-wrap: anywhere; }
 .intel-conv-locate { position: absolute; right: 0; top: 4px; }
+
+.intel-source-tier {
+  font-size: 10.5px; color: #4f7a9e; background: #f1f7fd;
+  border: 1px solid #d6e6f5; border-radius: 3px;
+  padding: 1px 6px; align-self: flex-start;
+}

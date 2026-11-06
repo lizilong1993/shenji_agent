@@ -125,6 +125,35 @@ SOURCE_INFO = {
 }
 
 
+# 采集方式与可信分级：界面上"这个源多久更新一次、能信到什么程度"必须看得到，
+# 否则新鲜度条与置信度就是没有依据的数字。
+SOURCE_CADENCE = {
+    "usgs": ("准实时", "USGS 事件接口按分钟更新"),
+    "gdacs": ("准实时", "GDACS 事件列表按小时更新"),
+    "firms": ("准实时", "FIRMS 近实时火点，卫星过境后约 3 小时"),
+    "eonet": ("准实时", "EONET 事件按小时更新"),
+    "adsb": ("实时快照", "ADS-B 交换站实时快照，仅当前状态"),
+    "gdelt": ("准实时", "GDELT 15 分钟滚动"),
+    "open-meteo": ("预报", "Open-Meteo 逐小时预报"),
+    "rss": ("不定", "RSS/Atom 按源自身发布节奏"),
+}
+
+
+def _tier(source_id: str) -> str:
+    """可信分级，与 trust.SOURCE_RELIABILITY 同源，不另立一套标准。"""
+    from .trust import SOURCE_RELIABILITY
+    value = SOURCE_RELIABILITY.get(source_id)
+    if value is None:
+        return "未登记"
+    if value >= 0.9:
+        return "A（权威机构）"
+    if value >= 0.8:
+        return "B（专业机构）"
+    if value >= 0.65:
+        return "C（汇聚/媒体）"
+    return "D（待核实）"
+
+
 def _builtin_entries() -> List[dict]:
     try:
         from .connectors.registry import SOURCES
@@ -147,6 +176,9 @@ def _builtin_entries() -> List[dict]:
         "builtin": True,
         "license": "",
         "attribution": "人工录入",
+        "cadence": "人工",
+        "cadence_note": "按分析员录入时机",
+        "tier": "人工（未核实前按线索处理）",
         "created_at": None,
         "updated_at": None,
     }]
@@ -174,6 +206,9 @@ def _builtin_entries() -> List[dict]:
             "builtin": True,
             "license": spec.license,
             "attribution": spec.attribution,
+            "cadence": (SOURCE_CADENCE.get(source_id) or ("未标注", ""))[0],
+            "cadence_note": (SOURCE_CADENCE.get(source_id) or ("", ""))[1],
+            "tier": _tier(source_id),
             "created_at": None,
             "updated_at": None,
         })

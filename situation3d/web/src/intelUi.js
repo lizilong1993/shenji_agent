@@ -1145,8 +1145,18 @@
       var facts = [];
       if (source.coverage) facts.push('覆盖：' + source.coverage);
       if (source.access) facts.push('接入：' + source.access);
+      if (source.cadence) {
+        facts.push('采集：' + source.cadence +
+          (source.cadence_note ? '（' + source.cadence_note + '）' : ''));
+      }
+      if (source.license) facts.push('许可：' + source.license);
       if (facts.length) {
         main.appendChild(el('span', 'intel-source-facts', facts.join(' · ')));
+      }
+      // 可信分级：与情报卡片的置信度是两回事（源级 vs 条目级），
+      // 放在源信息里，读者才知道置信度那个数字是按什么分档算出来的。
+      if (source.tier) {
+        main.appendChild(el('span', 'intel-source-tier', '可信分级 ' + source.tier));
       }
       if ((source.features || []).length) {
         var features = el('span', 'intel-source-features');
