@@ -246,7 +246,7 @@ def build_spec() -> C.CampaignSpec:
                       location=[120.2, 23.0]),
     ]
     return C.CampaignSpec(
-        id="taiwan_campaign", name="台海联合登陆战役演示（虚构）",
+        id="taiwan_campaign", name="TW3",
         theatre="taiwan_strait", seed=20261019, stages=stages,
         objectives=objectives, script_events=events,
         script_outcome={"winner": "red",

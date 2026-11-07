@@ -149,7 +149,7 @@ def build_spec() -> C.CampaignSpec:
                       location=[79.1, 33.75]),
     ]
     return C.CampaignSpec(
-        id="india_china_west", name="中印西段（虚构演示）",
+        id="india_china_west", name="ZY1",
         theatre="ak_sai_chin", seed=20261022, stages=stages,
         objectives=objectives, script_events=events,
         script_outcome={"winner": "contested",
