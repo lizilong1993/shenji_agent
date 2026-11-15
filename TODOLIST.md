@@ -3,13 +3,14 @@
 本文件是项目唯一的总待办表，**随代码一起维护**（旧的三份清单都已并入这里：`任务总清单_20261103.md`、`本机复现清单与计划_20261106.md`、交接文档第 3 节）。
 
 状态：`[x]` 已完成　`[~]` 进行中　`[ ]` 未开始　`[!]` 需用户批准　`[-]` 明确不做
-最近更新：2026-11-07
+最近更新：2026-11-15
 
 ---
 
 ## 0. 环境
 
-- [x] 本机开发环境（Python 3.11.9 + node 24）；当前全量 **800 passed / 10 skipped**，三个 JS 自检全过
+- [x] 本机开发环境（Python 3.11.9 + node 24）；当前全量 **810 passed / 10 skipped**，三个 JS 自检全过。
+      唯一失败 `test_fill_default_heights` 缺 `shapely`（本机无此依赖，非代码问题）
 - [x] 演示环境 **8848**（demo 模式，只读）：`python situation3d/server/serve.py --port 8848 --mode demo`
       提醒：此端口曾出现两个进程同时 listen（16:46 与 20:27 各起一次），旧进程 `Stop-Process`
       后新进程继续服务。重启前先 `netstat -ano | findstr :8848` 查重，别再叠第二份
@@ -19,7 +20,10 @@
 - [x] 演示公网入口：Tailscale Funnel 8443 → `https://pc-desktop.tailf6b2dc.ts.net:8443/`（443 已被其他服务占用）。**测试环境不开放公网**
 - [x] 静态资产重建：`web/vendor/cesium`、`web/tiles`（低层级）、`web/data`（3 个案例）、`envpacks`
 - [ ] `.env` 凭据同步到服务器（服务器容器挂不上 NFS，无法写入）
-- [~] 服务器 situ155：容器在线，`/remote-home` 落在本地盘，容器内 mount 返回 EPERM 且无 `/dev/fuse`；用 libnfs 用户态工具只读访问
+- [~] 服务器 situ155：容器在线，`/remote-home` 落在本地盘，容器内 mount 返回 EPERM 且无 `/dev/fuse`；用 libnfs 用户态工具只读访问。
+      **2026-11-15 复查**：situ155 已不在 tailnet 节点表里；server160 可达但它的
+      `/remote-home/lizilong` 是**本机 ext4**（`/dev/sda2`）不是共享 NFS，且没有
+      `shenji_agent` 目录——换机器取同一份数据这条路走不通，下面三条阻塞照旧
 - [ ] 服务器容器重新挂载 NFS（需宿主机操作，容器内做不到）
 - [x] `web/tiles` 本地瓦片补齐（c96a48c）：影像到 z11（4002 张）+ WSF3D 建筑高度
       z0-10（2802 张）+ 实测标定的 height_ramp.json。`tiles_db`/`tiles3d_db` 是发布用
@@ -167,6 +171,9 @@
 - [x] `test_resource_fetch.py` 用盘符拼 `file://`（改用 `pathlib.Path.as_uri()`）
 - [x] `serve.py` 的 `send_error()` 传入中文消息 → HTTP 状态行 latin-1 编码失败（47ff037）
 - [x] `web/data/geo_reports/` 未进 gitignore（5f488a6）
+- [x] `test_resource_path_outside_roots_rejected` 用 `/etc/hostname`，Windows 上
+      `os.path.isabs` 为 False，拒绝来自 isabs 分支而非 roots 分支，断言 "outside"
+      落空（9aceea7 改用 `tempfile.gettempdir()` 下的路径）
 
 ## 5. great-powers-rts 调研（2026-11-07）
 
@@ -179,26 +186,32 @@ MIT，155 个 JS 源文件 / 13,361 行，98 个 `node --test` 测试。three.js
 （潜入放炸弹、拆弹、断电锁指令），与本项目 `intel/` 无对应关系。真正的重叠在推演规则与前端容错两层。
 
 盘点：**采纳 4 · 待定 3 · 不采纳 7**。
+进度（2026-11-15）：GP-03 已做完（纯后端先做，维护规则 4）；GP-01/02/04 改 web UI，
+标 `[!]` 等批准。同 seed 复跑 20261023 / 20 tick 仍是 486 事件 / 225 开火 / 8 毁伤。
 
 ### 5.1 采纳（4）
 
-- [ ] **GP-01** HP 驱动的损伤呈现（P0）：`damagePresentation()` 按 `hp/maxHp` 分
+- [!] **GP-01** HP 驱动的损伤呈现（P0）：`damagePresentation()` 按 `hp/maxHp` 分
       冒烟（<98%）/ 起火（<30%）/ 结构残骸三档；`sinkingPose()` 舰艇击毁后 7.5 s
       横倾 0.42 rad + 下沉。本项目特效只由事件驱动（`targetCombatFx.js:152` 只认
       fire/impact/destroy），打到 10% 血但最近没挨打的目标画面上没有「快完了」的信号。
-      **改 web UI，按维护规则 4 需批准**。约 60 行
-- [ ] **GP-02** 血条避让布局（P1）：`layoutHealthBars()` 按优先级排位、候选位代价
+      **改 web UI，按维护规则 4 等批准**。约 60 行
+- [!] **GP-02** 血条避让布局（P1）：`layoutHealthBars()` 按优先级排位、候选位代价
       `|dx|+|dy|*1.1`、撞位换下一个、超视口丢弃。本项目血条固定 +17 px 无避让
       （`app.js:2491`），标牌有 declutter 血条没有；80 目标的
-      `taiwan_dense_transfer_v1` 会叠成一条。纯函数可在 Node 测，约 80 行
-- [ ] **GP-03** HTTP JSON 体结构防护（P1）：`checkTree()` 限深 24 层、拒非有限浮点、
-      拒 `__proto__`/`prototype`/`constructor`。本项目 `serve.py:1436`
-      只查 Content-Length ≤1.2 MB 与 `json.loads` 是否成功，公网 Funnel 8443 开着。
-      约 20 行 + 3 个用例
-- [ ] **GP-04** WebGL 上下文丢失恢复（P1）：`renderRecovery()` 区分「设备不支持」
+      `taiwan_dense_transfer_v1` 会叠成一条。纯函数可在 Node 测，约 80 行。**等批准**
+- [x] **GP-03** HTTP JSON 体结构防护（9aceea7）：`_json_body_ok()` 限深 24、
+      拒非有限浮点、拒 `__proto__`/`prototype`/`constructor`；解析处补抓
+      `RecursionError`（它不是 `ValueError` 子类，40000 层体原来会逃成 500）。
+      **实测确认的漏洞**：`/api/resources` 把 `notes` 整个 dict 存进条目
+      （`ResourceEntry.validate` 只校 bbox 与 quality），POST `{"notes":{"score":NaN}}`
+      返回 201 且响应体带字面量 `NaN` —— 那不是 JSON，前端 `JSON.parse` 直接抛，
+      坏值同时落盘。新增 11 例（7 判据单测 + 4 真 HTTP），去掉判据后 NaN 与
+      原型键两例确实变红，不是空转测试
+- [!] **GP-04** WebGL 上下文丢失恢复（P1）：`renderRecovery()` 区分「设备不支持」
       （不重试）与「context lost」（提示切流畅画质、先导出存档）。本项目全仓无
       `webglcontextlost` 处理，上下文一丢 rAF 循环继续空转、画面停在最后一帧。
-      约 40 行
+      约 40 行。**等批准**
 
 ### 5.2 待定（3）
 
