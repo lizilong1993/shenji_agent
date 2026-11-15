@@ -9,8 +9,9 @@
 
 ## 0. 环境
 
-- [x] 本机开发环境（Python 3.11.9 + node 24）；当前全量 **810 passed / 10 skipped**，三个 JS 自检全过。
-      唯一失败 `test_fill_default_heights` 缺 `shapely`（本机无此依赖，非代码问题）
+- [x] 本机开发环境（Python 3.11.9 + node 24）；当前全量 **810 passed / 10 skipped**，
+      **七个 JS 自检**全过。唯一失败 `test_fill_default_heights` 缺 `shapely`
+      （本机无此依赖，改动前后同样失败，非代码问题）
 - [x] 演示环境 **8848**（demo 模式，只读）：`python situation3d/server/serve.py --port 8848 --mode demo`
       提醒：此端口曾出现两个进程同时 listen（16:46 与 20:27 各起一次），旧进程 `Stop-Process`
       后新进程继续服务。重启前先 `netstat -ano | findstr :8848` 查重，别再叠第二份
@@ -186,20 +187,31 @@ MIT，155 个 JS 源文件 / 13,361 行，98 个 `node --test` 测试。three.js
 （潜入放炸弹、拆弹、断电锁指令），与本项目 `intel/` 无对应关系。真正的重叠在推演规则与前端容错两层。
 
 盘点：**采纳 4 · 待定 3 · 不采纳 7**。
-进度（2026-11-15）：GP-03 已做完（纯后端先做，维护规则 4）；GP-01/02/04 改 web UI，
-标 `[!]` 等批准。同 seed 复跑 20261023 / 20 tick 仍是 486 事件 / 225 开火 / 8 毁伤。
+**四项全部完成（7875af8）**。同 seed 复跑 20261023 / 20 tick 仍是
+486 事件 / 225 开火 / 8 毁伤——这四项全在前端呈现层，引擎未动。
 
 ### 5.1 采纳（4）
 
-- [!] **GP-01** HP 驱动的损伤呈现（P0）：`damagePresentation()` 按 `hp/maxHp` 分
-      冒烟（<98%）/ 起火（<30%）/ 结构残骸三档；`sinkingPose()` 舰艇击毁后 7.5 s
-      横倾 0.42 rad + 下沉。本项目特效只由事件驱动（`targetCombatFx.js:152` 只认
-      fire/impact/destroy），打到 10% 血但最近没挨打的目标画面上没有「快完了」的信号。
-      **改 web UI，按维护规则 4 等批准**。约 60 行
-- [!] **GP-02** 血条避让布局（P1）：`layoutHealthBars()` 按优先级排位、候选位代价
-      `|dx|+|dy|*1.1`、撞位换下一个、超视口丢弃。本项目血条固定 +17 px 无避让
-      （`app.js:2491`），标牌有 declutter 血条没有；80 目标的
-      `taiwan_dense_transfer_v1` 会叠成一条。纯函数可在 Node 测，约 80 行。**等批准**
+- [x] **GP-01** HP 驱动的损伤呈现（7875af8）：`presentationStage(hp, alive)` 四档
+      完好 / 冒烟（<98%）/ 起火（<30%）/ 残骸，另接明火池（8 km 内才画，火比烟近）。
+      **做的过程中先挖出一个更严重的既有缺陷**：`TargetStatus.at()` 只在
+      `provenance.runtime === 'engine_run'` 时读每帧 HP，而两个战役数据集写的是
+      字符串 `"fictional_demo"`/`"simulated"`，于是全落到按推理暴露量反推的老启发式——
+      **taiwan_campaign 47520 行里 62.3 % 档位错误**（含 28.3 % 已击毁仍判正常，
+      直接画满血条），india_china_west 61.6 %。两个写入方量纲还不一样
+      （run_situation_case 的 strength 是 0-1 比值，campaign 的 strength 是 0-100
+      且战损时不变、blood 才是真的）。修后 HP 与存活判定 100 % 对齐（76320 行
+      0 处不一致）。另：`combatEnabled` 原来 gated on `data.combat.model`，
+      四个数据集全没有该字段 → 整层战损呈现从未运行过；烟柱池上限 10 但实测
+      单帧峰值 19 个冒烟目标，超出部分被静默丢弃，已提到 20
+- [x] **GP-02** 血条避让布局（7875af8）：新增 `web/src/healthLayout.js`（纯函数）。
+      候选位从默认位向外扩、代价 `|dx|+|dy|*1.1`、取首个空位、超 68 px 或出视口
+      丢弃。布局在帧循环里按 150 ms 节流（依赖相机投影，不能只在脏帧跑）。
+      可见性**现算**而不是读 syncEntities 的缓存——那个缓存只在脏帧更新，
+      实测跳帧后 33 条里 8 条仍判不可见，血条会整片消失。
+      **画面实测的局限**：120 km 高度下 23/33 个目标被编队聚合吃掉，真实页面
+      只能同时看到 1–6 条血条；密集情形由 `health_layout_dense_test.js` 用合成
+      数据覆盖（20 条同点、4 种缩放的真实坐标分布，全部 0 重叠）
 - [x] **GP-03** HTTP JSON 体结构防护（9aceea7）：`_json_body_ok()` 限深 24、
       拒非有限浮点、拒 `__proto__`/`prototype`/`constructor`；解析处补抓
       `RecursionError`（它不是 `ValueError` 子类，40000 层体原来会逃成 500）。
@@ -208,10 +220,12 @@ MIT，155 个 JS 源文件 / 13,361 行，98 个 `node --test` 测试。three.js
       返回 201 且响应体带字面量 `NaN` —— 那不是 JSON，前端 `JSON.parse` 直接抛，
       坏值同时落盘。新增 11 例（7 判据单测 + 4 真 HTTP），去掉判据后 NaN 与
       原型键两例确实变红，不是空转测试
-- [!] **GP-04** WebGL 上下文丢失恢复（P1）：`renderRecovery()` 区分「设备不支持」
-      （不重试）与「context lost」（提示切流畅画质、先导出存档）。本项目全仓无
-      `webglcontextlost` 处理，上下文一丢 rAF 循环继续空转、画面停在最后一帧。
-      约 40 行。**等批准**
+- [x] **GP-04** WebGL 上下文丢失恢复（7875af8）：监听 canvas 的
+      `webglcontextlost`/`webglcontextrestored`。丢失时 preventDefault（不 prevent
+      则浏览器不尝试恢复）+ 停时间轴 + 状态报红 + 弹出可关闭的恢复提示
+      （切流畅画质 / 知道了）；恢复时重算投影缓存并重新标脏。
+      此前全仓无此监听：上下文一丢 rAF 循环继续空转，画面停在最后一帧、
+      顶栏状态点仍是绿的
 
 ### 5.2 待定（3）
 
