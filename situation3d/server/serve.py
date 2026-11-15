@@ -30,6 +30,7 @@ import gzip
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import subprocess
@@ -616,6 +617,37 @@ def _query_bool(value):
     if value is None or value == "":
         return None
     return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+_JSON_MAX_DEPTH = 24
+_JSON_BAD_KEYS = frozenset(("__proto__", "prototype", "constructor"))
+
+
+def _json_body_ok(value, depth=0):
+    """Reject trees that parse as JSON but must not reach storage.
+
+    ``json.loads`` accepts ``NaN`` / ``Infinity`` and ``json.dumps`` writes
+    them back verbatim, which is not JSON — the browser's ``JSON.parse``
+    throws on the response.  Deep nesting survives the C scanner but blows
+    the recursion limit on any later walk.  Prototype keys mean nothing to
+    Python and ride along into the frontend untouched.
+
+    Depth is checked before descending, so the guard bails on its own
+    counter rather than on Python's stack.
+    """
+    if depth > _JSON_MAX_DEPTH:
+        return False
+    if isinstance(value, float) and not math.isfinite(value):
+        return False
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in _JSON_BAD_KEYS or not _json_body_ok(item, depth + 1):
+                return False
+    elif isinstance(value, list):
+        for item in value:
+            if not _json_body_ok(item, depth + 1):
+                return False
+    return True
 
 
 def _body_bool(value, default=False):
@@ -1441,9 +1473,12 @@ class Handler(SimpleHTTPRequestHandler):
         if n <= 0 or n > 1200000:
             return None
         try:
-            return json.loads(self.rfile.read(n).decode("utf-8"))
-        except (ValueError, UnicodeDecodeError):
+            body = json.loads(self.rfile.read(n).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            # RecursionError is not a ValueError: a 40000-level body would
+            # otherwise escape as a 500 traceback.
             return None
+        return body if _json_body_ok(body) else None
 
     def _drain_request_body(self):
         """Consume an unread body so keep-alive framing stays valid."""

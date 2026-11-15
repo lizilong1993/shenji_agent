@@ -378,9 +378,12 @@ class ServerApiTest(unittest.TestCase):
 
     def test_resource_path_outside_roots_rejected(self):
         port = self._start("test")
+        # "/etc/hostname" is not absolute on Windows (no drive), so the
+        # rejection came from the isabs branch instead of the roots branch.
+        # Temp is absolute on both platforms and outside the resource roots.
         status, body = request(port, "/api/resources", "POST", {
             "kind": "satellite_imagery", "name": "outside",
-            "path": "/etc/hostname",
+            "path": os.path.join(tempfile.gettempdir(), "outside-hostname"),
         })
         self.assertEqual(status, 400, body)
         self.assertIn("outside", body.get("error", ""))
