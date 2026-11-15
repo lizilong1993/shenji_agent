@@ -394,6 +394,94 @@ window.addEventListener('unhandledrejection', function (e) {
 });
 
 /**
+ * WebGL 上下文丢失：Cesium 是**安静**地失败的。
+ *
+ * 上下文一丢，`requestAnimationFrame` 循环照常跑、`viewer.scene` 照常返回，
+ * 画面就停在最后一帧——用户看到的是"卡住了"，没有任何错误提示，顶栏状态点
+ * 也是绿的。这里把两种情况分开处理（gp-rts `renderRecovery()` 的做法）：
+ *
+ *   · `webglcontextlost`  → 先 preventDefault（不 prevent 的话浏览器不会尝试
+ *     恢复），停掉时间轴，提示"图形连接中断"并给出可操作的两步；
+ *   · `webglcontextrestored` → 清掉缓存的投影结果并重排，状态点回绿。
+ *
+ * 不需要重建 Viewer：Cesium 自己监听同一个事件并重建 GPU 资源，restored 之后
+ * scene 继续工作。我们要做的是**别再装作一切正常**。
+ */
+state.gl = { lost: false, lostAt: 0, restoredAt: 0 };
+
+function onContextLost(ev) {
+  // 不 preventDefault 会让浏览器认定"这个上下文救不回来"，restored 永远不来。
+  if (ev && ev.preventDefault) ev.preventDefault();
+  state.gl.lost = true;
+  state.gl.lostAt = Date.now();
+  // 时间轴先停：继续推进 tick 只会让停在最后一帧的画面与数据越走越远。
+  if (state.playing) setPlaying(false);
+  setStatus('3D 图形连接中断：画面已暂停', 'err');
+  showRenderRecovery();
+}
+
+function onContextRestored() {
+  state.gl.lost = false;
+  state.gl.restoredAt = Date.now();
+  setStatus('3D 图形连接已恢复', 'ok');
+  hideRenderRecovery();
+  // 缓存的屏幕投影与血条排布都基于旧上下文的画面尺寸，必须重算。
+  _hpLayoutLastMs = 0;
+  _hpOffsetCache = {};
+  _declutterLastMs = 0;
+  markScene('context-restored');
+}
+
+function attachContextRecovery() {
+  var canvas = viewer && viewer.canvas;
+  if (!canvas) return;
+  canvas.addEventListener('webglcontextlost', onContextLost, false);
+  canvas.addEventListener('webglcontextrestored', onContextRestored, false);
+}
+
+/**
+ * 恢复提示条：只在上下文丢失时出现，不写进状态栏就看不见。
+ *
+ * 文案刻意分成"能做什么"而不是"发生了什么"——这是唯一需要用户动手的地方：
+ * 改回流畅画质通常能救回显存不足导致的丢失，导存档是防止丢推演进度。
+ */
+function showRenderRecovery() {
+  var el = document.getElementById('renderRecovery');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'renderRecovery';
+    el.className = 'render-recovery';
+    el.innerHTML =
+      '<div class="rr-title">3D 画面已停止</div>' +
+      '<div class="rr-body">图形连接中断，地图停在最后一帧，推演已暂停。' +
+      '可以切到「流畅」画质恢复；若再次中断，先导出存档再关闭其他占用显存的页面。</div>' +
+      '<div class="rr-actions">' +
+      '<button type="button" id="rrQuality">切到流畅画质</button>' +
+      '<button type="button" id="rrDismiss">知道了</button>' +
+      '</div>';
+    document.body.appendChild(el);
+    var q = document.getElementById('rrQuality');
+    if (q) q.addEventListener('click', function () { switchToLowQuality(); });
+    var d = document.getElementById('rrDismiss');
+    if (d) d.addEventListener('click', function () { hideRenderRecovery(); });
+  }
+  el.style.display = 'block';
+}
+
+function hideRenderRecovery() {
+  var el = document.getElementById('renderRecovery');
+  if (el) el.style.display = 'none';
+}
+
+/** 降画质：把像素比与阴影档位降到最低，并关掉体块等重负载图层。 */
+function switchToLowQuality() {
+  try {
+    if (viewer && viewer.resolutionScale !== undefined) viewer.resolutionScale = 0.75;
+  } catch (e) { /* 上下文丢失时改这些可能抛，忽略 */ }
+  markScene('low-quality');
+}
+
+/**
  * 复选框当前状态。
  *
  * 一律现取，不用 `dom.*` 缓存：那个缓存里的复选框引用实测会与文档脱钩
@@ -543,6 +631,10 @@ function initViewer() {
   // 但在用户的机器上很可能是清晰度的主因。代价是 GPU 负载上升；若某台机器吃不消，
   // 把这一行改回 true 即可（只是又回到发虚的状态）。
   viewer.useBrowserRecommendedResolution = false;
+
+  // WebGL 上下文丢失/恢复的监听挂在 canvas 上（见 attachContextRecovery）。
+  // 必须在 viewer 建好之后：canvas 由 Cesium 在构造时创建。
+  attachContextRecovery();
 
   // 隐藏 Cesium 底部那条「Data attribution」署名条（按界面反馈：底部那道满宽的长条）。
   //
@@ -3234,6 +3326,103 @@ function syncEntities() {
   });
   updateOccupationAreas();
   if (state.selected) refreshRelations();
+}
+// 血条避让**不进** syncEntities：它依赖相机投影，相机移动时画面要重排，
+// 而 syncEntities 只在脏标记触发时跑。与 declutterLabels 一样在帧循环里按
+// 时间节流调用（见 loop）。
+
+/**
+ * 血条屏幕避让。
+ *
+ * 此前每条血条写死 `pixelOffset: (0, 17)`，密集编队时叠成一条。标牌早有
+ * `declutterLabels()`，血条没有。这里沿用同一套"先投影再排位"的做法，但
+ * 排法是单独的（`HealthLayout.layout`）：血条要贴着图标，不像标牌那样能
+ * 一路往下排。
+ *
+ * 三条与既有约定一致的取舍：
+ *   · 血条是**每帧重排**的（跟 declutterLabels 一样按时间节流），因为它依赖
+ *     相机投影，静止时也可能因为缩放而改变；
+ *   · 选中目标优先（priority 3，同标牌口径）；编队成员不参与（由编队图标代表）；
+ *   · 排不下就不画（`maxOffsetPx` 之外丢弃），不画到别的目标身上。
+ */
+var _hpLayoutLastMs = 0;
+var HP_LAYOUT_THROTTLE_MS = 150;
+var _hpOffsetCache = {};        // id -> "x|y"，只在变化时写属性
+
+function layoutHealthBars(force) {
+  if (!viewer || !window.HealthLayout || !window.Cesium) return;
+  var now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  if (!force && now - _hpLayoutLastMs < HP_LAYOUT_THROTTLE_MS) return;
+  _hpLayoutLastMs = now;
+
+  var time = viewer.clock.currentTime;
+  var canvas = viewer.canvas;
+  var viewport = { w: canvas.clientWidth, h: canvas.clientHeight };
+  if (!viewport.w || !viewport.h) return;
+
+  var bars = [];
+  Object.keys(state.targets).forEach(function (id) {
+    var rec = state.targets[id];
+    var bar = rec && rec.hpBar;
+    if (!bar) return;
+    // 可见性**现算**，不用 syncEntities 缓存的资格：syncEntities 只在脏帧跑，
+    // 相机移动/层级切换后那个缓存会过期，血条就会整片消失（实测：跳到 tick 860
+    // 再飞到目标群上，33 条里 8 条仍是 not-eligible）。判据与 syncEntities 同一套
+    // （isVisible + 编队聚合），只是不求值到缓存。
+    var clustered = !!(window.TargetClusters && TargetClusters.isClustered(id));
+    if (!isVisible(rec.def) || clustered) return;
+    var p = rec.entity && rec.entity.position && rec.entity.position.getValue
+      ? rec.entity.position.getValue(time) : null;
+    var w = p ? Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, p) : null;
+    if (!w || !isFinite(w.x) || !isFinite(w.y)) {
+      // 投影拿不到（CZML 采样还没覆盖到当前时刻、地形未就绪、目标在镜头背后）：
+      // 这一帧**没有可排的位置**，不是"该藏"。保持 syncEntities 的原判，
+      // 不要把血条关掉——否则首帧 CZML 尚未生效时全场血条会一起消失。
+      return;
+    }
+    // 约定：anchorX/Y = 血条**默认位置的左上角**（居中于图标、下移 17 px），
+    // 不是图标中心。HealthLayout 只负责从这个默认位出发找空位。
+    bars.push({
+      id: id, anchorX: w.x - 17, anchorY: w.y + 17, w: 34, h: 4,
+      priority: state.selected === id ? 3 : 1,
+    });
+  });
+  // 一个可投影的都没有：整帧放弃排布，让既有显隐保持不变。
+  if (!bars.length) return;
+
+  // 编队图标的屏幕矩形当作障碍：血条不能压在编队图标上。
+  var obstacles = [];
+  if (window.TargetClusters && TargetClusters.labelItems) {
+    TargetClusters.labelItems().forEach(function (it) {
+      if (!it || !it.w) return;
+      obstacles.push({ x: it.w.x - 17, y: it.w.y - 21, w: 34, h: 42 });
+    });
+  }
+
+  var placed = {};
+  HealthLayout.layout(bars, viewport, obstacles).forEach(function (r) {
+    placed[r.id] = r;
+  });
+
+  bars.forEach(function (b) {
+    var bar = state.targets[b.id] && state.targets[b.id].hpBar;
+    if (!bar) return;
+    var r = placed[b.id];
+    if (!r) {
+      // 排不下就藏。但**不能把 eligible 的血条永久关掉**：被隐藏的 id 仍然
+      // 候选里，下一次相机或时间变化会重新尝试（候选由 isVisible 现算，
+      // 不读 bar.show），所以这里只写 show，不动别的状态。
+      bar.show = false;
+      return;
+    }
+    var off = HealthLayout.offsetFor(r, b);
+    var key = off.x + '|' + off.y;
+    if (_hpOffsetCache[b.id] !== key) {
+      _hpOffsetCache[b.id] = key;
+      bar.pixelOffset = new Cesium.Cartesian2(off.x, off.y);
+    }
+    bar.show = true;
+  });
 }
 /**
  * 轨迹显示窗口：历史轨迹全量保留（回退到早期帧仍能重建），只在渲染时切片。
@@ -6317,6 +6506,8 @@ function loop(nowMs) {
   if (RenderGovernor.take()) syncEntities();
   // 标签避让按时间节流（不受 RenderGovernor 的脏标记影响：相机微动也要重排）。
   declutterLabels(false);
+  // 血条避让同理：投影随相机变化，必须按时间节流而不是按脏标记。
+  layoutHealthBars(false);
   // 编队聚合同样依赖屏幕距离，跟着相机/帧号变化按时间节流重算。
   if (window.TargetClusters) TargetClusters.frame(nowMs);
 

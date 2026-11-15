@@ -100,11 +100,19 @@
     cache.finalHp = {};
     cache.destroyedAt = {};
     cache.ranks = {};
-    // Engine-produced runs expose per-frame blood as ``strength``. When the
-    // case declares ``provenance.runtime = engine_run`` we use that value and
-    // never synthesize damage from inference exposure; legacy cases keep the
-    // old heuristic unchanged.
-    cache.engineMode = !!(data.provenance && data.provenance.runtime === 'engine_run');
+    // Engine-produced runs expose per-frame blood as ``strength`` (0-100, the
+    // engine's own HP scale). Campaign replays expose it as ``blood`` /
+    // ``max_blood`` (integer strength points). Everything else falls back to
+    // the old inference-exposure heuristic, unchanged.
+    var engine = false, perFrameHp = false;
+    if (data.provenance && typeof data.provenance === 'object'
+        && data.provenance.runtime === 'engine_run') engine = true;
+    perFrameHp = !!(data.frames && data.frames.length && data.frames[0]
+                    && data.frames[0].targets && data.frames[0].targets.length
+                    && data.frames[0].targets[0]
+                    && (data.frames[0].targets[0].strength !== undefined
+                        || data.frames[0].targets[0].blood !== undefined));
+    cache.engineMode = engine || perFrameHp;
     cache.engineTick = -1;
     cache.engineRows = {};
 
@@ -246,6 +254,43 @@
     return cache.engineRows[id] || null;
   }
 
+  /** Per-frame HP as 0-100, from whichever field the producer actually wrote.
+   *
+   * Two writers disagree on both name and scale:
+   *   scripts/run_situation_case.py  strength = blood / max_blood   (a 0-1 ratio)
+   *   campaign.py                   strength = u.strength           (0-100, unused for damage)
+   *                                 blood    = integer strength points
+   * Reading ``strength`` alone therefore reported every campaign row as 100 %
+   * healthy — 62 % of frame rows across the two campaign cases showed the wrong
+   * tier, and destroyed units still drew a full bar. ``alive`` is the
+   * authority for destroyed; blood/max_blood supplies the ratio.
+   *
+   * Returns null when the row carries no HP at all, so the caller falls back
+   * to the inference heuristic (movement-only cases: taiwan_dense_transfer_v1).
+   */
+  function rowHp(row, data, id) {
+    if (!row) return null;
+    if (row.alive === false || row.status === 'destroyed') return 0;
+    var def = null, targets = data && data.targets;
+    if (targets) {
+      for (var i = 0; i < targets.length; i++) {
+        if (targets[i].id === id) { def = targets[i]; break; }
+      }
+    }
+    if (typeof row.blood === 'number' && def && typeof def.max_blood === 'number'
+        && def.max_blood > 0) {
+      var pct = Math.max(0, Math.min(1, row.blood / def.max_blood));
+      return Math.round(pct * 1000) / 10;
+    }
+    // run_situation_case.py writes a 0-1 ratio here; the campaign writes 0-100
+    // and never lowers it, so guard the ambiguous 0-1 range by the ratio.
+    if (typeof row.strength === 'number') {
+      var v = row.strength <= 1 ? row.strength : row.strength / 100;
+      return Math.round(Math.max(0, Math.min(1, v)) * 1000) / 10;
+    }
+    return null;
+  }
+
   function statusOf(hp) {
     if (hp <= 0) return 3;
     if (hp <= THRESHOLDS.severe) return 2;
@@ -273,8 +318,8 @@
 
     if (cache.engineMode) {
       var row = engineRow(data, t, id);
-      if (row && typeof row.strength === 'number') {
-        var ehp = Math.round(Math.max(0, Math.min(1, row.strength)) * 1000) / 10;
+      var ehp = rowHp(row, data, id);
+      if (ehp !== null) {
         var est = statusOf(ehp);
         var inf = cache.infRef;
         var entry = (inf && inf.length) ? (inf[Math.min(t, inf.length - 1)] || {}).targets : null;

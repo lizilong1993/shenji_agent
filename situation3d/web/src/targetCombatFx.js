@@ -34,17 +34,27 @@
   var commKey = null;           // 当前链路的选中目标 id
   var commBuildTick = -999;     // 上次重建链路的 tick
   var destroyed = {};           // id -> true
+  var fire = {};                // id -> entity（起火档的明火）
+  var flare = {};               // id -> 0..1 抖动相位
   var hitFlash = {};            // id -> {until, prevColor, prevSize}
   var statusCache = {};
+  var fireStage = {};           // id -> 上一次的呈现档位（决定明火显隐）
   var origStyle = {};
   var lastStatusTick = -1;
   var scanAngle = 0;
   var lastCameraCheck = 0;
   var visibleScanIds = 0;
 
-  var MAX_SMOKE = 10;
+  // 实测 taiwan_campaign 单帧最多 19 个目标同时处于冒烟档（HP < 98 %）。
+  // 原来是 10，超出部分被静默丢弃——那 9 个目标在画面上是完好的，与数据冲突。
+  var MAX_SMOKE = 20;
   var MAX_TRANSIENTS = 80;
   var FLASH_MS = 350;
+  // 冒烟 / 点明火的血量阈值（百分比）。见 presentationStage()。
+  var DAMAGE_SMOKE_BELOW = 98;
+  var DAMAGE_FIRE_BELOW = 30;
+  var SMOKE_COLOR = { 1: '#9a9a9a', 2: '#6f6a66', 3: '#4a4a4a' };
+  var FIRE_MAX = 6;                 // 同时点明火的目标上限
 
   var scratchPos = new Cesium.Cartesian3();
   var scratchRot = new Cesium.Matrix3();
@@ -125,7 +135,15 @@
   function init(viewer, dataset, api) {
     ctx = { viewer: viewer, api: api };
     data = dataset || {};
-    combatEnabled = !!(data.combat && data.combat.model);
+    // Was gated on ``data.combat.model``, a field only tools/combat_events.py
+    // ever wrote — none of the shipped cases carry it, so the whole damage
+    // presentation layer (smoke tiers, destroyed wreck/sink, damage tinting)
+    // never ran for any real case. Damage state now comes from the engine's
+    // own per-frame HP (TargetStatus), which every case has; the event indexing
+    // below stays as-is for the muzzle/collision flashes that only the
+    // combat_events pipeline produces.
+    combatEnabled = !!(window.TargetStatus && window.TargetStatus.at)
+      || !!(data.combat && data.combat.model);
     defById = {};
     origStyle = {};
     (data.targets || []).forEach(function (d) {
@@ -214,6 +232,9 @@
     statusCache = {};
     lastStatusTick = -1;
     scan = null;
+    fire = {};
+    flare = {};
+    fireStage = {};
     commEntities = {};
     commKey = null;
     // 恢复模型着色（重播/回拖时）
@@ -229,6 +250,14 @@
     destroyed = {};
     statusCache = {};
     lastStatusTick = -1;
+    // 明火池与烟柱同属"持久状态"：两者都由 HP 档位驱动，跳转时间轴时
+    // 必须一起清空重建，否则会留下上一时刻的火点。
+    Object.keys(fire).forEach(function (id) {
+      if (fire[id]) ctx.viewer.entities.remove(fire[id]);
+    });
+    fire = {};
+    flare = {};
+    fireStage = {};
     Object.keys(origStyle).forEach(function (id) { restoreStyle(id); });
     restoreDeaths();
   }
@@ -250,13 +279,21 @@
   }
 
   function statusOf(id, tick) {
-    if (window.TargetStatus && window.TargetStatus.at) {
-      try {
-        var s = TargetStatus.at(data, id, tick);
-        return s ? s.status : 0;
-      } catch (e) { return 0; }
-    }
-    return destroyed[id] ? 3 : 0;
+    var s = statusRecord(id, tick);
+    return s ? s.status : (destroyed[id] ? 3 : 0);
+  }
+
+  /** 每帧 HP（0-100）。与 statusOf 共用一次 TargetStatus.at 查询。 */
+  function statusHp(id, tick) {
+    var s = statusRecord(id, tick);
+    return s ? s.hp : null;
+  }
+
+  function statusRecord(id, tick) {
+    if (!window.TargetStatus || !window.TargetStatus.at) return null;
+    try {
+      return TargetStatus.at(data, id, tick) || null;
+    } catch (e) { return null; }
   }
 
 
@@ -473,6 +510,7 @@
     updateTransients();
     updateProxyGuns();
     updateDamageStates(tick);
+    updateFire();
     updateSmoke(tick);
     updateComms(tick);
     updateScan(tick);
@@ -495,16 +533,32 @@
     lastStatusTick = tick;
     (data.targets || []).forEach(function (d) {
       var st = statusOf(d.id, tick);
-      if (st === statusCache[d.id]) return;
-      statusCache[d.id] = st;
+      var hp = statusHp(d.id, tick);
+      // 呈现档位来自 HP，不是来自事件：被打到 10 % 但最近没挨打的目标，
+      // 事件流是空的，画面仍必须给出"快完了"的信号。
+      var stage = presentationStage(hp, st < 3);
       if (st >= 1) applyDamage(d.id, st, tick);
       else restoreStyle(d.id);
+      if (stage >= 1) ensureSmoke(d.id, stage);
+      else if (smoke[d.id]) {
+        // 血补回来了（整备/回血不属于本 MVP，但回拖时间轴会走到这里）。
+        (smoke[d.id].ents || []).forEach(function (ent) { ctx.viewer.entities.remove(ent); });
+        delete smoke[d.id];
+        delete smokeState[d.id];
+      }
+      ensureFire(d.id, stage === 2);
+      if (stage !== fireStage[d.id]) {
+        fireStage[d.id] = stage;
+        if (fire[d.id]) fire[d.id].show = stage === 2;
+      }
       if (st >= 3 && !destroyed[d.id]) {
         destroyed[d.id] = true;
         var s = sample(d.id);
         if (s) spawnExplosion(Cesium.Cartesian3.fromDegrees(s.lon, s.lat, (s.alt || 0) + 2));
-        ensureSmoke(d.id, 4);
+        ensureSmoke(d.id, 3);
+        ensureFire(d.id, false);
       }
+      statusCache[d.id] = st;
     });
   }
 
@@ -876,6 +930,27 @@
   // （时间轴由 tickFloat 手动同步），ParticleSystem 不会发射粒子。Billboard 的
   // CallbackProperty 由本模块按 tickFloat/墙钟驱动，暂停时也能保持一致。
   // ------------------------------------------------------------------
+  /**
+   * HP 驱动的损伤呈现档位：0 完好 / 1 冒烟 / 2 起火 / 3 残骸。
+   *
+   * 与 TargetStatus 的四档不是一回事：这里问的是「画面上该冒多少烟、该不该
+   * 有明火」，不是「血条该涂什么颜色」。两档阈值故意不同——血条在 70 % 就转黄
+   * （提醒操作员注意），烟柱要到 30 % 以下才点明火，否则整张图上全是火点，
+   * 反而看不出哪个目标真的快完了。
+   *
+   * 依据是引擎自己的每帧 HP（TargetStatus.at().hp），不是事件。这正是补上
+   * gp-rts `damagePresentation()` 的用处：目标被打到 10 % 但最近没挨打时，
+   * 事件流是空的，而画面必须仍然给出「快完了」的信号。
+   */
+  function presentationStage(hp, alive) {
+    if (!alive) return 3;
+    if (typeof hp !== 'number' || !isFinite(hp)) return 0;
+    if (hp <= 0) return 3;
+    if (hp < DAMAGE_FIRE_BELOW) return 2;
+    if (hp < DAMAGE_SMOKE_BELOW) return 1;
+    return 0;
+  }
+
   function makePlumePuff(id, plume, k) {
     return ctx.viewer.entities.add({
       position: new Cesium.CallbackProperty(function () {
@@ -893,12 +968,50 @@
         }, false),
         color: new Cesium.CallbackProperty(function () {
           var lv = smokeState[id] || 1;
+          // 火起后烟变成深灰偏暖，与纯灰烟区分开；颜色跟着档位走，不再恒定。
           var a = lv >= 3 ? 0.52 : (lv === 2 ? 0.40 : 0.28);
-          return Cesium.Color.fromAlpha(Cesium.Color.fromCssColorString('#8f8f8f'), a * (1 - k * 0.20));
+          var hex = SMOKE_COLOR[lv >= 3 ? 3 : (lv === 2 ? 2 : 1)] || '#8f8f8f';
+          return Cesium.Color.fromAlpha(Cesium.Color.fromCssColorString(hex), a * (1 - k * 0.20));
         }, false),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     });
+  }
+
+  /** 明火：起火档（HP < 30 %）在目标处点一团火，按档位抖动。
+   *
+   * 与烟柱分开成池，是因为火的可见距离比烟短（6 km 内才画），而烟要远得多；
+   * 混在一起会让远处目标出现"有火没烟"的怪相。
+   */
+  function ensureFire(id, on) {
+    if (!on) {
+      if (!fire[id]) return;
+      ctx.viewer.entities.remove(fire[id]);
+      delete fire[id];
+      return;
+    }
+    if (fire[id] || Object.keys(fire).length >= FIRE_MAX) return;
+    var ent = ctx.viewer.entities.add({
+      position: new Cesium.CallbackProperty(function () {
+        var s = currentGeo(id);
+        if (!s) return undefined;
+        return Cesium.Cartesian3.fromDegrees(s.lon, s.lat, (s.alt || 0) + 2 + flare[id] * 0.9);
+      }, false),
+      billboard: {
+        image: IMG.fire,
+        scale: new Cesium.CallbackProperty(function () {
+          var k = flare[id] || 0;
+          return 0.9 + k * 0.5;
+        }, false),
+        color: new Cesium.CallbackProperty(function () {
+          var k = flare[id] || 0;
+          return Cesium.Color.fromAlpha(Cesium.Color.WHITE, 0.62 + k * 0.28);
+        }, false),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    });
+    ent.show = false;
+    fire[id] = ent;
   }
 
   function ensureSmoke(id, level) {
@@ -917,6 +1030,36 @@
     for (var k = 0; k < 3; k++) plume.ents.push(makePlumePuff(id, plume, k));
     smoke[id] = plume;
     smokeState[id] = level;
+  }
+
+  /** 明火：抖动相位 + 按相机距离/可见性收放。
+   *
+   * 火比烟近得多才画：一公里级的目标在 6 km 外就是一个点，点上一团火只会
+   * 变成噪点；烟柱反而要靠远景才能看出"这一片都在烧"。
+   */
+  function updateFire() {
+    if (!Object.keys(fire).length) return;
+    var camH = ctx.api.cameraHeight ? ctx.api.cameraHeight() : 0;
+    var cam = ctx.viewer.camera.positionWC;
+    Object.keys(fire).forEach(function (id) {
+      var ent = fire[id];
+      if (!ent) return;
+      var def = defById[id] || {};
+      var on = camH < 20000 && (ctx.api.isVisible ? ctx.api.isVisible(def) : true);
+      if (on) {
+        var s = currentGeo(id);
+        if (s) {
+          var p = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt || 0);
+          on = Cesium.Cartesian3.distance(cam, p) < 8000;
+        } else on = false;
+      }
+      // 抖动相位：每个目标一个固定偏移，避免整片火点同步呼吸。
+      var seed = 0;
+      for (var i = 0; i < id.length; i++) seed = (seed + id.charCodeAt(i)) % 97;
+      flare[id] = 0.5 + 0.5 * Math.sin(apiTickFloat() * 2.1 + seed * 0.37);
+      // 起火的档位实体由 updateDamageStates 决定显隐；这里只处置"目标已不可见"
+      ent.show = on && fireStage[id] === 2;
+    });
   }
 
   function updateSmoke(tick) {
