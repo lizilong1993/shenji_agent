@@ -9,9 +9,11 @@
 
 ## 0. 环境
 
-- [x] 本机开发环境（Python 3.11.9 + node 24）；当前全量 **810 passed / 10 skipped**，
-      **七个 JS 自检**全过。唯一失败 `test_fill_default_heights` 缺 `shapely`
-      （本机无此依赖，改动前后同样失败，非代码问题）
+- [x] 本机开发环境（Python 3.11.9 + node 24）；2026-11-18 全量 **816 passed / 10 skipped
+      / 1 failed**，**七个 JS 自检**全过。唯一失败 `test_fill_default_heights` 缺 `shapely`
+      （本机无此依赖，改动前后同样失败，非代码问题）。
+      注意 `python -m pytest -q` 会误收 `tools/*_test.py`（那些脚本按 argv 读文件），
+      跑全量要写 `python -m pytest tests -q`
 - [x] 演示环境 **8848**（demo 模式，只读）：`python situation3d/server/serve.py --port 8848 --mode demo`
       提醒：此端口曾出现两个进程同时 listen（16:46 与 20:27 各起一次），旧进程 `Stop-Process`
       后新进程继续服务。重启前先 `netstat -ano | findstr :8848` 查重，别再叠第二份
