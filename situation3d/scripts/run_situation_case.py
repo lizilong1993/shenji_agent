@@ -194,6 +194,29 @@ def _ui_domain(entity):
     return "air"
 
 
+def _losses_by_type(world, meta):
+    """按兵种统计红蓝双方战损。
+
+    兵种取 ``Entity.unit_kind``（vehicle/infantry/ship/sub/helicopter/...）。
+    ``value`` 取引擎自带的 ``Entity.value`` —— 与 ``GameState.score()`` 用的是
+    同一字段，不另造一张造价表。
+
+    只统计导入编成（``meta``）里的单位：运行时生成的临时单位不在 meta 里，
+    因此不会被计入。本项目没有蜂群子单位概念，无需额外排除。
+    """
+    out = {"red": {}, "blue": {}}
+    for m in meta.values():
+        entity = world.entities.get(int(m["uid"]))
+        if entity is None or entity.alive:
+            continue
+        side = "red" if m["affiliation"] == 0 else "blue"
+        kind = str(entity.unit_kind or "unknown")
+        rec = out[side].setdefault(kind, {"count": 0, "value": 0})
+        rec["count"] += 1
+        rec["value"] += int(entity.value or 0)
+    return out
+
+
 def _target_defs(world, meta):
     defs = []
     for cid in sorted(meta):
@@ -1105,6 +1128,7 @@ def main(argv=None):
             entity = world.entities.get(int(m["uid"]))
             if entity is not None and not entity.alive:
                 losses["red" if m["affiliation"] == 0 else "blue"] += 1
+        losses_by_type = _losses_by_type(world, meta)
         objectives = []
         for obj in plugin.objectives():
             cell = world.rule_grid.cell_of(float(obj["lon"]), float(obj["lat"]))
@@ -1193,7 +1217,8 @@ def main(argv=None):
             "case_id": args.case, "run_id": run_id, "seed": args.seed,
             "ticks": tick_count, "tick_seconds": tick_seconds,
             "events": dict(counts), "event_total": len(events),
-            "losses": losses, "objectives": objectives,
+            "losses": losses, "losses_by_type": losses_by_type,
+            "objectives": objectives,
             "elapsed_s": round(time.time() - t_start, 1),
             "step_ms_p50": round(statistics.median(step_ms), 1) if step_ms else 0,
             "step_ms_p95": round(sorted(step_ms)[int(len(step_ms) * 0.95)], 1) if step_ms else 0,
@@ -1206,7 +1231,8 @@ def main(argv=None):
         }
         metrics = {"events": len(events), "fires": counts.get("fire", 0),
                    "destroyed": counts.get("destroy", 0),
-                   "losses": losses, "elapsed_s": summary["elapsed_s"],
+                   "losses": losses, "losses_by_type": losses_by_type,
+                   "elapsed_s": summary["elapsed_s"],
                    "step_ms_p95": summary["step_ms_p95"],
                    "trajectory_mb": round(len(trajectory_bytes) / 1048576.0, 1)}
         # 先发布终态快照，再写 run.json：否则轮询端可能先看到 run.json=completed
