@@ -10,8 +10,9 @@
 ## 0. 环境
 
 - [x] 本机开发环境（Python 3.11.9 + node 24）；2026-11-18 全量 **816 passed / 10 skipped
-      / 1 failed**，**七个 JS 自检**全过。唯一失败 `test_fill_default_heights` 缺 `shapely`
+      / 1 failed**。唯一失败 `test_fill_default_heights` 缺 `shapely`
       （本机无此依赖，改动前后同样失败，非代码问题）。
+      JS 自检 11 个文件：**10 过 1 红**（`tools/plot_dynamic_test.js`，见 §1 那条）。
       注意 `python -m pytest -q` 会误收 `tools/*_test.py`（那些脚本按 argv 读文件），
       跑全量要写 `python -m pytest tests -q`
 - [x] 演示环境 **8848**（demo 模式，只读）：`python situation3d/server/serve.py --port 8848 --mode demo`
@@ -125,6 +126,20 @@
       搜索按 kind 前缀过滤且清空恢复、test 模式路径明文、无未捕获异常。
       脚本刻意不用 `[data-entry-id]` 计行（那是每行四个操作按钮的标记，会数出 4 倍），
       搜索走「搜索」按钮而不是 `input` 事件（组件只在 click / Enter 时读 `#resSearch`）
+- [!] **E** `tools/plot_dynamic_test.js` 红着——**阻塞：测的是被删掉的设计，需你定是删还是改**。
+      2026-11-18 跑出第一个失败后查证：它验的是「目标轨迹走 `target_track` → `plot.track` 图层、
+      标签『态势标绘』」这套设计，而 `ac7da7f`（2026-10-20）已经**明确删掉** `plot.track`
+      与 `target_track`，改成「历史轨迹实线 + 计划轨迹虚线，归『历史轨迹（含计划）』图层，
+      不再出现『态势标绘』」——剧本里的提交说明写得很清楚。
+      该测试自 6b79fb9 引入后**从未同步过这次改向**，所以不是回归，是脚本过时。
+      连带影响：TODOLIST 原来写的「七个 JS 自检全过」不成立——现存 11 个 JS 自检里
+      这一个是红的（其余 10 个全过）。
+      另：它从 `app.js` 里按 `var _plotLayerDesired = {};` / `/**\n * 注册各图层的` 两个
+      字符串切代码块，靠的是源码里的换行形态；`app.js` 现在是 CRLF 检出（仓库 .gitattributes
+      声明 LF，但工作区文件是 CRLF），所以它在别的机器上也容易一碰就断。
+      **要不要删**：删掉等于承认「目标轨迹已不走标绘」这条不再需要有守门测试；
+      **要不要改**：改就得按新设计重写 6 条断言（历史实线 / 计划虚线 / 图层归属）。
+      两条都要动测试资产，且涉及前端行为口径，等你定
 - [-] **C** intelpipe worktree 清理：**核实后不存在这项**。`git worktree list --porcelain`
       只有一个工作树，`.git/worktrees` 不存在，`prune --dry-run` 无输出；
       `git branch -a --contains aa13be6` 显示 main 与 origin/feat/battle-timeline 都已含该提交。
