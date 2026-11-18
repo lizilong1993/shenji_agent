@@ -20,13 +20,13 @@
 - [x] `.env` 凭据已配置（天地图 key + Cesium ion token），`/tdt/img/...` 代理实测 200，影像与注记正常叠加
 - [x] 演示公网入口：Tailscale Funnel 8443 → `https://pc-desktop.tailf6b2dc.ts.net:8443/`（443 已被其他服务占用）。**测试环境不开放公网**
 - [x] 静态资产重建：`web/vendor/cesium`、`web/tiles`（低层级）、`web/data`（3 个案例）、`envpacks`
-- [ ] `.env` 凭据同步到服务器——**阻塞：无服务器写权限**（situ155 已掉出 tailnet；
+- [!] `.env` 凭据同步到服务器——**阻塞：无服务器写权限**（situ155 已掉出 tailnet；
       server160 可达但没有本项目的部署目录）
 - [!] 服务器 situ155——**阻塞：节点已不可达**。容器在线，`/remote-home` 落在本地盘，容器内 mount 返回 EPERM 且无 `/dev/fuse`；用 libnfs 用户态工具只读访问。
       **2026-11-15 复查**：situ155 已不在 tailnet 节点表里；server160 可达但它的
       `/remote-home/lizilong` 是**本机 ext4**（`/dev/sda2`）不是共享 NFS，且没有
       `shenji_agent` 目录——换机器取同一份数据这条路走不通，下面三条阻塞照旧
-- [ ] 服务器容器重新挂载 NFS——**阻塞：需宿主机操作**，容器内 mount 返回 EPERM 且无 `/dev/fuse`
+- [!] 服务器容器重新挂载 NFS——**阻塞：需宿主机操作**，容器内 mount 返回 EPERM 且无 `/dev/fuse`
 - [x] `web/tiles` 本地瓦片补齐（c96a48c）：影像到 z11（4002 张）+ WSF3D 建筑高度
       z0-10（2802 张）+ 实测标定的 height_ramp.json。`tiles_db`/`tiles3d_db` 是发布用
       mbtiles 打包产物，按需生成，不做
@@ -132,7 +132,7 @@
       **交接文档记录的组合方向相反，已按公开资料纠正并在 CREDITS 写明**
 - [x] **备份（本机部分）** `_backup_20261106/shenji_agent_local_20261106.bundle`（254 MB，verify 通过）；
       `_recovered/timeline_from_nfs_20261106.bundle`（从 NFS 取回的服务器真实历史）
-- [ ] **备份（服务器部分）** canonical 未提交改动 + `.env`——**阻塞：无服务器写权限**
+- [!] **备份（服务器部分）** canonical 未提交改动 + `.env`——**阻塞：无服务器写权限**
       （同上，situ155 不可达、server160 无部署目录）
 
 ## 2. Palantir 借鉴（来源：Titan 机制分析与 UI 分析）
