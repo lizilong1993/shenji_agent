@@ -115,9 +115,17 @@ def main(argv=None):
         rec("顶部 kind 计数与 stats 一致", chips == stats,
             "chips=%s stats=%s" % (json.dumps(chips, sort_keys=True),
                                    json.dumps(stats, sort_keys=True)))
-        rec("记录总数 chip 与条目数一致",
-            bool(chips) and sum(stats.values()) == len(api_ids),
-            "sum(stats)=%d entries=%d" % (sum(stats.values()), len(api_ids)))
+        total_chip = page.evaluate("""() => {
+            const box = document.querySelector('.res-chips');
+            if (!box) return null;
+            for (const n of box.children) {
+              const m = (n.textContent || '').trim().match(/^记录\\s+(\\d+)$/);
+              if (m) return Number(m[1]);
+            }
+            return null;
+        }""")
+        rec("「记录 N」chip 与条目数一致", total_chip == len(api_ids),
+            "chip=%r entries=%d" % (total_chip, len(api_ids)))
 
         print("4. 搜索按 kind 前缀过滤")
         prefix = sorted({i.split(":", 1)[0] for i in api_ids})[0]
