@@ -275,8 +275,15 @@ def radio_share(world, seen: Dict[int, Set[int]]) -> Dict[int, Set[int]]:
                 continue
             distance = haversine_m((observer.pose.lon, observer.pose.lat),
                                    (mate.pose.lon, mate.pose.lat))
-            if distance <= comms:
-                result.setdefault(mate.uid, set()).update(contacts)
+            if distance > comms:
+                continue
+            # 同级协同中断：窗口内这一跳不成立。共享仍是单跳——被遮的一跳
+            # 不会绕道其他单位补上（见 test_radio_share_does_not_multihop）。
+            links = getattr(world, "command_links", None)
+            if links is not None and links.peer_blocked(
+                    observer.uid, mate.uid, world.time_s, world):
+                continue
+            result.setdefault(mate.uid, set()).update(contacts)
     return result
 
 

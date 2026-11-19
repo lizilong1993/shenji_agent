@@ -10,6 +10,7 @@ Rules are reached only through ``WorldRuleContext``; ``rules/`` never imports
 
 from __future__ import annotations
 
+import dataclasses
 import math
 import random
 from functools import lru_cache
@@ -153,6 +154,11 @@ class World(object):
         # 被 ROE 拒掉的交战：(攻击方, 目标) → 理由。用来回答"为什么没打"，
         # 与"刚打完的冷却"分开记，两者在界面上长得一样但原因完全不同。
         self.roe_rejections: Dict[Tuple[int, int], str] = {}
+        # 指挥链中断窗口（可选）。None = 案例没声明，所有路径与旧行为一致。
+        self.command_links = None
+        # 单位级交战姿态（可选）：uid → "free" / "hold_fire" / "hold_position"。
+        # 空字典 = 全按 self.roe 走，与今天完全一致。
+        self.unit_postures: Dict[int, str] = {}
         # 两栖卸载节拍：运载舰 uid → 下一次可放出的时刻。舱门、艇位与
         # 登陆艇数量都有限，整船人同一 tick 全冲上岸不真实。
         self.unload_interval_s = 20.0
@@ -196,7 +202,8 @@ class World(object):
     def _roe_allows(self, attacker, target, ctx, manual_fire=False,
                     distance_m=None):
         """把交战交给 ROE 手册判定，被拒时记下理由。"""
-        if self.roe is None:
+        rules = self._rules_for(attacker)
+        if rules is None:
             return True
         if distance_m is None:
             try:
@@ -204,10 +211,10 @@ class World(object):
             except Exception:      # noqa: BLE001 - 距离算不出时按 0 处理
                 distance_m = 0.0
         in_area = True
-        if self.roe.policy == "weapons_tight" and self.roe.area_radius_m > 0:
+        if rules.policy == "weapons_tight" and rules.area_radius_m > 0:
             in_area = self._near_friendly_objective(attacker)
         allowed, reason = roe_module.evaluate(
-            self.roe,
+            rules,
             distance_m=distance_m,
             now_s=self.time_s,
             first_seen_s=self.contact_since.get((attacker.uid, target.uid)),
@@ -221,6 +228,24 @@ class World(object):
         else:
             self.roe_rejections.pop((attacker.uid, target.uid), None)
         return allowed
+
+    def _rules_for(self, attacker):
+        """该攻击方实际适用的手册：单位姿态优先，其次全场手册。
+
+        没有全场手册、也没有该单位姿态时返回 None —— 调用方据此跳过判定，
+        与旧行为一致。单位姿态只替换 policy 一项，责任区/确认门槛/还击窗口
+        仍取全场手册的值。
+        """
+        posture = self.unit_postures.get(int(attacker.uid))
+        mapped = roe_module.posture_policy(posture) if posture else None
+        base = self.roe
+        if mapped is None:
+            return base
+        if base is None:
+            base = roe_module.Rules()
+        if mapped == base.policy:
+            return base
+        return dataclasses.replace(base, policy=mapped)
 
     def _near_friendly_objective(self, attacker) -> bool:
         """作战区近似：己方控制的目标点附近即视为责任区内。
@@ -1078,6 +1103,12 @@ class World(object):
                     continue
                 if self._order_source.get(entity.uid) == "manual":
                     continue
+                # 上级链路中断：只挡**新**命令；已下发的命令按原到期规则自然
+                # 失效，自动还击不经此路径，照常发生。
+                if (self.command_links is not None and
+                        self.command_links.upper_cut(
+                            entity.uid, side, now, self) is not None):
+                    continue
                 self._commander_owned.add(entity.uid)
                 self._commander_control[entity.uid] = now + max(
                     1.0, float(order.expires_s))
@@ -1185,7 +1216,10 @@ class World(object):
                 target = self._best_target(attacker, ctx)
             # ROE 判定：自动选出的目标要过一遍交战规则。人工开火命令
             # （order.type == 'fire'）在 evaluate 里已优先放行。
-            if (target is not None and self.roe is not None
+            # 全场手册与该单位自己的姿态都没有时才跳过判定（旧行为）。
+            if (target is not None
+                    and (self.roe is not None
+                         or attacker.uid in self.unit_postures)
                     and not self._roe_allows(
                         attacker, target, ctx,
                         manual_fire=(order.get("type") == "fire"))):

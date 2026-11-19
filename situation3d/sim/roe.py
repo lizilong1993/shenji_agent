@@ -25,6 +25,20 @@ from typing import Any, Dict, Optional, Tuple
 POLICIES = ("weapons_free", "weapons_tight", "hold_fire")
 DEFAULT_POLICY = "weapons_free"
 
+# 单位级姿态（GP-05）：只覆盖**该单位自己的**开火判定，不动全场手册。
+# "hold_position" = 原地警戒：不主动开火但仍可在还击窗口内还击，
+# 与 hold_fire 同判据——区别只在于它是逐单位声明的。
+UNIT_POSTURES = ("free", "hold_fire", "hold_position")
+_POSTURE_POLICY = {"free": "weapons_free", "hold_fire": "hold_fire",
+                   "hold_position": "hold_fire"}
+
+
+def posture_policy(posture: Optional[str]) -> Optional[str]:
+    """把单位姿态映射成全场政策名；未知姿态返回 None（按手册走）。"""
+    if not posture:
+        return None
+    return _POSTURE_POLICY.get(str(posture).strip().lower())
+
 
 def _num(value: Any, default: float) -> float:
     try:

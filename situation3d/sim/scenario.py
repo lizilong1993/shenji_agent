@@ -549,7 +549,73 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
     for sp in scenario.get("supply_points") or []:
         if isinstance(sp, dict) and "lon" in sp and "lat" in sp:
             world.supply_points.append((float(sp["lon"]), float(sp["lat"])))
+    _install_command_links(world, scenario)
+    _install_unit_postures(world, scenario)
     return world
+
+
+def _install_unit_postures(world: World, scenario: dict) -> None:
+    """单位级交战姿态（GP-05）。只认 ``roe.unit_postures`` 这一张表。
+
+    缺省 = 空字典，判定仍按全场手册；写错姿态名与非法政策名同样处理：
+    记一条 ``world.roe_warning``（追加，不覆盖），不因此让案例加载失败。
+    """
+    roe_config = scenario.get("roe")
+    if not isinstance(roe_config, dict):
+        return
+    table = roe_config.get("unit_postures")
+    if not isinstance(table, dict):
+        return
+    from sim.roe import UNIT_POSTURES, posture_policy
+    for raw_uid, raw_posture in sorted(table.items(), key=lambda kv: str(kv[0])):
+        try:
+            uid = int(raw_uid)
+        except (TypeError, ValueError):
+            _warn_posture(world, "unit_postures: uid %r 不是整数，已忽略" % (raw_uid,))
+            continue
+        entity = world.entities.get(uid)
+        if entity is None:
+            _warn_posture(world, "unit_postures: uid %d 不在本案编成内，已忽略" % uid)
+            continue
+        posture = str(raw_posture or "").strip().lower()
+        if posture_policy(posture) is None:
+            _warn_posture(world, "unit_postures: uid %d 的姿态 %r 无效（可选 %s），已忽略"
+                          % (uid, raw_posture, " / ".join(UNIT_POSTURES)))
+            continue
+        world.unit_postures[uid] = posture
+
+
+def _warn_posture(world: World, message: str) -> None:
+    previous = getattr(world, "roe_warning", "")
+    world.roe_warning = (previous + "；" if previous else "") + message
+
+
+def _install_command_links(world: World, scenario: dict) -> None:
+    """装指挥链中断窗口。没有该块 = None，所有路径与旧行为一致。
+
+    peer 对必须在同一阵营——跨阵营的"同级协同中断"没有意义，写错要报出来
+    （``world.command_links_warning``）而不是悄悄生效。
+    """
+    payload = scenario.get("command_links")
+    if not payload:
+        return
+    from sim.command_links import CommandLinks
+    warnings: list = []
+
+    def _side_of(uid: int):
+        entity = world.entities.get(int(uid))
+        if entity is None:
+            raise KeyError(uid)
+        return entity.affiliation
+
+    try:
+        links = CommandLinks.from_dict(payload, warnings, _side_of)
+    except ValueError as exc:
+        world.command_links_warning = str(exc)
+        return
+    if warnings:
+        world.command_links_warning = "；".join(warnings)
+    world.command_links = links
 
 
 def _spread_stacked_spawns(world: World) -> None:
