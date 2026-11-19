@@ -116,8 +116,7 @@ if (startAt < 0 || endAt < 0) {
   console.error('无法从 app.js 定位动态图层代码块');
   process.exit(1);
 }
-// 这几处是 app.js 里的全局函数/DOM 依赖，桩掉即可（不影响被测逻辑）。
-global.refreshPlotLayerSelect = function () {};
+// 抽取块依赖的全局函数：重排应用（applyLayers）与面板刷新（LayerPanel）。
 global.applyLayers = function () { LayerRegistry.apply(); };
 global.LayerPanel = { invalidate: function () {} };
 const dynamic = new Function(
