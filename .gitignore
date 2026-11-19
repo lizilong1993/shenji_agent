@@ -33,3 +33,6 @@ venv/
 situation3d/var/
 situation3d/web/data/situations/demo_release.json
 situation3d/web/data/situations/*.bak_prev_*
+
+# deja 钩子写出的运行期规则缓存（本机会话产物，不入库）
+.deja/
