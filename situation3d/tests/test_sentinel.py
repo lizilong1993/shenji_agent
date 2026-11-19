@@ -164,11 +164,20 @@ class SentinelTilesTest(unittest.TestCase):
                                       return_value={"features": scenes}), \
                     mock.patch.object(adapters, "_warp_sources", side_effect=warp), \
                     mock.patch.object(adapters, "raster_info", return_value={}), \
-                    mock.patch("resources.acquire.raster_to_tiles", side_effect=tile):
+                    mock.patch("resources.acquire.raster_to_tiles", side_effect=tile), \
+                    mock.patch("resources.acquire.urlopen",
+                               return_value=type("R", (), {
+                                   "__enter__": lambda self: self,
+                                   "__exit__": lambda self, *a: False,
+                                   "read": lambda self, n=None: b"II*\x00" + b"\0" * 1024,
+                               })()):
                 spec = TilesetSpec(name="vintage", bbox=BBOX, min_zoom=0, max_zoom=0)
                 tiles = adapters.acquire_sentinel_tiles(
                     self.store, spec, self.tmp, target_date="2025-12-31",
-                    mosaic=mosaic, force=True)["tiles"]
+                    mosaic=mosaic, force=True,
+                    # No fallback: this test is about the Sentinel scene's
+                    # vintage, not the fallback provider's metadata.
+                    fallback_sources=())["tiles"]
                 end = "2025-12-20T09:00:00Z"
                 start = "2025-12-15T10:00:00Z" if mosaic else end
                 # ``requested`` is the search reference date, kept separate
