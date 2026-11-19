@@ -9,7 +9,7 @@
 
 ## 0. 环境
 
-- [x] 本机开发环境（Python 3.14.6 + node 24）；2026-11-19 全量 **852 passed / 10 skipped
+- [x] 本机开发环境（Python 3.14.6 + node 24）；2026-11-19 全量 **859 passed / 10 skipped
       / 1 failed**。唯一失败 `test_fill_default_heights` 缺 `shapely`
       （本机无此依赖，改动前后同样失败，非代码问题）。
       JS 自检 11 个文件：**11 全过**（2026-11-19 `plot_dynamic_test.js` 按当前设计重写）。
@@ -252,7 +252,8 @@
       null/false/0/false，其余逐键不变。`as_of` 进缓存键，否则历史视图会拿到
       当前视图算好的 `links`；历史视图不喂基线统计（`observe=False`），
       免得筛选后的条数污染运行期分布。非法或未来 `as_of` 返回 400。
-      `tests/test_intel_as_of.py` 6 项 + 原 intel 用例 78 项通过；全量 858 passed。
+      `tests/test_intel_as_of.py` 6 项 + HTTP 契约 1 项 + 原 intel 用例 78 项通过；
+      全量 859 passed。
       **未做**：UI 入口（改 UI 须另批）；派生结果快照（B 类）
 - [-] **人工情报状态历史**——**已核实的硬边界**：撤销只改 `status` 并覆盖 `updated_at`，
       「T 时刻是否 active」还原不了。要还原须给 `manual.py` 加只追加的状态日志，
