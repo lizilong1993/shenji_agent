@@ -159,6 +159,8 @@ class World(object):
         # 单位级交战姿态（可选）：uid → "free" / "hold_fire" / "hold_position"。
         # 空字典 = 全按 self.roe 走，与今天完全一致。
         self.unit_postures: Dict[int, str] = {}
+        # 空中加油（可选）：一对加油机/受油机的有限输油窗口。None = 案例没写。
+        self.refuel = None
         # 两栖卸载节拍：运载舰 uid → 下一次可放出的时刻。舱门、艇位与
         # 登陆艇数量都有限，整船人同一 tick 全冲上岸不真实。
         self.unload_interval_s = 20.0
@@ -1883,6 +1885,8 @@ class World(object):
                 if haversine_m((e.pose.lon, e.pose.lat), p) <= 1000.0:
                     e.fuel = min(1.0, e.fuel + 0.02 * dt)
                     break
+        if self.refuel is not None:
+            self.refuel.apply(self, dt)
 
     # -- events -------------------------------------------------------------
     def _append(self, event: dict) -> None:

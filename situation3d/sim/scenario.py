@@ -451,6 +451,9 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             sea_air_weapons=sea_weapons,
             sensors=sensors,
             value=int(op.get("value") or 0),
+            # 血战默认满油；只有显式写 fuel 的案例才有缺油起点（空中加油
+            # 需要它，见 sim/refuel.py）。缺省值与旧行为一致。
+            fuel=min(1.0, max(0.0, _as_float(op.get("fuel"), 1.0))),
             readiness=float(op.get("readiness") or 0.85),
             concealed=(int(op.get("move_state") or 0) == 4),
             marching=(int(op.get("move_state") or 0) == 1),
@@ -551,6 +554,8 @@ def build_world(scenario: dict, basic: dict, seed: int = 20261021,
             world.supply_points.append((float(sp["lon"]), float(sp["lat"])))
     _install_command_links(world, scenario)
     _install_unit_postures(world, scenario)
+    from sim.refuel import install as _install_refuel
+    _install_refuel(world, scenario)
     return world
 
 
