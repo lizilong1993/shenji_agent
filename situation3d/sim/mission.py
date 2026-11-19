@@ -55,6 +55,9 @@ class MissionRunner(object):
                 "pace": str(raw.get("pace") or "normal"),
                 "risk": str(raw.get("risk") or "normal"),
                 "arrive_m": float(raw.get("arrive_m") or 250.0),
+                # GP-06: opt-in formation slots. Absent -> every unit keeps
+                # the existing per-unit _passable_point() behaviour.
+                "formation": raw.get("formation"),
                 "status": "pending",
                 "cell": None,
             }
@@ -130,7 +133,7 @@ class MissionRunner(object):
         if mission["lon"] is not None and mission["lat"] is not None:
             # Prefer the exact passable point over the 200 m rule-cell centre:
             # a cell centre can sit inside a building and trap the unit there.
-            lon, lat = self._passable_point(mission, uid)
+            lon, lat = self._slot_point(mission, uid)
             intent = Intent(lon=lon, lat=lat,
                             pace=mission["pace"], risk=mission["risk"],
                             objective=mission["objective"])
@@ -140,6 +143,76 @@ class MissionRunner(object):
         else:
             return False
         return bool(self.world.assign_intent(entity, intent))
+
+    def _slot_point(self, mission, uid):
+        """Formation slot when the mission asks for one, else today's path.
+
+        ``formation`` is ``{"spacing_m": <number>, ...}``; absent or malformed
+        means the per-unit ``_passable_point()`` candidates run unchanged.
+        """
+        formation = mission.get("formation")
+        if isinstance(formation, dict):
+            lon, lat = self._formation_point(mission, uid, formation)
+            if lon is not None:
+                return lon, lat
+        return self._passable_point(mission, uid)
+
+    def _formation_point(self, mission, uid, formation):
+        """Grid slot around the objective, rotated from centroid to objective.
+
+        ``ceil(sqrt(n))`` columns, ``spacing_m`` apart, nearest slots to the
+        objective first; each candidate must pass ``_point_free``. Returns
+        ``(None, None)`` when no slot fits so the caller falls back.
+        """
+        units = [u for u in sorted(mission["units"])
+                 if u in self.world.entities]
+        if len(units) < 2:
+            return None, None
+        try:
+            spacing = float(formation.get("spacing_m") or 40.0)
+        except (TypeError, ValueError):
+            return None, None
+        if spacing <= 0.0:
+            return None, None
+        index = units.index(int(uid)) if int(uid) in units else -1
+        if index < 0:
+            return None, None
+        cols = int(math.ceil(math.sqrt(len(units))))
+        rows = (len(units) + cols - 1) // cols
+        col, row = index % cols, index // cols
+        # Offsets centred on the objective, in metres.
+        dx_m = (col - (cols - 1) / 2.0) * spacing
+        dy_m = (row - (rows - 1) / 2.0) * spacing
+        # Rotate the grid so columns line up with the approach direction
+        # (centroid -> objective); without a sensible direction keep north-up.
+        angle = self._approach_angle(mission, units)
+        cos_a, sin_a = math.cos(angle), math.sin(angle)
+        east_m = dx_m * cos_a - dy_m * sin_a
+        north_m = dx_m * sin_a + dy_m * cos_a
+        entity = self.world.entities[int(uid)]
+        lon = mission["lon"] + east_m / (111320.0 * math.cos(
+            math.radians(mission["lat"])))
+        lat = mission["lat"] + north_m / 110540.0
+        if entity is None or self._point_free(entity, lon, lat):
+            return lon, lat
+        return None, None
+
+    def _approach_angle(self, mission, units):
+        """Bearing from the group's centroid to the objective, in radians."""
+        positions = [(self.world.entities[u].pose.lon,
+                      self.world.entities[u].pose.lat) for u in units
+                     if u in self.world.entities]
+        if not positions:
+            return 0.0
+        cx = sum(p[0] for p in positions) / len(positions)
+        cy = sum(p[1] for p in positions) / len(positions)
+        east = (mission["lon"] - cx) * 111320.0 * math.cos(
+            math.radians(mission["lat"]))
+        north = (mission["lat"] - cy) * 110540.0
+        if abs(east) < 1e-9 and abs(north) < 1e-9:
+            return 0.0
+        # Meet the approach head-on: the grid's first row faces the group.
+        return math.atan2(north, east) - math.pi / 2.0
 
     def _passable_point(self, mission, uid):
         """Objective point plus a small formation offset that is actually free.
@@ -349,6 +422,7 @@ class MissionRunner(object):
                     "pace": str(raw.get("pace") or "normal"),
                     "risk": str(raw.get("risk") or "normal"),
                     "arrive_m": float(raw.get("arrive_m") or 250.0),
+                    "formation": raw.get("formation"),
                     "after": [],
                     "start_s": moment,
                     "status": "active",
