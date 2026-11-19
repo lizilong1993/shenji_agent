@@ -464,7 +464,15 @@ class IntelManager:
         case_id = _case_key(case_id)
         moment = _parse_as_of(as_of)
         profile = self._profile(case_id)
-        sources = self.sources.list()
+        sources = self.sources.list() if moment is None else []
+        warnings = []
+        if moment is None:
+            correlations_view = self.correlations.list(case_id)
+            lifecycle_board = self.lifecycle.board()
+        else:
+            warnings.append("历史视图仅筛选情报记录；其他派生状态仍按当前值呈现")
+            correlations_view = []
+            lifecycle_board = {}
         cache_stats = None
         try:
             from .cache import IntelCache, cache_db_path
@@ -481,15 +489,19 @@ class IntelManager:
                         for entry in sources}
         bundle = self._bundle(case_id)
         pipeline = self._pipeline(case_id)
-        try:
-            ai_store = self._ai(case_id)
-            ai_counts = ai_store.counts()
-            ai_items = ai_store.list()[:20]
-        except (OSError, ValueError):
+        if moment is None:
+            try:
+                ai_store = self._ai(case_id)
+                ai_counts = ai_store.counts()
+                ai_items = ai_store.list()[:20]
+            except (OSError, ValueError):
+                ai_counts = {"total": 0, "suggested": 0, "accepted": 0,
+                             "rejected": 0, "needs_review": 0}
+                ai_items = []
+        else:
             ai_counts = {"total": 0, "suggested": 0, "accepted": 0,
                          "rejected": 0, "needs_review": 0}
             ai_items = []
-        warnings = []
         if bundle is None:
             warnings.append("案例 %s 暂无自动情报 bundle（var/intel/%s/bundle.json）"
                             % (case_id, _CASE_SAFE.sub("_", case_id)))
@@ -644,6 +656,7 @@ class IntelManager:
             "as_of_applied": moment is not None,
             "late_records_skipped": late_records_skipped,
             "manual_status_not_historical": moment is not None and bool(manual_items),
+            "derived_state_not_historical": moment is not None,
             "profile": profile.to_dict() if profile else None,
             "pipeline": pipeline,
             "conflict_rule": {
@@ -658,7 +671,7 @@ class IntelManager:
             # 不必从 links 里反推哪些是算法给的、哪些是人改过的。
             "correlations": {
                 "rule": "人工确认的关联提升为 manual 并按 0.99 计分；否决的直接移除",
-                "items": self.correlations.list(case_id),
+                "items": correlations_view,
             },
             "key_items": key_items,
             "convergence": {
@@ -682,7 +695,7 @@ class IntelManager:
                            for stage in LIFECYCLE_STAGES],
                 "transitions": {stage: list(LIFECYCLE_TRANSITIONS[stage])
                                 for stage in LIFECYCLE_STAGES},
-                "board": self.lifecycle.board(),
+                "board": lifecycle_board,
             },
             "cache": cache_stats,
             "ai": {"counts": ai_counts, "items": ai_items},

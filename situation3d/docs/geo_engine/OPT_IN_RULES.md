@@ -13,7 +13,8 @@
     "upper_cuts": [
       {"side": 1, "units": [12, 13], "from_s": 600, "until_s": 900,
        "note": "上级链路中断"},
-      {"side": 0, "units": "all", "restore_when": {"all_alive": true}}
+      {"side": 0, "units": "all", "until_s": 1800,
+       "restore_when": {"all_alive": true}}
     ],
     "peer_cuts": [
       {"units": [21, 22], "from_s": 300, "until_s": 600}

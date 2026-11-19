@@ -12,7 +12,7 @@
 - [x] 本机开发环境（Python 3.14.6 + node 24）；2026-11-19 全量 **859 passed / 10 skipped
       / 1 failed**。唯一失败 `test_fill_default_heights` 缺 `shapely`
       （本机无此依赖，改动前后同样失败，非代码问题）。
-      JS 自检 11 个文件：**11 全过**（2026-11-19 `plot_dynamic_test.js` 按当前设计重写）。
+      JS 自检 12 个文件：**12 全过**。
       注意 `python -m pytest -q` 会误收 `tools/*_test.py`（那些脚本按 argv 读文件），
       跑全量要写 `python -m pytest tests -q`
 - [x] 演示环境 **8848**（demo 模式，只读）：`python situation3d/server/serve.py --port 8848 --mode demo`
@@ -248,16 +248,18 @@
       判定：`ingest_time <= T`（存在性）+ `event_time <= T`（可见性）同时成立；
       缺 `ingest_time` 的旧记录按"存在性未知"排除并在 `warnings` 里点名。
       返回体新增 `as_of` / `as_of_applied` / `late_records_skipped` /
-      `manual_status_not_historical`；不传 `as_of` 时这些字段固定为
-      null/false/0/false，其余逐键不变。`as_of` 进缓存键，否则历史视图会拿到
-      当前视图算好的 `links`；历史视图不喂基线统计（`observe=False`），
-      免得筛选后的条数污染运行期分布。非法或未来 `as_of` 返回 400。
+      `manual_status_not_historical`；历史视图另标 `derived_state_not_historical: true`，
+      因关联裁决、来源目录、AI 建议与生命周期没有历史版本。当前不返回这些会误读为历史的状态，
+      也不更新运行期 baseline。未传 `as_of` 时新增字段固定为 null/false/0/false/false，其余逐键不变。
+      `as_of` 进缓存键，否则历史视图会拿到当前视图算好的 `links`；非法或未来 `as_of` 返回 400。
       `tests/test_intel_as_of.py` 6 项 + HTTP 契约 1 项 + 原 intel 用例 78 项通过；
       全量 859 passed。
       **未做**：UI 入口（改 UI 须另批）；派生结果快照（B 类）
 - [-] **人工情报状态历史**——**已核实的硬边界**：撤销只改 `status` 并覆盖 `updated_at`，
       「T 时刻是否 active」还原不了。要还原须给 `manual.py` 加只追加的状态日志，
-      属另立任务；当前按当前值呈现并标注 `manual_status_not_historical: true`
+      属另立任务；当前按当前值呈现并标注 `manual_status_not_historical: true`。
+      关联裁决、来源目录、AI 建议、目标生命周期和推演 pipeline 亦无历史版本，
+      历史视图以 `derived_state_not_historical: true` 明示，当前不在历史响应中伪装成时点数据。
 - [!] **三维瓦片运行诊断与离线验证**——**外部依赖：代表性授权样本**。本机
       `web/` 下没有 `tiles3d/`（只有 `tiles/` 影像与 WSF3D，10651 个文件），
       印证了这一项缺的确实是样本而不是代码。`?diag=1`
