@@ -24,6 +24,9 @@
 - [x] 演示公网入口：Tailscale Funnel 8443 → `https://pc-desktop.tailf6b2dc.ts.net:8443/`（443 已被其他服务占用）。**测试环境不开放公网**
 - [x] 静态资产重建：`web/vendor/cesium`、`web/tiles`（低层级）、`web/data`（3 个案例）、`envpacks`
 - [x] 远端 SSH 连通性复查（2026-11-19）。SSH 登录及只读检查成功，进程列表无 D 状态。
+      同一日在 `/tmp` 隔离检出跑全量：830 项 **全部通过**，17 项跳过，40 s。
+      注意检出必须带 `web/` 目录——缺它时 `serve.py` 打印 `web root not found` 直接退出，
+      表现为 19 项 "server did not start"，那是检出不完整而不是代码问题。
 - [!] 部署凭据同步。待恢复并核实正式部署目录及目标权限。
 - [!] 服务器验收环境。共享目录当前挂载为 `ext4`，现有检出较旧且有未提交改动，缺预期虚拟环境，`PATH` 中无 Node.js 或 Chromium。恢复共享挂载后复查项目版本与依赖，再执行产品验收。
 - [!] 服务器容器重新挂载 NFS。需宿主机恢复挂载，容器内挂载曾返回 EPERM。
