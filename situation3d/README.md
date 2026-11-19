@@ -67,6 +67,9 @@ sh situation3d/tools/restart_server.sh 8848
 
 每个目标都带真实型号、军标图形键、传感器型号与探测距离、武器有效射程。
 
+案例可选规则块（指挥链中断、单位级姿态、空中加油、队形落点）：`docs/geo_engine/OPT_IN_RULES.md`。
+不写这些键时行为与旧版逐项一致。
+
 ---
 
 ## 3. 三级TS推理（`engine/inference.py`）

@@ -79,7 +79,8 @@
       - **恢复判据**：`until_s` 与 `restore_when.all_alive` 任一满足即恢复，谁先到谁生效。
       - **多跳**：不做。共享仍是单跳，`test_radio_share_does_not_multihop` 继续守住。
       测试 `tests/test_command_links.py` 11 项；与 `test_event_scheduler` / `test_cot_integration`
-      / `test_roe*` 同跑 74 项通过。**未做**：跨案例的链路状态可视化（改 UI 须另批）
+      / `test_roe*` 同跑 74 项通过。**未做**：跨案例的链路状态可视化（改 UI 须另批）。
+      写法与示例：`situation3d/docs/geo_engine/OPT_IN_RULES.md` §1
 - [x] **潜艇浮出转换**（8bea776）：`sim/submarine.py` 三态（潜航/潜望镜/浮出），
       接入感知层；潜航只对声呐可见、浮出后才能用常规手段发现、浮出时不能用鱼雷
 - [x] **两栖卸载时机**（0ea8757）：按载体限速，默认 20 秒一批，
@@ -96,6 +97,7 @@
         （默认满油，与旧行为一致），缺油起点由案例显式给出。
       `tests/test_air_refuel.py` 11 项覆盖开窗/速率/脱离/满油/窗口到期/余额耗尽/
       大 dt 截断/跨阵营/缺 uid/非法速率/非空域。全量 852 passed。
+      写法与示例：`situation3d/docs/geo_engine/OPT_IN_RULES.md` §3
       背景（2026-11-18 复查仍成立）：`wargame_core/air.py` 有油耗而 `sim/` 没有；
       `wargame_core/logistics.py::consume_fuel()` 全仓无调用方，是死代码，仅记录不删
 - [x] **交战规则细化**（24115d9）：`sim/roe.py` 三种政策（自由/责任区/还击）+ 确认门槛 + NSL；
@@ -327,14 +329,15 @@ MIT，155 个 JS 源文件 / 13,361 行，98 个 `node --test` 测试。three.js
       `hold_fire/hold_position→hold_fire`。没写这张表时 `World.unit_postures` 为空，
       判定仍只看 `world.roe`，与旧行为一致。人工 `fire` 命令仍优先放行、NSL 仍优先。
       非法姿态/非法 uid 只追加 `world.roe_warning`，不让案例加载失败。
-      `tests/test_unit_posture.py` 6 项。**未做**：界面上的姿态设置入口（改 UI 须另批）
+      `tests/test_unit_posture.py` 6 项。**未做**：界面上的姿态设置入口（改 UI 须另批）。
+      写法与示例：`situation3d/docs/geo_engine/OPT_IN_RULES.md` §2
 - [x] **GP-06** 队形落点分配（5bb21c1）：`mission["formation"] = {"spacing_m": m}` 后按
       ⌈√n⌉ 栅格槽位、以「重心→目标」方向旋转生成逐单位落点，仍走 `_point_free()`
       校验，失败整段回退旧路径。没写 `formation` 或间距非法 → 仍走
       `_passable_point()` 的 17 候选点，与旧行为一致。`retask()` 新建任务会保留该字段。
       与 GPRTS 原方案差一处：它按运动层分组 + 最近单位贪心，这里按 uid 顺序占槽，
       更适合「同批出发」；分批抵达的队形不在本次范围。
-      `tests/test_formation_slots.py` 5 项
+      `tests/test_formation_slots.py` 5 项。写法与示例：`situation3d/docs/geo_engine/OPT_IN_RULES.md` §4
 - [x] **GP-07** 按兵种的战损明细：`_losses_by_type()` 按 `Entity.unit_kind` 记
       `{count, value}`，`value` 直接用引擎的 `Entity.value`（与 `GameState.score()`
       同一字段），不另造造价表。写进 `summary.json` 与 `metrics`（键 `losses_by_type`），
