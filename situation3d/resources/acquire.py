@@ -14,6 +14,7 @@ by a raster + local `gdal2tiles` path (and vice versa).
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import shutil
 import tempfile
@@ -21,7 +22,6 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -207,6 +207,12 @@ def _entry_id(spec: TilesetSpec) -> str:
     return "tile_layer:" + slugify(spec.name)
 
 
+def _is_synthetic_vintage(entry: ResourceEntry) -> bool:
+    """True when ``as_of`` is the acquisition date, not the imagery date."""
+    return not (entry.notes or {}).get("acquisition") and \
+        entry.as_of == (entry.fetched_at or "")[:10]
+
+
 def _cached_result(store: ResourceStore, spec: TilesetSpec) -> Optional[AcquireResult]:
     try:
         entry = store.get(_entry_id(spec))
@@ -223,6 +229,8 @@ def _cached_result(store: ResourceStore, spec: TilesetSpec) -> Optional[AcquireR
     verify = store.verify(entry.entry_id)
     if not verify["ok"]:
         return None
+    if _is_synthetic_vintage(entry):
+        entry = dataclasses.replace(entry, as_of="")
     return AcquireResult(entry=entry, manifest=manifest,
                          source=manifest.get("source") or {}, cached=True)
 
@@ -433,6 +441,9 @@ def acquire_tiles(store: ResourceStore, spec: TilesetSpec, mode: str = "auto",
                 source_meta["method"] = "file"
             else:
                 raise SourceFailed("unsupported method %s" % candidate.method)
+            acquisition = candidate.params.get("acquisition")
+            if acquisition:
+                source_meta["acquisition"] = dict(acquisition)
             if not _quality_ok(stats):
                 raise SourceFailed("tileset quality check failed: %r" % stats)
             quality = ("derived" if source_meta.get("hillshade") else
@@ -452,7 +463,7 @@ def acquire_tiles(store: ResourceStore, spec: TilesetSpec, mode: str = "auto",
                 provider="acquire:" + candidate.source_id,
                 source="%s via %s" % (spec.name, candidate.source_id),
                 fetched_at=utc_now(),
-                as_of=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                as_of=str((acquisition or {}).get("end_at") or "")[:10],
                 bbox=spec.bbox,
                 license=str(source_meta.get("license") or "unknown"),
                 quality=quality,
@@ -460,8 +471,11 @@ def acquire_tiles(store: ResourceStore, spec: TilesetSpec, mode: str = "auto",
                        "manifest": "manifest.json",
                        "method": candidate.method,
                        "zoom_range": [spec.min_zoom, spec.max_zoom],
-                       "attempts": list(attempts)},
-            ).validate()
+                       "attempts": list(attempts)})
+            if acquisition:
+                entry = dataclasses.replace(
+                    entry, notes=dict(entry.notes, acquisition=dict(acquisition)))
+            entry = entry.validate()
             store.register(entry, replace=True)
             if attempt not in attempts:
                 attempts.append(attempt)

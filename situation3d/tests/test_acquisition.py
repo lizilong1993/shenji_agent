@@ -137,8 +137,27 @@ class AcquisitionTest(unittest.TestCase):
         self.assertGreater(manifest["tile_count"], 0)
         entry = self.store.get(result.entry.entry_id)
         self.assertEqual(entry.kind, "tile_layer")
+        self.assertEqual(entry.as_of, "")
+        self.assertTrue(entry.fetched_at)
         self.assertTrue(self.store.verify(entry.entry_id)["ok"])
         self.assertEqual(entry.notes.get("spec_hash"), SPEC.hash())
+
+    def test_legacy_cache_ignores_synthetic_vintage(self):
+        from dataclasses import replace
+
+        result = acquire_tiles(self.store, SPEC,
+                               candidates=[candidate(self.base, "fast")])
+        legacy = replace(result.entry, as_of=result.entry.fetched_at[:10])
+        self.store.register(legacy, replace=True)
+        cached = acquire_tiles(self.store, SPEC, mode="offline")
+        self.assertTrue(cached.cached)
+        self.assertEqual(cached.entry.as_of, "")
+        self.assertEqual(cached.entry.fetched_at, legacy.fetched_at)
+        self.assertEqual(cached.entry.content_hash, legacy.content_hash)
+
+        reviewed = replace(legacy, notes=dict(legacy.notes, manual_override=True))
+        self.store.register(reviewed, replace=True)
+        self.assertEqual(self.store.get(legacy.entry_id).as_of, legacy.as_of)
 
 
 @unittest.skipIf(gdal is None, "GDAL python bindings not installed")

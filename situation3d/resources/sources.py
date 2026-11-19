@@ -113,13 +113,17 @@ def imagery_candidates(source_ids: Optional[Sequence[str]] = None) -> List[Sourc
 
 def raster_candidate(url: str, source_id: Optional[str] = None,
                      license_text: str = "unknown",
-                     cog: bool = True) -> SourceCandidate:
+                     cog: bool = True,
+                     acquisition: Optional[Dict[str, Any]] = None
+                     ) -> SourceCandidate:
+    params = {"url": url, "ext": "png", "license": license_text,
+              "cog": bool(cog), "attribution": "user-provided raster"}
+    if acquisition:
+        params["acquisition"] = dict(acquisition)
     return SourceCandidate(
         source_id=source_id or "raster-url",
         method="raster",
-        params={"url": url, "ext": "png", "license": license_text,
-                "cog": bool(cog),
-                "attribution": "user-provided raster"},
+        params=params,
         priority=5,
         quality="measured")
 

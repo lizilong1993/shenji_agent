@@ -338,6 +338,8 @@ def search_sentinel2(bbox, target_date=None, window_days: int = 60,
             when = _parse_day(props.get("datetime"))
         except DatasetError:
             continue
+        if str(props.get("datetime") or "").strip() == "":
+            continue  # no scene time: cannot claim a data vintage
         candidates.append({"id": feature.get("id"), "href": href,
                            "datetime": when, "cloud": cloud,
                            "bbox": feature.get("bbox"),
@@ -396,6 +398,8 @@ def search_sentinel2_mosaic(bbox, target_date=None, window_days: int = 60,
             when = _parse_day(props.get("datetime"))
         except DatasetError:
             continue
+        if str(props.get("datetime") or "").strip() == "":
+            continue
         code = str(props.get("grid:code") or props.get("s2:mgrs_tile")
                    or feature.get("id"))
         candidate = {"id": feature.get("id"), "href": href,
@@ -450,12 +454,18 @@ def fetch_sentinel2(store: ResourceStore, spec: DatasetSpec,
                   timeout_s=timeout_s, resolution_m=resolution_m,
                   resampling="bilinear")
     info = raster_info(dest)
+    times = sorted(c["datetime"] for c in scenes)
     source = {"label": "Sentinel-2 L2A true colour (Earth Search AWS)",
               "scene_id": scene_ids[0], "scene_ids": scene_ids,
               "scene_datetime": scene_datetime,
               "cloud_cover": cloud, "mosaic": bool(mosaic),
               "query": query, "license": SENTINEL2_LICENSE,
-              "as_of": scene_datetime[:10]}
+              # Imagery vintage: the newest chosen scene ends the interval.
+              "acquisition": {
+                  "start_at": times[0].strftime("%Y-%m-%dT%H:%M:%SZ"),
+                  "end_at": times[-1].strftime("%Y-%m-%dT%H:%M:%SZ"),
+                  "scene_ids": scene_ids},
+              "as_of": times[-1].strftime("%Y-%m-%d")}
     return dest, info, source, chosen
 
 
@@ -484,15 +494,17 @@ def acquire_sentinel(store: ResourceStore, spec: DatasetSpec,
     manifest = write_raster_manifest(root, "sentinel2.tif", spec, source,
                                      info, extra={"adapter": "sentinel2"})
     quality = "measured" if source["cloud_cover"] <= max_cloud else "derived"
+    notes = {"adapter": "sentinel2",
+             "scene_id": source.get("scene_id"),
+             "scene_ids": source.get("scene_ids")
+             or [source.get("scene_id")],
+             "mosaic": bool(source.get("mosaic")),
+             "cloud_cover": source["cloud_cover"]}
+    if source.get("acquisition"):
+        notes["acquisition"] = dict(source["acquisition"])
     entry = register_dataset(store, spec, root, source, SENTINEL2_LICENSE,
                              quality=quality, provider="adapter:sentinel2",
-                             as_of=source["as_of"],
-                             notes={"adapter": "sentinel2",
-                                    "scene_id": source.get("scene_id"),
-                                    "scene_ids": source.get("scene_ids")
-                                    or [source.get("scene_id")],
-                                    "mosaic": bool(source.get("mosaic")),
-                                    "cloud_cover": source["cloud_cover"]})
+                             as_of=source["as_of"], notes=notes)
     return {"entry": entry, "manifest": manifest, "source": source,
             "chosen": chosen, "cached": False}
 
@@ -535,11 +547,16 @@ def acquire_sentinel_tiles(store: ResourceStore, tile_spec, cache_root: str,
                               manifest.get("raster_file") or "sentinel2.tif")
         if not os.path.isfile(raster):
             raise DatasetError("Sentinel raster missing: %s" % raster)
+        # Carry the scene vintage across raster -> tiles; without it the tile
+        # entry would claim the processing day as its imagery date.
+        acquisition = (entry.notes or {}).get("acquisition") or \
+            (sentinel.get("source") or {}).get("acquisition")
         tiles = acquire_tiles(
             store, tile_spec,
             candidates=[raster_candidate("file://" + raster,
                                          source_id="sentinel2",
-                                         license_text=SENTINEL2_LICENSE)],
+                                         license_text=SENTINEL2_LICENSE,
+                                         acquisition=acquisition)],
             force=force)
         return {"sentinel": sentinel, "tiles": tiles, "fallback": False,
                 "errors": errors}

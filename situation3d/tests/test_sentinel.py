@@ -60,6 +60,13 @@ class SentinelSearchTest(unittest.TestCase):
             with self.assertRaises(adapters.DatasetError):
                 adapters.search_sentinel2(BBOX, "2025-12-31")
 
+    def test_scene_without_time_is_not_selected(self):
+        doc = {"features": [stac_feature("undated", "", 0)]}
+        with mock.patch.object(adapters, "_http_json", return_value=doc):
+            for search in (adapters.search_sentinel2, adapters.search_sentinel2_mosaic):
+                with self.assertRaises(adapters.DatasetError):
+                    search(BBOX, "2025-12-31")
+
     def test_mosaic_picks_best_scene_per_grid(self):
         def feat(fid, code, cloud, when="2025-12-20T00:00:00Z"):
             item = stac_feature(fid, when, cloud)
@@ -129,6 +136,64 @@ class SentinelTilesTest(unittest.TestCase):
         called = tiles.call_args
         self.assertEqual(called.kwargs["candidates"][0].source_id, "sentinel2")
         self.assertTrue(called.kwargs["candidates"][0].params["url"].startswith("file://"))
+
+    def test_scene_vintage_survives_raster_to_tiles(self):
+        from pathlib import Path
+
+        from resources.processing import TilesetSpec
+        from resources.sources import local_candidate
+
+        png = b"\x89PNG\r\n\x1a\n" + b"\0" * 1024
+        scenes = [stac_feature("s1", "2025-12-20T09:00:00Z", 1),
+                  stac_feature("s2", "2025-12-15T10:00:00Z", 2)]
+        scenes[0]["properties"]["grid:code"] = "A"
+        scenes[1]["properties"]["grid:code"] = "B"
+
+        def warp(urls, bbox, dest, **kwargs):
+            Path(dest).write_bytes(b"II*\0" + b"\0" * 1024)
+
+        def tile(src, spec, dest, **kwargs):
+            path = Path(dest) / "0" / "0" / "0.png"
+            path.parent.mkdir(parents=True)
+            path.write_bytes(png)
+            return {}
+
+        for mosaic in (False, True):
+            with self.subTest(mosaic=mosaic), \
+                    mock.patch.object(adapters, "_http_json",
+                                      return_value={"features": scenes}), \
+                    mock.patch.object(adapters, "_warp_sources", side_effect=warp), \
+                    mock.patch.object(adapters, "raster_info", return_value={}), \
+                    mock.patch("resources.acquire.raster_to_tiles", side_effect=tile):
+                spec = TilesetSpec(name="vintage", bbox=BBOX, min_zoom=0, max_zoom=0)
+                tiles = adapters.acquire_sentinel_tiles(
+                    self.store, spec, self.tmp, target_date="2025-12-31",
+                    mosaic=mosaic, force=True)["tiles"]
+                end = "2025-12-20T09:00:00Z"
+                start = "2025-12-15T10:00:00Z" if mosaic else end
+                interval = {"start_at": start, "end_at": end,
+                            "scene_ids": ["s1", "s2"] if mosaic else ["s1"]}
+                self.assertEqual(tiles.source["acquisition"], interval)
+                entry = self.store.get(tiles.entry.entry_id)
+                self.assertEqual(entry.notes["acquisition"], interval)
+                self.assertEqual(entry.as_of, "2025-12-20")
+                self.assertTrue(entry.fetched_at)
+
+        fallback_dir = Path(self.tmp) / "fallback"
+        fallback_dir.mkdir()
+        tile(None, None, str(fallback_dir))
+        with mock.patch.object(adapters, "acquire_sentinel",
+                               side_effect=adapters.DatasetError("no scene")), \
+                mock.patch("resources.acquire.candidates_for_tiles",
+                           side_effect=lambda *a, **kw: [
+                               local_candidate(str(fallback_dir))]):
+            spec = TilesetSpec(name="vintage-fallback", bbox=BBOX,
+                               min_zoom=0, max_zoom=0)
+            result = adapters.acquire_sentinel_tiles(
+                self.store, spec, self.tmp, force=True)
+        self.assertTrue(result["fallback"])
+        self.assertNotIn("acquisition", result["tiles"].source)
+        self.assertEqual(result["tiles"].entry.as_of, "")
 
     def test_fallback_to_eox(self):
         from resources.processing import TilesetSpec
