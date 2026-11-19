@@ -461,9 +461,12 @@ def fetch_sentinel2(store: ResourceStore, spec: DatasetSpec,
               "cloud_cover": cloud, "mosaic": bool(mosaic),
               "query": query, "license": SENTINEL2_LICENSE,
               # Imagery vintage: the newest chosen scene ends the interval.
+              # ``requested`` is the search reference date, kept apart from the
+              # scene dates so the UI never presents it as capture time.
               "acquisition": {
                   "start_at": times[0].strftime("%Y-%m-%dT%H:%M:%SZ"),
                   "end_at": times[-1].strftime("%Y-%m-%dT%H:%M:%SZ"),
+                  "requested": query["requested"],
                   "scene_ids": scene_ids},
               "as_of": times[-1].strftime("%Y-%m-%d")}
     return dest, info, source, chosen

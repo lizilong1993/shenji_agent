@@ -1486,6 +1486,13 @@ select {
 .plot-ctx-item.has-sub + .plot-ctx-sub { top: 100%; }
 .plot-ctx-head { padding: 6px 9px 3px; font-size: 11px; color: var(--text-dim); }
 .plot-ctx-std { font-size: 10px; color: var(--text-dim); }
+/* 来源三项是只读说明，不是可点菜单项：同一行样式，但换行且不参与 hover。 */
+.plot-ctx-source {
+  padding: 1px 9px;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .plot-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
 .plot-item {
   display: flex;

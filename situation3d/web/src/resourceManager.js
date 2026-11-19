@@ -303,11 +303,36 @@
     return btn;
   }
 
+  /**
+   * 影像时间分三项展示：采集区间（场景时间）、检索参考日期、入库时间。
+   * 没有 `notes.acquisition` 的条目（XYZ 源、旧缓存）只报入库时间并明写
+   * "采集 未记录"——不拿入库日充当采集日，那样会把今天的下载说成今天的影像。
+   */
+  function timeLines(entry) {
+    var acquisition = (entry.notes || {}).acquisition || null;
+    var lines = [];
+    var interval = acquisition && acquisition.start_at
+      ? (acquisition.start_at === acquisition.end_at
+        ? acquisition.start_at
+        : acquisition.start_at + ' → ' + acquisition.end_at)
+      : '未记录';
+    lines.push(['采集', interval]);
+    lines.push(['检索参考', (acquisition && acquisition.requested) || '未记录']);
+    lines.push(['入库', entry.fetched_at || '未记录']);
+    return lines;
+  }
+
   function entryRow(entry) {
     var tr = document.createElement('tr');
     var id = el('td', 'res-id-cell');
     id.appendChild(el('b', 'res-id', entry.entry_id));
     id.appendChild(el('div', 'res-sub', entry.path));
+    // 时间三项放在最宽的一列，ISO 串被截断时仍可悬停看全。
+    timeLines(entry).forEach(function (pair) {
+      var line = el('div', 'res-sub res-when', pair[0] + ' ' + pair[1]);
+      line.title = pair[0] + ' ' + pair[1];
+      id.appendChild(line);
+    });
     tr.appendChild(id);
 
     var kind = el('td', 'res-kind-cell');
@@ -410,6 +435,11 @@
     grid.appendChild(field('Source', textInput('source', entry.source || '')));
     grid.appendChild(field('数据时间 as_of', textInput('as_of', entry.as_of || '', '2026-10-27')));
     grid.appendChild(field('抓取时间 fetched_at', textInput('fetched_at', entry.fetched_at || '', '留空自动填')));
+    var when = el('div', 'res-form-when');
+    timeLines(entry).forEach(function (pair) {
+      when.appendChild(el('div', 'res-sub', pair[0] + ' ' + pair[1]));
+    });
+    grid.appendChild(field('影像时间（只读）', when));
     grid.appendChild(field('范围 bbox', textInput('bbox', entry.bbox ? entry.bbox.join(',') : '',
       'west,south,east,north')));
     grid.appendChild(field('许可', textInput('license', entry.license || '')));
@@ -774,6 +804,8 @@
     open: open,
     close: close,
     refresh: load,
-    _state: function () { return state; }
+    _state: function () { return state; },
+    // 自检用：时间三项的纯格式化，不需要真实 DOM 或网络。
+    _timeLines: timeLines
   };
 })(window);

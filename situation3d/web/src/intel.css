@@ -163,6 +163,20 @@
 .intel-fresh-chip.stale { border-color: #efd49d; background: #fff9ea; color: #8a5a00; }
 .intel-fresh-chip.bad { border-color: #efc3bf; background: #fff4f3; color: #a8332a; }
 
+.intel-review { margin: 0 0 8px; padding: 6px 8px; border: 1px solid #d7e2ef;
+  border-radius: 6px; background: #f8fbfe; font-size: 11px; }
+.intel-review-head { display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 3px; color: #5b7290; }
+.intel-review-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  padding: 2px 0; color: #4f6076; }
+.intel-review-pair { font-family: ui-monospace, monospace; color: #35455c; }
+.intel-review-confirm .intel-badge { color: #26734d; border-color: #b7ddc8;
+  background: #f0fbf5; }
+.intel-review-reject .intel-badge { color: #6b7280; border-color: #d7dbe2;
+  background: #f3f4f6; }
+.intel-review-note { color: var(--text-dim); }
+.intel-review-time { color: var(--text-dim); margin-left: auto; }
+
 .intel-toolbar-chips { flex-direction: column; align-items: stretch; gap: 6px; }
 .intel-domains { display: flex; gap: 6px; flex-wrap: wrap; }
 .intel-domain-chip {

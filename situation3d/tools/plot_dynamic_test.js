@@ -261,6 +261,18 @@ check('清空后声明类别仍在册',
   plotLayerIds().length === cats.length && Plotting.debug().count === 0,
   JSON.stringify({ layers: plotLayerIds(), items: Plotting.debug().count }));
 
+// 编辑菜单要只读展示来源三项：实例必须能读出它们，导出仍只带控制点。
+const p5info = Plotting.add({ type: 'phase_line', layer: 'plot.fire', points: [A, B] });
+const p5rec = Plotting.getItem(p5info.id);
+check('实例带出来源/引用/精度三项',
+  !!p5rec && !!p5rec.std && !!p5rec.ref && !!p5rec.confidence,
+  JSON.stringify(p5rec && { std: p5rec.std, ref: p5rec.ref }));
+check('导出不带来源字段（控制点格式不变）',
+  Plotting.exportAll().every(function (row) {
+    return !('std' in row) && !('confidence' in row);
+  }));
+Plotting.remove(p5info.id);
+
 // ------------------------------------------- 6. 计划轨迹取点（真实代码）
 //
 // 轨迹不走了标绘（ac7da7f），但取点逻辑仍是 app.js 里的真函数：

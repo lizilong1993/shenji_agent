@@ -519,6 +519,67 @@
     body.appendChild(strip);
   }
 
+  /**
+   * 人工关联复核三条展示规则：确认/否决都要看得见、按对象对计数、可撤销。
+   *
+   * 否决的链接在后端会被直接移除（不值得在看板上反复出现一条已知错误的
+   * 关联），所以"否决了什么"只能在这里读；撤销后这一对退回算法判定。
+   */
+  var REVIEW = [['confirm', '已确认'], ['reject', '已否决']];
+
+  function renderReviews(body, overview) {
+    var block = overview.correlations;
+    var items = (block && block.items) || [];
+    if (!items.length) return;
+    var counts = { confirm: 0, reject: 0 };
+    items.forEach(function (row) {
+      if (counts[row.verdict] !== undefined) counts[row.verdict] += 1;
+    });
+    var wrap = el('div', 'intel-review');
+    var head = el('div', 'intel-review-head');
+    head.appendChild(el('b', null, '关联复核'));
+    REVIEW.forEach(function (pair) {
+      head.appendChild(el('span', 'intel-chip', pair[1] + ' ' + counts[pair[0]]));
+    });
+    head.appendChild(el('span', 'intel-note',
+      '确认的一对按人工关联展示；否决的一对不再出现在关联里。'));
+    wrap.appendChild(head);
+    items.forEach(function (row) {
+      var line = el('div', 'intel-review-row intel-review-' + row.verdict);
+      line.appendChild(el('span', 'intel-review-pair',
+        row.a_id + ' ↔ ' + row.b_id));
+      var verdictRow = REVIEW.filter(function (pair) {
+        return pair[0] === row.verdict;
+      });
+      line.appendChild(el('span', 'intel-badge ' + row.verdict,
+        verdictRow.length ? verdictRow[0][1] : row.verdict));
+      if (row.note) line.appendChild(el('span', 'intel-review-note', row.note));
+      if (row.updated_at) {
+        line.appendChild(el('span', 'intel-review-time',
+          ageLabel(row.updated_at)));
+      }
+      var clear = el('button', 'mini', '撤销');
+      clear.type = 'button';
+      clear.title = '撤销后这一对退回算法判定';
+      clear.addEventListener('click', function () { clearReview(row); });
+      line.appendChild(clear);
+      wrap.appendChild(line);
+    });
+    body.appendChild(wrap);
+  }
+
+  function clearReview(row) {
+    if (!row.correlation_id) return;
+    api('/api/intel/correlations/' + encodeURIComponent(row.correlation_id), {
+      method: 'POST', body: {}
+    }).then(function () {
+      notify('info', '已撤销关联裁决：' + row.a_id + ' ↔ ' + row.b_id, {});
+      return refresh();
+    }).catch(function (err) {
+      notify('warn', '撤销失败：' + (err.message || err), {});
+    });
+  }
+
   function renderList(body) {
     var overview = state.overview;
     var all = overview.items || [];
@@ -530,6 +591,7 @@
     renderBrief(body, overview);
     renderConvergence(body, overview);
     renderFreshness(body, overview);
+    renderReviews(body, overview);
     (overview.warnings || []).forEach(function (warning) {
       body.appendChild(el('div', 'intel-warn', warning));
     });
@@ -1535,6 +1597,8 @@
     bind: bind, open: open, close: close, refresh: refresh,
     onCase: onCase,
     _state: function () { return state; },
-    _caseId: caseId
+    _caseId: caseId,
+    // 自检用：复核区块在自检里直接渲染到一个 stub 容器。
+    _renderReviews: renderReviews
   };
 })(window);

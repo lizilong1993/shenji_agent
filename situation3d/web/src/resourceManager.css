@@ -104,6 +104,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 时间三项：采集区间可能跨日（"05-01 → 05-20"），允许换行而不是截断。 */
+.res-when { white-space: normal; color: #4a5568; }
 .res-kind-cell { overflow: hidden; }
 .res-size { white-space: nowrap; }
 .res-actions { white-space: nowrap; }

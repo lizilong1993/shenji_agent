@@ -8274,6 +8274,18 @@ function openPlotEditMenu(plotId) {
   head.textContent = rec.label || rec.zh;
   menu.appendChild(head);
 
+  // 来源说明：只读。历史专题图里的示意线与实测轨迹必须能分开看，所以这三项
+  // 从图形目录存进实例、在这里原样显示；缺失就写"未记录"，不猜、不隐藏。
+  [
+    ['来源', rec.std], ['引用', rec.ref], ['精度', rec.confidence],
+  ].forEach(function (pair) {
+    var row = document.createElement('div');
+    row.className = 'plot-ctx-std plot-ctx-source';
+    row.textContent = pair[0] + '：' + (pair[1] || '未记录');
+    row.title = pair[1] || '未记录';
+    menu.appendChild(row);
+  });
+
   const rename = document.createElement('button');
   rename.type = 'button';
   rename.className = 'plot-ctx-item';

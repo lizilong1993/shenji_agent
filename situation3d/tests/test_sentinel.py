@@ -171,7 +171,10 @@ class SentinelTilesTest(unittest.TestCase):
                     mosaic=mosaic, force=True)["tiles"]
                 end = "2025-12-20T09:00:00Z"
                 start = "2025-12-15T10:00:00Z" if mosaic else end
+                # ``requested`` is the search reference date, kept separate
+                # from the scene dates so the UI can label them apart.
                 interval = {"start_at": start, "end_at": end,
+                            "requested": "2025-12-31T00:00:00Z",
                             "scene_ids": ["s1", "s2"] if mosaic else ["s1"]}
                 self.assertEqual(tiles.source["acquisition"], interval)
                 entry = self.store.get(tiles.entry.entry_id)

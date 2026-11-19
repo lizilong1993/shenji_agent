@@ -2009,6 +2009,9 @@
         zh: (CATALOGUE[rec.type] && CATALOGUE[rec.type].zh) || rec.type,
         layer: rec.layer, hostility: rec.hostility,
         label: rec.label || null,
+        // 来源三项随实例存，编辑菜单只读展示；exportAll 不带它们（导出的是控制点）。
+        std: rec.std || null, ref: rec.ref || null,
+        confidence: rec.confidence || null,
         points: rec.points.map(function (c) { return [c[0], c[1]]; }),
       };
     },
