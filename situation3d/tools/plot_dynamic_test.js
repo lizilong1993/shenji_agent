@@ -29,21 +29,9 @@ const ROOT = path.dirname(__dirname);
 const SRC = path.join(ROOT, 'web', 'src');
 
 let failures = 0;
-let defects = 0;
 function check(name, cond, detail) {
   console.log((cond ? '  ok   ' : '  FAIL ') + name + (detail && !cond ? '  ' + detail : ''));
   if (!cond) failures++;
-}
-
-/**
- * 已登记但尚未获批修复的缺陷：断言的是**应有行为**，当前未满足时只报 `DEFECT`
- * 并计入末尾清单，不判失败 —— 这样测试的重写能先落地，缺陷本身仍可见、不被
- * 悄悄写成"现状即正确"。（修复后这一行会自动变回 `ok`。）
- */
-function defect(name, fixed, detail) {
-  if (fixed) { console.log('  ok   ' + name + '（缺陷已修复）'); return; }
-  defects++;
-  console.log('  DEFECT ' + name + (detail ? '  ' + detail : ''));
 }
 
 /** 源码按 LF 读：定位标记都写成 \n，CRLF 检出会让一条都找不到。 */
@@ -244,11 +232,9 @@ check('重建时恢复用户关掉的显隐意图',
   LayerRegistry.runtime['plot.fire'].desired === false,
   JSON.stringify(LayerRegistry.runtime['plot.fire'] &&
                  LayerRegistry.runtime['plot.fire'].desired));
-// 3a60ad7 把标绘图层挪到【TS图层】/subgroup『标绘』，但 ensurePlotLayer 的
-// 既有层分支仍按 `def.group !== '标绘'` 判定，于是重建分支上每一个已存在的
-// 标绘层都被当成"非标绘类别层"拒掉、provider 不补。集合一致的分支不经过那里，
-// 所以只有"恰好在同一轮有图层增删"时才暴露。
-defect('重建分支也补齐既有层的 provider',
+// 3a60ad7 把标绘图层挪到【TS图层】/subgroup『标绘』；ensurePlotLayer 的既有层
+// 分支若按 group 判定，重建分支上每个已存在的标绘层都会被拒掉、provider 不补。
+check('重建分支也补齐既有层的 provider',
   LayerRegistry.hasProvider('plot.defense'),
   'defense provider=' + LayerRegistry.hasProvider('plot.defense'));
 delete dynamic.desired['plot.fire'];
@@ -366,18 +352,16 @@ check('web/src 里不再出现 target_track',
 
 // 标绘图层在 3a60ad7 之后用 subgroup 『标绘』归组，group 是『TS图层』。
 // 仍按 group 判定的两处会把合法标绘层拒掉：
-//   - app.js ensurePlotLayer：重建分支上拒层、不补 provider（上面已计一条 DEFECT）
+//   - app.js ensurePlotLayer：重建分支上拒层、不补 provider（上面已计一条）
 //   - situation.js 导入校验：plotLayers 只剩目录默认类别，显式归属图层的标绘被
 //     静默改回默认类别（用户看到的是"导入成功但图层变了"）
-defect('situation.js 用 subgroup 判定标绘图层',
+check('situation.js 用 subgroup 判定标绘图层',
+  /\.subgroup === '标绘'/.test(readSrc('situation.js')) &&
   !/\.group === '标绘'/.test(readSrc('situation.js')),
-  'situation.js:677 仍是 .group === \'标绘\'');
+  'situation.js 里有 .group === \'标绘\'');
 
 console.warn = realWarn;
 console.log();
-if (defects) {
-  console.log('DEFECTS (' + defects + ') —— 已登记、未修复，见 TODOLIST E');
-}
 if (failures) {
   console.log('FAILED (' + failures + ')');
   process.exit(1);

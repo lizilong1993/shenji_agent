@@ -674,7 +674,7 @@
       // 只认「标绘」组：situation.relations / situation.occupation 也是 kind:'plot'，
       // 但它们走各自的 handler、没有要素提供者，普通标绘落进去会变成关不掉的孤儿。
       plotLayers = LayerRegistry.list('plot').filter(function (l) {
-        return l.group === '标绘' && !systemOnlyLayers[l.id];
+        return l.subgroup === '标绘' && !systemOnlyLayers[l.id];
       }).map(function (l) { return l.id; });
     }
     // 标绘图层由**实际要素动态成层**：某个类别当前为空时并不在注册表里，

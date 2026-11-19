@@ -7052,7 +7052,9 @@ function ensurePlotLayer(layerId) {
   if (!window.LayerRegistry || !window.Plotting) return;
   var def = LayerRegistry.def(layerId);
   if (def) {
-    if (def.group !== '标绘') {
+    // 标绘类别层自 3a60ad7 起归在【TS图层】分组下的 subgroup『标绘』；
+    // group 相同只是巧合，不能用 group 判定。
+    if (def.subgroup !== '标绘') {
       // 程序化调用把标绘写进 relations/occupation 这类同 kind 但不同用途的图层：
       // 不接管，显式说出来（导入路径已被 situation.js 的校验挡住）。
       if (window.console && console.warn) {
