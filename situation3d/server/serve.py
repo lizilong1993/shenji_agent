@@ -1777,12 +1777,14 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/intel/overview":
             try:
                 overview = _intel_manager().overview(
-                    query.get("case_id") or "default")
+                    query.get("case_id") or "default",
+                    as_of=query.get("as_of"))
                 if SERVER_MODE != "test":
                     overview = _demo_public(overview)
                 self._send_json(overview)
             except ValueError as exc:
-                status = 400 if exc.__class__.__name__ == "InvalidCaseId" else 500
+                status = (400 if exc.__class__.__name__ in
+                          ("InvalidCaseId", "InvalidAsOf") else 500)
                 self._send_json({"error": str(exc)}, status)
             except Exception as exc:  # noqa: BLE001 - report a useful message
                 self._send_json({"error": "%s: %s"

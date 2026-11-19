@@ -243,13 +243,20 @@
 - [!] **双期影像比对**——**外部依赖：民用样区两期影像**。需要同一区域两期日期可信、
       许可明确、可配准的影像才能验；本机 `web/tiles` 只有单期（z11 一期快照）。
       另需按规则 4 批准界面。数据到位前不改代码
-- [!] **历史时点查询和快照**——**待界定范围（产品决策）**。2026-11-19 已把这条拆成
-      两问并给出推荐口径，见 [情报历史时点查询最小方案](goals/intel_asof_query_design.md)：
-      推荐「只读筛选」（用 `event_time` + `ingest_time` 筛现有记录，不重建派生结果），
-      文档含判定规则、接口形态、6 条验收与两个实现陷阱。
-      **硬边界已核实**：人工情报的状态历史不留档（撤销只改 `status` 并覆盖 `updated_at`），
-      所以「T 时刻是否 active」还原不了；要还原须另加只追加的状态日志。
-      影像侧「按采集时间投影」已是同一原则，不引第二套时间语义
+- [x] **历史时点查询（只读筛选）**（见 [最小方案](goals/intel_asof_query_design.md)）：
+      `IntelManager.overview(case_id, as_of=...)` 与 `GET /api/intel/overview?as_of=`。
+      判定：`ingest_time <= T`（存在性）+ `event_time <= T`（可见性）同时成立；
+      缺 `ingest_time` 的旧记录按"存在性未知"排除并在 `warnings` 里点名。
+      返回体新增 `as_of` / `as_of_applied` / `late_records_skipped` /
+      `manual_status_not_historical`；不传 `as_of` 时这些字段固定为
+      null/false/0/false，其余逐键不变。`as_of` 进缓存键，否则历史视图会拿到
+      当前视图算好的 `links`；历史视图不喂基线统计（`observe=False`），
+      免得筛选后的条数污染运行期分布。非法或未来 `as_of` 返回 400。
+      `tests/test_intel_as_of.py` 6 项 + 原 intel 用例 78 项通过；全量 858 passed。
+      **未做**：UI 入口（改 UI 须另批）；派生结果快照（B 类）
+- [-] **人工情报状态历史**——**已核实的硬边界**：撤销只改 `status` 并覆盖 `updated_at`，
+      「T 时刻是否 active」还原不了。要还原须给 `manual.py` 加只追加的状态日志，
+      属另立任务；当前按当前值呈现并标注 `manual_status_not_historical: true`
 - [!] **三维瓦片运行诊断与离线验证**——**外部依赖：代表性授权样本**。本机
       `web/` 下没有 `tiles3d/`（只有 `tiles/` 影像与 WSF3D，10651 个文件），
       印证了这一项缺的确实是样本而不是代码。`?diag=1`

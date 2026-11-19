@@ -32,6 +32,10 @@ class InvalidCaseId(ValueError):
     pass
 
 
+class InvalidAsOf(ValueError):
+    pass
+
+
 def _case_key(value: Any) -> str:
     text = str(value or "default")
     if not _CASE_RE.match(text) or ".." in text:
@@ -54,6 +58,40 @@ def _time(value: Any) -> Optional[datetime]:
         return parsed.astimezone(timezone.utc)
     except ValueError:
         return None
+
+
+def _parse_as_of(value: Any) -> Optional[datetime]:
+    """历史视图的参考时刻。缺省 = 当前视图；非法或未来时刻直接报错，
+    不静默改写成"现在"——那会把历史查询悄悄变成当前查询。"""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    moment = _time(text)
+    if moment is None:
+        raise InvalidAsOf("as_of must be ISO 8601")
+    if moment > datetime.now(timezone.utc):
+        raise InvalidAsOf("as_of must not be in the future")
+    return moment
+
+
+def _visible_at(record: Dict[str, Any], moment: datetime) -> Tuple[bool, str]:
+    """记录在 ``moment`` 时刻是否已可见。第二个返回值是排除原因，空串=可见。
+
+    两条都过才算：``ingest_time <= T``（那时还没入库的记录不可能被看到）、
+    ``event_time <= T``（事件还没发生的不算"当时掌握"）。缺 ``ingest_time``
+    的旧记录按"存在性未知"排除，而不是乐观放行。
+    """
+    event = _time(record.get("event_time"))
+    if event is not None and event > moment:
+        return False, "future_event"
+    # 缺 ingest_time（或写成了无法解析的值）一律按"存在性未知"排除：
+    # 旧缓存里确实有一批只写 event_time 的记录。
+    ingest = _time(record.get("ingest_time"))
+    if ingest is None:
+        return False, "unknown_ingest"
+    if ingest > moment:
+        return False, "late_ingest"
+    return True, ""
 
 
 def _haversine_km(lat1, lon1, lat2, lon2) -> float:
@@ -377,11 +415,13 @@ class IntelManager:
         except (OSError, ValueError):
             return None
 
-    def _baseline_block(self, items, profile):
+    def _baseline_block(self, items, profile, observe=True):
         """按网格统计情报条数，和历史基线比，列出偏离的网格。
 
         为什么按网格而不按"总量"：总量受案例大小与采集节奏影响，涨落几乎是
         采集行为的镜像；网格级才反映"某片区域忽然热起来了"。
+        历史视图传 ``observe=False``：基线是运行期间见过的分布，历史筛选后的
+        条数会把它污染成两套口径。
         """
         from .baseline import BaselineTracker
         from .convergence import cell_of, cell_size_for
@@ -401,6 +441,10 @@ class IntelManager:
         tracker = self._baseline_tracker
         if tracker is None:
             tracker = self._baseline_tracker = BaselineTracker()
+        if not observe:
+            return {"cells": len(counts), "anomalies": [],
+                    "baseline": tracker.snapshot(),
+                    "note": "历史视图不更新基线统计"}
         found = []
         # 顺序固定：同一次观察必须可复现（dict 顺序在 Py3.7+ 是插入序，
         # 但插入序取决于 items 顺序，这里再显式排序一次）。
@@ -416,8 +460,9 @@ class IntelManager:
             "baseline": tracker.snapshot(),
         }
 
-    def overview(self, case_id: str) -> dict:
+    def overview(self, case_id: str, as_of: Any = None) -> dict:
         case_id = _case_key(case_id)
+        moment = _parse_as_of(as_of)
         profile = self._profile(case_id)
         sources = self.sources.list()
         cache_stats = None
@@ -459,10 +504,40 @@ class IntelManager:
                 auto_records = [record for record in bundle.get("observations") or []
                                 if isinstance(record, dict)
                                 and record.get("status", "active") == "active"]
+        late_records_skipped = 0
+        if moment is not None:
+            reasons = {}
+            kept = []
+            for record in auto_records:
+                visible, why = _visible_at(record, moment)
+                if visible:
+                    kept.append(record)
+                else:
+                    reasons[why] = reasons.get(why, 0) + 1
+            late_records_skipped = reasons.get("late_ingest", 0)
+            skipped_unknown = reasons.get("unknown_ingest", 0)
+            skipped_future = reasons.get("future_event", 0)
+            auto_records = kept
+            if late_records_skipped:
+                warnings.append("as_of 视图排除 %d 条入库晚于参考时刻的记录"
+                                % late_records_skipped)
+            if skipped_unknown:
+                warnings.append("as_of 视图排除 %d 条缺 ingest_time 的旧记录"
+                                % skipped_unknown)
+            if skipped_future:
+                warnings.append("as_of 视图排除 %d 条事件晚于参考时刻的记录"
+                                % skipped_future)
         auto_items = [item for item in (_auto_item(record, source_names)
                                         for record in auto_records)
                       if item is not None]
         manual_records = self.manual.list(case_id, include_revoked=True)
+        if moment is not None:
+            # 人工情报只能判"当时是否已录入"（created_at <= T）；status 不留历史，
+            # 所以状态仍按当前值呈现，返回体里如实标注。
+            manual_records = [record for record in manual_records
+                              if (_time(record.get("created_at")) or
+                                  datetime.max.replace(tzinfo=timezone.utc))
+                              <= moment]
         manual_items = [_manual_item(record) for record in manual_records]
         active_manual = [item for item in manual_items
                          if item.get("status") == "active"]
@@ -524,8 +599,10 @@ class IntelManager:
             str((bundle or {}).get("hash") or ""),
             str((profile.to_dict() if profile else "")),
         ]).encode("utf-8")).hexdigest()[:16]
+        # as_of 必须进键：否则历史视图会拿到当前视图算好的 links。
         cache_key = (case_id, revision,
-                     datetime.now(timezone.utc).strftime("%Y%m%d%H"))
+                     datetime.now(timezone.utc).strftime("%Y%m%d%H"),
+                     moment.isoformat() if moment else "")
         cached = self._cache.get(cache_key)
         if cached is None:
             links = link_items(items, profile,
@@ -557,10 +634,16 @@ class IntelManager:
             "key_items": len(key_items),
             "convergence": len(events),
         }
-        return {
+        view = {
             "case_id": case_id,
             "generated_at": _now(),
             "revision": revision,
+            # 历史视图标记：调用方据此知道 items 已被筛选、links 是按筛选后
+            # 的集合重算的（不是当时算好的结论），revision 也不代表当时状态。
+            "as_of": moment.strftime("%Y-%m-%dT%H:%M:%SZ") if moment else None,
+            "as_of_applied": moment is not None,
+            "late_records_skipped": late_records_skipped,
+            "manual_status_not_historical": moment is not None and bool(manual_items),
             "profile": profile.to_dict() if profile else None,
             "pipeline": pipeline,
             "conflict_rule": {
@@ -590,7 +673,8 @@ class IntelManager:
             },
             # 基线异常：只输出"哪个网格的情报量偏离了平时"，不判定是否告警。
             # 判定交给调用方——同一组数字在不同任务下的含义完全不同。
-            "baseline": self._baseline_block(items, profile),
+            "baseline": self._baseline_block(items, profile,
+                                             observe=moment is None),
             "sources": sources,
             # 目标生命周期（五段式）。只读输出：写操作走 /api/intel/lifecycle。
             "lifecycle": {
@@ -604,3 +688,4 @@ class IntelManager:
             "ai": {"counts": ai_counts, "items": ai_items},
             "warnings": warnings,
         }
+        return view
