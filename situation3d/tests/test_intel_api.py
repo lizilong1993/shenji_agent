@@ -111,6 +111,23 @@ class IntelApiTest(unittest.TestCase):
         status, body = request(port, "/api/intel/job?case_id=../bad")
         self.assertEqual(status, 400)
 
+    def test_overview_as_of_parameter(self):
+        port = self._start("test")
+        status, body = request(
+            port, "/api/intel/overview?case_id=t1"
+                  "&as_of=2026-10-24T12:00:00Z")
+        self.assertEqual(status, 200)
+        self.assertTrue(body["as_of_applied"])
+        self.assertEqual(body["as_of"], "2026-10-24T12:00:00Z")
+
+        status, body = request(port, "/api/intel/overview?case_id=t1&as_of=bad")
+        self.assertEqual(status, 400)
+        self.assertIn("as_of", body["error"])
+
+        status, body = request(
+            port, "/api/intel/overview?case_id=t1&as_of=2099-01-01T00:00:00Z")
+        self.assertEqual(status, 400)
+
     def test_collect_is_read_only_in_demo_mode(self):
         port = self._start("demo")
         status, body = request(
