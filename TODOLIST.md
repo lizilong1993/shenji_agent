@@ -144,8 +144,8 @@
       另：`situation.js:660-661` 还有两行提到 `plot.track` 的注释，是已删设计的残留说明
       （那里实际计算 `systemOnlyLayers`，当前目录无 system 类型，逻辑空转但不致错）。
       两处行为缺陷已分别登记，旧注释随相关修复一起核对。
-- [!] **标绘图层重建时补齐要素提供者**。隔离远端可跑 JS 自检，待按规则 4 确认 Web 图层行为。
-- [!] **导入保留标绘的显式图层归属**。隔离远端可跑 JS 自检与浏览器验收，待按规则 4 确认 Web 导入行为。用非默认图层的导入导出往返验证。
+- [x] **标绘图层重建时补齐要素提供者**（`3d4fea0`）。`ensurePlotLayer` 改判 `subgroup`，重建分支上既有标绘层不再被拒；`plot_dynamic_test` 对应断言转正常断言并通过。
+- [x] **导入保留标绘的显式图层归属**（`3d4fea0`）。`situation.js` 导入校验改判 `subgroup`，TS 定义里显式 `plots[].layer` 不再被静默改回默认类别。验证只到源码级断言（`plot_dynamic_test` 检查 `.subgroup === '标绘'` 在场且 `.group === '标绘'` 消失）与 `Plotting.importAll` 往返；未做经 `situation.js` 入口的浏览器往返。
 - [-] **C** intelpipe worktree 清理：**核实后不存在这项**。`git worktree list --porcelain`
       只有一个工作树，`.git/worktrees` 不存在，`prune --dry-run` 无输出；
       `git branch -a --contains aa13be6` 显示 main 与 origin/feat/battle-timeline 都已含该提交。
